@@ -2,6 +2,7 @@ import os
 import re
 import base64
 import tempfile
+import requests
 from io import BytesIO
 from datetime import datetime
 
@@ -356,14 +357,25 @@ def generate():
         if not items:
             return jsonify({'success': False, 'error': 'No items found in packing list'}), 400
 
-        colour    = get_next_colour()
-        pdf_bytes_out = generate_labels(meta, items, colour)
-        pdf_b64   = base64.b64encode(pdf_bytes_out).decode('utf-8')
+        colour         = get_next_colour()
+        pdf_bytes_out  = generate_labels(meta, items, colour)
         label_filename = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
+
+        # Upload PDF to file.io — returns a one-click download link (expires after 1 download)
+        upload_resp = requests.post(
+            'https://file.io',
+            files={'file': (label_filename, pdf_bytes_out, 'application/pdf')},
+            data={'expires': '7d'},
+            timeout=30
+        )
+        upload_data = upload_resp.json()
+        if not upload_data.get('success'):
+            raise Exception('file.io upload failed: ' + str(upload_data))
+        file_url = upload_data['link']
 
         return jsonify({
             'success':   True,
-            'pdfBase64': pdf_b64,
+            'fileUrl':   file_url,
             'fileName':  label_filename,
             'jobNumber': meta['job_number'],
             'plNumber':  meta['pl_number'],

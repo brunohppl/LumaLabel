@@ -361,17 +361,33 @@ def generate():
         pdf_bytes_out  = generate_labels(meta, items, colour)
         label_filename = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
 
-        # Upload PDF to file.io — returns a one-click download link (expires after 1 download)
-        upload_resp = requests.post(
-            'https://file.io',
-            files={'file': (label_filename, pdf_bytes_out, 'application/pdf')},
-            data={'expires': '7d'},
-            timeout=30
-        )
-        upload_data = upload_resp.json()
-        if not upload_data.get('success'):
-            raise Exception('file.io upload failed: ' + str(upload_data))
-        file_url = upload_data['link']
+        # Upload PDF to file.io
+        file_url = None
+        try:
+            upload_resp = requests.post(
+                'https://file.io/?expires=7d',
+                files={'file': (label_filename, pdf_bytes_out, 'application/pdf')},
+                timeout=30
+            )
+            raw = upload_resp.text
+            if raw:
+                upload_data = upload_resp.json()
+                if upload_data.get('success'):
+                    file_url = upload_data.get('link') or upload_data.get('url')
+        except Exception as upload_err:
+            file_url = None
+
+        # Fallback: try 0x0.st if file.io fails
+        if not file_url:
+            try:
+                fallback_resp = requests.post(
+                    'https://0x0.st',
+                    files={'file': (label_filename, pdf_bytes_out, 'application/pdf')},
+                    timeout=30
+                )
+                file_url = fallback_resp.text.strip()
+            except:
+                file_url = 'PDF generated but upload failed — check server logs'
 
         return jsonify({
             'success':   True,

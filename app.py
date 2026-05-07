@@ -361,33 +361,40 @@ def generate():
         pdf_bytes_out  = generate_labels(meta, items, colour)
         label_filename = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
 
-        # Upload PDF to file.io
+        # Upload PDF to tmpfiles.org (free, no account needed, 60 day expiry)
         file_url = None
         try:
             upload_resp = requests.post(
-                'https://file.io/?expires=7d',
+                'https://tmpfiles.org/api/v1/upload',
                 files={'file': (label_filename, pdf_bytes_out, 'application/pdf')},
                 timeout=30
             )
-            raw = upload_resp.text
-            if raw:
-                upload_data = upload_resp.json()
-                if upload_data.get('success'):
-                    file_url = upload_data.get('link') or upload_data.get('url')
+            upload_data = upload_resp.json()
+            if upload_data.get('status') == 'success':
+                # tmpfiles returns URL like https://tmpfiles.org/1234/file.pdf
+                # convert to direct download URL
+                file_url = upload_data['data']['url'].replace(
+                    'tmpfiles.org/', 'tmpfiles.org/dl/'
+                )
         except Exception as upload_err:
             file_url = None
 
-        # Fallback: try 0x0.st if file.io fails
+        # Fallback: try gofile.io
         if not file_url:
             try:
-                fallback_resp = requests.post(
-                    'https://0x0.st',
+                # Get upload server first
+                server_resp = requests.get('https://api.gofile.io/servers', timeout=10)
+                server = server_resp.json()['data']['servers'][0]['name']
+                upload_resp = requests.post(
+                    f'https://{server}.gofile.io/contents/uploadfile',
                     files={'file': (label_filename, pdf_bytes_out, 'application/pdf')},
                     timeout=30
                 )
-                file_url = fallback_resp.text.strip()
+                upload_data = upload_resp.json()
+                if upload_data.get('status') == 'ok':
+                    file_url = upload_data['data']['downloadPage']
             except:
-                file_url = 'PDF generated but upload failed — check server logs'
+                file_url = 'Upload failed — please check Render logs'
 
         return jsonify({
             'success':   True,

@@ -493,24 +493,43 @@ generateBtn.addEventListener('click', async () => {
       body: JSON.stringify({ pdfBase64: base64, fileName: selectedFile.name })
     });
 
-    const data = await response.json();
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Generation failed');
+    }
 
-    if (!data.success) throw new Error(data.error || 'Generation failed');
+    // Read metadata from response headers
+    const jobNumber  = response.headers.get('X-Job-Number')  || '—';
+    const itemCount  = response.headers.get('X-Item-Count')  || '—';
+    const colour     = response.headers.get('X-Colour')      || '—';
+    const address    = response.headers.get('X-Address')     || '—';
+    const stageDate  = response.headers.get('X-Stage-Date')  || '—';
 
-    // Show success
-    statusTitle.textContent = 'Labels Ready';
+    // Get filename from Content-Disposition header
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const nameMatch   = disposition.match(/filename="([^"]+)"/);
+    const pdfFilename = nameMatch ? nameMatch[1] : 'LUMA_Labels.pdf';
+
+    // Trigger browser download directly
+    const blob = await response.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = pdfFilename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+    // Show success summary
+    statusTitle.textContent = 'Labels Downloaded';
     statusBody.innerHTML = `
       <div class="meta-grid">
-        <div class="meta-item"><span class="meta-label">Job</span><span class="meta-value">${data.jobNumber || '—'}</span></div>
-        <div class="meta-item"><span class="meta-label">Items</span><span class="meta-value">${data.itemCount} labels</span></div>
-        <div class="meta-item"><span class="meta-label">Date</span><span class="meta-value">${data.stageDate || '—'}</span></div>
-        <div class="meta-item"><span class="meta-label">Colour</span><span class="meta-value">${data.colour || '—'}</span></div>
-        <div class="meta-item" style="grid-column:1/-1"><span class="meta-label">Address</span><span class="meta-value">${data.address || '—'}</span></div>
+        <div class="meta-item"><span class="meta-label">Job</span><span class="meta-value">${jobNumber}</span></div>
+        <div class="meta-item"><span class="meta-label">Items</span><span class="meta-value">${itemCount} labels</span></div>
+        <div class="meta-item"><span class="meta-label">Date</span><span class="meta-value">${stageDate}</span></div>
+        <div class="meta-item"><span class="meta-label">Colour</span><span class="meta-value">${colour}</span></div>
+        <div class="meta-item" style="grid-column:1/-1"><span class="meta-label">Address</span><span class="meta-value">${address}</span></div>
       </div>
-      <a class="btn-download" href="${data.fileUrl}" target="_blank" rel="noopener">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M7 9L4 6M7 9l3-3M1 11h12v2H1z" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Download Labels PDF
-      </a>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:8px;">PDF downloaded to your device — print on Avery 89x62-R label sheets.</div>
     `;
     statusEl.className = 'status success';
 

@@ -2,12 +2,11 @@ import os
 import re
 import base64
 import tempfile
-import requests
 from io import BytesIO
 from datetime import datetime
 
 import pdfplumber
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.lib import colors
@@ -370,52 +369,19 @@ def generate():
         pdf_bytes_out  = generate_labels(meta, items, colour)
         label_filename = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
 
-        # Upload PDF to tmpfiles.org (free, no account needed, 60 day expiry)
-        file_url = None
-        try:
-            upload_resp = requests.post(
-                'https://tmpfiles.org/api/v1/upload',
-                files={'file': (label_filename, pdf_bytes_out, 'application/pdf')},
-                timeout=30
-            )
-            upload_data = upload_resp.json()
-            if upload_data.get('status') == 'success':
-                # tmpfiles returns URL like https://tmpfiles.org/1234/file.pdf
-                # convert to direct download URL
-                file_url = upload_data['data']['url'].replace(
-                    'tmpfiles.org/', 'tmpfiles.org/dl/'
-                )
-        except Exception as upload_err:
-            file_url = None
-
-        # Fallback: try gofile.io
-        if not file_url:
-            try:
-                # Get upload server first
-                server_resp = requests.get('https://api.gofile.io/servers', timeout=10)
-                server = server_resp.json()['data']['servers'][0]['name']
-                upload_resp = requests.post(
-                    f'https://{server}.gofile.io/contents/uploadfile',
-                    files={'file': (label_filename, pdf_bytes_out, 'application/pdf')},
-                    timeout=30
-                )
-                upload_data = upload_resp.json()
-                if upload_data.get('status') == 'ok':
-                    file_url = upload_data['data']['downloadPage']
-            except:
-                file_url = 'Upload failed — please check Render logs'
-
-        return jsonify({
-            'success':   True,
-            'fileUrl':   file_url,
-            'fileName':  label_filename,
-            'jobNumber': meta['job_number'],
-            'plNumber':  meta['pl_number'],
-            'address':   meta['address'],
-            'stageDate': meta['stage_date'],
-            'itemCount': len(items),
-            'colour':    colour['name'],
-        })
+        # Send PDF directly to browser as a download — no third-party hosting needed
+        return Response(
+            pdf_bytes_out,
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename="{label_filename}"',
+                'X-Job-Number':  meta['job_number'],
+                'X-Item-Count':  str(len(items)),
+                'X-Colour':      colour['name'],
+                'X-Address':     meta['address'],
+                'X-Stage-Date':  meta['stage_date'],
+            }
+        )
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

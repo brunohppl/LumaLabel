@@ -336,6 +336,11 @@ def generate_labels(meta, items, colour):
 # ════════════════════════════════════════════════
 # API ROUTES
 # ════════════════════════════════════════════════
+@app.route('/', methods=['GET'])
+def index():
+    with open('templates/index.html', 'r') as f:
+        return f.read()
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok', 'service': 'LUMA Label Generator'})

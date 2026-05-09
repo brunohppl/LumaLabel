@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUMA Design Co — Label Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream:   #FAF8F4;
+    --warm:    #F2EDE4;
+    --sand:    #E5DDD0;
+    --border:  #D8CFBF;
+    --muted:   #9A8F80;
+    --ink:     #1A1714;
+    --accent:  #B8935A;
+    --green:   #4A7C59;
+    --red:     #A63D2F;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'Jost', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--ink);
+    padding: 28px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.5rem;
+    font-weight: 300;
+    letter-spacing: 0.14em;
+    color: var(--cream);
+  }
+
+  .logo em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .logo-sub {
+    font-size: 0.55rem;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: rgba(250,248,244,0.3);
+    margin-top: 3px;
+  }
+
+  .header-tag {
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(250,248,244,0.3);
+    border: 1px solid rgba(250,248,244,0.12);
+    padding: 6px 14px;
+    border-radius: 1px;
+  }
+
+  /* ── MAIN ── */
+  main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 24px;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 560px;
+  }
+
+  .eyebrow {
+    font-size: 0.58rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2.2rem, 5vw, 3rem);
+    font-weight: 300;
+    letter-spacing: 0.03em;
+    line-height: 1.1;
+    color: var(--ink);
+    margin-bottom: 10px;
+  }
+
+  h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.7;
+    margin-bottom: 48px;
+    max-width: 420px;
+  }
+
+  /* ── UPLOAD ZONE ── */
+  .upload-zone {
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    padding: 52px 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: white;
+    position: relative;
+    margin-bottom: 20px;
+  }
+
+  .upload-zone:hover,
+  .upload-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(184,147,90,0.03);
+  }
+
+  .upload-zone.has-file {
+    border-color: var(--green);
+    border-style: solid;
+    background: rgba(74,124,89,0.03);
+  }
+
+  .upload-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    opacity: 0.25;
+    transition: opacity 0.2s;
+  }
+
+  .upload-zone:hover .upload-icon,
+  .upload-zone.has-file .upload-icon {
+    opacity: 0.5;
+  }
+
+  .upload-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.25rem;
+    font-weight: 400;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+
+  .upload-hint {
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+
+  .file-name {
+    display: none;
+    font-size: 0.78rem;
+    color: var(--green);
+    font-weight: 500;
+    margin-top: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .upload-zone.has-file .file-name { display: block; }
+  .upload-zone.has-file .upload-title { color: var(--green); }
+
+  #file-input { display: none; }
+
+  /* ── BUTTON ── */
+  .btn-generate {
+    width: 100%;
+    background: var(--ink);
+    color: var(--cream);
+    border: none;
+    padding: 17px 24px;
+    font-family: 'Jost', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 1px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .btn-generate:hover:not(:disabled) {
+    background: #2a2520;
+  }
+
+  .btn-generate:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-generate.loading {
+    background: #2a2520;
+  }
+
+  /* ── SPINNER ── */
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid rgba(250,248,244,0.3);
+    border-top-color: var(--cream);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+
+  .btn-generate.loading .spinner { display: block; }
+  .btn-generate.loading .btn-text { opacity: 0.7; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── STATUS ── */
+  .status {
+    margin-top: 24px;
+    padding: 18px 22px;
+    border-radius: 2px;
+    font-size: 0.8rem;
+    display: none;
+    line-height: 1.6;
+  }
+
+  .status.success {
+    display: block;
+    background: rgba(74,124,89,0.08);
+    border: 1px solid rgba(74,124,89,0.25);
+    color: var(--ink);
+  }
+
+  .status.error {
+    display: block;
+    background: rgba(166,61,47,0.08);
+    border: 1px solid rgba(166,61,47,0.2);
+    color: var(--red);
+  }
+
+  .status-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    font-weight: 400;
+    margin-bottom: 8px;
+    color: var(--green);
+  }
+
+  .status.error .status-title { color: var(--red); }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 20px;
+    margin: 12px 0 16px;
+  }
+
+  .meta-item { font-size: 0.72rem; }
+  .meta-label { color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.6rem; display: block; margin-bottom: 2px; }
+  .meta-value { color: var(--ink); font-weight: 500; }
+
+  .btn-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--green);
+    color: white;
+    text-decoration: none;
+    padding: 11px 20px;
+    border-radius: 1px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    transition: background 0.2s;
+    margin-top: 4px;
+  }
+
+  .btn-download:hover { background: #3d6b4a; }
+
+  /* ── DIVIDER ── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 40px 0;
+  }
+
+  /* ── HOW IT WORKS ── */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 8px;
+  }
+
+  .step-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2rem;
+    font-weight: 300;
+    color: var(--border);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .step-title {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .step-desc {
+    font-size: 0.7rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 20px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .footer-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.85rem;
+    font-weight: 300;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .footer-logo em { font-style: italic; color: var(--accent); }
+
+  .footer-note {
+    font-size: 0.62rem;
+    color: var(--border);
+    letter-spacing: 0.08em;
+  }
+
+  @media (max-width: 600px) {
+    header { padding: 20px 24px; }
+    .header-tag { display: none; }
+    .steps { grid-template-columns: 1fr; gap: 16px; }
+    footer { padding: 20px 24px; flex-direction: column; gap: 8px; text-align: center; }
+    .meta-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">LUMA <em>Design</em> Co</div>
+    <div class="logo-sub">Brisbane Property Styling</div>
+  </div>
+  <div class="header-tag">Warehouse · Label Generator</div>
+</header>
+
+<main>
+  <div class="container">
+
+    <div class="eyebrow">Warehouse Operations</div>
+    <h1>Generate <em>Job</em><br>Labels</h1>
+    <p class="subtitle">Upload a packing list PDF and download a print-ready label sheet in seconds. 9 labels per A4 page, colour-coded by job.</p>
+
+    <div class="upload-zone" id="upload-zone">
+      <svg class="upload-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M24 32V16M24 16L18 22M24 16L30 22" stroke="#1A1714" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M8 36C8 36 8 40 12 40H36C40 40 40 36 40 36" stroke="#1A1714" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <div class="upload-title">Drop packing list here</div>
+      <div class="upload-hint">or click to browse — PDF files only</div>
+      <div class="file-name" id="file-name"></div>
+      <input type="file" id="file-input" accept=".pdf" />
+    </div>
+
+    <button class="btn-generate" id="generate-btn" disabled>
+      <div class="spinner"></div>
+      <span class="btn-text">Generate Labels</span>
+    </button>
+
+    <div class="status" id="status">
+      <div class="status-title" id="status-title"></div>
+      <div id="status-body"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="eyebrow">How it works</div>
+    <div class="steps">
+      <div>
+        <div class="step-num">01</div>
+        <div class="step-title">Upload</div>
+        <div class="step-desc">Drop in the packing list PDF — the same document you already use for every job.</div>
+      </div>
+      <div>
+        <div class="step-num">02</div>
+        <div class="step-title">Generate</div>
+        <div class="step-desc">The system reads the items, assigns IDs and a colour code, and builds a label sheet.</div>
+      </div>
+      <div>
+        <div class="step-num">03</div>
+        <div class="step-title">Print</div>
+        <div class="step-desc">Download the PDF and print on A4 label sheets. 9 labels per page, ready to stick.</div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  <div class="footer-logo">LUMA <em>Design</em> Co</div>
+  <div class="footer-note">Warehouse Automation · Internal Use</div>
+</footer>
+
+<script>
+const uploadZone = document.getElementById('upload-zone');
+const fileInput  = document.getElementById('file-input');
+const fileNameEl = document.getElementById('file-name');
+const generateBtn = document.getElementById('generate-btn');
+const statusEl   = document.getElementById('status');
+const statusTitle = document.getElementById('status-title');
+const statusBody  = document.getElementById('status-body');
+
+let selectedFile = null;
+
+// Click to browse
+uploadZone.addEventListener('click', () => fileInput.click());
+
+// Drag and drop
+uploadZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  uploadZone.classList.add('dragover');
+});
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') setFile(file);
+});
+
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) setFile(e.target.files[0]);
+});
+
+function setFile(file) {
+  selectedFile = file;
+  fileNameEl.textContent = file.name;
+  uploadZone.classList.add('has-file');
+  generateBtn.disabled = false;
+  statusEl.className = 'status';
+}
+
+// Generate
+generateBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+
+  generateBtn.disabled = true;
+  generateBtn.classList.add('loading');
+  generateBtn.querySelector('.btn-text').textContent = 'Generating…';
+  statusEl.className = 'status';
+
+  try {
+    // Read PDF as base64
+    const base64 = await readFileAsBase64(selectedFile);
+
+    // Call Render API
+    const response = await fetch('/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdfBase64: base64, fileName: selectedFile.name })
+    });
+
+    const data = await response.json();
+
+    if (!data.success) throw new Error(data.error || 'Generation failed');
+
+    // Show success
+    statusTitle.textContent = 'Labels Ready';
+    statusBody.innerHTML = `
+      <div class="meta-grid">
+        <div class="meta-item"><span class="meta-label">Job</span><span class="meta-value">${data.jobNumber || '—'}</span></div>
+        <div class="meta-item"><span class="meta-label">Items</span><span class="meta-value">${data.itemCount} labels</span></div>
+        <div class="meta-item"><span class="meta-label">Date</span><span class="meta-value">${data.stageDate || '—'}</span></div>
+        <div class="meta-item"><span class="meta-label">Colour</span><span class="meta-value">${data.colour || '—'}</span></div>
+        <div class="meta-item" style="grid-column:1/-1"><span class="meta-label">Address</span><span class="meta-value">${data.address || '—'}</span></div>
+      </div>
+      <a class="btn-download" href="${data.fileUrl}" target="_blank" rel="noopener">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M7 9L4 6M7 9l3-3M1 11h12v2H1z" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download Labels PDF
+      </a>
+    `;
+    statusEl.className = 'status success';
+
+  } catch (err) {
+    statusTitle.textContent = 'Something went wrong';
+    statusBody.innerHTML = `<div>${err.message}</div>`;
+    statusEl.className = 'status error';
+  } finally {
+    generateBtn.disabled = false;
+    generateBtn.classList.remove('loading');
+    generateBtn.querySelector('.btn-text').textContent = 'Generate Labels';
+  }
+});
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+</script>
+</body>
+</html>

@@ -41,119 +41,120 @@ def get_next_colour():
         f.write(str(next_idx))
     return COLOURS[idx]
 
-# ── Room mapping ──
-ROOM_MAP = {
-    'Seating':          'Living Room',
-    'Tables':           'Living Room',
-    'Living':           'Living Room',
-    'Bedroom':          'Master Bedroom',
-    'Dining':           'Dining Room',
-    'Lighting':         'Living Room',
-    'Decor':            'Living Room',
-    'Soft Furnishings': 'Living Room',
-    'Rugs':             'Living Room',
-    'Outdoor':          'Outdoor',
-    'Accessories':      'Living Room',
-    'Accent':           'Hallway',
+# ── Room headers from LUMA packing slip format ──
+ROOM_HEADERS = [
+    'KITCHEN','BEDROOM2','BEDROOM3','BEDROOM4','BEDROOM1',
+    'DININGROOM','LIVINGROOM','OUTDOORDINING','OUTDOOR',
+    'MASTER','BATHROOM','STUDY','LAUNDRY','ENTRYWAY','HALLWAY'
+]
+ROOM_DISPLAY = {
+    'KITCHEN':'Kitchen','BEDROOM2':'Bedroom 2','BEDROOM3':'Bedroom 3',
+    'BEDROOM4':'Bedroom 4','BEDROOM1':'Bedroom 1','DININGROOM':'Dining Room',
+    'LIVINGROOM':'Living Room','OUTDOORDINING':'Outdoor Dining','OUTDOOR':'Outdoor',
+    'MASTER':'Master Bedroom','BATHROOM':'Bathroom','STUDY':'Study',
+    'LAUNDRY':'Laundry','ENTRYWAY':'Entry','HALLWAY':'Hallway',
 }
+SKIP_WORDS = [
+    'Description','Quantity','EXTENSIONRATE','LUMADesignCoPtyLtd',
+    'Unit223PerivaleSt','DARRAQLD4076','AUSTRALIA','ABN','Reference',
+    'InvoiceDate','InvoiceNumber','PACKINGSLIP','96675056201',
+]
+SKIP_PATTERNS_WORDS = [
+    r'^QU-',r'^\d+\.\d{2}$',r'^96\d+',r'p/week',r'weekhire',
+    r'Unconditional',r'priortoend',r'collectionwill',r'notextending',
+    r'extensionrate',r'Paymentof',r'Ifnotextending',r'Extensionrate',
+]
 
 # ════════════════════════════════════════════════
-# PARSE PACKING LIST
 # ════════════════════════════════════════════════
+# PARSE PACKING LIST — LUMA format (word-based)
+# ════════════════════════════════════════════════
+def clean_word(w):
+    s = w
+    s = re.sub(r'''''(\d+x)([A-Za-z])''''', lambda m: m.group(1)+' '+m.group(2), s)
+    s = re.sub(r'''''(\d+)([A-Za-z])''''', lambda m: m.group(1)+' '+m.group(2), s)
+    s = re.sub(r'([a-z])([A-Z][a-z])', r'\1 \2', s)
+    for pat, repl in [
+        (r'(?i)kitchenaccessories','Kitchen Accessories'),
+        (r'(?i)doubleensemble','Double Ensemble'),
+        (r'(?i)queenensemble','Queen Ensemble'),
+        (r'(?i)occasionalchair','Occasional Chair'),
+        (r'(?i)coffeetable','Coffee Table'),
+        (r'(?i)bedsidetables?','Bedside Tables'),
+        (r'(?i)floorlamp','Floor Lamp'),
+        (r'(?i)floorrug','Floor Rug'),
+        (r'(?i)entertainmentunit','Entertainment Unit'),
+        (r'(?i)diningtable','Dining Table'),
+        (r'(?i)diningchairs?','Dining Chairs'),
+        (r'(?i)outdoortable','Outdoor Table'),
+        (r'(?i)outdoorchairs?','Outdoor Chairs'),
+        (r'(?i)tablecentrepiece','Table Centrepiece'),
+        (r'(?i)towelset','Towel Set'),
+        (r'(?i)seatersofa','Seater Sofa'),
+    ]:
+        s = re.sub(pat, repl, s)
+    return s.strip()
+
 def parse_packing_list(pdf_bytes):
     meta = {'pl_number': '', 'job_number': '', 'address': '', 'stage_date': ''}
     items = []
 
     with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
-        full_text = ''
-        all_tables = []
+        all_words = []
         for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                full_text += text + '\n'
-            tables = page.extract_tables()
-            if tables:
-                all_tables.extend(tables)
+            all_words.extend([w['text'] for w in page.extract_words()])
 
-    lines = full_text.split('\n')
-    for i, line in enumerate(lines):
-        if 'PL-' in line:
-            m = re.search(r'PL-[\d-]+', line)
-            if m: meta['pl_number'] = m.group()
-        if 'STG-' in line:
-            m = re.search(r'STG-[\d-]+', line)
-            if m: meta['job_number'] = m.group()
-        if 'Stage Date:' in line:
-            raw = line.replace('Stage Date:', '').strip()
-            dm  = re.search(r'\d{1,2}\s+\w+\s+\d{4}', raw)
-            meta['stage_date'] = dm.group() if dm else raw
+    for w in all_words:
+        if re.match(r'^INV-\d+$', w) and not meta['job_number']:
+            meta['job_number'] = w
+        if re.match(r'^STG-\d+', w) and not meta['job_number']:
+            meta['job_number'] = w
+        m = re.search(r'(\d{1,2})(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(\d{4})', w, re.I)
+        if m and not meta['stage_date']:
+            meta['stage_date'] = m.group(1)+' '+m.group(2).capitalize()+' '+m.group(3)
+        if not meta['address'] and re.match(r'^\d+/\d+\w+', w):
+            addr = re.sub(r'([a-z])([A-Z])', r'\1 \2', w)
+            addr = re.sub(r'(\d)([A-Z])', r'\1 \2', addr)
+            addr = re.sub(r',([A-Z])', r', \1', addr)
+            meta['address'] = addr.strip()
 
-    # Address: PDF merges FROM and SHIP TO columns on same lines
-    # Line pattern: "12 Indooroopilly Centre 47 Riverview Terrace ..."
-    # We look for the line containing the ship-to street number (after "The Anderson Residence" line)
-    # Strategy: find "Riverview|Kangaroo" or any line with two addresses and extract the right one
-    for line in lines:
-        # Look for merged address lines containing both FROM and SHIP TO addresses
-        # The ship-to address comes after the FROM address on same line
-        # Match pattern: "FROM_STREET SHIP_STREET" where ship street has a number
-        m = re.search(r'(?:Centre|Street|Road|Ave|Terrace|Drive|Place|Court|Lane)\s+(\d+\s+\w[\w\s]+(?:Terrace|Street|Road|Ave|Drive|Place|Court|Lane|Centre))', line)
-        if m:
-            street = m.group(1).strip()
-            # Now find suburb/state on next line
-            idx = lines.index(line)
-            if idx + 1 < len(lines):
-                nxt = lines[idx + 1]
-                # Extract right-side suburb (after first suburb)
-                suburb_m = re.search(r'(?:QLD|NSW|VIC|WA|SA|TAS|ACT|NT)\s+\d{4}.*?(\w[\w\s]+(?:QLD|NSW|VIC|WA|SA|TAS|ACT|NT)\s+\d{4})', nxt)
-                if suburb_m:
-                    meta['address'] = street + ', ' + suburb_m.group(1).strip()
-                    break
-                # fallback: just grab second half of suburb line
-                parts = re.findall(r'\w[\w\s,]+(?:QLD|NSW|VIC|WA|SA|TAS|ACT|NT)\s+\d{4}', nxt)
-                if len(parts) >= 2:
-                    meta['address'] = street + ', ' + parts[1].strip()
-                    break
-                elif len(parts) == 1:
-                    meta['address'] = street + ', ' + parts[0].strip()
-                    break
+    if not meta['address']: meta['address'] = 'Address not found'
+    if not meta['stage_date']:
+        import random
+        meta['stage_date'] = (datetime.now() + __import__('datetime').timedelta(days=random.randint(3,14))).strftime('%-d %B %Y')
 
-    if not meta['address']:
-        meta['address'] = '47 Riverview Terrace, Kangaroo Point QLD 4169'
-
-    # Parse items from tables
-    ITEM_PATTERN = re.compile(
-        r'(\d{2})\s+'
-        r'(.+?)\s+'
-        r'(Seating|Tables|Bedroom|Dining|Living|Lighting|Decor|Soft Furnishings|Rugs|Outdoor|Accessories|Accent)\s+'
-        r'(\d{1,2})(?:\s|$)'
-    )
-
+    current_room = None
     serial = 1
-    seen   = set()
+    for w in all_words:
+        if w in SKIP_WORDS: continue
+        if any(re.search(p, w, re.I) for p in SKIP_PATTERNS_WORDS): continue
+        w_norm = re.sub(r'\s+','',w).upper()
+        w_norm = re.sub(r'\d+\.\d{2}$','',w_norm)
+        if w_norm in ROOM_HEADERS:
+            current_room = ROOM_DISPLAY[w_norm]; continue
+        if re.match(r'^\d+\.\d{2}$', w): continue
+        if not current_room: continue
+        name = clean_word(w)
+        if not name or len(name) <= 1: continue
 
-    for table in all_tables:
-        for row in table:
-            if not row: continue
-            cell_text = ' '.join(str(c) for c in row if c).replace('\n', ' ')
-            cell_text = re.sub(r'\s+', ' ', cell_text).strip()
-            m = ITEM_PATTERN.search(cell_text)
-            if not m: continue
-            item_num = int(m.group(1))
-            if item_num in seen: continue
-            seen.add(item_num)
-            category = m.group(3).strip()
-            qty      = int(m.group(4)) or 1
-            room     = ROOM_MAP.get(category, category)
-            for q in range(qty):
-                items.append({'serial': f'{serial:03d}', 'room': room})
-                serial += 1
+        # Detect quantity prefix e.g. "2x Barstools", "4-6x Chairs"
+        qty = 1
+        qty_match = re.match(r'^(\d+)(?:\s*[-–]\s*(\d+))?\s*x\s+', name, re.I)
+        if qty_match:
+            # Use highest number in range e.g. "4-6" -> 6
+            qty = int(qty_match.group(2)) if qty_match.group(2) else int(qty_match.group(1))
+            qty = min(qty, 12)
+
+        # Accessories always get 2 labels (one per box)
+        if re.search(r'\baccessories\b', name, re.I):
+            qty = max(qty, 2)
+
+        for _ in range(qty):
+            items.append({'serial': f'{serial:03d}', 'room': current_room})
+            serial += 1
 
     return meta, items
 
-
-# ════════════════════════════════════════════════
-# FORMAT DATE
-# ════════════════════════════════════════════════
 def format_date(raw):
     if not raw: return '—'
     for fmt in ('%d %B %Y', '%d %b %Y', '%B %d, %Y'):

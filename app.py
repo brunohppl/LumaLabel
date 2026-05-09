@@ -176,14 +176,17 @@ def generate_labels(meta, items, colour):
     date_txt    = format_date(meta['stage_date'])
 
     PAGE_W, PAGE_H = A4
-    MARGIN_X = 0.7 * cm
-    MARGIN_Y = 1.2 * cm
-    GAP_X    = 0.35 * cm
-    GAP_Y    = 0.35 * cm
+    # Avery 89x62-R — exact dimensions from official Word template
+    # Label: 62mm wide x 89mm tall, 3 cols x 3 rows
+    # Both gaps equal at 4.99mm (283 DXA)
+    MARGIN_X = 0.921 * cm  # 9.21mm left margin
+    MARGIN_Y = 0.998 * cm  # 9.98mm top margin
+    GAP_X    = 0.499 * cm  # 4.99mm horizontal gap
+    GAP_Y    = 0.499 * cm  # 4.99mm vertical gap (same as horizontal)
     COLS     = 3
     ROWS     = 3
-    LBL_W    = (PAGE_W - 2 * MARGIN_X - (COLS - 1) * GAP_X) / COLS
-    LBL_H    = (PAGE_H - 2 * MARGIN_Y - (ROWS - 1) * GAP_Y) / ROWS
+    LBL_W    = 6.20  * cm  # 62mm wide
+    LBL_H    = 8.90  * cm  # 89mm tall
 
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -219,7 +222,7 @@ def generate_labels(meta, items, colour):
 
         # DATE — top
         date_size = 17
-        date_base = y + h - pad - 0.05 * cm
+        date_base = y + h - pad - 0.38 * cm
         c.setFillColor(C_INK)
         c.setFont('Helvetica-Bold', date_size)
         dw = c.stringWidth(date_txt, 'Helvetica-Bold', date_size)
@@ -232,17 +235,17 @@ def generate_labels(meta, items, colour):
         c.line(rx, div_y, rx_end, div_y)
 
         # Middle zone: ITEM NUMBER + ID + ROOM stacked and centred
-        addr_div_y = y + pad + 0.7 * cm
+        addr_div_y = y + pad + 0.9 * cm
         mid_centre = (div_y - 0.1 * cm + addr_div_y + 0.1 * cm) / 2
 
         lbl_size  = 5.5
         id_size   = 34
-        room_size = 11
+        room_size = 14
         room_txt  = item['room'].upper()
 
         c.setFont('Helvetica-Bold', room_size)
         if c.stringWidth(room_txt, 'Helvetica-Bold', room_size) > rw:
-            room_size = max(7, int(room_size * rw / c.stringWidth(room_txt, 'Helvetica-Bold', room_size)) - 1)
+            room_size = max(9, int(room_size * rw / c.stringWidth(room_txt, 'Helvetica-Bold', room_size)) - 1)
 
         gap     = 0.08 * cm
         block_h = (lbl_size * 0.4) + gap + (id_size * 0.75) + gap + (room_size * 0.75)
@@ -272,19 +275,19 @@ def generate_labels(meta, items, colour):
 
         # Address — two lines if needed
         addr      = meta['address']
-        addr_size = 8
+        addr_size = 9
         c.setFillColor(C_INK)
         c.setFont('Helvetica-Bold', addr_size)
 
         if c.stringWidth(addr, 'Helvetica-Bold', addr_size) <= rw:
             aw = c.stringWidth(addr, 'Helvetica-Bold', addr_size)
-            c.drawString(rx + (rw - aw) / 2, y + pad + 0.22 * cm, addr)
+            c.drawString(rx + (rw - aw) / 2, y + pad + 0.45 * cm, addr)
         else:
             parts   = addr.split(',', 1)
             line1   = parts[0].strip()
             line2   = parts[1].strip() if len(parts) > 1 else ''
-            addr_y2 = y + pad + 0.08 * cm
-            addr_y1 = addr_y2 + addr_size * 1.0
+            addr_y2 = y + pad + 0.20 * cm
+            addr_y1 = addr_y2 + addr_size * 1.1
             for ln, ay in [(line1, addr_y1), (line2, addr_y2)]:
                 lw = c.stringWidth(ln, 'Helvetica-Bold', addr_size)
                 c.drawString(rx + (rw - lw) / 2, ay, ln)
@@ -295,7 +298,7 @@ def generate_labels(meta, items, colour):
     pages    = (total + per_page - 1) // per_page
 
     for pg in range(pages):
-        c.setFillColor(HexColor('#F2EDE4'))
+        c.setFillColor(colors.white)
         c.rect(0, 0, PAGE_W, PAGE_H, fill=1, stroke=0)
 
         # Header

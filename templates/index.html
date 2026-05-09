@@ -517,9 +517,11 @@ generateBtn.addEventListener('click', async () => {
     a.href     = url;
     a.download = pdfFilename;
     a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    // Keep blob URL alive so the download button works
+    // Clean up after 10 minutes
+    setTimeout(() => URL.revokeObjectURL(url), 600000);
 
-    // Show success summary
+    // Show success summary with re-download button
     statusTitle.textContent = 'Labels Downloaded';
     statusBody.innerHTML = `
       <div class="meta-grid">
@@ -529,7 +531,11 @@ generateBtn.addEventListener('click', async () => {
         <div class="meta-item"><span class="meta-label">Colour</span><span class="meta-value">${colour}</span></div>
         <div class="meta-item" style="grid-column:1/-1"><span class="meta-label">Address</span><span class="meta-value">${address}</span></div>
       </div>
-      <div style="font-size:0.72rem;color:var(--muted);margin-top:8px;">PDF downloaded to your device — print on Avery 89x62-R label sheets.</div>
+      <a class="btn-download" href="${url}" download="${pdfFilename}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M7 9L4 6M7 9l3-3M1 11h12v2H1z" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download Labels PDF
+      </a>
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:10px;">Print on Avery 89x62-R label sheets · 9 labels per page</div>
     `;
     statusEl.className = 'status success';
 

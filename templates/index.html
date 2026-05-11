@@ -296,6 +296,50 @@
 
   .btn-download:hover { background: #3d6b4a; }
 
+  /* ── DATE FIELD ── */
+  .date-field {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .date-field label {
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .date-input {
+    background: var(--warm);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 9px 12px;
+    color: var(--ink);
+    font-family: 'Jost', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 400;
+    outline: none;
+    transition: border-color 0.2s;
+    flex: 1;
+    max-width: 200px;
+  }
+  .date-input:focus { border-color: var(--accent); background: white; }
+
+  .date-hint {
+    font-size: 0.65rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+
   /* ── DIVIDER ── */
   .divider {
     height: 1px;
@@ -395,6 +439,12 @@
       <input type="file" id="file-input" accept=".pdf" />
     </div>
 
+    <div class="date-field">
+      <label>Installation Date</label>
+      <input type="date" class="date-input" id="install-date" />
+      <span class="date-hint">Optional — overrides PDF date</span>
+    </div>
+
     <button class="btn-generate" id="generate-btn" disabled>
       <div class="spinner"></div>
       <span class="btn-text">Generate Labels</span>
@@ -486,11 +536,18 @@ generateBtn.addEventListener('click', async () => {
     // Read PDF as base64
     const base64 = await readFileAsBase64(selectedFile);
 
+    // Get install date if entered
+    const installDate = document.getElementById('install-date').value;
+
     // Call Render API
     const response = await fetch('/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pdfBase64: base64, fileName: selectedFile.name })
+      body: JSON.stringify({
+        pdfBase64: base64,
+        fileName: selectedFile.name,
+        installDate: installDate || null
+      })
     });
 
     if (!response.ok) {

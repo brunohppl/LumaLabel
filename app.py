@@ -458,11 +458,20 @@ def generate():
         if not pdf_base64:
             return jsonify({'success': False, 'error': 'No pdfBase64 provided'}), 400
 
-        pdf_bytes = base64.b64decode(pdf_base64)
-        meta, items = parse_packing_list(pdf_bytes)
+        pdf_bytes    = base64.b64decode(pdf_base64)
+        install_date = data.get('installDate')  # optional override from web app
+        meta, items  = parse_packing_list(pdf_bytes)
 
         if not items:
             return jsonify({'success': False, 'error': 'No items found in packing list'}), 400
+
+        # Override stage date with user-entered install date if provided
+        if install_date:
+            try:
+                dt = datetime.strptime(install_date, '%Y-%m-%d')
+                meta['stage_date'] = dt.strftime('%-d %B %Y')
+            except:
+                pass  # keep whatever the parser found
 
         colour         = get_next_colour()
         pdf_bytes_out  = generate_labels(meta, items, colour)

@@ -2,6 +2,8 @@ import os
 import re
 import base64
 import tempfile
+import json
+import urllib.request
 from io import BytesIO
 from datetime import datetime
 
@@ -14,6 +16,57 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
 
 app = Flask(__name__)
+
+# ── Slack notification ──
+def notify_slack(meta, item_count, colour_name, label_filename):
+    """Post a notification to Slack when labels are generated.
+    Set SLACK_WEBHOOK_URL as an environment variable in Render."""
+    webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
+    if not webhook_url:
+        return  # Silently skip if not configured
+
+    colour_emoji = {
+        'Red': '🔴', 'Blue': '🔵', 'Green': '🟢',
+        'Yellow': '🟡', 'Purple': '🟣', 'Orange': '🟠', 'Pink': '🩷'
+    }.get(colour_name, '🏷️')
+
+    message = {
+        'username': 'Luma Warehouse',
+        'icon_emoji': ':package:',
+        'blocks': [
+            {
+                'type': 'header',
+                'text': {'type': 'plain_text', 'text': '🏷️  Labels Generated'}
+            },
+            {
+                'type': 'section',
+                'fields': [
+                    {'type': 'mrkdwn', 'text': f'*Job*\n`{meta["job_number"]}`'},
+                    {'type': 'mrkdwn', 'text': f'*Items*\n{item_count} labels'},
+                    {'type': 'mrkdwn', 'text': f'*Address*\n{meta["address"]}'},
+                    {'type': 'mrkdwn', 'text': f'*Date*\n{meta["stage_date"]}'},
+                    {'type': 'mrkdwn', 'text': f'*Colour*\n{colour_emoji} {colour_name}'},
+                    {'type': 'mrkdwn', 'text': f'*File*\n{label_filename}'},
+                ]
+            },
+            {
+                'type': 'context',
+                'elements': [{'type': 'mrkdwn', 'text': 'Generated via LUMA Warehouse · lumalabel.onrender.com'}]
+            }
+        ]
+    }
+
+    try:
+        data = json.dumps(message).encode('utf-8')
+        req  = urllib.request.Request(
+            webhook_url,
+            data=data,
+            headers={'Content-Type': 'application/json'}
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass  # Never let Slack failure break label generation
+
 
 # ── Colour cycle ──
 COLOURS = [
@@ -111,11 +164,57 @@ def parse_packing_list(pdf_bytes):
         m = re.search(r'(\d{1,2})(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(\d{4})', w, re.I)
         if m and not meta['stage_date']:
             meta['stage_date'] = m.group(1)+' '+m.group(2).capitalize()+' '+m.group(3)
-        if not meta['address'] and re.match(r'^\d+/\d+\w+', w):
-            addr = re.sub(r'([a-z])([A-Z])', r'\1 \2', w)
-            addr = re.sub(r'(\d)([A-Z])', r'\1 \2', addr)
-            addr = re.sub(r',([A-Z])', r', \1', addr)
-            meta['address'] = addr.strip()
+
+    # Extract address positionally — grab top-left area of page 1
+    # This handles all address formats: "1504/66 Hope St" and "47 Riverview Terrace"
+    if not meta['address']:
+        with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
+            page  = pdf.pages[0]
+            # Left 42% of page, below header (y>100), top third
+            box   = page.within_bbox((0, 100, page.width * 0.42, page.height * 0.32))
+            words = box.extract_words()
+
+            # Find the first word that looks like a street address:
+            # - starts with a number (47, 1504/66, Unit 2)
+            # - or is on a line that contains a number followed by street-like words
+            addr_lines = {}
+            for w in words:
+                y_bucket = round(w['top'] / 8) * 8  # group words on same line
+                if y_bucket not in addr_lines:
+                    addr_lines[y_bucket] = []
+                addr_lines[y_bucket].append(w['text'])
+
+            # Find first line starting with a number or apartment pattern
+            for y_pos in sorted(addr_lines.keys()):
+                line_text = ' '.join(addr_lines[y_pos])
+                # Skip header lines like "PACKING SLIP", "FROM", company names
+                if re.match(r'^(PACKING|FROM|SHIP|Luma|Interior|LUMA)', line_text, re.I):
+                    continue
+                # Match: starts with digits, optional slash, digits
+                if re.match(r'^\d', line_text):
+                    # Fix merged words
+                    addr = re.sub(r'([a-z])([A-Z])', r'\1 \2', line_text)
+                    addr = re.sub(r'(\d)([A-Z])', r'\1 \2', addr)
+                    addr = re.sub(r',([A-Z])', r', \1', addr)
+                    # Strip anything after "Invoic" or similar boilerplate
+                    addr = re.sub(r'\s*(Invoic|Invoice|INV-|QU-).*$', '', addr, flags=re.I).strip()
+
+                    # Check if next line has suburb/state info
+                    next_lines = [addr_lines[y] for y in sorted(addr_lines.keys()) if y > y_pos]
+                    if next_lines:
+                        next_text = ' '.join(next_lines[0])
+                        # Skip if next line is LUMA's own office address
+                        if re.search(r'Darra|Perivale|Indooroopilly', next_text, re.I):
+                            next_lines = next_lines[1:] if len(next_lines) > 1 else []
+                            if next_lines:
+                                next_text = ' '.join(next_lines[0])
+                        if re.search(r'QLD|NSW|VIC|WA|SA|TAS|ACT|NT|Brisbane|Sydney|Melbourne', next_text, re.I):
+                            # Only take suburb/postcode part — up to 4-digit postcode
+                            suburb_m = re.search(r'([\w\s]+(?:QLD|NSW|VIC|WA|SA|TAS|ACT|NT)[\s\d]+)', next_text, re.I)
+                            if suburb_m:
+                                addr = addr + ', ' + suburb_m.group(1).strip()
+                    meta['address'] = addr.strip()
+                    break
 
     if not meta['address']: meta['address'] = 'Address not found'
     if not meta['stage_date']:
@@ -368,6 +467,9 @@ def generate():
         colour         = get_next_colour()
         pdf_bytes_out  = generate_labels(meta, items, colour)
         label_filename = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
+
+        # Notify Slack (non-blocking — failure won't affect PDF delivery)
+        notify_slack(meta, len(items), colour['name'], label_filename)
 
         # Send PDF directly to browser as a download — no third-party hosting needed
         return Response(

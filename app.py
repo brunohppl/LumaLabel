@@ -295,6 +295,9 @@ def generate_labels(meta, items, colour):
     C_ACCENT = HexColor(colour_hex)
     C_WHITE  = colors.white
 
+    # Extract last 3 digits of invoice number for colour bar
+    inv_suffix = re.sub(r'\D', '', meta['job_number'])[-3:] if meta['job_number'] else ''
+
     def draw_label(x, y, item):
         w, h    = LBL_W, LBL_H
         pad     = 0.3 * cm
@@ -307,6 +310,28 @@ def generate_labels(meta, items, colour):
         c.setFillColor(C_ACCENT)
         c.roundRect(x, y, w * 0.45, h, 6, fill=1, stroke=0)
         c.rect(x + w * 0.45 - 6, y, 8, h, fill=1, stroke=0)
+
+        # Invoice suffix number — bold white, rotated 90° anti-clockwise, centred on colour bar
+        if inv_suffix:
+            bar_w = w * 0.45
+            bar_h = h
+            # Find font size that fits along the bar height with padding
+            inv_size = 42
+            c.setFont('Helvetica-Bold', inv_size)
+            while c.stringWidth(inv_suffix, 'Helvetica-Bold', inv_size) > bar_h - 0.4*cm and inv_size > 10:
+                inv_size -= 1
+            c.setFillColor(C_WHITE)
+            c.setFont('Helvetica-Bold', inv_size)
+            inv_w = c.stringWidth(inv_suffix, 'Helvetica-Bold', inv_size)
+            # Centre of colour bar
+            cx = x + bar_w / 2
+            cy = y + bar_h / 2
+            # Save state, translate to centre, rotate, draw centred
+            c.saveState()
+            c.translate(cx, cy)
+            c.rotate(-90)  # 90° clockwise
+            c.drawString(-inv_w / 2, -inv_size * 0.35, inv_suffix)
+            c.restoreState()
 
         # White block
         c.setFillColor(C_WHITE)

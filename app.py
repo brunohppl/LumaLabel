@@ -532,7 +532,7 @@ def generate_checklist(meta, items):
 
     # ── Header ──
     story.append(Paragraph('LUMA <font color="#B8935A">Design</font> Co', title_style))
-    story.append(Spacer(1, 6))
+    story.append(Spacer(1, 14))
     story.append(Paragraph('Warehouse Packing Checklist', sub_style))
     story.append(Spacer(1, 8))
 

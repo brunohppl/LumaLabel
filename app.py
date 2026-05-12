@@ -235,20 +235,40 @@ def parse_packing_list(pdf_bytes):
         name = clean_word(w)
         if not name or len(name) <= 1: continue
 
-        # Detect quantity prefix e.g. "2x Barstools", "4-6x Chairs"
+        # Detect quantity prefix e.g. "2x Barstools", "4-6x Chairs", "2xBedside"
         qty = 1
-        qty_match = re.match(r'^(\d+)(?:\s*[-–]\s*(\d+))?\s*x\s+', name, re.I)
+        qty_match = re.match(r'^(\d+)(?:\s*[-–]\s*(\d+))?\s*[xX]\s*', name)
         if qty_match:
             # Use highest number in range e.g. "4-6" -> 6
             qty = int(qty_match.group(2)) if qty_match.group(2) else int(qty_match.group(1))
             qty = min(qty, 12)
 
-        # Accessories always get 2 labels (one per box)
-        if re.search(r'\baccessories\b', name, re.I):
-            qty = max(qty, 2)
+        # Strip quantity prefix for clean description e.g. "2x Barstools", "2xBedside" -> clean name
+        _desc_raw = re.sub(r'^\d+(?:\s*[-–]\s*\d+)?\s*[xX]\s*', '', name).strip()
+        # Capitalise first letter only (preserve rest of casing)
+        description = _desc_raw[0].upper() + _desc_raw[1:] if _desc_raw else _desc_raw
+
+        # Accessories always get 2 labels — one per box
+        if re.search(r'\baccessories\b', description, re.I):
+            for _ in range(2):
+                items.append({'serial': f'{serial:03d}', 'room': current_room,
+                              'description': f'{description} (Box)'})
+                serial += 1
+            continue
+
+        # Artwork always gets 2 labels
+        if re.search(r'\bartwork\b', description, re.I):
+            qty = 2
+
+        # Ensemble items always get exactly 3 labels: mattress + 2x bed frame
+        if re.search(r'\bensemble\b', description, re.I):
+            for suffix in ['(Mattress)', '(Bed Frame)', '(Bed Frame)']:
+                items.append({'serial': f'{serial:03d}', 'room': current_room, 'description': f'{description} {suffix}'})
+                serial += 1
+            continue
 
         for _ in range(qty):
-            items.append({'serial': f'{serial:03d}', 'room': current_room})
+            items.append({'serial': f'{serial:03d}', 'room': current_room, 'description': description})
             serial += 1
 
     return meta, items
@@ -460,6 +480,153 @@ def generate_labels(meta, items, colour):
     return buffer.getvalue()
 
 
+
+# ════════════════════════════════════════════════
+# GENERATE CHECKLIST PDF
+# ════════════════════════════════════════════════
+def generate_checklist(meta, items):
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors as rl_colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        topMargin    = 1.2 * cm,
+        bottomMargin = 1.2 * cm,
+        leftMargin   = 1.2 * cm,
+        rightMargin  = 1.2 * cm,
+    )
+
+    C_INK    = HexColor('#1A1714')
+    C_MUTED  = HexColor('#9A8F80')
+    C_ACCENT = HexColor('#B8935A')
+    C_LIGHT  = HexColor('#F5F0E8')
+    C_BORDER = HexColor('#D8CFBF')
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle('title',
+        fontName='Helvetica-Bold', fontSize=20,
+        textColor=C_INK, spaceAfter=2)
+    sub_style = ParagraphStyle('sub',
+        fontName='Helvetica', fontSize=11,
+        textColor=C_MUTED, spaceAfter=2)
+    meta_style = ParagraphStyle('meta',
+        fontName='Helvetica-Bold', fontSize=10,
+        textColor=C_INK, spaceAfter=0)
+    cell_style = ParagraphStyle('cell',
+        fontName='Helvetica', fontSize=10,
+        textColor=C_INK, leading=13)
+    hdr_style = ParagraphStyle('hdr',
+        fontName='Helvetica-Bold', fontSize=10,
+        textColor=colors.white, alignment=TA_CENTER)
+    hdr_small_style = ParagraphStyle('hdr_small',
+        fontName='Helvetica-Bold', fontSize=9,
+        textColor=colors.white, alignment=TA_CENTER)
+
+    story = []
+
+    # ── Header ──
+    story.append(Paragraph('LUMA <font color="#B8935A">Design</font> Co', title_style))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph('Warehouse Packing Checklist', sub_style))
+    story.append(Spacer(1, 8))
+
+    # ── Meta row ──
+    inv_suffix = re.sub(r'\D', '', meta['job_number'])[-3:] if meta['job_number'] else meta['job_number']
+    meta_data = [
+        [
+            Paragraph(f'<b>Job Ref:</b> {inv_suffix}', meta_style),
+            Paragraph(f'<b>Address:</b> {meta["address"]}', meta_style),
+            Paragraph(f'<b>Installation Date:</b> {meta["stage_date"]}', meta_style),
+            Paragraph(f'<b>Total Items:</b> {len(items)}', meta_style),
+        ]
+    ]
+    meta_table = Table(meta_data, colWidths=['20%', '40%', '20%', '20%'])
+    meta_table.setStyle(TableStyle([
+        ('BACKGROUND',  (0,0), (-1,-1), C_LIGHT),
+        ('BOX',         (0,0), (-1,-1), 0.5, C_BORDER),
+        ('TOPPADDING',  (0,0), (-1,-1), 8),
+        ('BOTTOMPADDING',(0,0), (-1,-1), 8),
+        ('LEFTPADDING', (0,0), (-1,-1), 10),
+        ('RIGHTPADDING',(0,0), (-1,-1), 10),
+        ('VALIGN',      (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    story.append(meta_table)
+    story.append(Spacer(1, 10))
+
+    # ── Table header ──
+    col_widths = [1.1*cm, 3.8*cm, 5.0*cm, 5.1*cm, 1.8*cm, 1.9*cm]  # total ~18.7cm
+    headers = [
+        Paragraph('#', hdr_style),
+        Paragraph('Location', hdr_style),
+        Paragraph('Description', hdr_style),
+        Paragraph('Notes', hdr_style),
+        Paragraph('Packed', hdr_small_style),
+        Paragraph('Returned', hdr_small_style),
+    ]
+
+    rows = [headers]
+    for i, item in enumerate(items):
+        rows.append([
+            Paragraph(f'<b>{item["serial"]}</b>', ParagraphStyle('num',
+                fontName='Helvetica-Bold', fontSize=10,
+                textColor=C_ACCENT, alignment=TA_CENTER)),
+            Paragraph(item['room'], cell_style),
+            Paragraph(item.get('description', ''), cell_style),
+            Paragraph('', cell_style),   # notes — blank for writing
+            Paragraph('', cell_style),   # packed checkbox
+            Paragraph('', cell_style),   # returned checkbox
+        ])
+
+    table = Table(rows, colWidths=col_widths, repeatRows=1)
+    table.setStyle(TableStyle([
+        # Header row
+        ('BACKGROUND',   (0,0), (-1,0), C_INK),
+        ('TEXTCOLOR',    (0,0), (-1,0), colors.white),
+        ('FONTNAME',     (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE',     (0,0), (-1,0), 8),
+        ('TOPPADDING',   (0,0), (-1,0), 9),
+        ('BOTTOMPADDING',(0,0), (-1,0), 9),
+        # Data rows
+        ('FONTNAME',     (0,1), (-1,-1), 'Helvetica'),
+        ('FONTSIZE',     (0,1), (-1,-1), 10),
+        ('TOPPADDING',   (0,1), (-1,-1), 7),
+        ('BOTTOMPADDING',(0,1), (-1,-1), 7),
+        ('LEFTPADDING',  (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+        ('VALIGN',       (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN',        (0,0), (0,-1), 'CENTER'),
+        ('ALIGN',        (4,0), (5,-1), 'CENTER'),
+        # Alternating row colours
+        *[('BACKGROUND', (0,i), (-1,i), colors.white if i%2==1 else C_LIGHT)
+          for i in range(1, len(rows))],
+        # Grid
+        ('GRID',        (0,0), (-1,-1), 0.4, C_BORDER),
+        ('LINEBELOW',   (0,0), (-1,0), 1.0, C_INK),
+        # Checkbox columns
+        ('BOX',         (4,1), (4,-1), 0.5, C_BORDER),
+        ('BOX',         (5,1), (5,-1), 0.5, C_BORDER),
+    ]))
+
+    story.append(table)
+
+    # ── Footer ──
+    story.append(Spacer(1, 12))
+    story.append(Paragraph(
+        'LUMA Design Co  ·  lumadesignco.com.au  ·  Warehouse Automation',
+        ParagraphStyle('footer', fontName='Helvetica', fontSize=7,
+                       textColor=C_MUTED, alignment=TA_CENTER)
+    ))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
 # ════════════════════════════════════════════════
 # API ROUTES
 # ════════════════════════════════════════════════
@@ -471,6 +638,47 @@ def index():
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok', 'service': 'LUMA Label Generator'})
+
+
+@app.route('/checklist', methods=['POST'])
+def checklist():
+    try:
+        data        = request.get_json()
+        pdf_base64  = data.get('pdfBase64')
+        file_name   = data.get('fileName', 'packing_list.pdf')
+
+        if not pdf_base64:
+            return jsonify({'success': False, 'error': 'No pdfBase64 provided'}), 400
+
+        pdf_bytes    = base64.b64decode(pdf_base64)
+        install_date = data.get('installDate')
+        meta, items  = parse_packing_list(pdf_bytes)
+
+        if not items:
+            return jsonify({'success': False, 'error': 'No items found'}), 400
+
+        if install_date:
+            try:
+                dt = datetime.strptime(install_date, '%Y-%m-%d')
+                meta['stage_date'] = dt.strftime('%-d %B %Y')
+            except:
+                pass
+
+        checklist_bytes    = generate_checklist(meta, items)
+        checklist_filename = f'LUMA_Checklist_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
+
+        return Response(
+            checklist_bytes,
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename="{checklist_filename}"',
+                'X-Job-Number': meta['job_number'],
+                'X-Item-Count': str(len(items)),
+            }
+        )
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/generate', methods=['POST'])

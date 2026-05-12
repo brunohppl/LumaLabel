@@ -83,11 +83,13 @@ COLOURS = [
 COLOUR_INDEX_FILE = '/tmp/luma_colour_index.txt'
 
 def get_next_colour():
+    import random as _random
     try:
         with open(COLOUR_INDEX_FILE, 'r') as f:
             idx = int(f.read().strip())
     except:
-        idx = 0
+        # File missing = fresh start after restart — pick random to avoid always starting on Red
+        idx = _random.randint(0, len(COLOURS) - 1)
     next_idx = (idx + 1) % len(COLOURS)
     with open(COLOUR_INDEX_FILE, 'w') as f:
         f.write(str(next_idx))

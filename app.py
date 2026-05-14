@@ -262,6 +262,10 @@ def parse_packing_list(pdf_bytes):
         if re.search(r'\bartwork\b', description, re.I):
             qty = 2
 
+        # Linen and cushion items get (Bag) suffix
+        if re.search(r'\blinen\b|cushion', description, re.I):
+            description = description + ' (Bag)'
+
         # Ensemble items always get exactly 3 labels: mattress + 2x bed frame
         if re.search(r'\bensemble\b', description, re.I):
             for suffix in ['(Mattress)', '(Bed Frame)', '(Bed Frame)']:
@@ -272,6 +276,26 @@ def parse_packing_list(pdf_bytes):
         for _ in range(qty):
             items.append({'serial': f'{serial:03d}', 'room': current_room, 'description': description})
             serial += 1
+
+    # ── Add extras to fill last label page + ~10 blank labels ──
+    # Labels per page = 9 (3x3 Avery grid)
+    per_page = 9
+    current_count = len(items)
+    remainder = current_count % per_page
+    # Fill remainder of current page, then add one more full page worth
+    extras_to_fill = (per_page - remainder) % per_page   # slots left on current page
+    extras_count   = extras_to_fill + per_page            # fill page + one full extra page
+    # Keep it between 9 and 18 (1-2 pages worth)
+    extras_count = max(9, min(18, extras_count))
+
+    for i in range(extras_count):
+        items.append({
+            'serial':      f'{serial:03d}',
+            'room':        '',          # no location
+            'description': '',          # blank
+            'is_extra':    True,
+        })
+        serial += 1
 
     return meta, items
 
@@ -409,9 +433,10 @@ def generate_labels(meta, items, colour):
         id_w   = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
         c.drawString(rx + (rw - id_w) / 2, id_y, id_txt)
 
-        c.setFont('Helvetica-Bold', room_size)
-        rtw = c.stringWidth(room_txt, 'Helvetica-Bold', room_size)
-        c.drawString(rx + (rw - rtw) / 2, room_y, room_txt)
+        if room_txt:  # skip room text for blank extra labels
+            c.setFont('Helvetica-Bold', room_size)
+            rtw = c.stringWidth(room_txt, 'Helvetica-Bold', room_size)
+            c.drawString(rx + (rw - rtw) / 2, room_y, room_txt)
 
         # Divider above address
         c.setStrokeColor(C_BORDER)
@@ -538,84 +563,198 @@ def generate_checklist(meta, items):
     story.append(Paragraph('Warehouse Packing Checklist', sub_style))
     story.append(Spacer(1, 8))
 
-    # ── Meta row ──
+    # ── Header block: meta left, sign-off fields right ──
     inv_suffix = re.sub(r'\D', '', meta['job_number'])[-3:] if meta['job_number'] else meta['job_number']
-    meta_data = [
-        [
-            Paragraph(f'<b>Job Ref:</b> {inv_suffix}', meta_style),
-            Paragraph(f'<b>Address:</b> {meta["address"]}', meta_style),
-            Paragraph(f'<b>Installation Date:</b> {meta["stage_date"]}', meta_style),
-            Paragraph(f'<b>Total Items:</b> {len(items)}', meta_style),
-        ]
+
+    sign_style = ParagraphStyle('sign',
+        fontName='Helvetica-Bold', fontSize=10,
+        textColor=C_INK, spaceAfter=0)
+    line_style = ParagraphStyle('line',
+        fontName='Helvetica', fontSize=10,
+        textColor=C_MUTED, spaceAfter=0)
+
+    # Left: job details stacked
+    left_data = [
+        [Paragraph(f'<b>Job Ref:</b> {inv_suffix}', meta_style)],
+        [Paragraph(f'<b>Address:</b> {meta["address"]}', meta_style)],
+        [Paragraph(f'<b>Installation Date:</b> {meta["stage_date"]}', meta_style)],
+        [Paragraph(f'<b>Total Items:</b> {len(items)}', meta_style)],
     ]
-    meta_table = Table(meta_data, colWidths=['20%', '40%', '20%', '20%'])
-    meta_table.setStyle(TableStyle([
-        ('BACKGROUND',  (0,0), (-1,-1), C_LIGHT),
-        ('BOX',         (0,0), (-1,-1), 0.5, C_BORDER),
-        ('TOPPADDING',  (0,0), (-1,-1), 8),
-        ('BOTTOMPADDING',(0,0), (-1,-1), 8),
-        ('LEFTPADDING', (0,0), (-1,-1), 10),
-        ('RIGHTPADDING',(0,0), (-1,-1), 10),
-        ('VALIGN',      (0,0), (-1,-1), 'MIDDLE'),
+    left_table = Table(left_data, colWidths=[10.5*cm])
+    left_table.setStyle(TableStyle([
+        ('BACKGROUND',   (0,0), (-1,-1), C_LIGHT),
+        ('BOX',          (0,0), (-1,-1), 0.5, C_BORDER),
+        ('TOPPADDING',   (0,0), (-1,-1), 7),
+        ('BOTTOMPADDING',(0,0), (-1,-1), 7),
+        ('LEFTPADDING',  (0,0), (-1,-1), 10),
+        ('RIGHTPADDING', (0,0), (-1,-1), 10),
+        ('VALIGN',       (0,0), (-1,-1), 'MIDDLE'),
     ]))
-    story.append(meta_table)
+
+    # Right: simple two-line sign-off
+    right_data = [
+        [Paragraph('<b>Job Owner:</b>', sign_style)],
+        [Paragraph('<b>Transport Lead:</b>', sign_style)],
+    ]
+    right_table = Table(right_data, colWidths=[8.2*cm])
+    right_table.setStyle(TableStyle([
+        ('BACKGROUND',   (0,0), (-1,-1), colors.white),
+        ('BOX',          (0,0), (-1,-1), 0.5, C_BORDER),
+        ('TOPPADDING',   (0,0), (-1,-1), 9),
+        ('BOTTOMPADDING',(0,0), (-1,-1), 9),
+        ('LEFTPADDING',  (0,0), (-1,-1), 10),
+        ('RIGHTPADDING', (0,0), (-1,-1), 10),
+        ('VALIGN',       (0,0), (-1,-1), 'MIDDLE'),
+        ('LINEBELOW',    (0,0), (-1,0), 0.5, C_BORDER),
+    ]))
+
+    # Combine left and right side by side
+    header_row = [[left_table, right_table]]
+    header_table = Table(header_row, colWidths=[10.5*cm, 8.2*cm])
+    header_table.setStyle(TableStyle([
+        ('VALIGN',       (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING',  (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ('TOPPADDING',   (0,0), (-1,-1), 0),
+        ('BOTTOMPADDING',(0,0), (-1,-1), 0),
+    ]))
+    story.append(header_table)
     story.append(Spacer(1, 10))
 
-    # ── Table header ──
-    col_widths = [1.1*cm, 3.8*cm, 5.0*cm, 5.1*cm, 1.8*cm, 1.9*cm]  # total ~18.7cm
+    # ── Table — grouped by room section headers ──
+    # 4 columns: # | Description | Notes | Packed | Returned
+    col_widths = [1.1*cm, 6.5*cm, 7.2*cm, 1.8*cm, 1.9*cm]  # total ~18.5cm
+
     headers = [
         Paragraph('#', hdr_style),
-        Paragraph('Location', hdr_style),
+        Paragraph('Item', hdr_style),
         Paragraph('Description', hdr_style),
-        Paragraph('Notes', hdr_style),
         Paragraph('Packed', hdr_small_style),
         Paragraph('Returned', hdr_small_style),
     ]
 
+    # Group items by room preserving order
+    from itertools import groupby as _groupby
     rows = [headers]
-    for i, item in enumerate(items):
-        rows.append([
-            Paragraph(f'<b>{item["serial"]}</b>', ParagraphStyle('num',
-                fontName='Helvetica-Bold', fontSize=10,
-                textColor=C_ACCENT, alignment=TA_CENTER)),
-            Paragraph(item['room'], cell_style),
-            Paragraph(item.get('description', ''), cell_style),
-            Paragraph('', cell_style),   # notes — blank for writing
-            Paragraph('', cell_style),   # packed checkbox
-            Paragraph('', cell_style),   # returned checkbox
-        ])
-
-    table = Table(rows, colWidths=col_widths, repeatRows=1)
-    table.setStyle(TableStyle([
+    style_cmds = [
         # Header row
         ('BACKGROUND',   (0,0), (-1,0), C_INK),
         ('TEXTCOLOR',    (0,0), (-1,0), colors.white),
         ('FONTNAME',     (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE',     (0,0), (-1,0), 8),
+        ('FONTSIZE',     (0,0), (-1,0), 10),
         ('TOPPADDING',   (0,0), (-1,0), 9),
         ('BOTTOMPADDING',(0,0), (-1,0), 9),
-        # Data rows
-        ('FONTNAME',     (0,1), (-1,-1), 'Helvetica'),
-        ('FONTSIZE',     (0,1), (-1,-1), 10),
-        ('TOPPADDING',   (0,1), (-1,-1), 7),
-        ('BOTTOMPADDING',(0,1), (-1,-1), 7),
         ('LEFTPADDING',  (0,0), (-1,-1), 6),
         ('RIGHTPADDING', (0,0), (-1,-1), 6),
         ('VALIGN',       (0,0), (-1,-1), 'MIDDLE'),
         ('ALIGN',        (0,0), (0,-1), 'CENTER'),
-        ('ALIGN',        (4,0), (5,-1), 'CENTER'),
-        # Alternating row colours
-        *[('BACKGROUND', (0,i), (-1,i), colors.white if i%2==1 else C_LIGHT)
-          for i in range(1, len(rows))],
-        # Grid
-        ('GRID',        (0,0), (-1,-1), 0.4, C_BORDER),
-        ('LINEBELOW',   (0,0), (-1,0), 1.0, C_INK),
-        # Checkbox columns
-        ('BOX',         (4,1), (4,-1), 0.5, C_BORDER),
-        ('BOX',         (5,1), (5,-1), 0.5, C_BORDER),
-    ]))
+        ('ALIGN',        (3,0), (4,-1), 'CENTER'),
+        ('GRID',         (0,0), (-1,-1), 0.4, C_BORDER),
+        ('LINEBELOW',    (0,0), (-1,0), 1.0, C_INK),
+    ]
 
+    room_section_style = ParagraphStyle('room_section',
+        fontName='Helvetica-Bold', fontSize=11,
+        textColor=colors.white)
+
+    data_row_idx = 1  # track row index for styling (1-based, row 0 = header)
+
+    for room, group in _groupby(items, key=lambda x: x['room']):
+        group_items = list(group)
+
+        # Room section header row — spans all columns
+        section_row = [
+            Paragraph(room.upper(), room_section_style),
+            '', '', '', ''
+        ]
+        rows.append(section_row)
+        style_cmds += [
+            ('BACKGROUND',   (0, data_row_idx), (-1, data_row_idx), C_ACCENT),
+            ('SPAN',         (0, data_row_idx), (-1, data_row_idx)),
+            ('TOPPADDING',   (0, data_row_idx), (-1, data_row_idx), 7),
+            ('BOTTOMPADDING',(0, data_row_idx), (-1, data_row_idx), 7),
+            ('LINEABOVE',    (0, data_row_idx), (-1, data_row_idx), 1.0, C_ACCENT),
+        ]
+        data_row_idx += 1
+
+        # Item rows for this room
+        for i, item in enumerate(group_items):
+            bg = colors.white if i % 2 == 0 else C_LIGHT
+            rows.append([
+                Paragraph(f'<b>{item["serial"]}</b>', ParagraphStyle('num',
+                    fontName='Helvetica-Bold', fontSize=10,
+                    textColor=C_ACCENT, alignment=TA_CENTER)),
+                Paragraph(item.get('description', ''), cell_style),
+                Paragraph('', cell_style),
+                Paragraph('', cell_style),
+                Paragraph('', cell_style),
+            ])
+            style_cmds += [
+                ('BACKGROUND',   (0, data_row_idx), (-1, data_row_idx), bg),
+                ('FONTNAME',     (0, data_row_idx), (-1, data_row_idx), 'Helvetica'),
+                ('FONTSIZE',     (0, data_row_idx), (-1, data_row_idx), 10),
+                ('TOPPADDING',   (0, data_row_idx), (-1, data_row_idx), 7),
+                ('BOTTOMPADDING',(0, data_row_idx), (-1, data_row_idx), 7),
+            ]
+            data_row_idx += 1
+
+    table = Table(rows, colWidths=col_widths, repeatRows=1)
+    table.setStyle(TableStyle(style_cmds))
     story.append(table)
+
+    # ── Extras section ──
+    extras = [item for item in items if item.get('is_extra')]
+    if extras:
+        story.append(Spacer(1, 14))
+        extras_rows = [headers]
+        extras_style_cmds = [
+            ('BACKGROUND',   (0,0), (-1,0), C_INK),
+            ('TEXTCOLOR',    (0,0), (-1,0), colors.white),
+            ('FONTNAME',     (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE',     (0,0), (-1,0), 10),
+            ('TOPPADDING',   (0,0), (-1,0), 9),
+            ('BOTTOMPADDING',(0,0), (-1,0), 9),
+            ('LEFTPADDING',  (0,0), (-1,-1), 6),
+            ('RIGHTPADDING', (0,0), (-1,-1), 6),
+            ('VALIGN',       (0,0), (-1,-1), 'MIDDLE'),
+            ('ALIGN',        (0,0), (0,-1), 'CENTER'),
+            ('ALIGN',        (3,0), (4,-1), 'CENTER'),
+            ('GRID',         (0,0), (-1,-1), 0.4, C_BORDER),
+            ('LINEBELOW',    (0,0), (-1,0), 1.0, C_INK),
+        ]
+
+        # Section header
+        extras_rows.append([Paragraph('EXTRAS', room_section_style), '', '', '', ''])
+        extras_style_cmds += [
+            ('BACKGROUND',   (0,1), (-1,1), C_ACCENT),
+            ('SPAN',         (0,1), (-1,1)),
+            ('TOPPADDING',   (0,1), (-1,1), 7),
+            ('BOTTOMPADDING',(0,1), (-1,1), 7),
+        ]
+        row_i = 2
+        for i, item in enumerate(extras):
+            bg = colors.white if i % 2 == 0 else C_LIGHT
+            extras_rows.append([
+                Paragraph(f'<b>{item["serial"]}</b>', ParagraphStyle('num2',
+                    fontName='Helvetica-Bold', fontSize=10,
+                    textColor=C_ACCENT, alignment=TA_CENTER)),
+                Paragraph('', cell_style),
+                Paragraph('', cell_style),
+                Paragraph('', cell_style),
+                Paragraph('', cell_style),
+            ])
+            extras_style_cmds += [
+                ('BACKGROUND',   (0, row_i), (-1, row_i), bg),
+                ('FONTNAME',     (0, row_i), (-1, row_i), 'Helvetica'),
+                ('FONTSIZE',     (0, row_i), (-1, row_i), 10),
+                ('TOPPADDING',   (0, row_i), (-1, row_i), 7),
+                ('BOTTOMPADDING',(0, row_i), (-1, row_i), 7),
+            ]
+            row_i += 1
+
+        extras_table = Table(extras_rows, colWidths=col_widths, repeatRows=1)
+        extras_table.setStyle(TableStyle(extras_style_cmds))
+        story.append(extras_table)
 
     # ── Footer ──
     story.append(Spacer(1, 12))

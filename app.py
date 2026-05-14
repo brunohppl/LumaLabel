@@ -1072,8 +1072,11 @@ def api_job_status(job_id):
 
 @app.route('/api/items/<item_id>/check', methods=['PATCH'])
 def api_item_check(item_id):
-    data   = request.get_json()
-    result = sb_patch('items', f'id=eq.{item_id}', {'checked': data['checked']})
+    data    = request.get_json()
+    payload = {}
+    if 'checked' in data: payload['checked'] = data['checked']
+    if 'notes'   in data: payload['notes']   = data['notes']
+    result = sb_patch('items', f'id=eq.{item_id}', payload)
     return jsonify({'success': bool(result)})
 
 @app.route('/api/jobs/<job_id>/items', methods=['POST'])

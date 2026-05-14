@@ -95,29 +95,90 @@ def get_next_colour():
         f.write(str(next_idx))
     return COLOURS[idx]
 
-# ── Room headers from LUMA packing slip format ──
-ROOM_HEADERS = [
-    'KITCHEN','BEDROOM2','BEDROOM3','BEDROOM4','BEDROOM1',
-    'DININGROOM','LIVINGROOM','OUTDOORDINING','OUTDOOR',
-    'MASTER','BATHROOM','STUDY','LAUNDRY','ENTRYWAY','HALLWAY'
-]
-ROOM_DISPLAY = {
-    'KITCHEN':'Kitchen','BEDROOM2':'Bedroom 2','BEDROOM3':'Bedroom 3',
-    'BEDROOM4':'Bedroom 4','BEDROOM1':'Bedroom 1','DININGROOM':'Dining Room',
-    'LIVINGROOM':'Living Room','OUTDOORDINING':'Outdoor Dining','OUTDOOR':'Outdoor',
-    'MASTER':'Master Bedroom','BATHROOM':'Bathroom','STUDY':'Study',
-    'LAUNDRY':'Laundry','ENTRYWAY':'Entry','HALLWAY':'Hallway',
-}
+# ── Room headers detected dynamically — no hardcoded list needed ──
 SKIP_WORDS = [
     'Description','Quantity','EXTENSIONRATE','LUMADesignCoPtyLtd',
     'Unit223PerivaleSt','DARRAQLD4076','AUSTRALIA','ABN','Reference',
     'InvoiceDate','InvoiceNumber','PACKINGSLIP','96675056201',
+    'EXTENSIONRATE',
 ]
 SKIP_PATTERNS_WORDS = [
     r'^QU-',r'^\d+\.\d{2}$',r'^96\d+',r'p/week',r'weekhire',
     r'Unconditional',r'priortoend',r'collectionwill',r'notextending',
     r'extensionrate',r'Paymentof',r'Ifnotextending',r'Extensionrate',
 ]
+
+def is_room_header(word, next_word):
+    """Detect room headers dynamically.
+    A word is a room header if:
+    - Its significant letters are uppercase (ignoring ordinals like 2nd, 3rd)
+    - The next word is a quantity like 1.00 or 2.00
+    """
+    import re as _re
+    # Next word must be a quantity
+    if not next_word or not _re.match(r'^\d+\.\d{2}$', next_word):
+        return False
+    # Strip leading ordinal prefix (2nd, 3rd etc.) before checking case
+    stripped = _re.sub(r'^\d+(st|nd|rd|th)', '', word, flags=_re.I)
+    letters_only = _re.sub(r'[^a-zA-Z]', '', stripped)
+    if not letters_only:
+        return False
+    # Must be all uppercase
+    return letters_only == letters_only.upper()
+
+def format_room_name(raw):
+    """Convert merged all-caps room names to readable format.
+    e.g. FRONTDECK -> Front Deck, MASTERBEDROOM -> Master Bedroom
+    """
+    import re as _re
+
+    # Handle leading digit prefix like '2nd'
+    prefix = ''
+    m = _re.match(r'^(\d+\w{0,2})(.*)', raw)
+    if m and _re.match(r'^\d', m.group(1)):
+        prefix = m.group(1) + ' '
+        raw = m.group(2)
+
+    # Insert spaces before known room word boundaries
+    BREAKS = ['OUTDOOR','LIVING','DINING','SITTING','MASTER','FRONT','BACK',
+              'LAUNDRY','KITCHEN','HALLWAY','HALLW','STUDY','ENTRY','GARAGE',
+              'PATIO','GARDEN','MEDIA','OFFICE','BEDROOM','BATHROOM','BATH',
+              'DECK','ROOM']
+    result = raw
+    for word in sorted(BREAKS, key=len, reverse=True):
+        result = _re.sub(f'({word})', r' \1', result, flags=_re.I)
+    result = result.strip()
+
+    # Title case
+    parts = (prefix + result).split()
+    titled = ' '.join(w.capitalize() for w in parts)
+
+    # Fix common joins
+    fixes = [
+        ('Bed Room', 'Bedroom'),
+        ('Bath Room', 'Bathroom'),
+        ('Hall Way', 'Hallway'),
+    ]
+    for wrong, right in fixes:
+        titled = titled.replace(wrong, right)
+
+    # Handle standalone room words that imply a full name
+    STANDALONE_MAP = {
+        'Master': 'Master Bedroom',
+        'Outdoor': 'Outdoor Area',
+        'Hallway': 'Hallway',
+        'Laundry': 'Laundry',
+        'Study': 'Study',
+        'Kitchen': 'Kitchen',
+        'Bathroom': 'Bathroom',
+    }
+    if titled in STANDALONE_MAP:
+        titled = STANDALONE_MAP[titled]
+
+    # Separate trailing digits: Bedroom2 -> Bedroom 2
+    titled = _re.sub(r'([A-Za-z])([0-9])', lambda m: m.group(1) + ' ' + m.group(2), titled)
+
+    return titled
 
 # ════════════════════════════════════════════════
 # ════════════════════════════════════════════════
@@ -225,13 +286,14 @@ def parse_packing_list(pdf_bytes):
 
     current_room = None
     serial = 1
-    for w in all_words:
+    for idx, w in enumerate(all_words):
         if w in SKIP_WORDS: continue
         if any(re.search(p, w, re.I) for p in SKIP_PATTERNS_WORDS): continue
-        w_norm = re.sub(r'\s+','',w).upper()
-        w_norm = re.sub(r'\d+\.\d{2}$','',w_norm)
-        if w_norm in ROOM_HEADERS:
-            current_room = ROOM_DISPLAY[w_norm]; continue
+        # Dynamic room header detection: all-caps word followed by quantity
+        next_w = all_words[idx + 1] if idx + 1 < len(all_words) else ''
+        if is_room_header(w, next_w):
+            current_room = format_room_name(w)
+            continue
         if re.match(r'^\d+\.\d{2}$', w): continue
         if not current_room: continue
         name = clean_word(w)
@@ -625,12 +687,16 @@ def generate_checklist(meta, items):
     # 4 columns: # | Description | Notes | Packed | Returned
     col_widths = [1.1*cm, 6.5*cm, 7.2*cm, 1.8*cm, 1.9*cm]  # total ~18.5cm
 
+    hdr_two_line = ParagraphStyle('hdr_two_line',
+        fontName='Helvetica-Bold', fontSize=8,
+        textColor=colors.white, alignment=TA_CENTER, leading=11)
+
     headers = [
         Paragraph('#', hdr_style),
         Paragraph('Item', hdr_style),
         Paragraph('Description', hdr_style),
-        Paragraph('Packed', hdr_small_style),
-        Paragraph('Returned', hdr_small_style),
+        Paragraph('Packed<br/><font size="7">(truck)</font>', hdr_two_line),
+        Paragraph('Returned<br/><font size="7">(warehouse)</font>', hdr_two_line),
     ]
 
     # Group items by room preserving order
@@ -659,7 +725,7 @@ def generate_checklist(meta, items):
 
     data_row_idx = 1  # track row index for styling (1-based, row 0 = header)
 
-    for room, group in _groupby(items, key=lambda x: x['room']):
+    for room, group in _groupby([i for i in items if not i.get('is_extra')], key=lambda x: x['room']):
         group_items = list(group)
 
         # Room section header row — spans all columns

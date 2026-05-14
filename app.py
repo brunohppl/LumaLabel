@@ -17,6 +17,102 @@ from reportlab.lib.colors import HexColor
 
 app = Flask(__name__)
 
+# ── Supabase config ──
+SUPABASE_URL  = os.environ.get('SUPABASE_URL', 'https://aqgxojawmohhogkhcxdb.supabase.co')
+SUPABASE_KEY  = os.environ.get('SUPABASE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxZ3hvamF3bW9oaG9na2hjeGRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NDc5ODYsImV4cCI6MjA5NDMyMzk4Nn0.-2UOdGY52jDEmCmBBtQA2XEy6dVT8ZPA_AIPcM7RFX4')
+SUPABASE_REST = SUPABASE_URL + '/rest/v1'
+
+def sb_headers():
+    return {
+        'apikey':        SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=representation',
+    }
+
+def sb_get(table, params=''):
+    url = f'{SUPABASE_REST}/{table}?{params}'
+    req = urllib.request.Request(url, headers=sb_headers())
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return json.loads(r.read())
+    except Exception as e:
+        return []
+
+def sb_post(table, data):
+    url     = f'{SUPABASE_REST}/{table}'
+    payload = json.dumps(data).encode()
+    req     = urllib.request.Request(url, data=payload, headers=sb_headers(), method='POST')
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return json.loads(r.read())
+    except Exception as e:
+        return None
+
+def sb_patch(table, params, data):
+    url     = f'{SUPABASE_REST}/{table}?{params}'
+    payload = json.dumps(data).encode()
+    hdrs    = {**sb_headers(), 'Prefer': 'return=representation'}
+    req     = urllib.request.Request(url, data=payload, headers=hdrs, method='PATCH')
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return json.loads(r.read())
+    except Exception as e:
+        return None
+
+def sb_delete(table, params):
+    url = f'{SUPABASE_REST}/{table}?{params}'
+    req = urllib.request.Request(url, headers=sb_headers(), method='DELETE')
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return True
+    except Exception as e:
+        return False
+
+def save_job_to_db(meta, items, colour_name):
+    """Save job and items to Supabase. Called after label generation."""
+    try:
+        job_ref = re.sub(r'\D', '', meta['job_number'])[-3:] if meta['job_number'] else '000'
+        # Upsert job record
+        job_data = {
+            'job_number':  meta['job_number'],
+            'job_ref':     job_ref,
+            'address':     meta['address'],
+            'stage_date':  meta['stage_date'],
+            'colour':      colour_name,
+            'status':      'picking',
+            'item_count':  len([i for i in items if not i.get('is_extra')]),
+        }
+        # Delete existing job+items if re-generating
+        existing = sb_get('jobs', f'job_number=eq.{meta["job_number"]}')
+        if existing:
+            job_id = existing[0]['id']
+            sb_delete('items', f'job_id=eq.{job_id}')
+            sb_patch('jobs', f'id=eq.{job_id}', job_data)
+        else:
+            result = sb_post('jobs', job_data)
+            if result:
+                job_id = result[0]['id']
+            else:
+                return
+
+        # Insert items
+        items_data = [
+            {
+                'job_id':      job_id,
+                'serial':      item['serial'],
+                'room':        item['room'],
+                'description': item.get('description', ''),
+                'is_extra':    item.get('is_extra', False),
+                'checked':     False,
+            }
+            for item in items
+        ]
+        sb_post('items', items_data)
+    except Exception as e:
+        pass  # Never let DB failure break label generation
+
+
 # ── Slack notification ──
 def notify_slack(meta, item_count, colour_name, label_filename):
     """Post a notification to Slack when labels are generated.
@@ -917,6 +1013,9 @@ def generate():
         pdf_bytes_out  = generate_labels(meta, items, colour)
         label_filename = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
 
+        # Save job to database (non-blocking)
+        save_job_to_db(meta, items, colour['name'])
+
         # Notify Slack (non-blocking — failure won't affect PDF delivery)
         notify_slack(meta, len(items), colour['name'], label_filename)
 
@@ -936,6 +1035,64 @@ def generate():
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ════════════════════════════════════════════════
+# JOB TRACKER ROUTES
+# ════════════════════════════════════════════════
+
+@app.route('/jobs', methods=['GET'])
+def jobs_page():
+    with open('templates/jobs.html', 'r') as f:
+        return f.read()
+
+@app.route('/driver/<job_id>', methods=['GET'])
+def driver_page(job_id):
+    with open('templates/driver.html', 'r') as f:
+        return f.read()
+
+@app.route('/api/jobs', methods=['GET'])
+def api_jobs():
+    jobs = sb_get('jobs', 'order=created_at.desc')
+    return jsonify(jobs)
+
+@app.route('/api/jobs/<job_id>', methods=['GET'])
+def api_job(job_id):
+    job   = sb_get('jobs',  f'id=eq.{job_id}')
+    items = sb_get('items', f'job_id=eq.{job_id}&order=serial.asc')
+    if not job:
+        return jsonify({'error': 'Job not found'}), 404
+    return jsonify({'job': job[0], 'items': items})
+
+@app.route('/api/jobs/<job_id>/status', methods=['PATCH'])
+def api_job_status(job_id):
+    data   = request.get_json()
+    result = sb_patch('jobs', f'id=eq.{job_id}', {'status': data['status']})
+    return jsonify({'success': bool(result)})
+
+@app.route('/api/items/<item_id>/check', methods=['PATCH'])
+def api_item_check(item_id):
+    data   = request.get_json()
+    result = sb_patch('items', f'id=eq.{item_id}', {'checked': data['checked']})
+    return jsonify({'success': bool(result)})
+
+@app.route('/api/jobs/<job_id>/items', methods=['POST'])
+def api_add_item(job_id):
+    data   = request.get_json()
+    result = sb_post('items', {
+        'job_id':      job_id,
+        'serial':      data['serial'],
+        'room':        data['room'],
+        'description': data.get('description', ''),
+        'is_extra':    data.get('is_extra', False),
+        'checked':     False,
+    })
+    return jsonify(result[0] if result else {'error': 'Failed'})
+
+@app.route('/api/items/<item_id>', methods=['DELETE'])
+def api_delete_item(item_id):
+    result = sb_delete('items', f'id=eq.{item_id}')
+    return jsonify({'success': result})
 
 
 if __name__ == '__main__':

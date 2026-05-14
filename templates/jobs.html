@@ -85,6 +85,9 @@ header { background: var(--ink); padding: 20px 32px; display: flex; align-items:
 .item-extra { font-size: 0.65rem; color: var(--muted); font-style: italic; }
 .item-del { background: none; border: none; color: var(--border); cursor: pointer; font-size: 1rem; padding: 2px 4px; transition: color 0.15s; }
 .item-del:hover { color: var(--red); }
+.item-notes { width: 100%; background: none; border: none; border-top: 1px dashed var(--sand); padding: 5px 0 4px; font-family: 'Jost', sans-serif; font-size: 0.75rem; color: var(--muted); outline: none; resize: none; margin-top: 4px; }
+.item-notes:focus { color: var(--ink); border-top-color: var(--accent); }
+.item-notes::placeholder { color: var(--border); }
 
 .add-item-row { display: flex; gap: 8px; margin-top: 12px; }
 .add-input { flex: 1; background: var(--warm); border: 1px solid var(--border); border-radius: 1px; padding: 9px 12px; font-family: 'Jost', sans-serif; font-size: 0.85rem; color: var(--ink); outline: none; }
@@ -266,12 +269,27 @@ function renderPanelItems() {
 }
 
 function itemRow(item, isExtra = false) {
+  const notes = item.notes || '';
   return `
-    <div class="item-row" id="item-${item.id}">
+    <div class="item-row" id="item-${item.id}" style="flex-wrap:wrap;">
       <div class="item-serial">#${item.serial}</div>
-      <div class="item-desc">${item.description || '<span class="item-extra">blank extra</span>'}</div>
+      <div class="item-desc" style="flex:1;">${item.description || '<span class="item-extra">blank extra</span>'}</div>
       <button class="item-del" onclick="deleteItem('${item.id}')">✕</button>
+      <textarea class="item-notes" rows="1" placeholder="Add note for driver…"
+        onblur="saveNote('${item.id}', this.value)"
+        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+      >${notes}</textarea>
     </div>`;
+}
+
+async function saveNote(itemId, notes) {
+  await fetch('/api/items/' + itemId + '/check', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({notes: notes})
+  });
+  const item = allItems.find(i => i.id === itemId);
+  if (item) item.notes = notes;
 }
 
 // ── Actions ──

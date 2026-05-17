@@ -69,7 +69,8 @@ def sb_delete(table, params):
     except Exception as e:
         return False
 
-def save_job_to_db(meta, items, colour_name):
+def save_job_to_db(meta, items, colour_name, job_owner=''):
+    meta['job_owner'] = job_owner
     """Save job and items to Supabase. Called after label generation."""
     try:
         job_ref = re.sub(r'\D', '', meta['job_number'])[-3:] if meta['job_number'] else '000'
@@ -80,7 +81,8 @@ def save_job_to_db(meta, items, colour_name):
             'address':     meta['address'],
             'stage_date':  meta['stage_date'],
             'colour':      colour_name,
-            'status':      'picking',
+            'status':      'ready',
+            'job_owner':   meta.get('job_owner', ''),
             'item_count':  len([i for i in items if not i.get('is_extra')]),
         }
         # Delete existing job+items if re-generating
@@ -732,11 +734,13 @@ def generate_checklist(meta, items):
         textColor=C_MUTED, spaceAfter=0)
 
     # Left: job details stacked
+    owner_line = f'<b>Job Owner:</b> {meta.get("job_owner", "")}' if meta.get("job_owner") else '<b>Job Owner:</b> —'
     left_data = [
         [Paragraph(f'<b>Job Ref:</b> {inv_suffix}', meta_style)],
         [Paragraph(f'<b>Address:</b> {meta["address"]}', meta_style)],
         [Paragraph(f'<b>Installation Date:</b> {meta["stage_date"]}', meta_style)],
         [Paragraph(f'<b>Total Items:</b> {len(items)}', meta_style)],
+        [Paragraph(owner_line, meta_style)],
     ]
     left_table = Table(left_data, colWidths=[10.5*cm])
     left_table.setStyle(TableStyle([
@@ -955,7 +959,9 @@ def checklist():
 
         pdf_bytes    = base64.b64decode(pdf_base64)
         install_date = data.get('installDate')
+        job_owner    = data.get('jobOwner', '')
         meta, items  = parse_packing_list(pdf_bytes)
+        meta['job_owner'] = job_owner
 
         if not items:
             return jsonify({'success': False, 'error': 'No items found'}), 400
@@ -995,7 +1001,8 @@ def generate():
             return jsonify({'success': False, 'error': 'No pdfBase64 provided'}), 400
 
         pdf_bytes    = base64.b64decode(pdf_base64)
-        install_date = data.get('installDate')  # optional override from web app
+        install_date = data.get('installDate')
+        job_owner    = data.get('jobOwner', '')
         meta, items  = parse_packing_list(pdf_bytes)
 
         if not items:
@@ -1014,7 +1021,7 @@ def generate():
         label_filename = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
 
         # Save job to database (non-blocking)
-        save_job_to_db(meta, items, colour['name'])
+        save_job_to_db(meta, items, colour['name'], job_owner)
 
         # Notify Slack (non-blocking — failure won't affect PDF delivery)
         notify_slack(meta, len(items), colour['name'], label_filename)
@@ -1066,8 +1073,10 @@ def api_job(job_id):
 
 @app.route('/api/jobs/<job_id>/status', methods=['PATCH'])
 def api_job_status(job_id):
-    data   = request.get_json()
-    result = sb_patch('jobs', f'id=eq.{job_id}', {'status': data['status']})
+    data    = request.get_json()
+    payload = {'status': data['status']}
+    if 'truck' in data: payload['truck'] = data['truck']
+    result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})
 
 @app.route('/api/items/<item_id>/check', methods=['PATCH'])

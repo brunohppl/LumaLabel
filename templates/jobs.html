@@ -13,7 +13,7 @@
   --accent: #B8935A; --green: #4A7C59; --red: #A63D2F;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--cream); color: var(--ink); font-family: 'Jost', sans-serif; font-weight: 300; min-height: 100vh; }
+body { background: var(--cream); color: var(--ink); font-family: 'Jost', sans-serif; font-weight: 400; font-size: 16px; min-height: 100vh; }
 
 header { background: var(--ink); padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; }
 .logo { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 300; letter-spacing: 0.12em; color: #FAF8F4; }
@@ -35,10 +35,10 @@ header { background: var(--ink); padding: 20px 32px; display: flex; align-items:
 .job-card-top { padding: 18px 20px; display: flex; align-items: center; gap: 14px; }
 .colour-swatch { width: 12px; align-self: stretch; border-radius: 1px; min-height: 50px; flex-shrink: 0; }
 .job-info { flex: 1; min-width: 0; }
-.job-ref { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 400; color: var(--accent); line-height: 1; }
-.job-address { font-size: 0.8rem; color: var(--ink); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.job-meta { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
-.job-status { padding: 3px 10px; border-radius: 1px; font-size: 0.58rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
+.job-ref { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 400; color: var(--accent); line-height: 1; }
+.job-address { font-size: 0.95rem; color: var(--ink); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job-meta { font-size: 0.8rem; color: var(--muted); margin-top: 5px; }
+.job-status { padding: 4px 12px; border-radius: 1px; font-size: 0.65rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
 .status-picking { background: rgba(74,158,232,0.1); color: #4A9EE8; }
 .status-ready   { background: rgba(74,124,89,0.1); color: var(--green); }
 .status-loaded  { background: rgba(184,147,90,0.1); color: var(--accent); }
@@ -57,8 +57,8 @@ header { background: var(--ink); padding: 20px 32px; display: flex; align-items:
 .panel-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
 .panel-close { background: none; border: none; font-size: 1.5rem; color: var(--muted); cursor: pointer; padding: 4px; }
 .panel-title { flex: 1; }
-.panel-job-ref { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 400; color: var(--accent); }
-.panel-address { font-size: 0.75rem; color: var(--muted); }
+.panel-job-ref { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; font-weight: 400; color: var(--accent); }
+.panel-address { font-size: 0.9rem; color: var(--muted); }
 
 .panel-actions { padding: 12px 24px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
 .btn { padding: 9px 16px; border-radius: 1px; border: none; cursor: pointer; font-family: 'Jost', sans-serif; font-size: 0.7rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
@@ -76,13 +76,17 @@ header { background: var(--ink); padding: 20px 32px; display: flex; align-items:
 .panel-body { flex: 1; overflow-y: auto; padding: 16px 24px; }
 
 .room-section { margin-bottom: 20px; }
-.room-header { font-size: 0.6rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); font-weight: 500; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--sand); }
+.room-header { font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); font-weight: 500; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--sand); }
 
 .item-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--sand); }
 .item-row:last-child { border-bottom: none; }
-.item-serial { font-size: 0.68rem; font-weight: 500; color: var(--accent); min-width: 36px; }
-.item-desc { flex: 1; font-size: 0.85rem; }
-.item-extra { font-size: 0.65rem; color: var(--muted); font-style: italic; }
+.item-serial { font-size: 0.8rem; font-weight: 600; color: var(--accent); min-width: 40px; }
+.item-desc { flex: 1; font-size: 1rem; line-height: 1.4; }
+.item-extra { font-size: 0.75rem; color: var(--muted); font-style: italic; }
+.item-picked { opacity: 0.5; }
+.item-picked .item-desc { text-decoration: line-through; }
+.pick-btn { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border); background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; font-size: 0.85rem; color: transparent; }
+.pick-btn.picked { background: var(--green); border-color: var(--green); color: white; }
 .item-del { background: none; border: none; color: var(--border); cursor: pointer; font-size: 1rem; padding: 2px 4px; transition: color 0.15s; }
 .item-del:hover { color: var(--red); }
 .item-notes { width: 100%; background: none; border: none; border-top: 1px dashed var(--sand); padding: 5px 0 4px; font-family: 'Jost', sans-serif; font-size: 0.75rem; color: var(--muted); outline: none; resize: none; margin-top: 4px; }
@@ -269,17 +273,42 @@ function renderPanelItems() {
 }
 
 function itemRow(item, isExtra = false) {
-  const notes = item.notes || '';
+  const notes      = item.notes || '';
+  const picked     = item.picked || false;
+  const pickedCls  = picked ? 'pick-btn picked' : 'pick-btn';
+  const rowCls     = picked ? 'item-row item-picked' : 'item-row';
   return `
-    <div class="item-row" id="item-${item.id}" style="flex-wrap:wrap;">
-      <div class="item-serial">#${item.serial}</div>
+    <div class="${rowCls}" id="item-${item.id}" style="flex-wrap:wrap; padding:10px 0;">
+      <button class="${pickedCls}" id="pick-${item.id}" onclick="togglePicked('${item.id}')" title="Mark as picked">✓</button>
+      <div class="item-serial" style="margin:0 8px;">#${item.serial}</div>
       <div class="item-desc" style="flex:1;">${item.description || '<span class="item-extra">blank extra</span>'}</div>
       <button class="item-del" onclick="deleteItem('${item.id}')">✕</button>
       <textarea class="item-notes" rows="1" placeholder="Add note for driver…"
+        style="margin-left:40px;"
         onblur="saveNote('${item.id}', this.value)"
         oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
       >${notes}</textarea>
     </div>`;
+}
+
+async function togglePicked(itemId) {
+  const item      = allItems.find(i => i.id === itemId);
+  if (!item) return;
+  const newPicked = !item.picked;
+  item.picked     = newPicked;
+
+  // Update UI immediately
+  const row = document.getElementById('item-' + itemId);
+  const btn = document.getElementById('pick-' + itemId);
+  if (newPicked) { row.classList.add('item-picked'); btn.classList.add('picked'); }
+  else           { row.classList.remove('item-picked'); btn.classList.remove('picked'); }
+
+  // Persist
+  await fetch('/api/items/' + itemId + '/check', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({picked: newPicked})
+  });
 }
 
 async function saveNote(itemId, notes) {

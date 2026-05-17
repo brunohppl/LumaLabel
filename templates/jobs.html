@@ -5,110 +5,87 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LUMA Design Co — Jobs</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root {
-  --cream: #FAF8F4; --warm: #F2EDE4; --sand: #E5DDD0;
-  --border: #D8CFBF; --muted: #9A8F80; --ink: #1A1714;
-  --accent: #B8935A; --green: #4A7C59; --red: #A63D2F;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--cream); color: var(--ink); font-family: 'Jost', sans-serif; font-weight: 400; font-size: 16px; min-height: 100vh; }
-
-header { background: var(--ink); padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; }
-.logo { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 300; letter-spacing: 0.12em; color: #FAF8F4; }
-.logo em { font-style: italic; color: var(--accent); }
-.nav-links { display: flex; gap: 20px; }
-.nav-link { color: rgba(250,248,244,0.5); text-decoration: none; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; transition: color 0.2s; }
-.nav-link:hover, .nav-link.active { color: var(--accent); }
-
-.main { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
-.page-title { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 300; margin-bottom: 6px; }
-.page-sub { font-size: 0.78rem; color: var(--muted); margin-bottom: 32px; }
-
-/* Job cards */
-.jobs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
-
-.job-card { background: white; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
-.job-card:hover { border-color: var(--accent); box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
-
-.job-card-top { padding: 18px 20px; display: flex; align-items: center; gap: 14px; }
-.colour-swatch { width: 12px; align-self: stretch; border-radius: 1px; min-height: 50px; flex-shrink: 0; }
-.job-info { flex: 1; min-width: 0; }
-.job-ref { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 400; color: var(--accent); line-height: 1; }
-.job-address { font-size: 0.95rem; color: var(--ink); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.job-meta { font-size: 0.8rem; color: var(--muted); margin-top: 5px; }
-.job-status { padding: 4px 12px; border-radius: 1px; font-size: 0.65rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
-.status-picking { background: rgba(74,158,232,0.1); color: #4A9EE8; }
-.status-ready   { background: rgba(74,124,89,0.1); color: var(--green); }
-.status-loaded  { background: rgba(184,147,90,0.1); color: var(--accent); }
-
-.job-progress { padding: 10px 20px; border-top: 1px solid var(--sand); display: flex; align-items: center; gap: 10px; }
-.progress-bar { flex: 1; height: 3px; background: var(--sand); border-radius: 1px; overflow: hidden; }
-.progress-fill { height: 100%; background: var(--green); border-radius: 1px; transition: width 0.3s; }
-.progress-txt { font-size: 0.65rem; color: var(--muted); white-space: nowrap; }
-
-/* Job detail panel */
-.panel-overlay { display: none; position: fixed; inset: 0; background: rgba(26,23,20,0.5); z-index: 100; }
-.panel-overlay.open { display: block; }
-.panel { position: fixed; right: 0; top: 0; bottom: 0; width: 100%; max-width: 560px; background: white; z-index: 101; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.3s ease; }
-.panel.open { transform: translateX(0); }
-
-.panel-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
-.panel-close { background: none; border: none; font-size: 1.5rem; color: var(--muted); cursor: pointer; padding: 4px; }
-.panel-title { flex: 1; }
-.panel-job-ref { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; font-weight: 400; color: var(--accent); }
-.panel-address { font-size: 0.9rem; color: var(--muted); }
-
-.panel-actions { padding: 12px 24px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
-.btn { padding: 9px 16px; border-radius: 1px; border: none; cursor: pointer; font-family: 'Jost', sans-serif; font-size: 0.7rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
-.btn-dark { background: var(--ink); color: var(--cream); }
-.btn-dark:hover { background: #2a2520; }
-.btn-gold { background: var(--accent); color: white; }
-.btn-gold:hover { background: #a07840; }
-.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--ink); }
-.btn-outline:hover { border-color: var(--ink); }
-.btn-green { background: rgba(74,124,89,0.1); color: var(--green); border: 1px solid rgba(74,124,89,0.3); }
-.btn-green:hover { background: rgba(74,124,89,0.2); }
-.driver-link { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.06em; padding: 9px 0; display: flex; align-items: center; gap: 6px; }
-.driver-link a { color: var(--accent); text-decoration: none; }
-
-.panel-body { flex: 1; overflow-y: auto; padding: 16px 24px; }
-
-.room-section { margin-bottom: 20px; }
-.room-header { font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); font-weight: 500; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--sand); }
-
-.item-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--sand); }
-.item-row:last-child { border-bottom: none; }
-.item-serial { font-size: 0.8rem; font-weight: 600; color: var(--accent); min-width: 40px; }
-.item-desc { flex: 1; font-size: 1rem; line-height: 1.4; }
-.item-extra { font-size: 0.75rem; color: var(--muted); font-style: italic; }
-.item-picked { opacity: 0.5; }
-.item-picked .item-desc { text-decoration: line-through; }
-.pick-btn { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border); background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; font-size: 0.85rem; color: transparent; }
-.pick-btn.picked { background: var(--green); border-color: var(--green); color: white; }
-.item-del { background: none; border: none; color: var(--border); cursor: pointer; font-size: 1rem; padding: 2px 4px; transition: color 0.15s; }
-.item-del:hover { color: var(--red); }
-.item-notes { width: 100%; background: none; border: none; border-top: 1px dashed var(--sand); padding: 5px 0 4px; font-family: 'Jost', sans-serif; font-size: 0.75rem; color: var(--muted); outline: none; resize: none; margin-top: 4px; }
-.item-notes:focus { color: var(--ink); border-top-color: var(--accent); }
-.item-notes::placeholder { color: var(--border); }
-
-.add-item-row { display: flex; gap: 8px; margin-top: 12px; }
-.add-input { flex: 1; background: var(--warm); border: 1px solid var(--border); border-radius: 1px; padding: 9px 12px; font-family: 'Jost', sans-serif; font-size: 0.85rem; color: var(--ink); outline: none; }
-.add-input:focus { border-color: var(--accent); }
-.room-select { background: var(--warm); border: 1px solid var(--border); border-radius: 1px; padding: 9px 10px; font-family: 'Jost', sans-serif; font-size: 0.82rem; color: var(--ink); outline: none; }
-
-/* Loading / empty */
-.loading { text-align: center; padding: 60px; color: var(--muted); font-size: 0.82rem; }
-.empty { text-align: center; padding: 60px 24px; }
-.empty-title { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 300; color: var(--muted); margin-bottom: 8px; }
-.empty-sub { font-size: 0.78rem; color: var(--muted); }
-
-footer { border-top: 1px solid var(--border); padding: 16px 32px; text-align: center; font-size: 0.62rem; color: var(--muted); letter-spacing: 0.08em; }
+:root { --cream:#FAF8F4; --warm:#F2EDE4; --sand:#E5DDD0; --border:#D8CFBF; --muted:#9A8F80; --ink:#1A1714; --accent:#B8935A; --green:#4A7C59; --red:#A63D2F; --blue:#4A7EB8; }
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font-weight:400;font-size:16px;min-height:100vh;}
+header{background:var(--ink);padding:20px 32px;display:flex;align-items:center;justify-content:space-between;}
+.logo{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:300;letter-spacing:0.12em;color:#FAF8F4;}
+.logo em{font-style:italic;color:var(--accent);}
+.nav-links{display:flex;gap:20px;}
+.nav-link{color:rgba(250,248,244,0.45);text-decoration:none;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;transition:color 0.2s;}
+.nav-link:hover,.nav-link.active{color:var(--accent);}
+.main{max-width:1100px;margin:0 auto;padding:36px 24px;}
+.page-title{font-family:'Cormorant Garamond',serif;font-size:2.2rem;font-weight:300;margin-bottom:4px;}
+.page-sub{font-size:0.82rem;color:var(--muted);margin-bottom:32px;}
+.pill{display:inline-block;padding:4px 12px;border-radius:1px;font-size:0.62rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;}
+.pill-ready{background:rgba(74,126,184,0.12);color:var(--blue);}
+.pill-picking{background:rgba(232,197,71,0.15);color:#B8972A;}
+.pill-readyload{background:rgba(184,147,90,0.15);color:var(--accent);}
+.pill-loading{background:rgba(232,92,71,0.12);color:var(--red);}
+.pill-loaded{background:rgba(74,124,89,0.12);color:var(--green);}
+.jobs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
+.job-card{background:white;border:1px solid var(--border);border-radius:2px;overflow:hidden;cursor:pointer;transition:border-color 0.2s,box-shadow 0.2s;}
+.job-card:hover{border-color:var(--accent);box-shadow:0 4px 20px rgba(0,0,0,0.06);}
+.job-card-top{padding:18px 20px;display:flex;align-items:center;gap:14px;}
+.colour-swatch{width:12px;align-self:stretch;border-radius:1px;min-height:54px;flex-shrink:0;}
+.job-info{flex:1;min-width:0;}
+.job-ref{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:400;color:var(--accent);line-height:1;}
+.job-address{font-size:0.95rem;color:var(--ink);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.job-meta{font-size:0.78rem;color:var(--muted);margin-top:4px;display:flex;gap:12px;flex-wrap:wrap;}
+.job-progress{padding:10px 20px;border-top:1px solid var(--sand);display:flex;align-items:center;gap:10px;}
+.progress-bar{flex:1;height:3px;background:var(--sand);border-radius:1px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--green);border-radius:1px;transition:width 0.3s;}
+.progress-txt{font-size:0.72rem;color:var(--muted);white-space:nowrap;}
+.panel-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.5);z-index:100;}
+.panel-overlay.open{display:block;}
+.panel{position:fixed;right:0;top:0;bottom:0;width:100%;max-width:580px;background:white;z-index:101;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s ease;}
+.panel.open{transform:translateX(0);}
+.panel-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:14px;flex-shrink:0;}
+.panel-close{background:none;border:none;font-size:1.5rem;color:var(--muted);cursor:pointer;padding:4px;margin-top:2px;}
+.panel-title{flex:1;}
+.panel-job-ref{font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:400;color:var(--accent);}
+.panel-address{font-size:0.9rem;color:var(--muted);margin-top:2px;}
+.panel-owner{font-size:0.85rem;color:var(--ink);margin-top:3px;font-weight:500;}
+.panel-actions{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-shrink:0;flex-wrap:wrap;align-items:center;}
+.btn{padding:10px 18px;border-radius:1px;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.75rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.btn-dark{background:var(--ink);color:var(--cream);}
+.btn-dark:hover{background:#2a2520;}
+.btn-gold{background:var(--accent);color:white;}
+.btn-gold:hover{background:#a07840;}
+.btn-green{background:rgba(74,124,89,0.1);color:var(--green);border:1px solid rgba(74,124,89,0.3);}
+.btn-green:hover{background:rgba(74,124,89,0.2);}
+.driver-link{font-size:0.75rem;color:var(--muted);}
+.driver-link a{color:var(--accent);text-decoration:none;font-weight:500;}
+.driver-link a:hover{text-decoration:underline;}
+.panel-body{flex:1;overflow-y:auto;padding:16px 24px;}
+.room-section{margin-bottom:22px;}
+.room-header{font-size:0.72rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--sand);}
+.item-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--sand);flex-wrap:wrap;}
+.item-row:last-child{border-bottom:none;}
+.pick-btn{width:32px;height:32px;border-radius:50%;border:2px solid var(--border);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s;font-size:0.9rem;color:transparent;margin-top:2px;}
+.pick-btn.picked{background:var(--green);border-color:var(--green);color:white;}
+.item-serial{font-size:0.8rem;font-weight:600;color:var(--accent);min-width:40px;margin-top:6px;}
+.item-desc{flex:1;font-size:1rem;line-height:1.4;margin-top:4px;}
+.item-picked .item-desc{text-decoration:line-through;opacity:0.5;}
+.item-del{background:none;border:none;color:var(--border);cursor:pointer;font-size:1rem;padding:4px;transition:color 0.15s;flex-shrink:0;margin-top:2px;}
+.item-del:hover{color:var(--red);}
+.item-notes{width:100%;background:none;border:none;border-top:1px dashed var(--sand);padding:6px 0 4px;font-family:'Jost',sans-serif;font-size:0.85rem;color:var(--muted);outline:none;resize:none;margin-top:6px;margin-left:42px;}
+.item-notes:focus{color:var(--ink);border-top-color:var(--accent);}
+.item-notes::placeholder{color:var(--border);}
+.add-item-row{display:flex;gap:8px;margin-top:12px;}
+.add-input{flex:1;background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:10px 12px;font-family:'Jost',sans-serif;font-size:0.9rem;color:var(--ink);outline:none;}
+.add-input:focus{border-color:var(--accent);}
+.room-select{background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:10px;font-family:'Jost',sans-serif;font-size:0.85rem;color:var(--ink);outline:none;}
+.loading{text-align:center;padding:60px;color:var(--muted);font-size:0.9rem;}
+.empty{text-align:center;padding:60px 24px;}
+.empty-title{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:300;color:var(--muted);margin-bottom:8px;}
+.empty-sub{font-size:0.85rem;color:var(--muted);}
+footer{border-top:1px solid var(--border);padding:16px 32px;text-align:center;font-size:0.65rem;color:var(--muted);letter-spacing:0.08em;}
 </style>
 </head>
 <body>
-
 <header>
   <div class="logo">LUMA <em>Design</em> Co</div>
   <div class="nav-links">
@@ -116,17 +93,11 @@ footer { border-top: 1px solid var(--border); padding: 16px 32px; text-align: ce
     <a href="/jobs" class="nav-link active">Jobs</a>
   </div>
 </header>
-
 <div class="main">
   <div class="page-title">Active Jobs</div>
-  <div class="page-sub">Click a job to review items and mark ready for the driver</div>
-
-  <div class="jobs-grid" id="jobs-grid">
-    <div class="loading">Loading jobs…</div>
-  </div>
+  <div class="page-sub">Click a job to manage items and update status</div>
+  <div class="jobs-grid" id="jobs-grid"><div class="loading">Loading jobs…</div></div>
 </div>
-
-<!-- Job detail panel -->
 <div class="panel-overlay" id="overlay" onclick="closePanel()"></div>
 <div class="panel" id="panel">
   <div class="panel-header">
@@ -134,224 +105,154 @@ footer { border-top: 1px solid var(--border); padding: 16px 32px; text-align: ce
     <div class="panel-title">
       <div class="panel-job-ref" id="panel-ref"></div>
       <div class="panel-address" id="panel-address"></div>
+      <div class="panel-owner" id="panel-owner"></div>
     </div>
     <div id="panel-status-badge"></div>
   </div>
-  <div class="panel-actions">
-    <button class="btn btn-green" id="btn-ready" onclick="markReady()">✓ Mark Ready for Driver</button>
-    <div class="driver-link">Driver link: <a id="driver-link-a" href="#" target="_blank">open →</a></div>
-  </div>
-  <div class="panel-body" id="panel-body">
-    <div class="loading">Loading items…</div>
-  </div>
+  <div class="panel-actions" id="panel-actions"></div>
+  <div class="panel-body" id="panel-body"><div class="loading">Loading…</div></div>
 </div>
-
 <footer>LUMA Design Co · Warehouse Operations · lumadesignco.com.au</footer>
-
 <script>
-let currentJob = null;
-let allItems   = [];
+let currentJob=null,allItems=[];
+const COLOUR_MAP={Red:'#E85C47',Blue:'#4A9EE8',Green:'#4CAF7D',Yellow:'#E8C547',Purple:'#A04AE8',Orange:'#E87E47',Pink:'#E84A9E'};
+const STATUS_LABELS={ready:'Ready',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded'};
+const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded'};
 
-const COLOUR_MAP = {
-  Red:'#E85C47', Blue:'#4A9EE8', Green:'#4CAF7D',
-  Yellow:'#E8C547', Purple:'#A04AE8', Orange:'#E87E47', Pink:'#E84A9E'
-};
-
-// ── Load jobs ──
-async function loadJobs() {
-  const res  = await fetch('/api/jobs');
-  const jobs = await res.json();
-  const grid = document.getElementById('jobs-grid');
-
-  if (!jobs.length) {
-    grid.innerHTML = `<div class="empty"><div class="empty-title">No jobs yet</div><div class="empty-sub">Generate labels from a packing slip to create a job</div></div>`;
-    return;
-  }
-
-  grid.innerHTML = jobs.map(job => {
-    const checked = job.checked_count || 0;
-    const total   = job.item_count || 1;
-    const pct     = Math.round(checked / total * 100);
-    const colour  = COLOUR_MAP[job.colour] || '#888';
-    const statusClass = `status-${job.status}`;
-    const statusLabel = {picking:'Picking', ready:'Ready', loaded:'Loaded'}[job.status] || job.status;
-    return `
-      <div class="job-card" onclick="openJob('${job.id}')">
-        <div class="job-card-top">
-          <div class="colour-swatch" style="background:${colour}"></div>
-          <div class="job-info">
-            <div class="job-ref">${job.job_ref || job.job_number}</div>
-            <div class="job-address">${job.address}</div>
-            <div class="job-meta">📅 ${job.stage_date} · ${job.item_count} items</div>
+async function loadJobs(){
+  const res=await fetch('/api/jobs');
+  const jobs=await res.json();
+  const grid=document.getElementById('jobs-grid');
+  if(!jobs.length){grid.innerHTML=`<div class="empty"><div class="empty-title">No jobs yet</div><div class="empty-sub">Generate labels from a packing slip to create a job</div></div>`;return;}
+  grid.innerHTML=jobs.map(job=>{
+    const colour=COLOUR_MAP[job.colour]||'#888';
+    const checked=job.checked_count||0,total=job.item_count||1,pct=Math.round(checked/total*100);
+    const pill=STATUS_PILLS[job.status]||'pill-ready',label=STATUS_LABELS[job.status]||job.status;
+    const truck=job.truck?`🚛 ${job.truck}`:'',owner=job.job_owner?`👤 ${job.job_owner}`:'';
+    return `<div class="job-card" onclick="openJob('${job.id}')">
+      <div class="job-card-top">
+        <div class="colour-swatch" style="background:${colour}"></div>
+        <div class="job-info">
+          <div class="job-ref">${job.job_ref||job.job_number}</div>
+          <div class="job-address">${job.address}</div>
+          <div class="job-meta">
+            <span>📅 ${job.stage_date}</span><span>${job.item_count} items</span>
+            ${owner?`<span>${owner}</span>`:''}${truck?`<span>${truck}</span>`:''}
           </div>
-          <div class="job-status ${statusClass}">${statusLabel}</div>
         </div>
-        <div class="job-progress">
-          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-          <div class="progress-txt">${checked}/${total} loaded</div>
-        </div>
-      </div>`;
+        <span class="pill ${pill}">${label}</span>
+      </div>
+      <div class="job-progress">
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="progress-txt">${checked}/${total} loaded</div>
+      </div>
+    </div>`;
   }).join('');
 }
 
-// ── Open job panel ──
-async function openJob(jobId) {
+async function openJob(jobId){
   document.getElementById('overlay').classList.add('open');
   document.getElementById('panel').classList.add('open');
-  document.getElementById('panel-body').innerHTML = '<div class="loading">Loading…</div>';
-
-  const res  = await fetch(`/api/jobs/${jobId}`);
-  const data = await res.json();
-  currentJob = data.job;
-  allItems   = data.items;
-
-  document.getElementById('panel-ref').textContent     = currentJob.job_ref || currentJob.job_number;
-  document.getElementById('panel-address').textContent = currentJob.address + ' · ' + currentJob.stage_date;
-  document.getElementById('driver-link-a').href        = `/driver/${currentJob.id}`;
-
-  const badge = document.getElementById('panel-status-badge');
-  const statusLabel = {picking:'Picking', ready:'Ready', loaded:'Loaded'}[currentJob.status] || currentJob.status;
-  badge.innerHTML = `<span class="job-status status-${currentJob.status}">${statusLabel}</span>`;
-
-  const btnReady = document.getElementById('btn-ready');
-  btnReady.style.display = currentJob.status === 'picking' ? 'inline-flex' : 'none';
-
-  renderPanelItems();
+  document.getElementById('panel-body').innerHTML='<div class="loading">Loading…</div>';
+  const res=await fetch(`/api/jobs/${jobId}`);
+  const data=await res.json();
+  currentJob=data.job;allItems=data.items;
+  document.getElementById('panel-ref').textContent=currentJob.job_ref||currentJob.job_number;
+  document.getElementById('panel-address').textContent=currentJob.address+' · '+currentJob.stage_date;
+  document.getElementById('panel-owner').textContent=currentJob.job_owner?'👤 '+currentJob.job_owner:'';
+  renderStatus();renderPanelItems();
 }
 
-function closePanel() {
+function closePanel(){
   document.getElementById('overlay').classList.remove('open');
   document.getElementById('panel').classList.remove('open');
-  currentJob = null;
-  loadJobs();
+  currentJob=null;loadJobs();
 }
 
-// ── Render items grouped by room ──
-function renderPanelItems() {
-  const body    = document.getElementById('panel-body');
-  const regular = allItems.filter(i => !i.is_extra);
-  const extras  = allItems.filter(i => i.is_extra);
+function renderStatus(){
+  const s=currentJob.status;
+  const pill=STATUS_PILLS[s]||'pill-ready',label=STATUS_LABELS[s]||s;
+  document.getElementById('panel-status-badge').innerHTML=`<span class="pill ${pill}">${label}</span>`;
+  const truck=currentJob.truck?` · 🚛 ${currentJob.truck}`:'';
+  let btns='';
+  if(s==='ready') btns=`<button class="btn btn-gold" onclick="setStatus('picking')">Start Picking</button>`;
+  else if(s==='picking') btns=`<button class="btn btn-green" onclick="setStatus('ready_to_load')">Picking Complete</button>`;
+  else if(s==='ready_to_load') btns=`<span style="font-size:0.82rem;color:var(--muted);">Waiting for driver to load</span>`;
+  else if(s==='loading') btns=`<span style="font-size:0.82rem;color:var(--red);">Driver is loading…</span>`;
+  else if(s==='loaded') btns=`<span style="font-size:0.82rem;color:var(--green);font-weight:500;">✓ Truck loaded</span>`;
+  document.getElementById('panel-actions').innerHTML=`
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;width:100%;">
+      ${btns}
+      <div class="driver-link" style="margin-left:auto;">Driver: <a href="/driver/${currentJob.id}" target="_blank">open link →</a>${truck}</div>
+    </div>`;
+}
 
-  // Group by room
-  const rooms = {};
-  for (const item of regular) {
-    if (!rooms[item.room]) rooms[item.room] = [];
-    rooms[item.room].push(item);
+async function setStatus(newStatus){
+  await fetch(`/api/jobs/${currentJob.id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:newStatus})});
+  currentJob.status=newStatus;renderStatus();
+}
+
+function renderPanelItems(){
+  const body=document.getElementById('panel-body');
+  const regular=allItems.filter(i=>!i.is_extra),extras=allItems.filter(i=>i.is_extra);
+  const rooms={};
+  for(const item of regular){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
+  let html='';
+  for(const[room,items] of Object.entries(rooms)){
+    html+=`<div class="room-section"><div class="room-header">${room||'Uncategorised'}</div>${items.map(itemRow).join('')}</div>`;
   }
-
-  let html = '';
-  for (const [room, items] of Object.entries(rooms)) {
-    html += `<div class="room-section">
-      <div class="room-header">${room || 'Uncategorised'}</div>
-      ${items.map(item => itemRow(item)).join('')}
-    </div>`;
-  }
-
-  if (extras.length) {
-    html += `<div class="room-section">
-      <div class="room-header">Extras</div>
-      ${extras.map(item => itemRow(item, true)).join('')}
-    </div>`;
-  }
-
-  // Add item form
-  const rooms_list = [...new Set(allItems.map(i => i.room).filter(r => r))];
-  html += `
-    <div class="room-section" style="margin-top:24px">
-      <div class="room-header">Add Item</div>
-      <div class="add-item-row">
-        <select class="room-select" id="new-room">
-          ${rooms_list.map(r => `<option>${r}</option>`).join('')}
-          <option value="">— Extra</option>
-        </select>
-        <input class="add-input" id="new-desc" placeholder="Item description" onkeydown="if(event.key==='Enter') addItem()" />
-        <button class="btn btn-gold" onclick="addItem()">Add</button>
-      </div>
-    </div>`;
-
-  body.innerHTML = html;
+  if(extras.length) html+=`<div class="room-section"><div class="room-header">Extras</div>${extras.map(itemRow).join('')}</div>`;
+  const rooms_list=[...new Set(allItems.map(i=>i.room).filter(r=>r))];
+  html+=`<div class="room-section" style="margin-top:24px"><div class="room-header">Add Item</div>
+    <div class="add-item-row">
+      <select class="room-select" id="new-room">${rooms_list.map(r=>`<option>${r}</option>`).join('')}<option value="">— Extra</option></select>
+      <input class="add-input" id="new-desc" placeholder="Item description" onkeydown="if(event.key==='Enter') addItem()"/>
+      <button class="btn btn-gold" onclick="addItem()">Add</button>
+    </div></div>`;
+  body.innerHTML=html;
 }
 
-function itemRow(item, isExtra = false) {
-  const notes      = item.notes || '';
-  const picked     = item.picked || false;
-  const pickedCls  = picked ? 'pick-btn picked' : 'pick-btn';
-  const rowCls     = picked ? 'item-row item-picked' : 'item-row';
-  return `
-    <div class="${rowCls}" id="item-${item.id}" style="flex-wrap:wrap; padding:10px 0;">
-      <button class="${pickedCls}" id="pick-${item.id}" onclick="togglePicked('${item.id}')" title="Mark as picked">✓</button>
-      <div class="item-serial" style="margin:0 8px;">#${item.serial}</div>
-      <div class="item-desc" style="flex:1;">${item.description || '<span class="item-extra">blank extra</span>'}</div>
-      <button class="item-del" onclick="deleteItem('${item.id}')">✕</button>
-      <textarea class="item-notes" rows="1" placeholder="Add note for driver…"
-        style="margin-left:40px;"
-        onblur="saveNote('${item.id}', this.value)"
-        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
-      >${notes}</textarea>
-    </div>`;
+function itemRow(item){
+  const notes=item.notes||'',picked=item.picked||false;
+  const rowCls=picked?'item-row item-picked':'item-row',btnCls=picked?'pick-btn picked':'pick-btn';
+  return `<div class="${rowCls}" id="item-${item.id}">
+    <button class="${btnCls}" id="pick-${item.id}" onclick="togglePicked('${item.id}')" title="Mark picked">✓</button>
+    <div class="item-serial">#${item.serial}</div>
+    <div class="item-desc">${item.description||'<span style="color:var(--muted);font-style:italic">blank extra</span>'}</div>
+    <button class="item-del" onclick="deleteItem('${item.id}')">✕</button>
+    <textarea class="item-notes" rows="1" placeholder="Add note for driver…"
+      onblur="saveNote('${item.id}',this.value)"
+      oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+    >${notes}</textarea></div>`;
 }
 
-async function togglePicked(itemId) {
-  const item      = allItems.find(i => i.id === itemId);
-  if (!item) return;
-  const newPicked = !item.picked;
-  item.picked     = newPicked;
-
-  // Update UI immediately
-  const row = document.getElementById('item-' + itemId);
-  const btn = document.getElementById('pick-' + itemId);
-  if (newPicked) { row.classList.add('item-picked'); btn.classList.add('picked'); }
-  else           { row.classList.remove('item-picked'); btn.classList.remove('picked'); }
-
-  // Persist
-  await fetch('/api/items/' + itemId + '/check', {
-    method: 'PATCH',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({picked: newPicked})
-  });
+async function togglePicked(itemId){
+  const item=allItems.find(i=>i.id===itemId);if(!item)return;
+  item.picked=!item.picked;
+  const row=document.getElementById('item-'+itemId),btn=document.getElementById('pick-'+itemId);
+  if(item.picked){row.classList.add('item-picked');btn.classList.add('picked');}
+  else{row.classList.remove('item-picked');btn.classList.remove('picked');}
+  await fetch('/api/items/'+itemId+'/check',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({picked:item.picked})});
 }
 
-async function saveNote(itemId, notes) {
-  await fetch('/api/items/' + itemId + '/check', {
-    method: 'PATCH',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({notes: notes})
-  });
-  const item = allItems.find(i => i.id === itemId);
-  if (item) item.notes = notes;
+async function saveNote(itemId,notes){
+  await fetch('/api/items/'+itemId+'/check',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes})});
+  const item=allItems.find(i=>i.id===itemId);if(item)item.notes=notes;
 }
 
-// ── Actions ──
-async function markReady() {
-  await fetch(`/api/jobs/${currentJob.id}/status`, {
-    method: 'PATCH', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({status: 'ready'})
-  });
-  currentJob.status = 'ready';
-  document.getElementById('panel-status-badge').innerHTML = `<span class="job-status status-ready">Ready</span>`;
-  document.getElementById('btn-ready').style.display = 'none';
+async function deleteItem(itemId){
+  await fetch(`/api/items/${itemId}`,{method:'DELETE'});
+  allItems=allItems.filter(i=>i.id!==itemId);renderPanelItems();
 }
 
-async function deleteItem(itemId) {
-  await fetch(`/api/items/${itemId}`, { method: 'DELETE' });
-  allItems = allItems.filter(i => i.id !== itemId);
-  renderPanelItems();
-}
-
-async function addItem() {
-  const desc  = document.getElementById('new-desc').value.trim();
-  const room  = document.getElementById('new-room').value;
-  if (!desc) return;
-  const lastSerial = allItems.length ? Math.max(...allItems.map(i => parseInt(i.serial)||0)) : 0;
-  const newSerial  = String(lastSerial + 1).padStart(3, '0');
-  const res = await fetch(`/api/jobs/${currentJob.id}/items`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ serial: newSerial, room, description: desc, is_extra: !room })
-  });
-  const newItem = await res.json();
-  allItems.push(newItem);
-  document.getElementById('new-desc').value = '';
-  renderPanelItems();
+async function addItem(){
+  const desc=document.getElementById('new-desc').value.trim(),room=document.getElementById('new-room').value;
+  if(!desc)return;
+  const lastSerial=allItems.length?Math.max(...allItems.map(i=>parseInt(i.serial)||0)):0;
+  const newSerial=String(lastSerial+1).padStart(3,'0');
+  const res=await fetch(`/api/jobs/${currentJob.id}/items`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serial:newSerial,room,description:desc,is_extra:!room})});
+  const newItem=await res.json();
+  allItems.push(newItem);document.getElementById('new-desc').value='';renderPanelItems();
 }
 
 loadJobs();

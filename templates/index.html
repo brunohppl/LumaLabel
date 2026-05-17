@@ -450,6 +450,12 @@
       <span class="date-hint">Optional — overrides PDF date</span>
     </div>
 
+    <div class="date-field">
+      <label>Job Owner</label>
+      <input type="text" class="date-input" id="job-owner" placeholder="e.g. Sarah" style="max-width:260px;" />
+      <span class="date-hint">Optional</span>
+    </div>
+
     <button class="btn-generate" id="generate-btn" disabled>
       <div class="spinner"></div>
       <span class="btn-text">Generate Labels</span>
@@ -555,9 +561,10 @@ generateBtn.addEventListener('click', async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        pdfBase64: base64,
-        fileName: selectedFile.name,
-        installDate: installDate || null
+        pdfBase64:   base64,
+        fileName:    selectedFile.name,
+        installDate: installDate || null,
+        jobOwner:    document.getElementById('job-owner').value.trim() || ''
       })
     });
 
@@ -637,7 +644,8 @@ document.getElementById('checklist-btn').addEventListener('click', async () => {
       body: JSON.stringify({
         pdfBase64:   base64,
         fileName:    selectedFile.name,
-        installDate: installDate || null
+        installDate: installDate || null,
+        jobOwner:    document.getElementById('job-owner').value.trim() || ''
       })
     });
 

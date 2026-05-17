@@ -1076,6 +1076,7 @@ def api_item_check(item_id):
     payload = {}
     if 'checked' in data: payload['checked'] = data['checked']
     if 'notes'   in data: payload['notes']   = data['notes']
+    if 'picked'  in data: payload['picked']  = data['picked']
     result = sb_patch('items', f'id=eq.{item_id}', payload)
     return jsonify({'success': bool(result)})
 

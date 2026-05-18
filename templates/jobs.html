@@ -80,6 +80,21 @@ header{background:var(--ink);padding:20px 32px;display:flex;align-items:center;j
 .empty{text-align:center;padding:60px 24px;}
 .empty-title{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:300;color:var(--muted);margin-bottom:8px;}
 .empty-sub{font-size:0.85rem;color:var(--muted);}
+/* Role selector modal */
+.role-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.95);background:white;border-radius:3px;z-index:102;width:calc(100% - 48px);max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.15);opacity:0;pointer-events:none;transition:all 0.2s ease;}
+.role-modal.open{opacity:1;pointer-events:all;transform:translate(-50%,-50%) scale(1);}
+.role-modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);position:relative;}
+.role-job-ref{font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:400;color:var(--accent);line-height:1;}
+.role-job-addr{font-size:0.85rem;color:var(--muted);margin-top:3px;}
+.role-close{position:absolute;top:16px;right:18px;background:none;border:none;font-size:1.1rem;color:var(--muted);cursor:pointer;padding:4px;}
+.role-btns{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.role-btn{background:none;border:none;padding:28px 20px;cursor:pointer;text-align:center;transition:background 0.15s;border-top:1px solid var(--border);}
+.role-btn:first-child{border-right:1px solid var(--border);}
+.role-btn:hover{background:var(--warm);}
+.role-btn:active{background:var(--sand);}
+.role-icon{font-size:2rem;margin-bottom:8px;}
+.role-label{font-size:1rem;font-weight:600;color:var(--ink);margin-bottom:4px;font-family:'Jost',sans-serif;}
+.role-sub{font-size:0.75rem;color:var(--muted);}
 footer{border-top:1px solid var(--border);padding:16px 32px;text-align:center;font-size:0.65rem;color:var(--muted);letter-spacing:0.08em;}
 </style>
 </head>
@@ -99,6 +114,27 @@ footer{border-top:1px solid var(--border);padding:16px 32px;text-align:center;fo
   </div>
   <div class="jobs-grid" id="jobs-grid"><div class="loading">Loading jobs…</div></div>
 </div>
+<!-- Role selector modal -->
+<div class="panel-overlay" id="role-overlay" onclick="closeRole()"></div>
+<div class="role-modal" id="role-modal">
+  <div class="role-modal-header">
+    <div class="role-job-ref" id="role-ref"></div>
+    <div class="role-job-addr" id="role-addr"></div>
+    <button class="role-close" onclick="closeRole()">✕</button>
+  </div>
+  <div class="role-btns">
+    <button class="role-btn role-stylist" onclick="openAsStylist()">
+      <div class="role-label">Stylist</div>
+      <div class="role-sub">Pick items & manage job</div>
+    </button>
+    <button class="role-btn role-driver" onclick="openAsDriver()">
+      <div class="role-label">Driver</div>
+      <div class="role-sub">Load truck & check items</div>
+    </button>
+  </div>
+</div>
+
+<!-- Stylist panel -->
 <div class="panel-overlay" id="overlay" onclick="closePanel()"></div>
 <div class="panel" id="panel">
   <div class="panel-header">
@@ -144,7 +180,7 @@ async function loadJobs(){
     const colour=COLOUR_MAP[job.colour]||'#888';
     const checked=job.checked_count||0,total=job.item_count||1,pct=Math.round(checked/total*100);
     const pill=STATUS_PILLS[job.status]||'pill-ready',label=STATUS_LABELS[job.status]||job.status;
-    const truck=job.truck?`🚛 ${job.truck}`:'',owner=job.job_owner?`👤 ${job.job_owner}`:'';
+    const truck=job.truck?`${job.truck}`:'',owner=job.job_owner?`${job.job_owner}`:'';
     return `<div class="job-card" onclick="openJob('${job.id}')">
       <div class="job-card-top">
         <div class="colour-swatch" style="background:${colour}"></div>
@@ -155,8 +191,8 @@ async function loadJobs(){
           </div>
           <div class="job-address">${job.address}</div>
           <div class="job-meta">
-            ${job.stage_date ? `<span>📅 ${job.stage_date}</span>` : ''}
-            <span>📦 ${job.item_count} items</span>
+            ${job.stage_date ? `<span>${job.stage_date}</span>` : ''}
+            <span>${job.item_count} items</span>
             ${owner ? `<span>${owner}</span>` : ''}
             ${truck ? `<span>${truck}</span>` : ''}
           </div>
@@ -166,17 +202,41 @@ async function loadJobs(){
   }).join('');
 }
 
+let pendingJobId=null;
+
 async function openJob(jobId){
-  document.getElementById('overlay').classList.add('open');
-  document.getElementById('panel').classList.add('open');
-  document.getElementById('panel-body').innerHTML='<div class="loading">Loading…</div>';
+  // Show role selector first
+  pendingJobId=jobId;
+  // Fetch job for display in modal header
   const res=await fetch(`/api/jobs/${jobId}`);
   const data=await res.json();
   currentJob=data.job;allItems=data.items;
+  document.getElementById('role-ref').textContent=currentJob.job_ref||currentJob.job_number;
+  document.getElementById('role-addr').textContent=currentJob.address+' · '+currentJob.stage_date;
+  document.getElementById('role-overlay').classList.add('open');
+  document.getElementById('role-modal').classList.add('open');
+}
+
+function closeRole(){
+  document.getElementById('role-overlay').classList.remove('open');
+  document.getElementById('role-modal').classList.remove('open');
+  pendingJobId=null;
+}
+
+function openAsStylist(){
+  closeRole();
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('panel').classList.add('open');
+  document.getElementById('panel-body').innerHTML='<div class="loading">Loading…</div>';
   document.getElementById('panel-ref').textContent=currentJob.job_ref||currentJob.job_number;
   document.getElementById('panel-address').textContent=currentJob.address+' · '+currentJob.stage_date;
-  document.getElementById('panel-owner').textContent=currentJob.job_owner?'👤 '+currentJob.job_owner:'';
+  document.getElementById('panel-owner').textContent=currentJob.job_owner?''+currentJob.job_owner:'';
   renderStatus();renderPanelItems();
+}
+
+function openAsDriver(){
+  closeRole();
+  window.open(`/driver/${currentJob.id}`, '_blank');
 }
 
 function closePanel(){

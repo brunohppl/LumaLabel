@@ -25,19 +25,17 @@ header{background:var(--ink);padding:20px 32px;display:flex;align-items:center;j
 .pill-readyload{background:rgba(184,147,90,0.15);color:var(--accent);}
 .pill-loading{background:rgba(232,92,71,0.12);color:var(--red);}
 .pill-loaded{background:rgba(74,124,89,0.12);color:var(--green);}
+.pill-archived{background:rgba(155,150,145,0.12);color:var(--muted);}
 .jobs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
 .job-card{background:white;border:1px solid var(--border);border-radius:2px;overflow:hidden;cursor:pointer;transition:border-color 0.2s,box-shadow 0.2s;}
 .job-card:hover{border-color:var(--accent);box-shadow:0 4px 20px rgba(0,0,0,0.06);}
-.job-card-top{padding:18px 20px;display:flex;align-items:center;gap:14px;}
-.colour-swatch{width:12px;align-self:stretch;border-radius:1px;min-height:54px;flex-shrink:0;}
+.job-card-top{padding:20px;display:flex;align-items:flex-start;gap:14px;}
+.colour-swatch{width:10px;align-self:stretch;border-radius:1px;min-height:70px;flex-shrink:0;}
 .job-info{flex:1;min-width:0;}
 .job-ref{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:400;color:var(--accent);line-height:1;}
 .job-address{font-size:0.95rem;color:var(--ink);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.job-meta{font-size:0.78rem;color:var(--muted);margin-top:4px;display:flex;gap:12px;flex-wrap:wrap;}
-.job-progress{padding:10px 20px;border-top:1px solid var(--sand);display:flex;align-items:center;gap:10px;}
-.progress-bar{flex:1;height:3px;background:var(--sand);border-radius:1px;overflow:hidden;}
-.progress-fill{height:100%;background:var(--green);border-radius:1px;transition:width 0.3s;}
-.progress-txt{font-size:0.72rem;color:var(--muted);white-space:nowrap;}
+.job-meta{font-size:0.82rem;color:var(--muted);margin-top:6px;display:flex;gap:14px;flex-wrap:wrap;line-height:1.6;}
+.job-ref-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;}
 .panel-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.5);z-index:100;}
 .panel-overlay.open{display:block;}
 .panel{position:fixed;right:0;top:0;bottom:0;width:100%;max-width:580px;background:white;z-index:101;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s ease;}
@@ -95,7 +93,10 @@ footer{border-top:1px solid var(--border);padding:16px 32px;text-align:center;fo
 </header>
 <div class="main">
   <div class="page-title">Active Jobs</div>
-  <div class="page-sub">Click a job to manage items and update status</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
+    <div class="page-sub" style="margin-bottom:0;">Click a job to manage items and update status</div>
+    <button class="btn btn-outline" id="archived-toggle" onclick="toggleArchived()" style="font-size:0.68rem;padding:8px 14px;">Show Archived</button>
+  </div>
   <div class="jobs-grid" id="jobs-grid"><div class="loading">Loading jobs…</div></div>
 </div>
 <div class="panel-overlay" id="overlay" onclick="closePanel()"></div>
@@ -116,14 +117,29 @@ footer{border-top:1px solid var(--border);padding:16px 32px;text-align:center;fo
 <script>
 let currentJob=null,allItems=[];
 const COLOUR_MAP={Red:'#E85C47',Blue:'#4A9EE8',Green:'#4CAF7D',Yellow:'#E8C547',Purple:'#A04AE8',Orange:'#E87E47',Pink:'#E84A9E'};
-const STATUS_LABELS={ready:'Ready',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded'};
-const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded'};
+const STATUS_LABELS={ready:'Ready',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',archived:'Archived'};
+const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',archived:'pill-archived'};
+let showArchived=false;
+
+function toggleArchived(){
+  showArchived=!showArchived;
+  const btn=document.getElementById('archived-toggle');
+  btn.textContent=showArchived?'Hide Archived':'Show Archived';
+  btn.style.color=showArchived?'var(--accent)':'';
+  btn.style.borderColor=showArchived?'var(--accent)':'';
+  loadJobs();
+}
 
 async function loadJobs(){
   const res=await fetch('/api/jobs');
-  const jobs=await res.json();
+  const allJobs=await res.json();
+  const jobs=showArchived?allJobs:allJobs.filter(j=>j.status!=='archived');
   const grid=document.getElementById('jobs-grid');
-  if(!jobs.length){grid.innerHTML=`<div class="empty"><div class="empty-title">No jobs yet</div><div class="empty-sub">Generate labels from a packing slip to create a job</div></div>`;return;}
+  if(!jobs.length){
+    const msg=showArchived?'No jobs found':'No active jobs — <span style="color:var(--accent);cursor:pointer" onclick="toggleArchived()">show archived</span>';
+    grid.innerHTML=`<div class="empty"><div class="empty-title">No jobs yet</div><div class="empty-sub">${msg}</div></div>`;
+    return;
+  }
   grid.innerHTML=jobs.map(job=>{
     const colour=COLOUR_MAP[job.colour]||'#888';
     const checked=job.checked_count||0,total=job.item_count||1,pct=Math.round(checked/total*100);
@@ -133,18 +149,18 @@ async function loadJobs(){
       <div class="job-card-top">
         <div class="colour-swatch" style="background:${colour}"></div>
         <div class="job-info">
-          <div class="job-ref">${job.job_ref||job.job_number}</div>
+          <div class="job-ref-row">
+            <div class="job-ref">${job.job_ref||job.job_number}</div>
+            <span class="pill ${pill}">${label}</span>
+          </div>
           <div class="job-address">${job.address}</div>
           <div class="job-meta">
-            <span>📅 ${job.stage_date}</span><span>${job.item_count} items</span>
-            ${owner?`<span>${owner}</span>`:''}${truck?`<span>${truck}</span>`:''}
+            ${job.stage_date ? `<span>📅 ${job.stage_date}</span>` : ''}
+            <span>📦 ${job.item_count} items</span>
+            ${owner ? `<span>${owner}</span>` : ''}
+            ${truck ? `<span>${truck}</span>` : ''}
           </div>
         </div>
-        <span class="pill ${pill}">${label}</span>
-      </div>
-      <div class="job-progress">
-        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-        <div class="progress-txt">${checked}/${total} loaded</div>
       </div>
     </div>`;
   }).join('');
@@ -180,16 +196,29 @@ function renderStatus(){
   else if(s==='ready_to_load') btns=`<span style="font-size:0.82rem;color:var(--muted);">Waiting for driver to load</span>`;
   else if(s==='loading') btns=`<span style="font-size:0.82rem;color:var(--red);">Driver is loading…</span>`;
   else if(s==='loaded') btns=`<span style="font-size:0.82rem;color:var(--green);font-weight:500;">✓ Truck loaded</span>`;
+  else if(s==='archived') btns=`<button class="btn btn-outline" onclick="setStatus('ready')">Restore Job</button>`;
+
+  const archiveBtn = s!=='archived'
+    ? `<button class="btn btn-outline" onclick="archiveJob()" style="margin-left:auto;color:var(--muted);font-size:0.68rem;">Archive</button>`
+    : '';
+
   document.getElementById('panel-actions').innerHTML=`
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;width:100%;">
       ${btns}
       <div class="driver-link" style="margin-left:auto;">Driver: <a href="/driver/${currentJob.id}" target="_blank">open link →</a>${truck}</div>
+      ${archiveBtn}
     </div>`;
 }
 
 async function setStatus(newStatus){
   await fetch(`/api/jobs/${currentJob.id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:newStatus})});
   currentJob.status=newStatus;renderStatus();
+}
+
+async function archiveJob(){
+  if(!confirm('Archive this job? It will be hidden from the main view but can be restored.')) return;
+  await setStatus('archived');
+  closePanel();
 }
 
 function renderPanelItems(){

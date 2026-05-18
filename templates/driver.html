@@ -18,6 +18,7 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .pill-readyload{background:rgba(184,147,90,0.25);color:var(--accent);}
 .pill-loading{background:rgba(232,92,71,0.2);color:#E8856A;}
 .pill-loaded{background:rgba(74,124,89,0.25);color:#6BBF8A;}
+.pill-installed{background:rgba(74,124,89,0.4);color:#4A7C59;font-weight:700;}
 .hdr-job{margin-bottom:6px;}
 .hdr-ref{font-size:2.4rem;font-weight:600;color:var(--accent);line-height:1;}
 .hdr-addr{font-size:0.9rem;color:rgba(250,248,244,0.65);margin-top:2px;}
@@ -40,6 +41,7 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .action-btn:active{opacity:0.85;}
 .btn-start{background:var(--accent);color:white;}
 .btn-finish{background:var(--green);color:white;}
+.btn-installed{background:var(--ink);color:var(--cream);}
 .action-status-msg{font-size:0.82rem;color:var(--muted);text-align:center;padding:4px 0;}
 
 .content{padding:16px;padding-bottom:100px;}
@@ -114,8 +116,8 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 const jobId=window.location.pathname.split('/').pop();
 let job=null,items=[];
 
-const STATUS_PILLS={ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded'};
-const STATUS_LABELS={ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded'};
+const STATUS_PILLS={ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed'};
+const STATUS_LABELS={ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed'};
 
 async function loadJob(){
   const res=await fetch(`/api/jobs/${jobId}`);
@@ -139,7 +141,9 @@ function renderStatusBar(){
   } else if(s==='loading'){
     bar.innerHTML=`<button class="action-btn btn-finish" onclick="finishLoading()">Loading Finished</button>`;
   } else if(s==='loaded'){
-    bar.innerHTML=`<div class="action-status-msg">✓ Job complete — truck loaded</div>`;
+    bar.innerHTML=`<button class="action-btn btn-installed" onclick="setStatus('installed')">Installed</button>`;
+  } else if(s==='installed'){
+    bar.innerHTML=`<div class="action-status-msg">Installation complete</div>`;
   } else {
     bar.innerHTML=`<div class="action-status-msg">Waiting for stylist to complete picking…</div>`;
   }

@@ -25,6 +25,7 @@ header{background:var(--ink);padding:20px 32px;display:flex;align-items:center;j
 .pill-readyload{background:rgba(184,147,90,0.15);color:var(--accent);}
 .pill-loading{background:rgba(232,92,71,0.12);color:var(--red);}
 .pill-loaded{background:rgba(74,124,89,0.12);color:var(--green);}
+.pill-installed{background:rgba(74,124,89,0.2);color:var(--green);font-weight:600;}
 .pill-archived{background:rgba(155,150,145,0.12);color:var(--muted);}
 .jobs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
 .job-card{background:white;border:1px solid var(--border);border-radius:2px;overflow:hidden;cursor:pointer;transition:border-color 0.2s,box-shadow 0.2s;}
@@ -153,8 +154,8 @@ footer{border-top:1px solid var(--border);padding:16px 32px;text-align:center;fo
 <script>
 let currentJob=null,allItems=[];
 const COLOUR_MAP={Red:'#E85C47',Blue:'#4A9EE8',Green:'#4CAF7D',Yellow:'#E8C547',Purple:'#A04AE8',Orange:'#E87E47',Pink:'#E84A9E'};
-const STATUS_LABELS={ready:'Ready',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',archived:'Archived'};
-const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',archived:'pill-archived'};
+const STATUS_LABELS={ready:'Ready',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',archived:'Archived'};
+const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',archived:'pill-archived'};
 let showArchived=false;
 
 function toggleArchived(){

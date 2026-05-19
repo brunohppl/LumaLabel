@@ -3,73 +3,75 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>LUMA — Driver View</title>
-<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<title>LUMA — Driver</title>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--ink:#1A1714;--muted:#9A8F80;--border:#D8CFBF;--warm:#F2EDE4;--cream:#FAF8F4;--accent:#B8935A;--green:#4A7C59;--green-light:rgba(74,124,89,0.1);--red:#A63D2F;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font-weight:400;font-size:17px;min-height:100vh;max-width:480px;margin:0 auto;}
+body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font-weight:400;font-size:18px;min-height:100vh;max-width:540px;margin:0 auto;}
 
-.hdr{background:var(--ink);padding:16px 20px;position:sticky;top:0;z-index:50;}
-.hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-.hdr-logo{font-size:0.8rem;letter-spacing:0.2em;color:rgba(250,248,244,0.4);text-transform:uppercase;}
-.pill{display:inline-block;padding:4px 12px;border-radius:1px;font-size:0.62rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;}
-.pill-ready{background:rgba(74,126,184,0.25);color:#8ABAEE;}
+.hdr{background:var(--ink);padding:18px 22px;position:sticky;top:0;z-index:50;}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.hdr-logo{font-size:0.75rem;letter-spacing:0.22em;color:rgba(250,248,244,0.35);text-transform:uppercase;}
+.pill{display:inline-block;padding:5px 14px;border-radius:1px;font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;}
 .pill-readyload{background:rgba(184,147,90,0.25);color:var(--accent);}
 .pill-loading{background:rgba(232,92,71,0.2);color:#E8856A;}
 .pill-loaded{background:rgba(74,124,89,0.25);color:#6BBF8A;}
-.pill-installed{background:rgba(74,124,89,0.4);color:#4A7C59;font-weight:700;}
-.hdr-job{margin-bottom:6px;}
-.hdr-ref{font-size:2.4rem;font-weight:600;color:var(--accent);line-height:1;}
-.hdr-addr{font-size:0.9rem;color:rgba(250,248,244,0.65);margin-top:2px;}
-.hdr-owner{font-size:0.8rem;color:rgba(250,248,244,0.45);margin-top:2px;}
-.prog-wrap{display:flex;align-items:center;gap:10px;}
-.prog-bar{flex:1;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;}
-.prog-fill{height:100%;background:var(--green);border-radius:2px;transition:width 0.4s ease;}
-.prog-txt{font-size:0.78rem;color:rgba(250,248,244,0.6);white-space:nowrap;font-weight:500;}
+.pill-installed{background:rgba(74,124,89,0.45);color:#9FFFCE;font-weight:800;}
 
-/* Truck input section */
-.truck-section{background:white;border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;}
-.truck-label{font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;}
-.truck-input{flex:1;background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:9px 12px;font-family:'Jost',sans-serif;font-size:0.95rem;color:var(--ink);outline:none;}
+.hdr-ref{font-size:2.8rem;font-weight:700;color:var(--accent);line-height:1;letter-spacing:-0.01em;}
+.hdr-addr{font-size:1rem;color:rgba(250,248,244,0.6);margin-top:3px;}
+.hdr-owner{font-size:0.85rem;color:rgba(250,248,244,0.38);margin-top:2px;}
+
+.prog-wrap{display:flex;align-items:center;gap:12px;margin-top:12px;}
+.prog-bar{flex:1;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;}
+.prog-fill{height:100%;background:var(--green);border-radius:3px;transition:width 0.4s ease;}
+.prog-txt{font-size:0.85rem;color:rgba(250,248,244,0.55);white-space:nowrap;font-weight:600;}
+
+.truck-section{background:white;border-bottom:1px solid var(--border);padding:16px 22px;display:flex;align-items:center;gap:14px;}
+.truck-label{font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap;font-weight:600;}
+.truck-input{flex:1;background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:11px 14px;font-family:'Jost',sans-serif;font-size:1rem;color:var(--ink);outline:none;}
 .truck-input:focus{border-color:var(--accent);}
-.truck-save{padding:9px 16px;background:var(--accent);color:white;border:none;border-radius:1px;font-family:'Jost',sans-serif;font-size:0.72rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;white-space:nowrap;}
+.truck-save{padding:11px 18px;background:var(--accent);color:white;border:none;border-radius:1px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;white-space:nowrap;}
 
-/* Status action bar */
-.action-bar{background:white;border-bottom:1px solid var(--border);padding:12px 20px;}
-.action-btn{width:100%;padding:14px;border:none;border-radius:1px;font-family:'Jost',sans-serif;font-size:0.82rem;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;transition:opacity 0.15s;}
-.action-btn:active{opacity:0.85;}
+.action-bar{background:white;border-bottom:2px solid var(--border);padding:14px 22px;}
+.action-btn{width:100%;padding:17px;border:none;border-radius:1px;font-family:'Jost',sans-serif;font-size:0.9rem;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;transition:opacity 0.15s;}
+.action-btn:active{opacity:0.8;}
 .btn-start{background:var(--accent);color:white;}
 .btn-finish{background:var(--green);color:white;}
 .btn-installed{background:var(--ink);color:var(--cream);}
-.action-status-msg{font-size:0.82rem;color:var(--muted);text-align:center;padding:4px 0;}
+.action-status-msg{font-size:0.88rem;color:var(--muted);text-align:center;padding:6px 0;}
 
-.content{padding:16px;padding-bottom:100px;}
-.room-section{margin-bottom:20px;}
-.room-label{font-size:0.72rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--accent);font-weight:600;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:4px;}
-.item{background:white;border:1px solid var(--border);border-radius:2px;margin-bottom:4px;display:flex;align-items:center;overflow:hidden;transition:all 0.2s;}
-.item.checked{background:var(--green-light);border-color:rgba(74,124,89,0.35);}
-.item-check-btn{width:64px;height:68px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.15s;}
+.content{padding:18px;padding-bottom:40px;}
+.room-section{margin-bottom:24px;}
+.room-label{font-size:0.78rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);font-weight:700;padding:10px 0;border-bottom:2px solid var(--border);margin-bottom:6px;}
+
+.item{background:white;border:1px solid var(--border);border-radius:2px;margin-bottom:6px;display:flex;align-items:center;overflow:hidden;transition:all 0.2s;min-height:72px;}
+.item.checked{background:var(--green-light);border-color:rgba(74,124,89,0.4);}
+.item-check-btn{width:70px;min-height:72px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.15s;}
 .item-check-btn:active{background:var(--warm);}
-.check-circle{width:32px;height:32px;border-radius:50%;border:2.5px solid var(--border);display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
+.check-circle{width:36px;height:36px;border-radius:50%;border:3px solid var(--border);display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
 .item.checked .check-circle{background:var(--green);border-color:var(--green);}
-.check-tick{display:none;color:white;font-size:1rem;font-weight:700;}
+.check-tick{display:none;color:white;font-size:1.1rem;font-weight:800;}
 .item.checked .check-tick{display:block;}
-.check-empty{display:block;}
+.check-empty{display:block;width:10px;height:10px;}
 .item.checked .check-empty{display:none;}
-.item-info{flex:1;padding:12px 12px 12px 0;}
-.item-serial{font-size:0.75rem;font-weight:600;color:var(--accent);letter-spacing:0.1em;}
-.item-desc{font-size:1rem;color:var(--ink);margin-top:3px;line-height:1.4;font-weight:400;}
-.item-extra-tag{font-size:0.75rem;color:var(--muted);font-style:italic;}
-.item-note{font-size:0.82rem;color:var(--accent);margin-top:5px;font-style:italic;padding:4px 8px;background:rgba(184,147,90,0.08);border-radius:2px;}
 
-.done-banner{display:none;background:rgba(74,124,89,0.1);border:1px solid rgba(74,124,89,0.3);border-radius:2px;padding:20px;text-align:center;margin-bottom:20px;}
+.item-info{flex:1;padding:14px 14px 14px 0;}
+.item-serial{font-size:0.78rem;font-weight:700;color:var(--accent);letter-spacing:0.1em;}
+.item-desc{font-size:1.08rem;color:var(--ink);margin-top:4px;line-height:1.4;font-weight:500;}
+.item.checked .item-desc{color:var(--muted);}
+.item-extra-tag{font-size:0.8rem;color:var(--muted);font-style:italic;}
+.item-note{font-size:0.85rem;color:var(--accent);margin-top:6px;font-style:italic;padding:5px 10px;background:rgba(184,147,90,0.08);border-radius:2px;line-height:1.4;}
+
+.done-banner{display:none;background:rgba(74,124,89,0.1);border:1px solid rgba(74,124,89,0.3);border-radius:2px;padding:24px;text-align:center;margin-bottom:24px;}
 .done-banner.show{display:block;}
-.done-icon{font-size:2rem;}
-.done-title{font-size:1.5rem;font-weight:500;color:var(--green);margin-top:6px;}
-.done-sub{font-size:0.85rem;color:var(--muted);margin-top:6px;}
-.loading{text-align:center;padding:60px 20px;color:var(--muted);font-size:0.9rem;}
-.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px;}
+.done-icon{font-size:2.4rem;}
+.done-title{font-size:1.6rem;font-weight:600;color:var(--green);margin-top:8px;}
+.done-sub{font-size:0.9rem;color:var(--muted);margin-top:6px;}
+
+.loading{text-align:center;padding:60px 20px;color:var(--muted);font-size:1rem;}
+.spinner{width:24px;height:24px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 14px;}
 @keyframes spin{to{transform:rotate(360deg);}}
 </style>
 </head>
@@ -80,32 +82,28 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
     <div class="hdr-logo">LUMA Warehouse</div>
     <div id="status-badge" class="pill pill-readyload">Ready to Load</div>
   </div>
-  <div class="hdr-job">
-    <div class="hdr-ref" id="job-ref">—</div>
-    <div class="hdr-addr" id="job-addr"></div>
-    <div class="hdr-owner" id="job-owner"></div>
-  </div>
+  <div class="hdr-ref" id="job-ref">—</div>
+  <div class="hdr-addr" id="job-addr"></div>
+  <div class="hdr-owner" id="job-owner"></div>
   <div class="prog-wrap">
     <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
     <div class="prog-txt" id="prog-txt">0 / 0</div>
   </div>
 </div>
 
-<!-- Truck input -->
 <div class="truck-section">
-  <div class="truck-label">🚛 Truck</div>
-  <input type="text" class="truck-input" id="truck-input" placeholder="Enter truck name or number" />
+  <div class="truck-label">Truck</div>
+  <input type="text" class="truck-input" id="truck-input" placeholder="Enter truck name or number"/>
   <button class="truck-save" onclick="saveTruck()">Save</button>
 </div>
 
-<!-- Status action bar -->
 <div class="action-bar" id="action-bar"></div>
 
 <div class="content">
   <div class="done-banner" id="done-banner">
     <div class="done-icon">✓</div>
     <div class="done-title">All Items Loaded</div>
-    <div class="done-sub">Tap "Loading Finished" to complete</div>
+    <div class="done-sub">Tap "Loading Finished" above to complete</div>
   </div>
   <div id="items-container">
     <div class="loading"><div class="spinner"></div>Loading job…</div>
@@ -115,7 +113,6 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 <script>
 const jobId=window.location.pathname.split('/').pop();
 let job=null,items=[];
-
 const STATUS_PILLS={ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed'};
 const STATUS_LABELS={ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed'};
 
@@ -125,8 +122,8 @@ async function loadJob(){
   job=data.job;items=data.items;
   document.getElementById('job-ref').textContent=job.job_ref||job.job_number;
   document.getElementById('job-addr').textContent=job.address;
-  document.getElementById('job-owner').textContent=job.job_owner?'👤 '+job.job_owner:'';
-  if(job.truck) document.getElementById('truck-input').value=job.truck;
+  document.getElementById('job-owner').textContent=job.job_owner||'';
+  if(job.truck)document.getElementById('truck-input').value=job.truck;
   renderStatusBar();renderItems();updateProgress();
 }
 
@@ -136,25 +133,16 @@ function renderStatusBar(){
   badge.className='pill '+(STATUS_PILLS[s]||'pill-readyload');
   badge.textContent=STATUS_LABELS[s]||s;
   const bar=document.getElementById('action-bar');
-  if(s==='ready_to_load'){
-    bar.innerHTML=`<button class="action-btn btn-start" onclick="setStatus('loading')">Start Loading</button>`;
-  } else if(s==='loading'){
-    bar.innerHTML=`<button class="action-btn btn-finish" onclick="finishLoading()">Loading Finished</button>`;
-  } else if(s==='loaded'){
-    bar.innerHTML=`<button class="action-btn btn-installed" onclick="setStatus('installed')">Installed</button>`;
-  } else if(s==='installed'){
-    bar.innerHTML=`<div class="action-status-msg">Installation complete</div>`;
-  } else {
-    bar.innerHTML=`<div class="action-status-msg">Waiting for stylist to complete picking…</div>`;
-  }
+  if(s==='ready_to_load') bar.innerHTML=`<button class="action-btn btn-start" onclick="setStatus('loading')">Start Loading</button>`;
+  else if(s==='loading') bar.innerHTML=`<button class="action-btn btn-finish" onclick="finishLoading()">Loading Finished</button>`;
+  else if(s==='loaded') bar.innerHTML=`<button class="action-btn btn-installed" onclick="setStatus('installed')">Installed</button>`;
+  else if(s==='installed') bar.innerHTML=`<div class="action-status-msg">Installation complete</div>`;
+  else bar.innerHTML=`<div class="action-status-msg">Waiting for stylist to complete picking…</div>`;
 }
 
 async function setStatus(newStatus){
   const truck=document.getElementById('truck-input').value.trim();
-  await fetch(`/api/jobs/${job.id}/status`,{
-    method:'PATCH',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({status:newStatus,truck:truck||job.truck||''})
-  });
+  await fetch(`/api/jobs/${job.id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:newStatus,truck:truck||job.truck||''})});
   job.status=newStatus;if(truck)job.truck=truck;
   renderStatusBar();
 }
@@ -162,10 +150,7 @@ async function setStatus(newStatus){
 async function saveTruck(){
   const truck=document.getElementById('truck-input').value.trim();
   if(!truck)return;
-  await fetch(`/api/jobs/${job.id}/status`,{
-    method:'PATCH',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({status:job.status,truck})
-  });
+  await fetch(`/api/jobs/${job.id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:job.status,truck})});
   job.truck=truck;
   const btn=document.querySelector('.truck-save');
   btn.textContent='Saved ✓';setTimeout(()=>btn.textContent='Save',1500);
@@ -173,11 +158,8 @@ async function saveTruck(){
 
 async function finishLoading(){
   const checked=items.filter(i=>i.checked).length,total=items.length;
-  if(checked<total){
-    if(!confirm(`${total-checked} items not checked off. Mark as loaded anyway?`)) return;
-  }
+  if(checked<total){if(!confirm(`${total-checked} items not checked off. Mark as loaded anyway?`))return;}
   await setStatus('loaded');
-  document.getElementById('done-banner').querySelector('.done-sub').textContent='Truck confirmed loaded ✓';
 }
 
 function renderItems(){
@@ -195,7 +177,7 @@ function renderItems(){
 
 function itemHTML(item){
   const cls=item.checked?'item checked':'item';
-  const note=item.notes?`<div class="item-note">📝 ${item.notes}</div>`:'';
+  const note=item.notes?`<div class="item-note">${item.notes}</div>`:'';
   return `<div class="${cls}" id="item-${item.id}" onclick="toggleItem('${item.id}')">
     <button class="item-check-btn">
       <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
@@ -209,7 +191,7 @@ function itemHTML(item){
 }
 
 async function toggleItem(itemId){
-  if(job.status==='loaded')return;
+  if(job.status==='installed')return;
   const item=items.find(i=>i.id===itemId);if(!item)return;
   item.checked=!item.checked;
   const el=document.getElementById('item-'+itemId);
@@ -223,7 +205,7 @@ function updateProgress(){
   document.getElementById('prog-fill').style.width=pct+'%';
   document.getElementById('prog-txt').textContent=`${checked} / ${total}`;
   const allDone=total>0&&checked===total;
-  document.getElementById('done-banner').classList.toggle('show',allDone&&job.status!=='loaded');
+  document.getElementById('done-banner').classList.toggle('show',allDone&&job.status==='loading');
 }
 
 loadJob();

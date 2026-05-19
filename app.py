@@ -418,9 +418,9 @@ def parse_packing_list(pdf_bytes):
                 serial += 1
             continue
 
-        # Artwork always gets 2 labels
+        # Artwork gets 1 label
         if re.search(r'\bartwork\b', description, re.I):
-            qty = 2
+            qty = 1
 
         # Linen and cushion items get (Bag) suffix
         if re.search(r'\blinen\b|cushion', description, re.I):

@@ -70,9 +70,9 @@ def sb_delete(table, params):
         return False
 
 def save_job_to_db(meta, items, colour_name, job_owner=''):
-    meta['job_owner'] = job_owner
     """Save job and items to Supabase. Called after label generation."""
     try:
+        meta['job_owner'] = job_owner
         job_ref = re.sub(r'\D', '', meta['job_number'])[-3:] if meta['job_number'] else '000'
         # Upsert job record
         job_data = {

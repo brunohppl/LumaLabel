@@ -10,7 +10,7 @@ from datetime import datetime
 import pdfplumber
 from flask import Flask, request, jsonify, Response
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import cm
+from reportlab.lib.units import cm, mm
 from reportlab.lib import colors
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
@@ -437,9 +437,9 @@ def parse_packing_list(pdf_bytes):
             items.append({'serial': f'{serial:03d}', 'room': current_room, 'description': description})
             serial += 1
 
-    # ── Add extras to fill last label page + ~10 blank labels ──
-    # Labels per page = 9 (3x3 Avery grid)
-    per_page = 9
+    # ── Add extras to fill last label page + ~18 blank labels ──
+    # Labels per page = 18 (3x6 Avery 62x42-R grid)
+    per_page = 18
     current_count = len(items)
     remainder = current_count % per_page
     # Fill remainder of current page, then add one more full page worth
@@ -480,17 +480,21 @@ def generate_labels(meta, items, colour):
     date_txt    = format_date(meta['stage_date'])
 
     PAGE_W, PAGE_H = A4
-    # Avery 89x62-R — exact dimensions from official Word template
-    # Label: 62mm wide x 89mm tall, 3 cols x 3 rows
-    # Both gaps equal at 4.99mm (283 DXA)
-    MARGIN_X = 0.921 * cm  # 9.21mm left margin
-    MARGIN_Y = 0.998 * cm  # 9.98mm top margin
-    GAP_X    = 0.499 * cm  # 4.99mm horizontal gap
-    GAP_Y    = 0.499 * cm  # 4.99mm vertical gap (same as horizontal)
-    COLS     = 3
-    ROWS     = 3
-    LBL_W    = 6.20  * cm  # 62mm wide
-    LBL_H    = 8.90  * cm  # 89mm tall
+    # Avery 62x42-R — equal spacing throughout
+    # Label: 62mm wide x 42mm tall, 3 cols x 6 rows = 18 per page
+    # All horizontal spacing equal: 6mm (margins + gaps)
+    # All vertical spacing equal: 6.43mm (margins + gaps)
+    SX    = 6.00 * mm   # horizontal spacing (margin = gap)
+    SY    = 6.43 * mm   # vertical spacing (margin = gap)
+    COLS  = 3
+    ROWS  = 6
+    LBL_W = 62 * mm
+    LBL_H = 42 * mm
+    # Aliases for pagination section below
+    MARGIN_X = SX
+    MARGIN_Y = SY
+    GAP_X    = SX
+    GAP_Y    = SY
 
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -505,122 +509,129 @@ def generate_labels(meta, items, colour):
     inv_suffix = re.sub(r'\D', '', meta['job_number'])[-3:] if meta['job_number'] else ''
 
     def draw_label(x, y, item):
-        w, h    = LBL_W, LBL_H
-        pad     = 0.3 * cm
-        split_x = x + w * 0.45
-        rx      = split_x + pad
-        rx_end  = x + w - pad
-        rw      = rx_end - rx
+        w, h  = LBL_W, LBL_H
+        pad   = 0.18 * cm
+        bar_w = w * 0.28
 
-        # Colour block
+        # Colour bar
         c.setFillColor(C_ACCENT)
-        c.roundRect(x, y, w * 0.45, h, 6, fill=1, stroke=0)
-        c.rect(x + w * 0.45 - 6, y, 8, h, fill=1, stroke=0)
+        c.roundRect(x, y, bar_w, h, 4, fill=1, stroke=0)
+        c.rect(x + bar_w - 4, y, 6, h, fill=1, stroke=0)
 
-        # Invoice suffix number — bold white, rotated 90° anti-clockwise, centred on colour bar
-        if inv_suffix:
-            bar_w = w * 0.45
-            bar_h = h
-            # Find font size that fits along the bar height with padding
-            inv_size = 42
-            c.setFont('Helvetica-Bold', inv_size)
-            while c.stringWidth(inv_suffix, 'Helvetica-Bold', inv_size) > bar_h - 0.4*cm and inv_size > 10:
-                inv_size -= 1
-            c.setFillColor(C_WHITE)
-            c.setFont('Helvetica-Bold', inv_size)
-            inv_w = c.stringWidth(inv_suffix, 'Helvetica-Bold', inv_size)
-            # Centre of colour bar
-            cx = x + bar_w / 2
-            cy = y + bar_h / 2
-            # Save state, translate to centre, rotate, draw centred
-            c.saveState()
-            c.translate(cx, cy)
-            c.rotate(-90)  # 90° clockwise
-            c.drawString(-inv_w / 2, -inv_size * 0.35, inv_suffix)
-            c.restoreState()
-
-        # White block
+        # White area
         c.setFillColor(C_WHITE)
-        c.roundRect(x + w * 0.45, y, w * 0.55, h, 6, fill=1, stroke=0)
-        c.rect(x + w * 0.45, y, 6, h, fill=1, stroke=0)
+        c.roundRect(x + bar_w, y, w - bar_w, h, 4, fill=1, stroke=0)
+        c.rect(x + bar_w, y, 4, h, fill=1, stroke=0)
 
         # Border
         c.setStrokeColor(C_BORDER)
-        c.setLineWidth(0.8)
-        c.roundRect(x, y, w, h, 6, fill=0, stroke=1)
+        c.setLineWidth(0.7)
+        c.roundRect(x, y, w, h, 4, fill=0, stroke=1)
 
-        # DATE — top
-        date_size = 17
-        date_base = y + h - pad - 0.38 * cm
-        c.setFillColor(C_INK)
-        c.setFont('Helvetica-Bold', date_size)
-        dw = c.stringWidth(date_txt, 'Helvetica-Bold', date_size)
-        c.drawString(rx + (rw - dw) / 2, date_base - date_size * 0.35, date_txt)
+        # Invoice suffix — rotated 90° clockwise on colour bar
+        if inv_suffix:
+            # Fill bar width (rotated, so fit against bar height h)
+            inv_size = 48
+            c.setFont('Helvetica-Bold', inv_size)
+            while c.stringWidth(inv_suffix, 'Helvetica-Bold', inv_size) > h - 4 * mm and inv_size > 8:
+                inv_size -= 1
+            # Also constrain to bar_w so it doesn't overflow horizontally when rotated
+            while c.stringWidth(inv_suffix, 'Helvetica-Bold', inv_size) * 0.6 > bar_w - 2 and inv_size > 8:
+                inv_size -= 1
+            inv_w = c.stringWidth(inv_suffix, 'Helvetica-Bold', inv_size)
+            c.setFillColor(C_WHITE)
+            c.saveState()
+            c.translate(x + bar_w / 2, y + h / 2)
+            c.rotate(-90)
+            c.drawString(-inv_w / 2, -inv_size * 0.35, inv_suffix)
+            c.restoreState()
 
-        # Divider under date
-        div_y = date_base - date_size * 0.38 - 0.15 * cm
-        c.setStrokeColor(C_BORDER)
-        c.setLineWidth(0.4)
-        c.line(rx, div_y, rx_end, div_y)
+        # Right panel
+        rx  = x + bar_w + pad
+        rxe = x + w - pad
+        rw  = rxe - rx
 
-        # Middle zone: ITEM NUMBER + ID + ROOM stacked and centred
-        addr_div_y = y + pad + 0.9 * cm
-        mid_centre = (div_y - 0.1 * cm + addr_div_y + 0.1 * cm) / 2
+        # Date — top
+        ds = 12
+        c.setFillColor(C_INK); c.setFont('Helvetica-Bold', ds)
+        dw = c.stringWidth(date_txt, 'Helvetica-Bold', ds)
+        c.drawString(rx + (rw - dw) / 2, y + h - pad - ds * 0.75, date_txt)
 
-        lbl_size  = 5.5
-        id_size   = 34
-        room_size = 14
-        room_txt  = item['room'].upper()
+        # Divider
+        div_y = y + h - pad - ds * 0.9 - 1.5
+        c.setStrokeColor(C_BORDER); c.setLineWidth(0.3)
+        c.line(rx, div_y, rxe, div_y)
 
-        c.setFont('Helvetica-Bold', room_size)
-        if c.stringWidth(room_txt, 'Helvetica-Bold', room_size) > rw:
-            room_size = max(9, int(room_size * rw / c.stringWidth(room_txt, 'Helvetica-Bold', room_size)) - 1)
+        # Item number — centred in upper portion
+        id_size = 20
+        id_txt  = f'#{item["serial"]}'
+        id_w    = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
+        while id_w > rw and id_size > 10:
+            id_size -= 1
+            id_w = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
+        c.setFillColor(C_INK); c.setFont('Helvetica-Bold', id_size)
+        c.drawString(rx + (rw - id_w) / 2, y + h * 0.52, id_txt)
 
-        gap     = 0.08 * cm
-        block_h = (lbl_size * 0.4) + gap + (id_size * 0.75) + gap + (room_size * 0.75)
-        room_y  = mid_centre - block_h / 2
-        id_y    = room_y + room_size * 0.75 + gap
-        lbl_y   = id_y + id_size * 0.75 + gap
+        # Room — as large as possible, wrap to two lines if needed
+        room_txt = item['room'].upper() if item['room'] else ''
+        if room_txt:
+            # Try single line first, starting large
+            rs = 13
+            c.setFont('Helvetica-Bold', rs)
+            if c.stringWidth(room_txt, 'Helvetica-Bold', rs) <= rw:
+                # Fits on one line — keep going bigger
+                while rs < 20 and c.stringWidth(room_txt, 'Helvetica-Bold', rs + 1) <= rw:
+                    rs += 1
+                rtw = c.stringWidth(room_txt, 'Helvetica-Bold', rs)
+                c.drawString(rx + (rw - rtw) / 2, y + h * 0.17, room_txt)
+            else:
+                # Wrap to two lines — split at space or midpoint
+                words = room_txt.split()
+                if len(words) >= 2:
+                    # Find best split point
+                    best_split = 1
+                    best_diff  = float('inf')
+                    for i in range(1, len(words)):
+                        l1 = ' '.join(words[:i])
+                        l2 = ' '.join(words[i:])
+                        diff = abs(len(l1) - len(l2))
+                        if diff < best_diff:
+                            best_diff = diff
+                            best_split = i
+                    line1 = ' '.join(words[:best_split])
+                    line2 = ' '.join(words[best_split:])
+                else:
+                    line1 = room_txt[:len(room_txt)//2]
+                    line2 = room_txt[len(room_txt)//2:]
 
-        c.setFillColor(C_MUTED)
-        c.setFont('Helvetica', lbl_size)
-        lbl_w = c.stringWidth('ITEM NUMBER:', 'Helvetica', lbl_size)
-        c.drawString(rx + (rw - lbl_w) / 2, lbl_y, 'ITEM NUMBER:')
+                # Find largest font that fits both lines
+                rs = 13
+                while rs < 18:
+                    if (c.stringWidth(line1, 'Helvetica-Bold', rs + 1) <= rw and
+                        c.stringWidth(line2, 'Helvetica-Bold', rs + 1) <= rw):
+                        rs += 1
+                    else:
+                        break
+                c.setFont('Helvetica-Bold', rs)
+                line_gap = rs * 1.2
+                total_h  = line_gap * 2
+                base_y   = y + h * 0.17 + total_h / 2 - line_gap / 2
+                for i, ln in enumerate([line1, line2]):
+                    lw2 = c.stringWidth(ln, 'Helvetica-Bold', rs)
+                    c.drawString(rx + (rw - lw2) / 2, base_y - i * line_gap, ln)
 
-        c.setFillColor(C_INK)
-        c.setFont('Helvetica-Bold', id_size)
-        id_txt = f'#{item["serial"]}'
-        id_w   = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
-        c.drawString(rx + (rw - id_w) / 2, id_y, id_txt)
-
-        if room_txt:  # skip room text for blank extra labels
-            c.setFont('Helvetica-Bold', room_size)
-            rtw = c.stringWidth(room_txt, 'Helvetica-Bold', room_size)
-            c.drawString(rx + (rw - rtw) / 2, room_y, room_txt)
-
-        # Divider above address
-        c.setStrokeColor(C_BORDER)
-        c.setLineWidth(0.3)
-        c.line(rx, addr_div_y, rx_end, addr_div_y)
-
-        # Address — two lines if needed
-        addr      = meta['address']
-        addr_size = 9
-        c.setFillColor(C_INK)
-        c.setFont('Helvetica-Bold', addr_size)
-
-        if c.stringWidth(addr, 'Helvetica-Bold', addr_size) <= rw:
-            aw = c.stringWidth(addr, 'Helvetica-Bold', addr_size)
-            c.drawString(rx + (rw - aw) / 2, y + pad + 0.45 * cm, addr)
+        # Address — bottom
+        addr = meta['address']; asz = 5.5
+        c.setFillColor(C_INK); c.setFont('Helvetica-Bold', asz)
+        if c.stringWidth(addr, 'Helvetica-Bold', asz) <= rw:
+            aw = c.stringWidth(addr, 'Helvetica-Bold', asz)
+            c.drawString(rx + (rw - aw) / 2, y + 3, addr)
         else:
-            parts   = addr.split(',', 1)
-            line1   = parts[0].strip()
-            line2   = parts[1].strip() if len(parts) > 1 else ''
-            addr_y2 = y + pad + 0.20 * cm
-            addr_y1 = addr_y2 + addr_size * 1.1
-            for ln, ay in [(line1, addr_y1), (line2, addr_y2)]:
-                lw = c.stringWidth(ln, 'Helvetica-Bold', addr_size)
-                c.drawString(rx + (rw - lw) / 2, ay, ln)
+            pts = addr.split(',', 1)
+            l1 = pts[0].strip(); l2 = pts[1].strip() if len(pts) > 1 else ''
+            for ln, ay in [(l1, y + 8), (l2, y + 2)]:
+                lw3 = c.stringWidth(ln, 'Helvetica-Bold', asz)
+                c.drawString(rx + (rw - lw3) / 2, ay, ln)
 
     # Paginate
     per_page = COLS * ROWS
@@ -631,36 +642,20 @@ def generate_labels(meta, items, colour):
         c.setFillColor(colors.white)
         c.rect(0, 0, PAGE_W, PAGE_H, fill=1, stroke=0)
 
-        # Header
-        c.setFillColor(HexColor('#1A1714'))
-        c.setFont('Helvetica-Bold', 9)
-        c.drawString(MARGIN_X, PAGE_H - MARGIN_Y + 0.4 * cm, 'LUMA')
-        c.setFillColor(HexColor('#B8935A'))
-        c.setFont('Helvetica-Oblique', 9)
-        c.drawString(MARGIN_X + 1.3 * cm, PAGE_H - MARGIN_Y + 0.4 * cm, 'Design')
-        c.setFillColor(HexColor('#1A1714'))
-        c.setFont('Helvetica', 9)
-        c.drawString(MARGIN_X + 2.7 * cm, PAGE_H - MARGIN_Y + 0.4 * cm, 'Co  —  Warehouse Labels')
-
-        c.setFillColor(HexColor('#9A8F80'))
-        c.setFont('Helvetica', 7)
-        pg_txt = f'Page {pg+1} of {pages}   ·   {meta["job_number"]}   ·   {total} items total'
-        pg_w   = c.stringWidth(pg_txt, 'Helvetica', 7)
-        c.drawString(PAGE_W - MARGIN_X - pg_w, PAGE_H - MARGIN_Y + 0.4 * cm, pg_txt)
-
         for idx in range(per_page):
             item_idx = pg * per_page + idx
             if item_idx >= total: break
             col = idx % COLS
             row = ROWS - 1 - (idx // COLS)
             draw_label(
-                MARGIN_X + col * (LBL_W + GAP_X),
-                MARGIN_Y + row * (LBL_H + GAP_Y),
+                SX + col * (LBL_W + SX),
+                SY + row * (LBL_H + SY),
                 items[item_idx]
             )
 
         if pg < pages - 1:
             c.showPage()
+
 
     c.save()
     buffer.seek(0)
@@ -785,7 +780,7 @@ def generate_checklist(meta, items):
 
     # ── Table — grouped by room section headers ──
     # 4 columns: # | Description | Notes | Packed | Returned
-    col_widths = [1.1*cm, 6.5*cm, 7.2*cm, 1.8*cm, 1.9*cm]  # total ~18.5cm
+    col_widths = [2.6*cm, 5.8*cm, 6.4*cm, 1.8*cm, 1.9*cm]  # total ~18.5cm
 
     hdr_two_line = ParagraphStyle('hdr_two_line',
         fontName='Helvetica-Bold', fontSize=8,
@@ -843,14 +838,56 @@ def generate_checklist(meta, items):
         ]
         data_row_idx += 1
 
-        # Item rows for this room
-        for i, item in enumerate(group_items):
+        # Group consecutive identical descriptions into one row
+        grouped_items = []
+        i = 0
+        while i < len(group_items):
+            item = group_items[i]
+            desc = item.get('description', '')
+            # Count consecutive items with same description
+            j = i + 1
+            while j < len(group_items) and group_items[j].get('description', '') == desc:
+                j += 1
+            count = j - i
+            first_serial = item['serial']
+            last_serial  = group_items[j-1]['serial']
+            grouped_items.append({
+                'count':        count,
+                'description':  desc,
+                'first_serial': first_serial,
+                'last_serial':  last_serial,
+            })
+            i = j
+
+        for i, grp in enumerate(grouped_items):
             bg = colors.white if i % 2 == 0 else C_LIGHT
+            # Serial display: single item shows #001, multiple shows #001–#006
+            if grp['count'] == 1:
+                serial_txt = f'<b>#{grp["first_serial"]}</b>'
+            else:
+                serial_txt = f'<b>#{grp["first_serial"]}–#{grp["last_serial"]}</b>'
+            # Description: prefix quantity if more than one
+            if grp['count'] > 1:
+                item_txt = f'{grp["count"]}×  {grp["description"]}'
+            else:
+                item_txt = grp['description']
+
+            # Auto-size font so serial always fits on one line
+            # col width = 2.6cm, minus padding = ~2.2cm usable
+            serial_col_w = 2.2 * cm
+            serial_fs = 11
+            from reportlab.pdfbase.pdfmetrics import stringWidth as _sw
+            _raw = serial_txt.replace('<b>','').replace('</b>','')
+            while _sw(_raw, 'Helvetica-Bold', serial_fs) > serial_col_w and serial_fs > 7:
+                serial_fs -= 0.5
+
+            serial_style = ParagraphStyle('num',
+                fontName='Helvetica-Bold', fontSize=serial_fs,
+                textColor=C_ACCENT, alignment=TA_CENTER, leading=serial_fs * 1.2)
+
             rows.append([
-                Paragraph(f'<b>{item["serial"]}</b>', ParagraphStyle('num',
-                    fontName='Helvetica-Bold', fontSize=10,
-                    textColor=C_ACCENT, alignment=TA_CENTER)),
-                Paragraph(item.get('description', ''), cell_style),
+                Paragraph(serial_txt, serial_style),
+                Paragraph(item_txt, cell_style),
                 Paragraph('', cell_style),
                 Paragraph('', cell_style),
                 Paragraph('', cell_style),

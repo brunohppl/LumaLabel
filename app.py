@@ -198,10 +198,28 @@ def get_next_colour():
     try:
         with open(COLOUR_INDEX_FILE, 'r') as f:
             idx = int(f.read().strip())
+        # File exists — pick next in sequence
+        next_idx = (idx + 1) % len(COLOURS)
     except:
-        # File missing = fresh start after restart — pick random to avoid always starting on Red
-        idx = _random.randint(0, len(COLOURS) - 1)
-    next_idx = (idx + 1) % len(COLOURS)
+        # File missing = restart — look up last used colour from Supabase
+        # and pick a random different one
+        last_colour = None
+        try:
+            jobs = sb_get('jobs', 'order=created_at.desc&limit=1')
+            if jobs:
+                last_colour = jobs[0].get('colour')
+        except:
+            pass
+        if last_colour:
+            # Find index of last colour and pick a random different one
+            used_idx  = next((i for i, c in enumerate(COLOURS) if c['name'] == last_colour), None)
+            available = [i for i in range(len(COLOURS)) if i != used_idx]
+            next_idx  = _random.choice(available)
+        else:
+            next_idx = _random.randint(0, len(COLOURS) - 1)
+        idx = next_idx
+        next_idx = (idx + 1) % len(COLOURS)
+
     with open(COLOUR_INDEX_FILE, 'w') as f:
         f.write(str(next_idx))
     return COLOURS[idx]

@@ -450,8 +450,9 @@ def parse_packing_list(pdf_bytes):
             items.append({'serial': f'{serial:03d}', 'room': current_room, 'description': description})
             serial += 1
 
-    # ── Add extras to fill last label page + ~18 blank labels ──
-    # Labels per page = 18 (3x6 Avery 62x42-R grid)
+    # ── Add extras to fill last label page ──
+    # Will be recalculated based on selected format at generation time
+    # Use 18 as default (can be overridden); extras fill the last page
     per_page = 18
     current_count = len(items)
     remainder = current_count % per_page
@@ -488,26 +489,34 @@ def format_date(raw):
 # ════════════════════════════════════════════════
 # GENERATE LABELS PDF
 # ════════════════════════════════════════════════
-def generate_labels(meta, items, colour):
+def generate_labels(meta, items, colour, label_format=18):
     colour_hex  = colour['hex']
     date_txt    = format_date(meta['stage_date'])
 
     PAGE_W, PAGE_H = A4
-    # Avery 62x42-R — equal spacing throughout
-    # Label: 62mm wide x 42mm tall, 3 cols x 6 rows = 18 per page
-    # All horizontal spacing equal: 6mm (margins + gaps)
-    # All vertical spacing equal: 6.43mm (margins + gaps)
-    SX    = 6.00 * mm   # horizontal spacing (margin = gap)
-    SY    = 6.43 * mm   # vertical spacing (margin = gap)
-    COLS  = 3
-    ROWS  = 6
-    LBL_W = 62 * mm
-    LBL_H = 42 * mm
-    # Aliases for pagination section below
-    MARGIN_X = SX
-    MARGIN_Y = SY
-    GAP_X    = SX
-    GAP_Y    = SY
+
+    if label_format == 9:
+        # Avery 89x62-R — 9 per page, 3 cols x 3 rows
+        # Exact dimensions from official Word template
+        SX    = 0.921 * cm   # 9.21mm left margin
+        SY    = 0.998 * cm   # 9.98mm top margin
+        GX    = 0.499 * cm   # 4.99mm horizontal gap
+        GY    = 0.499 * cm   # 4.99mm vertical gap
+        COLS  = 3
+        ROWS  = 3
+        LBL_W = 6.20 * cm    # 62mm wide
+        LBL_H = 8.90 * cm    # 89mm tall
+    else:
+        # Avery 62x42-R — 18 per page, 3 cols x 6 rows
+        # Equal spacing throughout
+        SX    = 6.00 * mm
+        SY    = 6.43 * mm
+        GX    = SX
+        GY    = SY
+        COLS  = 3
+        ROWS  = 6
+        LBL_W = 62 * mm      # 62mm wide
+        LBL_H = 42 * mm      # 42mm tall
 
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -564,87 +573,106 @@ def generate_labels(meta, items, colour):
         rxe = x + w - pad
         rw  = rxe - rx
 
-        # Date — top
-        ds = 12
-        c.setFillColor(C_INK); c.setFont('Helvetica-Bold', ds)
-        dw = c.stringWidth(date_txt, 'Helvetica-Bold', ds)
-        c.drawString(rx + (rw - dw) / 2, y + h - pad - ds * 0.75, date_txt)
+        # ── Layout: DATE (top) → ROOM (centre) → ITEM NUMBER → ADDRESS (bottom) ──
+        # All zones defined upfront to prevent overlap
+        # Zone heights (points): date=14, gap=2, room=middle, itemno=12, gap=2, addr=8
+        asz  = 5.5   # address font
+        ds   = 10    # date font
+        idfs = 9     # item number font
+        addr_h   = asz * 1.4      # ~8pt
+        itemno_h = idfs * 1.4     # ~13pt
+        date_h   = ds * 1.4       # ~14pt
+        inner_h  = h - 2 * pad    # usable height
+        room_h   = inner_h - date_h - addr_h - itemno_h - 8  # remaining for room
 
-        # Divider
-        div_y = y + h - pad - ds * 0.9 - 1.5
+        # Fixed Y positions — room shifted lower, item number shifted up
+        addr_y   = y + pad
+        itemno_y = addr_y + addr_h + 9   # shifted further up
+        room_bot = itemno_y + itemno_h - 6  # room shifted lower
+        room_top = room_bot + room_h
+        date_y   = y + h - pad - date_h
+
+        # Divider under date
+        div_y = date_y - 1
         c.setStrokeColor(C_BORDER); c.setLineWidth(0.3)
         c.line(rx, div_y, rxe, div_y)
 
-        # Item number — centred in upper portion
-        id_size = 20
-        id_txt  = f'#{item["serial"]}'
-        id_w    = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
-        while id_w > rw and id_size > 10:
-            id_size -= 1
-            id_w = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
-        c.setFillColor(C_INK); c.setFont('Helvetica-Bold', id_size)
-        c.drawString(rx + (rw - id_w) / 2, y + h * 0.52, id_txt)
+        # Date
+        c.setFillColor(C_INK); c.setFont('Helvetica-Bold', ds)
+        dw = c.stringWidth(date_txt, 'Helvetica-Bold', ds)
+        c.drawString(rx + (rw - dw) / 2, date_y, date_txt)
 
-        # Room — as large as possible, wrap to two lines if needed
-        room_txt = item['room'].upper() if item['room'] else ''
-        if room_txt:
-            # Try single line first, starting large
-            rs = 13
-            c.setFont('Helvetica-Bold', rs)
-            if c.stringWidth(room_txt, 'Helvetica-Bold', rs) <= rw:
-                # Fits on one line — keep going bigger
-                while rs < 20 and c.stringWidth(room_txt, 'Helvetica-Bold', rs + 1) <= rw:
-                    rs += 1
-                rtw = c.stringWidth(room_txt, 'Helvetica-Bold', rs)
-                c.drawString(rx + (rw - rtw) / 2, y + h * 0.17, room_txt)
-            else:
-                # Wrap to two lines — split at space or midpoint
-                words = room_txt.split()
-                if len(words) >= 2:
-                    # Find best split point
-                    best_split = 1
-                    best_diff  = float('inf')
-                    for i in range(1, len(words)):
-                        l1 = ' '.join(words[:i])
-                        l2 = ' '.join(words[i:])
-                        diff = abs(len(l1) - len(l2))
-                        if diff < best_diff:
-                            best_diff = diff
-                            best_split = i
-                    line1 = ' '.join(words[:best_split])
-                    line2 = ' '.join(words[best_split:])
-                else:
-                    line1 = room_txt[:len(room_txt)//2]
-                    line2 = room_txt[len(room_txt)//2:]
-
-                # Find largest font that fits both lines
-                rs = 13
-                while rs < 18:
-                    if (c.stringWidth(line1, 'Helvetica-Bold', rs + 1) <= rw and
-                        c.stringWidth(line2, 'Helvetica-Bold', rs + 1) <= rw):
-                        rs += 1
-                    else:
-                        break
-                c.setFont('Helvetica-Bold', rs)
-                line_gap = rs * 1.2
-                total_h  = line_gap * 2
-                base_y   = y + h * 0.17 + total_h / 2 - line_gap / 2
-                for i, ln in enumerate([line1, line2]):
-                    lw2 = c.stringWidth(ln, 'Helvetica-Bold', rs)
-                    c.drawString(rx + (rw - lw2) / 2, base_y - i * line_gap, ln)
-
-        # Address — bottom
-        addr = meta['address']; asz = 5.5
-        c.setFillColor(C_INK); c.setFont('Helvetica-Bold', asz)
-        if c.stringWidth(addr, 'Helvetica-Bold', asz) <= rw:
-            aw = c.stringWidth(addr, 'Helvetica-Bold', asz)
-            c.drawString(rx + (rw - aw) / 2, y + 3, addr)
+        # Address — very bottom
+        addr = meta['address']
+        c.setFillColor(C_MUTED); c.setFont('Helvetica', asz)
+        if c.stringWidth(addr, 'Helvetica', asz) <= rw:
+            aw = c.stringWidth(addr, 'Helvetica', asz)
+            c.drawString(rx + (rw - aw) / 2, addr_y, addr)
         else:
             pts = addr.split(',', 1)
             l1 = pts[0].strip(); l2 = pts[1].strip() if len(pts) > 1 else ''
-            for ln, ay in [(l1, y + 8), (l2, y + 2)]:
-                lw3 = c.stringWidth(ln, 'Helvetica-Bold', asz)
+            for ln, ay in [(l1, addr_y + asz * 0.9), (l2, addr_y)]:
+                lw3 = c.stringWidth(ln, 'Helvetica', asz)
                 c.drawString(rx + (rw - lw3) / 2, ay, ln)
+
+        # ── ROOM — fills pre-calculated middle zone ──
+        top_clearance = 0
+        mid_top = room_top if h < 60 else div_y
+        mid_bot = room_bot if h < 60 else y + h * 0.18
+        mid_h       = mid_top - mid_bot
+        room_txt = item['room'].upper() if item['room'] else ''
+        if room_txt:
+            words = room_txt.split()
+            if len(words) >= 2:
+                # Try two lines — find best split
+                best_split, best_diff = 1, float('inf')
+                for i in range(1, len(words)):
+                    l1 = ' '.join(words[:i]); l2 = ' '.join(words[i:])
+                    diff = abs(len(l1) - len(l2))
+                    if diff < best_diff:
+                        best_diff = diff; best_split = i
+                line1 = ' '.join(words[:best_split])
+                line2 = ' '.join(words[best_split:])
+                # Find largest font where both lines fit in rw and total height fits mid_h
+                rs = 8
+                max_two = 10 if h < 60 else 999
+                while True:
+                    next_rs = rs + 1
+                    lh = next_rs * 1.25
+                    if (next_rs <= max_two and
+                        c.stringWidth(line1, 'Helvetica-Bold', next_rs) <= rw and
+                        c.stringWidth(line2, 'Helvetica-Bold', next_rs) <= rw and
+                        lh * 2 <= mid_h):
+                        rs = next_rs
+                    else:
+                        break
+                c.setFillColor(C_INK); c.setFont('Helvetica-Bold', rs)
+                lh       = rs * 1.25
+                total_rh = lh * 2
+                base_y   = mid_bot + (mid_h - total_rh) / 2 + total_rh - lh * 0.25
+                for i, ln in enumerate([line1, line2]):
+                    lw2 = c.stringWidth(ln, 'Helvetica-Bold', rs)
+                    c.drawString(rx + (rw - lw2) / 2, base_y - i * lh, ln)
+            else:
+                # Single line — maximise font
+                rs = 8
+                max_rs = 10 if h < 60 else 999
+                while c.stringWidth(room_txt, 'Helvetica-Bold', rs + 1) <= rw and rs + 1 <= mid_h * 0.75 and rs < max_rs:
+                    rs += 1
+                c.setFillColor(C_INK); c.setFont('Helvetica-Bold', rs)
+                rtw = c.stringWidth(room_txt, 'Helvetica-Bold', rs)
+                c.drawString(rx + (rw - rtw) / 2, mid_bot + (mid_h - rs) / 2, room_txt)
+
+        # ── ITEM NUMBER — fixed zone above address ──
+        id_size = idfs if h < 60 else 18  # bigger on 9pp
+        id_txt  = f'#{item["serial"]}'
+        id_w    = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
+        while id_w > rw and id_size > 7:
+            id_size -= 1
+            id_w = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
+        id_y = itemno_y if h < 60 else y + pad + 0.6 * cm  # shifted up on 9pp
+        c.setFillColor(C_MUTED); c.setFont('Helvetica-Bold', id_size)
+        c.drawString(rx + (rw - id_w) / 2, id_y, id_txt)
 
     # Paginate
     per_page = COLS * ROWS
@@ -661,8 +689,8 @@ def generate_labels(meta, items, colour):
             col = idx % COLS
             row = ROWS - 1 - (idx // COLS)
             draw_label(
-                SX + col * (LBL_W + SX),
-                SY + row * (LBL_H + SY),
+                SX + col * (LBL_W + GX),
+                SY + row * (LBL_H + GY),
                 items[item_idx]
             )
 
@@ -1010,6 +1038,7 @@ def checklist():
         pdf_bytes    = base64.b64decode(pdf_base64)
         install_date = data.get('installDate')
         job_owner    = data.get('jobOwner', '')
+        label_format = int(data.get('labelFormat', 18))  # 9 or 18 per page
         meta, items  = parse_packing_list(pdf_bytes)
         meta['job_owner'] = job_owner
 
@@ -1053,6 +1082,7 @@ def generate():
         pdf_bytes    = base64.b64decode(pdf_base64)
         install_date = data.get('installDate')
         job_owner    = data.get('jobOwner', '')
+        label_format = int(data.get('labelFormat', 18))  # 9 or 18 per page
         meta, items  = parse_packing_list(pdf_bytes)
 
         if not items:
@@ -1067,7 +1097,7 @@ def generate():
                 pass  # keep whatever the parser found
 
         colour         = get_next_colour()
-        pdf_bytes_out  = generate_labels(meta, items, colour)
+        pdf_bytes_out  = generate_labels(meta, items, colour, label_format)
         label_filename = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
 
         # Save job to database (non-blocking)

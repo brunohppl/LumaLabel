@@ -591,106 +591,119 @@ def generate_labels(meta, items, colour, label_format=18):
         rxe = x + w - pad
         rw  = rxe - rx
 
-        # ── Layout: DATE (top) → ROOM (centre) → ITEM NUMBER → ADDRESS (bottom) ──
-        # All zones defined upfront to prevent overlap
-        # Zone heights (points): date=14, gap=2, room=middle, itemno=12, gap=2, addr=8
-        asz  = 5.5   # address font
-        ds   = 10    # date font
-        idfs = 9     # item number font
-        addr_h   = asz * 1.4      # ~8pt
-        itemno_h = idfs * 1.4     # ~13pt
-        date_h   = ds * 1.4       # ~14pt
-        inner_h  = h - 2 * pad    # usable height
-        room_h   = inner_h - date_h - addr_h - itemno_h - 8  # remaining for room
+        # ── Layout (18pp): ITEM NUMBER (upper) → ROOM (bottom) → ADDRESS + DATE (very bottom) ──
+        ds  = 10    # date font
+        asz = 5.5   # address font
 
-        # Fixed Y positions — room shifted lower, item number shifted up
-        addr_y   = y + pad
-        itemno_y = addr_y + addr_h + 9   # shifted further up
-        room_bot = itemno_y + itemno_h - 6  # room shifted lower
-        room_top = room_bot + room_h
-        date_y   = y + h - pad - date_h
-
-        # Divider under date
-        div_y = date_y - 1
+        # Divider — near top, below where date used to be
+        div_y = y + h - pad - ds * 1.2
         c.setStrokeColor(C_BORDER); c.setLineWidth(0.3)
         c.line(rx, div_y, rxe, div_y)
 
-        # Date
-        c.setFillColor(C_INK); c.setFont('Helvetica-Bold', ds)
-        dw = c.stringWidth(date_txt, 'Helvetica-Bold', ds)
-        c.drawString(rx + (rw - dw) / 2, date_y, date_txt)
-
-        # Address — very bottom
+        # Address + Date on same line at very bottom
         addr = meta['address']
         c.setFillColor(C_MUTED); c.setFont('Helvetica', asz)
-        if c.stringWidth(addr, 'Helvetica', asz) <= rw:
-            aw = c.stringWidth(addr, 'Helvetica', asz)
-            c.drawString(rx + (rw - aw) / 2, addr_y, addr)
+        # Date right-aligned, address left-aligned on same baseline
+        date_sz = 8  # date font larger than address
+        dw = c.stringWidth(date_txt, 'Helvetica-Bold', date_sz)
+        # Truncate address if needed to leave room for date
+        addr_max_w = rw - dw - 6
+        addr_display = addr
+        while addr_display and c.stringWidth(addr_display, 'Helvetica', asz) > addr_max_w:
+            addr_display = addr_display[:-1]
+        if addr_display != addr:
+            addr_display = addr_display[:-1] + '…'
+        baseline = y + pad
+        c.setFont('Helvetica', asz)
+        c.drawString(rx, baseline, addr_display)
+        c.setFillColor(C_INK); c.setFont('Helvetica-Bold', date_sz)
+        c.drawString(rxe - dw, baseline, date_txt)
+
+        # ── Fixed zones for 18pp — calculated upfront, no overlap possible ──
+        if h < 60:
+            # 18pp: all positions fixed in points from label edges
+            ROOM_FONT  = 7          # fixed font — no auto-sizing
+            ROOM_Y     = y + 4      # shifted down
+            ID_FONT    = 9
+            ID_Y       = div_y - ID_FONT * 1.4 - 2  # just below divider
+
+            # Item number
+            id_txt = f'#{item["serial"]}'
+            id_w   = c.stringWidth(id_txt, 'Helvetica-Bold', ID_FONT)
+            c.setFillColor(C_MUTED); c.setFont('Helvetica-Bold', ID_FONT)
+            c.drawString(rx + (rw - id_w) / 2, ID_Y, id_txt)
+
+            # Room — clipped to its zone so it CANNOT overflow into date area
+            room_txt = item['room'].upper() if item['room'] else ''
+            if room_txt:
+                from reportlab.lib.utils import simpleSplit
+                # Clip region: from bottom of label up to just below item number
+                clip_bot = y
+                clip_top = ID_Y - 2
+                clip_w   = rw
+                c.saveState()
+                p = c.beginPath()
+                p.rect(rx, clip_bot, clip_w, clip_top - clip_bot)
+                c.clipPath(p, stroke=0, fill=0)
+                c.setFillColor(C_INK); c.setFont('Helvetica-Bold', ROOM_FONT)
+                # Split text to fit width
+                lines = simpleSplit(room_txt, 'Helvetica-Bold', ROOM_FONT, rw)
+                lh = ROOM_FONT * 1.3
+                for i, ln in enumerate(lines[:2]):
+                    lw2 = c.stringWidth(ln, 'Helvetica-Bold', ROOM_FONT)
+                    c.drawString(rx + (rw - lw2) / 2, ROOM_Y + lh * (len(lines[:2]) - 1 - i), ln)
+                c.restoreState()
         else:
-            pts = addr.split(',', 1)
-            l1 = pts[0].strip(); l2 = pts[1].strip() if len(pts) > 1 else ''
-            for ln, ay in [(l1, addr_y + asz * 0.9), (l2, addr_y)]:
-                lw3 = c.stringWidth(ln, 'Helvetica', asz)
-                c.drawString(rx + (rw - lw3) / 2, ay, ln)
+            # 9pp — auto-size room to fill middle zone
+            mid_top = div_y
+            mid_bot = y + h * 0.18
+            mid_h   = mid_top - mid_bot
+            room_txt = item['room'].upper() if item['room'] else ''
+            if room_txt:
+                words = room_txt.split()
+                if len(words) >= 2:
+                    best_split, best_diff = 1, float('inf')
+                    for i in range(1, len(words)):
+                        l1 = ' '.join(words[:i]); l2 = ' '.join(words[i:])
+                        diff = abs(len(l1) - len(l2))
+                        if diff < best_diff:
+                            best_diff = diff; best_split = i
+                    line1 = ' '.join(words[:best_split])
+                    line2 = ' '.join(words[best_split:])
+                    rs = 8
+                    while True:
+                        next_rs = rs + 1
+                        lh = next_rs * 1.25
+                        if (c.stringWidth(line1, 'Helvetica-Bold', next_rs) <= rw and
+                            c.stringWidth(line2, 'Helvetica-Bold', next_rs) <= rw and
+                            lh * 2 <= mid_h):
+                            rs = next_rs
+                        else:
+                            break
+                    c.setFillColor(C_INK); c.setFont('Helvetica-Bold', rs)
+                    lh = rs * 1.25
+                    total_rh = lh * 2
+                    base_y = mid_bot + (mid_h - total_rh) / 2 + total_rh - lh * 0.25
+                    for i, ln in enumerate([line1, line2]):
+                        lw2 = c.stringWidth(ln, 'Helvetica-Bold', rs)
+                        c.drawString(rx + (rw - lw2) / 2, base_y - i * lh, ln)
+                else:
+                    rs = 13
+                    while c.stringWidth(room_txt, 'Helvetica-Bold', rs + 1) <= rw:
+                        rs += 1
+                    c.setFillColor(C_INK); c.setFont('Helvetica-Bold', rs)
+                    rtw = c.stringWidth(room_txt, 'Helvetica-Bold', rs)
+                    c.drawString(rx + (rw - rtw) / 2, mid_bot + (mid_h - rs) / 2, room_txt)
 
-        # ── ROOM — fills pre-calculated middle zone ──
-        top_clearance = 0
-        mid_top = room_top if h < 60 else div_y
-        mid_bot = room_bot if h < 60 else y + h * 0.18
-        mid_h       = mid_top - mid_bot
-        room_txt = item['room'].upper() if item['room'] else ''
-        if room_txt:
-            words = room_txt.split()
-            if len(words) >= 2:
-                # Try two lines — find best split
-                best_split, best_diff = 1, float('inf')
-                for i in range(1, len(words)):
-                    l1 = ' '.join(words[:i]); l2 = ' '.join(words[i:])
-                    diff = abs(len(l1) - len(l2))
-                    if diff < best_diff:
-                        best_diff = diff; best_split = i
-                line1 = ' '.join(words[:best_split])
-                line2 = ' '.join(words[best_split:])
-                # Find largest font where both lines fit in rw and total height fits mid_h
-                rs = 8
-                max_two = 10 if h < 60 else 999
-                while True:
-                    next_rs = rs + 1
-                    lh = next_rs * 1.25
-                    if (next_rs <= max_two and
-                        c.stringWidth(line1, 'Helvetica-Bold', next_rs) <= rw and
-                        c.stringWidth(line2, 'Helvetica-Bold', next_rs) <= rw and
-                        lh * 2 <= mid_h):
-                        rs = next_rs
-                    else:
-                        break
-                c.setFillColor(C_INK); c.setFont('Helvetica-Bold', rs)
-                lh       = rs * 1.25
-                total_rh = lh * 2
-                base_y   = mid_bot + (mid_h - total_rh) / 2 + total_rh - lh * 0.25
-                for i, ln in enumerate([line1, line2]):
-                    lw2 = c.stringWidth(ln, 'Helvetica-Bold', rs)
-                    c.drawString(rx + (rw - lw2) / 2, base_y - i * lh, ln)
-            else:
-                # Single line — maximise font
-                rs = 8
-                max_rs = 10 if h < 60 else 999
-                while c.stringWidth(room_txt, 'Helvetica-Bold', rs + 1) <= rw and rs + 1 <= mid_h * 0.75 and rs < max_rs:
-                    rs += 1
-                c.setFillColor(C_INK); c.setFont('Helvetica-Bold', rs)
-                rtw = c.stringWidth(room_txt, 'Helvetica-Bold', rs)
-                c.drawString(rx + (rw - rtw) / 2, mid_bot + (mid_h - rs) / 2, room_txt)
-
-        # ── ITEM NUMBER — fixed zone above address ──
-        id_size = idfs if h < 60 else 18  # bigger on 9pp
-        id_txt  = f'#{item["serial"]}'
-        id_w    = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
-        while id_w > rw and id_size > 7:
-            id_size -= 1
-            id_w = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
-        id_y = itemno_y if h < 60 else y + pad + 0.6 * cm  # shifted up on 9pp
-        c.setFillColor(C_MUTED); c.setFont('Helvetica-Bold', id_size)
-        c.drawString(rx + (rw - id_w) / 2, id_y, id_txt)
+            # Item number for 9pp
+            id_size = 18
+            id_txt  = f'#{item["serial"]}'
+            id_w    = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
+            while id_w > rw and id_size > 7:
+                id_size -= 1
+                id_w = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
+            c.setFillColor(C_MUTED); c.setFont('Helvetica-Bold', id_size)
+            c.drawString(rx + (rw - id_w) / 2, y + pad + 0.6 * cm, id_txt)
 
     # Paginate
     per_page = COLS * ROWS

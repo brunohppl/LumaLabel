@@ -456,6 +456,15 @@
       <span class="date-hint">Optional</span>
     </div>
 
+    <div class="date-field">
+      <label>Label Format</label>
+      <select class="date-input" id="label-format" style="max-width:260px;">
+        <option value="9">9 per page — Avery 89×62mm</option>
+        <option value="18">18 per page — Avery 62×42mm</option>
+      </select>
+      <span class="date-hint">Choose sheet size</span>
+    </div>
+
     <button class="btn-generate" id="generate-btn" disabled>
       <div class="spinner"></div>
       <span class="btn-text">Generate Labels</span>
@@ -564,7 +573,8 @@ generateBtn.addEventListener('click', async () => {
         pdfBase64:   base64,
         fileName:    selectedFile.name,
         installDate: installDate || null,
-        jobOwner:    document.getElementById('job-owner').value.trim() || ''
+        jobOwner:    document.getElementById('job-owner').value.trim() || '',
+        labelFormat: document.getElementById('label-format').value
       })
     });
 
@@ -645,7 +655,8 @@ document.getElementById('checklist-btn').addEventListener('click', async () => {
         pdfBase64:   base64,
         fileName:    selectedFile.name,
         installDate: installDate || null,
-        jobOwner:    document.getElementById('job-owner').value.trim() || ''
+        jobOwner:    document.getElementById('job-owner').value.trim() || '',
+        labelFormat: document.getElementById('label-format').value
       })
     });
 

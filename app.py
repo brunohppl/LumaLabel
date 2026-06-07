@@ -166,28 +166,15 @@ def notify_slack(meta, item_count, colour_name, label_filename):
         pass  # Never let Slack failure break label generation
 
 
-# ── Colour cycle ──
+# ── Colour cycle — 7 maximally distinct colours ──
 COLOURS = [
-    {'hex': '#E85C47', 'name': 'Red'},
-    {'hex': '#4A9EE8', 'name': 'Blue'},
-    {'hex': '#4CAF7D', 'name': 'Green'},
-    {'hex': '#E8C547', 'name': 'Yellow'},
-    {'hex': '#A04AE8', 'name': 'Purple'},
-    {'hex': '#E87E47', 'name': 'Orange'},
-    {'hex': '#E84A9E', 'name': 'Pink'},
-    {'hex': '#2E86AB', 'name': 'Ocean'},
-    {'hex': '#A23B72', 'name': 'Plum'},
-    {'hex': '#F18F01', 'name': 'Amber'},
-    {'hex': '#C73E1D', 'name': 'Crimson'},
-    {'hex': '#3B1F2B', 'name': 'Aubergine'},
-    {'hex': '#44BBA4', 'name': 'Teal'},
-    {'hex': '#E94F37', 'name': 'Coral'},
-    {'hex': '#393E41', 'name': 'Charcoal'},
-    {'hex': '#6B4226', 'name': 'Tan'},
-    {'hex': '#7B2D8B', 'name': 'Violet'},
-    {'hex': '#1B998B', 'name': 'Emerald'},
-    {'hex': '#D62246', 'name': 'Raspberry'},
-    {'hex': '#4281A4', 'name': 'Steel'},
+    {'hex': '#D62828', 'name': 'Red'},
+    {'hex': '#1565C0', 'name': 'Blue'},
+    {'hex': '#2E7D32', 'name': 'Green'},
+    {'hex': '#F9A825', 'name': 'Yellow'},
+    {'hex': '#6A0DAD', 'name': 'Purple'},
+    {'hex': '#E65100', 'name': 'Orange'},
+    {'hex': '#00838F', 'name': 'Teal'},
 ]
 
 # Persistent colour index stored in a simple file

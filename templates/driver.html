@@ -43,8 +43,14 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .action-status-msg{font-size:0.88rem;color:var(--muted);text-align:center;padding:6px 0;}
 
 .content{padding:18px;padding-bottom:40px;}
-.room-section{margin-bottom:24px;}
-.room-label{font-size:0.78rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);font-weight:700;padding:10px 0;border-bottom:2px solid var(--border);margin-bottom:6px;}
+.room-section{margin-bottom:6px;border:1px solid var(--border);border-radius:2px;overflow:hidden;}
+.room-label{font-size:0.78rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--accent);font-weight:700;padding:12px 16px;background:rgba(26,23,20,0.04);display:flex;align-items:center;justify-content:space-between;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.room-label-left{display:flex;align-items:center;gap:12px;}
+.room-label-count{font-size:0.72rem;color:var(--muted);font-weight:400;letter-spacing:0.04em;}
+.room-chevron{font-size:0.72rem;color:var(--muted);transition:transform 0.2s;}
+.room-chevron.collapsed{transform:rotate(-90deg);}
+.room-items-wrap{padding:0 0;}
+.room-items-wrap.collapsed{display:none;}
 
 .item{background:white;border:1px solid var(--border);border-radius:2px;margin-bottom:6px;display:flex;align-items:center;overflow:hidden;transition:all 0.2s;min-height:72px;}
 .item.checked{background:var(--green-light);border-color:rgba(74,124,89,0.4);}
@@ -162,6 +168,14 @@ async function finishLoading(){
   await setStatus('loaded');
 }
 
+function toggleRoom(el){
+  const section=el.closest('.room-section');
+  const wrap=section.querySelector('.room-items-wrap');
+  const chev=section.querySelector('.room-chevron');
+  wrap.classList.toggle('collapsed');
+  chev.classList.toggle('collapsed');
+}
+
 function renderItems(){
   const container=document.getElementById('items-container');
   const regular=items.filter(i=>!i.is_extra),extras=items.filter(i=>i.is_extra);
@@ -169,9 +183,27 @@ function renderItems(){
   for(const item of regular){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
   let html='';
   for(const[room,roomItems] of Object.entries(rooms)){
-    html+=`<div class="room-section"><div class="room-label">${room||'General'}</div>${roomItems.map(itemHTML).join('')}</div>`;
+    const checked=roomItems.filter(i=>i.checked).length;
+    html+=`<div class="room-section">
+      <div class="room-label" onclick="toggleRoom(this)">
+        <div class="room-label-left">
+          <span>${room||'General'}</span>
+          <span class="room-label-count">${checked}/${roomItems.length}</span>
+        </div>
+        <span class="room-chevron">▼</span>
+      </div>
+      <div class="room-items-wrap">${roomItems.map(itemHTML).join('')}</div>
+    </div>`;
   }
-  if(extras.length) html+=`<div class="room-section"><div class="room-label">Extras</div>${extras.map(itemHTML).join('')}</div>`;
+  if(extras.length){
+    html+=`<div class="room-section">
+      <div class="room-label" onclick="toggleRoom(this)">
+        <div class="room-label-left"><span>Extras</span><span class="room-label-count">${extras.length}</span></div>
+        <span class="room-chevron">▼</span>
+      </div>
+      <div class="room-items-wrap">${extras.map(itemHTML).join('')}</div>
+    </div>`;
+  }
   container.innerHTML=html;
 }
 

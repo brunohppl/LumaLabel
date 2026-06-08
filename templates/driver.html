@@ -168,12 +168,53 @@ async function finishLoading(){
   await setStatus('loaded');
 }
 
+function groupItems(itemList){
+  const groups=[];
+  let i=0;
+  while(i<itemList.length){
+    const item=itemList[i];
+    const desc=item.description||'';
+    let j=i+1;
+    while(j<itemList.length&&(itemList[j].description||'')===desc)j++;
+    const count=j-i;
+    groups.push({
+      count,
+      description:desc,
+      firstSerial:itemList[i].serial,
+      lastSerial:itemList[j-1].serial,
+      items:itemList.slice(i,j),
+      allChecked:itemList.slice(i,j).every(x=>x.checked),
+      notes:itemList[i].notes||'',
+    });
+    i=j;
+  }
+  return groups;
+}
+
 function toggleRoom(el){
   const section=el.closest('.room-section');
   const wrap=section.querySelector('.room-items-wrap');
   const chev=section.querySelector('.room-chevron');
   wrap.classList.toggle('collapsed');
   chev.classList.toggle('collapsed');
+}
+
+function groupHTML(grp){
+  const cls=grp.allChecked?'item checked':'item';
+  const note=grp.notes?`<div class="item-note">${grp.notes}</div>`:'';
+  const serialTxt=grp.count>1?`#${grp.firstSerial}–#${grp.lastSerial}`:`#${grp.firstSerial}`;
+  const descTxt=grp.count>1?`${grp.count}×  ${grp.description||'blank extra'}`:(grp.description||'<span class="item-extra-tag">blank extra</span>');
+  const ids=grp.items.map(i=>i.id).join(',');
+  return `<div class="${cls}" id="group-${grp.firstSerial}" onclick="toggleGroup('${ids}', this)">
+    <button class="item-check-btn">
+      <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
+    </button>
+    <div class="item-info">
+      <div class="item-serial">${serialTxt}</div>
+      <div class="item-desc">${descTxt}</div>
+      ${note}
+    </div>
+  </div>`;
 }
 
 function renderItems(){
@@ -192,7 +233,7 @@ function renderItems(){
         </div>
         <span class="room-chevron">▼</span>
       </div>
-      <div class="room-items-wrap">${roomItems.map(itemHTML).join('')}</div>
+      <div class="room-items-wrap">${groupItems(roomItems).map(groupHTML).join('')}</div>
     </div>`;
   }
   if(extras.length){
@@ -201,7 +242,7 @@ function renderItems(){
         <div class="room-label-left"><span>Extras</span><span class="room-label-count">${extras.length}</span></div>
         <span class="room-chevron">▼</span>
       </div>
-      <div class="room-items-wrap">${extras.map(itemHTML).join('')}</div>
+      <div class="room-items-wrap">${groupItems(extras).map(groupHTML).join('')}</div>
     </div>`;
   }
   container.innerHTML=html;
@@ -220,6 +261,23 @@ function itemHTML(item){
       ${note}
     </div>
   </div>`;
+}
+
+async function toggleGroup(ids, el){
+  if(job.status==='installed')return;
+  const idList=ids.split(',');
+  const firstItem=items.find(i=>i.id===idList[0]);
+  if(!firstItem)return;
+  const newChecked=!firstItem.checked;
+  for(const id of idList){
+    const item=items.find(i=>i.id===id);
+    if(item)item.checked=newChecked;
+  }
+  if(newChecked)el.classList.add('checked');else el.classList.remove('checked');
+  updateProgress();
+  await Promise.all(idList.map(id=>
+    fetch(`/api/items/${id}/check`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({checked:newChecked})})
+  ));
 }
 
 async function toggleItem(itemId){

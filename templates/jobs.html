@@ -285,6 +285,14 @@ async function archiveJob(){
   await setStatus('archived');closePanel();
 }
 
+function toggleRoom(el){
+  const section=el.closest('.room-section');
+  const items=section.querySelector('.room-items');
+  const chevron=el.querySelector('.room-chevron');
+  items.classList.toggle('collapsed');
+  chevron.classList.toggle('collapsed');
+}
+
 function renderPanelItems(){
   const body=document.getElementById('panel-body');
   const regular=allItems.filter(i=>!i.is_extra),extras=allItems.filter(i=>i.is_extra);
@@ -292,9 +300,27 @@ function renderPanelItems(){
   for(const item of regular){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
   let html='';
   for(const[room,items] of Object.entries(rooms)){
-    html+=`<div class="room-section"><div class="room-header">${room||'Uncategorised'}</div>${items.map(itemRow).join('')}</div>`;
+    const picked=items.filter(i=>i.picked).length;
+    html+=`<div class="room-section">
+      <div class="room-header" onclick="toggleRoom(this)">
+        <div class="room-header-left">
+          <span>${room||'Uncategorised'}</span>
+          <span class="room-count">${picked}/${items.length} picked</span>
+        </div>
+        <span class="room-chevron">▼</span>
+      </div>
+      <div class="room-items">${items.map(itemRow).join('')}</div>
+    </div>`;
   }
-  if(extras.length) html+=`<div class="room-section"><div class="room-header">Extras</div>${extras.map(itemRow).join('')}</div>`;
+  if(extras.length){
+    html+=`<div class="room-section">
+      <div class="room-header" onclick="toggleRoom(this)">
+        <div class="room-header-left"><span>Extras</span><span class="room-count">${extras.length} items</span></div>
+        <span class="room-chevron">▼</span>
+      </div>
+      <div class="room-items">${extras.map(itemRow).join('')}</div>
+    </div>`;
+  }
   const rooms_list=[...new Set(allItems.map(i=>i.room).filter(r=>r))];
   html+=`<div class="room-section" style="margin-top:28px"><div class="room-header">Add Item</div>
     <div class="add-item-row">

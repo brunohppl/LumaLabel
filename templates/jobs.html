@@ -81,8 +81,15 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .driver-link a:hover{text-decoration:underline;}
 .panel-body{flex:1;overflow-y:auto;padding:20px 28px;}
 
-.room-section{margin-bottom:26px;}
-.room-header{font-size:0.8rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--sand);}
+.room-section{margin-bottom:4px;border:1px solid var(--sand);border-radius:2px;overflow:hidden;}
+.room-header{font-size:0.8rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--accent);font-weight:600;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;background:var(--warm);transition:background 0.15s;}
+.room-header:hover{background:var(--sand);}
+.room-header-left{display:flex;align-items:center;gap:10px;}
+.room-count{font-size:0.7rem;color:var(--muted);font-weight:400;}
+.room-chevron{font-size:0.7rem;color:var(--muted);transition:transform 0.2s;display:inline-block;}
+.room-chevron.collapsed{transform:rotate(-90deg);}
+.room-items{padding:0 14px;}
+.room-items.collapsed{display:none;}
 .item-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--sand);flex-wrap:wrap;}
 .item-row:last-child{border-bottom:none;}
 .pick-btn{width:36px;height:36px;border-radius:50%;border:2px solid var(--border);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s;font-size:1rem;color:transparent;margin-top:2px;}
@@ -299,24 +306,24 @@ function renderPanelItems(){
   const rooms={};
   for(const item of regular){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
   let html='';
-  for(const[room,items] of Object.entries(rooms)){
-    const picked=items.filter(i=>i.picked).length;
+  for(const[room,roomItemList] of Object.entries(rooms)){
+    const picked=roomItemList.filter(i=>i.picked).length;
     html+=`<div class="room-section">
       <div class="room-header" onclick="toggleRoom(this)">
         <div class="room-header-left">
           <span>${room||'Uncategorised'}</span>
-          <span class="room-count">${picked}/${items.length} picked</span>
+          <span class="room-count">${picked}/${roomItemList.length} picked</span>
         </div>
-        <span class="room-chevron">▼</span>
+        <span class="room-chevron">&#9660;</span>
       </div>
-      <div class="room-items">${items.map(itemRow).join('')}</div>
+      <div class="room-items">${roomItemList.map(itemRow).join('')}</div>
     </div>`;
   }
   if(extras.length){
     html+=`<div class="room-section">
       <div class="room-header" onclick="toggleRoom(this)">
         <div class="room-header-left"><span>Extras</span><span class="room-count">${extras.length} items</span></div>
-        <span class="room-chevron">▼</span>
+        <span class="room-chevron">&#9660;</span>
       </div>
       <div class="room-items">${extras.map(itemRow).join('')}</div>
     </div>`;

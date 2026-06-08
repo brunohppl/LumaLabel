@@ -94,6 +94,8 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .item-row:last-child{border-bottom:none;}
 .pick-btn{width:36px;height:36px;border-radius:50%;border:2px solid var(--border);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s;font-size:1rem;color:transparent;margin-top:2px;}
 .pick-btn.picked{background:var(--green);border-color:var(--green);color:white;}
+.pick-btn.partial{background:rgba(74,124,89,0.25);border-color:var(--green);color:var(--green);}
+.item-partial .item-desc{opacity:0.6;}
 .item-serial{font-size:0.88rem;font-weight:600;color:var(--accent);min-width:44px;margin-top:6px;}
 .item-desc{flex:1;font-size:1.05rem;line-height:1.5;margin-top:4px;}
 .item-picked .item-desc{text-decoration:line-through;opacity:0.45;}
@@ -292,6 +294,34 @@ async function archiveJob(){
   await setStatus('archived');closePanel();
 }
 
+function groupItems(itemList){
+  // Group consecutive identical descriptions into one row
+  const groups=[];
+  let i=0;
+  while(i<itemList.length){
+    const item=itemList[i];
+    const desc=item.description||'';
+    let j=i+1;
+    while(j<itemList.length && (itemList[j].description||'')=== desc) j++;
+    const count=j-i;
+    groups.push({
+      count,
+      description: desc,
+      firstSerial: itemList[i].serial,
+      lastSerial:  itemList[j-1].serial,
+      items:       itemList.slice(i,j),
+      // For pick/check state — group is fully picked/checked if all are
+      allPicked:   itemList.slice(i,j).every(x=>x.picked),
+      somePicked:  itemList.slice(i,j).some(x=>x.picked),
+      allChecked:  itemList.slice(i,j).every(x=>x.checked),
+      someChecked: itemList.slice(i,j).some(x=>x.checked),
+      notes:       itemList[i].notes||'',
+    });
+    i=j;
+  }
+  return groups;
+}
+
 function toggleRoom(el){
   const section=el.closest('.room-section');
   const items=section.querySelector('.room-items');
@@ -316,7 +346,7 @@ function renderPanelItems(){
         </div>
         <span class="room-chevron">&#9660;</span>
       </div>
-      <div class="room-items">${roomItemList.map(itemRow).join('')}</div>
+      <div class="room-items">${groupItems(roomItemList).map(groupRow).join('')}</div>
     </div>`;
   }
   if(extras.length){
@@ -325,7 +355,7 @@ function renderPanelItems(){
         <div class="room-header-left"><span>Extras</span><span class="room-count">${extras.length} items</span></div>
         <span class="room-chevron">&#9660;</span>
       </div>
-      <div class="room-items">${extras.map(itemRow).join('')}</div>
+      <div class="room-items">${groupItems(extras).map(groupRow).join('')}</div>
     </div>`;
   }
   const rooms_list=[...new Set(allItems.map(i=>i.room).filter(r=>r))];
@@ -338,7 +368,26 @@ function renderPanelItems(){
   body.innerHTML=html;
 }
 
+function groupRow(grp){
+  const picked = grp.allPicked;
+  const partial = grp.somePicked && !grp.allPicked;
+  const serialTxt = grp.count>1 ? `#${grp.firstSerial}–#${grp.lastSerial}` : `#${grp.firstSerial}`;
+  const descTxt   = grp.count>1 ? `${grp.count}×  ${grp.description||'blank extra'}` : (grp.description||'<span style="color:var(--muted);font-style:italic">blank extra</span>');
+  const rowCls    = picked?'item-row item-picked':partial?'item-row item-partial':'item-row';
+  const btnCls    = picked?'pick-btn picked':partial?'pick-btn partial':'pick-btn';
+  const ids       = grp.items.map(i=>i.id).join(',');
+  return `<div class="${rowCls}" id="group-${grp.firstSerial}">
+    <button class="${btnCls}" onclick="toggleGroupPicked('${ids}', this)">✓</button>
+    <div class="item-serial">${serialTxt}</div>
+    <div class="item-desc">${descTxt}</div>
+    <textarea class="item-notes" rows="1" placeholder="Add note for driver…"
+      onblur="saveNote('${grp.items[0].id}',this.value)"
+      oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+    >${grp.notes}</textarea></div>`;
+}
+
 function itemRow(item){
+  // kept for add-item single rows
   const notes=item.notes||'',picked=item.picked||false;
   return `<div class="${picked?'item-row item-picked':'item-row'}" id="item-${item.id}">
     <button class="${picked?'pick-btn picked':'pick-btn'}" id="pick-${item.id}" onclick="togglePicked('${item.id}')">✓</button>
@@ -349,6 +398,26 @@ function itemRow(item){
       onblur="saveNote('${item.id}',this.value)"
       oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
     >${notes}</textarea></div>`;
+}
+
+async function toggleGroupPicked(ids, btn){
+  const idList = ids.split(',');
+  const firstItem = allItems.find(i=>i.id===idList[0]);
+  if(!firstItem) return;
+  const newPicked = !firstItem.picked;
+  for(const id of idList){
+    const item=allItems.find(i=>i.id===id);
+    if(!item) continue;
+    item.picked=newPicked;
+  }
+  // Update button style
+  btn.classList.toggle('picked', newPicked);
+  const row=btn.closest('.item-row');
+  if(row){ row.classList.toggle('item-picked', newPicked); }
+  // Persist all
+  await Promise.all(idList.map(id=>
+    fetch('/api/items/'+id+'/check',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({picked:newPicked})})
+  ));
 }
 
 async function togglePicked(itemId){

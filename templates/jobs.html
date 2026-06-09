@@ -214,7 +214,7 @@ async function loadJobs(){
     const fallback=new Date(s);
     return isNaN(fallback)?0:fallback.getTime();
   };
-  allJobs.sort((a,b)=>parseStageDate(b.stage_date)-parseStageDate(a.stage_date));
+  allJobs.sort((a,b)=>parseStageDate(a.stage_date)-parseStageDate(b.stage_date));
   const jobs=showArchived?allJobs:allJobs.filter(j=>j.status!=='archived');
   const grid=document.getElementById('jobs-grid');
   if(!jobs.length){

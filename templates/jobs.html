@@ -192,6 +192,16 @@ function toggleArchived(){
 async function loadJobs(){
   const res=await fetch('/api/jobs');
   const allJobs=await res.json();
+  // Sort by installation date descending (most recent first)
+  // stage_date format: "12 May 2026" — parse and compare
+  allJobs.sort((a,b)=>{
+    const parseDate=s=>{
+      if(!s)return 0;
+      const d=new Date(s);
+      return isNaN(d)?0:d.getTime();
+    };
+    return parseDate(b.stage_date)-parseDate(a.stage_date);
+  });
   const jobs=showArchived?allJobs:allJobs.filter(j=>j.status!=='archived');
   const grid=document.getElementById('jobs-grid');
   if(!jobs.length){

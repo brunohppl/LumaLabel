@@ -81,15 +81,24 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .driver-link a:hover{text-decoration:underline;}
 .panel-body{flex:1;overflow-y:auto;padding:20px 28px;}
 
-.room-section{margin-bottom:4px;border:1px solid var(--sand);border-radius:2px;overflow:hidden;}
-.room-header{font-size:0.8rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--accent);font-weight:600;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;background:var(--warm);transition:background 0.15s;}
-.room-header:hover{background:var(--sand);}
-.room-header-left{display:flex;align-items:center;gap:10px;}
-.room-count{font-size:0.7rem;color:var(--muted);font-weight:400;}
-.room-chevron{font-size:0.7rem;color:var(--muted);transition:transform 0.2s;display:inline-block;}
-.room-chevron.collapsed{transform:rotate(-90deg);}
-.room-items{padding:0 14px;}
-.room-items.collapsed{display:none;}
+/* Room cards — matches driver interface */
+.room-card{margin-bottom:8px;border:1px solid var(--border);border-radius:3px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
+.room-card.done .room-card-header{background:rgba(74,124,89,0.06);}
+.room-card-header{padding:13px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;background:var(--warm);transition:background 0.15s;}
+.room-card-header:hover{background:var(--sand);}
+.ring-wrap{flex-shrink:0;width:44px;height:44px;position:relative;}
+.ring-bg{fill:none;stroke:var(--border);stroke-width:4;}
+.ring-fill{fill:none;stroke:var(--green);stroke-width:4;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset 0.4s;}
+.ring-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.62rem;font-weight:700;color:var(--ink);}
+.ring-done-icon{font-size:1rem;color:var(--green);}
+.room-card-info{flex:1;min-width:0;}
+.room-card-name{font-size:1rem;font-weight:600;color:var(--ink);letter-spacing:0.02em;}
+.room-card.done .room-card-name{color:var(--green);}
+.room-card-sub{font-size:0.72rem;color:var(--muted);margin-top:2px;}
+.room-chevron{font-size:0.7rem;color:var(--muted);transition:transform 0.25s;flex-shrink:0;}
+.room-chevron.open{transform:rotate(180deg);}
+.room-items{padding:0 14px;display:none;}
+.room-items.open{display:block;}
 .item-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--sand);flex-wrap:wrap;}
 .item-row:last-child{border-bottom:none;}
 .pick-btn{width:36px;height:36px;border-radius:50%;border:2px solid var(--border);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s;font-size:1rem;color:transparent;margin-top:2px;}
@@ -193,15 +202,19 @@ async function loadJobs(){
   const res=await fetch('/api/jobs');
   const allJobs=await res.json();
   // Sort by installation date descending (most recent first)
-  // stage_date format: "12 May 2026" — parse and compare
-  allJobs.sort((a,b)=>{
-    const parseDate=s=>{
-      if(!s)return 0;
-      const d=new Date(s);
-      return isNaN(d)?0:d.getTime();
-    };
-    return parseDate(b.stage_date)-parseDate(a.stage_date);
-  });
+  // stage_date format: "12 May 2026"
+  const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  const parseStageDate=s=>{
+    if(!s)return 0;
+    const parts=s.trim().split(/\s+/);
+    if(parts.length===3){
+      const d=parseInt(parts[0]),m=MONTHS[parts[1].toLowerCase().slice(0,3)],y=parseInt(parts[2]);
+      if(!isNaN(d)&&m!==undefined&&!isNaN(y)) return new Date(y,m,d).getTime();
+    }
+    const fallback=new Date(s);
+    return isNaN(fallback)?0:fallback.getTime();
+  };
+  allJobs.sort((a,b)=>parseStageDate(b.stage_date)-parseStageDate(a.stage_date));
   const jobs=showArchived?allJobs:allJobs.filter(j=>j.status!=='archived');
   const grid=document.getElementById('jobs-grid');
   if(!jobs.length){
@@ -332,12 +345,61 @@ function groupItems(itemList){
   return groups;
 }
 
-function toggleRoom(el){
-  const section=el.closest('.room-section');
-  const items=section.querySelector('.room-items');
-  const chevron=el.querySelector('.room-chevron');
-  items.classList.toggle('collapsed');
-  chevron.classList.toggle('collapsed');
+function toggleRoomCard(header){
+  const card=header.closest('.room-card');
+  const itemsDiv=card.querySelector('.room-items');
+  const chev=card.querySelector('.room-chevron');
+  const isOpen=itemsDiv.classList.contains('open');
+  itemsDiv.classList.toggle('open',!isOpen);
+  chev.classList.toggle('open',!isOpen);
+}
+
+function roomCardHTML(room, roomItemList, isExtra=false){
+  const picked=roomItemList.filter(i=>i.picked).length;
+  const total=roomItemList.length;
+  const done=picked===total;
+  const pct=total?picked/total:0;
+  const r=16,circ=2*Math.PI*r,offset=circ*(1-pct);
+  const groups=isExtra
+    ? groupItems(roomItemList)
+    : groupItems(roomItemList);
+  const key=(room||'extra').replace(/[^a-zA-Z0-9]/g,'_');
+  return `<div class="room-card${done?' done':''}" id="stylist-room-${key}">
+    <div class="room-card-header" onclick="toggleRoomCard(this)">
+      <div class="ring-wrap">
+        <svg width="44" height="44" viewBox="0 0 44 44">
+          <circle class="ring-bg" cx="22" cy="22" r="${r}"/>
+          <circle class="ring-fill" cx="22" cy="22" r="${r}"
+            stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"/>
+        </svg>
+        <div class="ring-txt">${done?'<span class="ring-done-icon">✓</span>':`${picked}/${total}`}</div>
+      </div>
+      <div class="room-card-info">
+        <div class="room-card-name">${room||'Extras'}</div>
+        <div class="room-card-sub">${groups.length} line${groups.length!==1?'s':''} · ${total} item${total!==1?'s':''}</div>
+      </div>
+      <span class="room-chevron">▼</span>
+    </div>
+    <div class="room-items">${groups.map(groupRow).join('')}</div>
+  </div>`;
+}
+
+function rerenderRoomProgress(){
+  const regular=allItems.filter(i=>!i.is_extra),extras=allItems.filter(i=>i.is_extra);
+  const rooms={};
+  for(const item of regular){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
+  if(extras.length)rooms['Extras']=extras;
+  for(const[room,roomItems] of Object.entries(rooms)){
+    const key=(room||'extra').replace(/[^a-zA-Z0-9]/g,'_');
+    const card=document.getElementById('stylist-room-'+key);if(!card)continue;
+    const picked=roomItems.filter(i=>i.picked).length,total=roomItems.length,done=picked===total;
+    const pct=total?picked/total:0,r=16,circ=2*Math.PI*r,offset=circ*(1-pct);
+    const ringFill=card.querySelector('.ring-fill');
+    const ringTxt=card.querySelector('.ring-txt');
+    if(ringFill)ringFill.setAttribute('stroke-dashoffset',offset.toFixed(2));
+    if(ringTxt)ringTxt.innerHTML=done?'<span class="ring-done-icon">✓</span>':`${picked}/${total}`;
+    if(done)card.classList.add('done');else card.classList.remove('done');
+  }
 }
 
 function renderPanelItems(){
@@ -347,29 +409,14 @@ function renderPanelItems(){
   for(const item of regular){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
   let html='';
   for(const[room,roomItemList] of Object.entries(rooms)){
-    const picked=roomItemList.filter(i=>i.picked).length;
-    html+=`<div class="room-section">
-      <div class="room-header" onclick="toggleRoom(this)">
-        <div class="room-header-left">
-          <span>${room||'Uncategorised'}</span>
-          <span class="room-count">${picked}/${roomItemList.length} picked</span>
-        </div>
-        <span class="room-chevron">&#9660;</span>
-      </div>
-      <div class="room-items">${groupItems(roomItemList).map(groupRow).join('')}</div>
-    </div>`;
+    html+=roomCardHTML(room, roomItemList);
   }
   if(extras.length){
-    html+=`<div class="room-section">
-      <div class="room-header" onclick="toggleRoom(this)">
-        <div class="room-header-left"><span>Extras</span><span class="room-count">${extras.length} items</span></div>
-        <span class="room-chevron">&#9660;</span>
-      </div>
-      <div class="room-items">${groupItems(extras).map(groupRow).join('')}</div>
-    </div>`;
+    html+=roomCardHTML('Extras', extras, true);
   }
   const rooms_list=[...new Set(allItems.map(i=>i.room).filter(r=>r))];
-  html+=`<div class="room-section" style="margin-top:28px"><div class="room-header">Add Item</div>
+  html+=`<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+    <div style="font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px;">Add Item</div>
     <div class="add-item-row">
       <select class="room-select" id="new-room">${rooms_list.map(r=>`<option>${r}</option>`).join('')}<option value="">— Extra</option></select>
       <input class="add-input" id="new-desc" placeholder="Item description" onkeydown="if(event.key==='Enter')addItem()"/>
@@ -424,6 +471,7 @@ async function toggleGroupPicked(ids, btn){
   btn.classList.toggle('picked', newPicked);
   const row=btn.closest('.item-row');
   if(row){ row.classList.toggle('item-picked', newPicked); }
+  rerenderRoomProgress();
   // Persist all
   await Promise.all(idList.map(id=>
     fetch('/api/items/'+id+'/check',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({picked:newPicked})})
@@ -436,6 +484,7 @@ async function togglePicked(itemId){
   const row=document.getElementById('item-'+itemId),btn=document.getElementById('pick-'+itemId);
   if(item.picked){row.classList.add('item-picked');btn.classList.add('picked');}
   else{row.classList.remove('item-picked');btn.classList.remove('picked');}
+  rerenderRoomProgress();
   await fetch('/api/items/'+itemId+'/check',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({picked:item.picked})});
 }
 

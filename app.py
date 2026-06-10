@@ -620,67 +620,12 @@ def generate_labels(meta, items, colour, label_format=18):
             c.setFillColor(C_MUTED); c.setFont('Helvetica-Bold', ID_FONT)
             c.drawString(rx + (rw - id_w) / 2, ID_Y, id_txt)
 
-            # Room — clipped to its zone so it CANNOT overflow into date area
-            room_txt = item['room'].upper() if item['room'] else ''
-            if room_txt:
-                from reportlab.lib.utils import simpleSplit
-                # Clip region: from bottom of label up to just below item number
-                clip_bot = y
-                clip_top = ID_Y - 2
-                clip_w   = rw
-                c.saveState()
-                p = c.beginPath()
-                p.rect(rx, clip_bot, clip_w, clip_top - clip_bot)
-                c.clipPath(p, stroke=0, fill=0)
-                c.setFillColor(C_INK); c.setFont('Helvetica-Bold', ROOM_FONT)
-                # Split text to fit width
-                lines = simpleSplit(room_txt, 'Helvetica-Bold', ROOM_FONT, rw)
-                lh = ROOM_FONT * 1.3
-                for i, ln in enumerate(lines[:2]):
-                    lw2 = c.stringWidth(ln, 'Helvetica-Bold', ROOM_FONT)
-                    c.drawString(rx + (rw - lw2) / 2, ROOM_Y + lh * (len(lines[:2]) - 1 - i), ln)
-                c.restoreState()
+            # Room name removed — left blank for stylist to write manually
         else:
             # 9pp — auto-size room to fill middle zone
-            mid_top = div_y
-            mid_bot = y + h * 0.18
-            mid_h   = mid_top - mid_bot
-            room_txt = item['room'].upper() if item['room'] else ''
-            if room_txt:
-                words = room_txt.split()
-                if len(words) >= 2:
-                    best_split, best_diff = 1, float('inf')
-                    for i in range(1, len(words)):
-                        l1 = ' '.join(words[:i]); l2 = ' '.join(words[i:])
-                        diff = abs(len(l1) - len(l2))
-                        if diff < best_diff:
-                            best_diff = diff; best_split = i
-                    line1 = ' '.join(words[:best_split])
-                    line2 = ' '.join(words[best_split:])
-                    rs = 8
-                    while True:
-                        next_rs = rs + 1
-                        lh = next_rs * 1.25
-                        if (c.stringWidth(line1, 'Helvetica-Bold', next_rs) <= rw and
-                            c.stringWidth(line2, 'Helvetica-Bold', next_rs) <= rw and
-                            lh * 2 <= mid_h):
-                            rs = next_rs
-                        else:
-                            break
-                    c.setFillColor(C_INK); c.setFont('Helvetica-Bold', rs)
-                    lh = rs * 1.25
-                    total_rh = lh * 2
-                    base_y = mid_bot + (mid_h - total_rh) / 2 + total_rh - lh * 0.25
-                    for i, ln in enumerate([line1, line2]):
-                        lw2 = c.stringWidth(ln, 'Helvetica-Bold', rs)
-                        c.drawString(rx + (rw - lw2) / 2, base_y - i * lh, ln)
-                else:
-                    rs = 13
-                    while c.stringWidth(room_txt, 'Helvetica-Bold', rs + 1) <= rw:
-                        rs += 1
-                    c.setFillColor(C_INK); c.setFont('Helvetica-Bold', rs)
-                    rtw = c.stringWidth(room_txt, 'Helvetica-Bold', rs)
-                    c.drawString(rx + (rw - rtw) / 2, mid_bot + (mid_h - rs) / 2, room_txt)
+            # Room name removed — blank for stylist to write manually
+            pass
+
 
             # Item number for 9pp
             id_size = 18

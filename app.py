@@ -456,8 +456,7 @@ def parse_packing_list(pdf_bytes):
             serial += 1
 
     # ── Add extras to fill last label page ──
-    # Will be recalculated based on selected format at generation time
-    # Use 18 as default (can be overridden); extras fill the last page
+    # Default extras — generate_labels will use the correct per_page
     per_page = 18
     current_count = len(items)
     remainder = current_count % per_page
@@ -502,26 +501,36 @@ def generate_labels(meta, items, colour, label_format=18):
 
     if label_format == 9:
         # Avery 89x62-R — 9 per page, 3 cols x 3 rows
-        # Exact dimensions from official Word template
-        SX    = 0.921 * cm   # 9.21mm left margin
-        SY    = 0.998 * cm   # 9.98mm top margin
-        GX    = 0.499 * cm   # 4.99mm horizontal gap
-        GY    = 0.499 * cm   # 4.99mm vertical gap
+        SX    = 0.921 * cm
+        SY    = 0.998 * cm
+        GX    = 0.499 * cm
+        GY    = 0.499 * cm
         COLS  = 3
         ROWS  = 3
-        LBL_W = 6.20 * cm    # 62mm wide
-        LBL_H = 8.90 * cm    # 89mm tall
+        LBL_W = 6.20 * cm
+        LBL_H = 8.90 * cm
+    elif label_format == 12:
+        # Avery 80x45-R — 12 per page, 4 cols x 3 rows
+        # Label portrait: 45mm wide x 80mm tall
+        # Equal spacing: SX=6mm, SY=14.25mm
+        SX    = 6.00  * mm
+        SY    = 14.25 * mm
+        GX    = SX
+        GY    = SY
+        COLS  = 4
+        ROWS  = 3
+        LBL_W = 45 * mm   # 45mm wide
+        LBL_H = 80 * mm   # 80mm tall
     else:
         # Avery 62x42-R — 18 per page, 3 cols x 6 rows
-        # Equal spacing throughout
         SX    = 6.00 * mm
         SY    = 6.43 * mm
         GX    = SX
         GY    = SY
         COLS  = 3
         ROWS  = 6
-        LBL_W = 62 * mm      # 62mm wide
-        LBL_H = 42 * mm      # 42mm tall
+        LBL_W = 62 * mm
+        LBL_H = 42 * mm
 
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -538,7 +547,8 @@ def generate_labels(meta, items, colour, label_format=18):
     def draw_label(x, y, item):
         w, h  = LBL_W, LBL_H
         pad   = 0.18 * cm
-        bar_w = w * 0.28
+        # Wider colour bar for 12pp (45mm wide label) — 0.38 vs 0.28
+        bar_w = w * (0.38 if abs(w - 45*mm) < 1 else 0.28)
 
         # Colour bar
         c.setFillColor(C_ACCENT)
@@ -637,8 +647,25 @@ def generate_labels(meta, items, colour, label_format=18):
             c.setFillColor(C_MUTED); c.setFont('Helvetica-Bold', id_size)
             c.drawString(rx + (rw - id_w) / 2, y + pad + 0.6 * cm, id_txt)
 
+    # Adjust extras count to fill last page for this specific format
+    ppp       = COLS * ROWS
+    regular   = [i for i in items if not i.get('is_extra')]
+    extras    = [i for i in items if i.get('is_extra')]
+    remainder = len(regular) % ppp
+    needed    = (ppp - remainder) % ppp + ppp  # fill page + one full page
+    needed    = max(ppp, min(ppp * 2, needed))
+    # Trim or extend extras to match needed count
+    if len(extras) > needed:
+        extras = extras[:needed]
+    elif len(extras) < needed:
+        last_serial = int(extras[-1]['serial']) if extras else int(regular[-1]['serial']) if regular else 0
+        while len(extras) < needed:
+            last_serial += 1
+            extras.append({'serial': f'{last_serial:03d}', 'room': '', 'description': '', 'is_extra': True})
+    items = regular + extras
+
     # Paginate
-    per_page = COLS * ROWS
+    per_page = ppp
     total    = len(items)
     pages    = (total + per_page - 1) // per_page
 

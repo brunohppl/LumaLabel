@@ -190,20 +190,23 @@ const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 async function uploadPhoto(file, itemId){
   // Compress image before upload
   const compressed = await compressImage(file, 800, 0.6);
-  const ext = 'jpg';
-  const path = `${itemId}.${ext}`;
+  const path = `${itemId}.jpg`;
   const res = await fetch(`${SB_URL}/storage/v1/object/item-photos/${path}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${SB_KEY}`,
       'Content-Type': 'image/jpeg',
       'x-upsert': 'true',
+      'cache-control': '3600',
     },
     body: compressed,
   });
-  if(!res.ok) throw new Error('Upload failed');
-  const publicUrl = `${SB_URL}/storage/v1/object/public/item-photos/${path}`;
-  return publicUrl;
+  if(!res.ok){
+    const err = await res.text();
+    console.error('Upload error:', res.status, err);
+    throw new Error(`Upload failed (${res.status}): ${err}`);
+  }
+  return `${SB_URL}/storage/v1/object/public/item-photos/${path}`;
 }
 
 function compressImage(file, maxWidth, quality){

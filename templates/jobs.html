@@ -2,369 +2,591 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>LUMA — Driver</title>
-<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUMA Design Co — Jobs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--ink:#1A1714;--muted:#9A8F80;--border:#D8CFBF;--warm:#F2EDE4;--cream:#FAF8F4;--accent:#B8935A;--green:#4A7C59;--green-light:rgba(74,124,89,0.1);--red:#A63D2F;}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weight:400;font-size:17px;min-height:100vh;max-width:540px;margin:0 auto;}
+:root{--cream:#FAF8F4;--warm:#F2EDE4;--sand:#E5DDD0;--border:#D8CFBF;--muted:#9A8F80;--ink:#1A1714;--accent:#B8935A;--green:#4A7C59;--red:#A63D2F;--blue:#4A7EB8;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font-weight:400;font-size:18px;min-height:100vh;}
 
-/* ── HEADER ── */
-.hdr{background:var(--ink);padding:16px 20px;position:sticky;top:0;z-index:50;}
-.hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-.hdr-logo{font-size:0.72rem;letter-spacing:0.22em;color:rgba(250,248,244,0.35);text-transform:uppercase;}
-.pill{display:inline-block;padding:5px 14px;border-radius:1px;font-size:0.65rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;}
-.pill-readyload{background:rgba(184,147,90,0.25);color:var(--accent);}
-.pill-loading{background:rgba(232,92,71,0.2);color:#E8856A;}
-.pill-loaded{background:rgba(74,124,89,0.25);color:#6BBF8A;}
-.pill-installed{background:rgba(74,124,89,0.45);color:#9FFFCE;font-weight:800;}
-.hdr-ref{font-size:2.6rem;font-weight:700;color:var(--accent);line-height:1;letter-spacing:-0.01em;}
-.hdr-addr{font-size:0.92rem;color:rgba(250,248,244,0.6);margin-top:2px;}
-.hdr-owner{font-size:0.8rem;color:rgba(250,248,244,0.35);margin-top:1px;}
-.prog-wrap{display:flex;align-items:center;gap:12px;margin-top:10px;}
-.prog-bar{flex:1;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;}
-.prog-fill{height:100%;background:var(--green);border-radius:3px;transition:width 0.4s ease;}
-.prog-txt{font-size:0.82rem;color:rgba(250,248,244,0.55);white-space:nowrap;font-weight:600;}
+header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;justify-content:space-between;}
+.logo{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:300;letter-spacing:0.12em;color:#FAF8F4;}
+.logo em{font-style:italic;color:var(--accent);}
+.nav-links{display:flex;gap:24px;}
+.nav-link{color:rgba(250,248,244,0.45);text-decoration:none;font-size:0.8rem;letter-spacing:0.14em;text-transform:uppercase;transition:color 0.2s;}
+.nav-link:hover,.nav-link.active{color:var(--accent);}
 
-/* ── TRUCK ── */
-.truck-section{background:white;border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;}
-.truck-label{font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap;font-weight:600;}
-.truck-input{flex:1;background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:10px 13px;font-family:'Jost',sans-serif;font-size:1rem;color:var(--ink);outline:none;}
-.truck-input:focus{border-color:var(--accent);}
-.truck-save{padding:10px 16px;background:var(--accent);color:white;border:none;border-radius:1px;font-family:'Jost',sans-serif;font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;}
+.main{max-width:1100px;margin:0 auto;padding:36px 24px;}
+.page-title{font-family:'Cormorant Garamond',serif;font-size:2.6rem;font-weight:300;margin-bottom:4px;}
+.page-sub{font-size:0.9rem;color:var(--muted);margin-bottom:0;}
 
-/* ── ACTION BAR ── */
-.action-bar{background:white;border-bottom:2px solid var(--border);padding:14px 20px;}
-.action-btn{width:100%;padding:16px;border:none;border-radius:1px;font-family:'Jost',sans-serif;font-size:0.88rem;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;}
-.action-btn:active{opacity:0.8;}
-.btn-start{background:var(--accent);color:white;}
-.btn-finish{background:var(--green);color:white;}
-.btn-installed{background:var(--ink);color:var(--cream);}
-.action-status-msg{font-size:0.88rem;color:var(--muted);text-align:center;padding:4px 0;}
+.pill{display:inline-block;padding:5px 14px;border-radius:1px;font-size:0.68rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;}
+.pill-ready{background:rgba(74,126,184,0.12);color:var(--blue);}
+.pill-picking{background:rgba(232,197,71,0.15);color:#B8972A;}
+.pill-readyload{background:rgba(184,147,90,0.15);color:var(--accent);}
+.pill-loading{background:rgba(232,92,71,0.12);color:var(--red);}
+.pill-loaded{background:rgba(74,124,89,0.12);color:var(--green);}
+.pill-installed{background:rgba(74,124,89,0.2);color:var(--green);font-weight:700;}
+.pill-archived{background:rgba(155,150,145,0.12);color:var(--muted);}
 
-/* ── CONTENT ── */
-.content{padding:16px;padding-bottom:40px;}
+.jobs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:18px;}
+.job-card{background:white;border:1px solid var(--border);border-radius:2px;overflow:hidden;cursor:pointer;transition:border-color 0.2s,box-shadow 0.2s;}
+.job-card:hover{border-color:var(--accent);box-shadow:0 4px 24px rgba(0,0,0,0.07);}
+.job-card-top{padding:22px;display:flex;align-items:flex-start;gap:14px;}
+.colour-swatch{width:10px;align-self:stretch;border-radius:1px;min-height:70px;flex-shrink:0;}
+.job-info{flex:1;min-width:0;}
+.job-ref-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
+.job-ref{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:400;color:var(--accent);line-height:1;}
+.job-address{font-size:1rem;color:var(--ink);margin-top:4px;}
+.job-meta{font-size:0.85rem;color:var(--muted);margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;line-height:1.7;}
 
-/* ── ROOM CARDS ── */
-.room-card{background:white;border-radius:3px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
-.room-card-header{padding:16px 18px;display:flex;align-items:center;gap:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background 0.15s;}
-.room-card-header:active{background:var(--warm);}
-.room-card.done .room-card-header{background:var(--green-light);}
+/* Role modal */
+.panel-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.5);z-index:100;}
+.panel-overlay.open{display:block;}
+.role-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.95);background:white;border-radius:3px;z-index:102;width:calc(100% - 40px);max-width:440px;box-shadow:0 24px 64px rgba(0,0,0,0.18);opacity:0;pointer-events:none;transition:all 0.2s ease;}
+.role-modal.open{opacity:1;pointer-events:all;transform:translate(-50%,-50%) scale(1);}
+.role-modal-header{padding:24px 28px 18px;border-bottom:1px solid var(--border);position:relative;}
+.role-job-ref{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:400;color:var(--accent);line-height:1;}
+.role-job-addr{font-size:0.9rem;color:var(--muted);margin-top:4px;}
+.role-close{position:absolute;top:18px;right:20px;background:none;border:none;font-size:1.3rem;color:var(--muted);cursor:pointer;padding:4px;}
+.role-btns{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.role-btn{background:none;border:none;padding:34px 24px;cursor:pointer;text-align:center;transition:background 0.15s;border-top:1px solid var(--border);}
+.role-btn:first-child{border-right:1px solid var(--border);}
+.role-btn:hover{background:var(--warm);}
+.role-btn:active{background:var(--sand);}
+.role-label{font-size:1.3rem;font-weight:600;color:var(--ink);margin-bottom:6px;font-family:'Jost',sans-serif;letter-spacing:0.04em;}
+.role-sub{font-size:0.82rem;color:var(--muted);}
 
-/* Progress ring */
-.ring-wrap{flex-shrink:0;width:48px;height:48px;position:relative;}
+/* Stylist panel */
+.panel{position:fixed;right:0;top:0;bottom:0;width:100%;max-width:600px;background:white;z-index:101;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s ease;}
+.panel.open{transform:translateX(0);}
+.panel-header{padding:22px 28px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:14px;flex-shrink:0;}
+.panel-close{background:none;border:none;font-size:1.6rem;color:var(--muted);cursor:pointer;padding:4px;margin-top:2px;}
+.panel-title{flex:1;}
+.panel-job-ref{font-family:'Cormorant Garamond',serif;font-size:1.9rem;font-weight:400;color:var(--accent);}
+.panel-address{font-size:0.95rem;color:var(--muted);margin-top:3px;}
+.panel-owner{font-size:0.9rem;color:var(--ink);margin-top:3px;font-weight:500;}
+.panel-actions{padding:16px 28px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-shrink:0;flex-wrap:wrap;align-items:center;}
+.btn{padding:12px 20px;border-radius:1px;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.82rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.btn-gold{background:var(--accent);color:white;}
+.btn-gold:hover{background:#a07840;}
+.btn-green{background:rgba(74,124,89,0.1);color:var(--green);border:1px solid rgba(74,124,89,0.3);}
+.btn-green:hover{background:rgba(74,124,89,0.2);}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--ink);}
+.btn-outline:hover{border-color:var(--ink);}
+.driver-link{font-size:0.8rem;color:var(--muted);}
+.driver-link a{color:var(--accent);text-decoration:none;font-weight:500;}
+.driver-link a:hover{text-decoration:underline;}
+.panel-body{flex:1;overflow-y:auto;padding:20px 28px;}
+
+/* Room cards — matches driver interface */
+.room-card{margin-bottom:8px;border:1px solid var(--border);border-radius:3px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
+.room-card.done .room-card-header{background:rgba(74,124,89,0.06);}
+.room-card-header{padding:13px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;background:var(--warm);transition:background 0.15s;}
+.room-card-header:hover{background:var(--sand);}
+.ring-wrap{flex-shrink:0;width:44px;height:44px;position:relative;}
 .ring-bg{fill:none;stroke:var(--border);stroke-width:4;}
-.ring-fill{fill:none;stroke:var(--green);stroke-width:4;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset 0.4s ease;}
-.ring-done .ring-fill{stroke:var(--green);}
-.ring-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:700;color:var(--ink);}
-.ring-done-icon{font-size:1.1rem;color:var(--green);}
-
+.ring-fill{fill:none;stroke:var(--green);stroke-width:4;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset 0.4s;}
+.ring-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.62rem;font-weight:700;color:var(--ink);}
+.ring-done-icon{font-size:1rem;color:var(--green);}
 .room-card-info{flex:1;min-width:0;}
-.room-card-name{font-size:1.1rem;font-weight:600;color:var(--ink);letter-spacing:0.02em;}
+.room-card-name{font-size:1rem;font-weight:600;color:var(--ink);letter-spacing:0.02em;}
 .room-card.done .room-card-name{color:var(--green);}
-.room-card-sub{font-size:0.78rem;color:var(--muted);margin-top:2px;}
-.room-chevron{font-size:0.75rem;color:var(--muted);transition:transform 0.25s;flex-shrink:0;}
+.room-card-sub{font-size:0.72rem;color:var(--muted);margin-top:2px;}
+.room-chevron{font-size:0.7rem;color:var(--muted);transition:transform 0.25s;flex-shrink:0;}
 .room-chevron.open{transform:rotate(180deg);}
-
-/* Item list inside card */
-.room-items{border-top:1px solid var(--border);display:none;}
+.room-items{padding:0 14px;display:none;}
 .room-items.open{display:block;}
-.group-row{display:flex;align-items:center;padding:0;border-bottom:1px solid var(--warm);transition:background 0.15s;}
-.group-row:last-child{border-bottom:none;}
-.group-row.checked{background:var(--green-light);}
-.check-btn{width:64px;min-height:64px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.check-btn:active{background:var(--warm);}
-.check-circle{width:32px;height:32px;border-radius:50%;border:2.5px solid var(--border);display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
-.group-row.checked .check-circle{background:var(--green);border-color:var(--green);}
-.check-tick{display:none;color:white;font-size:1rem;font-weight:700;}
-.group-row.checked .check-tick{display:block;}
-.check-empty{display:block;width:8px;height:8px;}
-.group-row.checked .check-empty{display:none;}
-.group-info{flex:1;padding:14px 14px 14px 0;}
-.group-serial{font-size:0.75rem;font-weight:700;color:var(--accent);letter-spacing:0.08em;}
-.group-desc{font-size:1rem;color:var(--ink);margin-top:3px;line-height:1.4;font-weight:500;}
-.group-row.checked .group-desc{color:var(--muted);}
-.group-note{font-size:0.82rem;color:var(--accent);margin-top:5px;font-style:italic;padding:4px 8px;background:rgba(184,147,90,0.08);border-radius:2px;}
-.photo-thumb-wrap{margin-top:6px;}
-.photo-thumb-btn{background:none;border:1px solid var(--border);border-radius:2px;padding:4px 10px;font-size:0.72rem;color:var(--muted);cursor:pointer;}
-.photo-thumb-btn:active{background:var(--warm);}
-.photo-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;align-items:center;justify-content:center;}
-.photo-modal.open{display:flex;}
-.photo-modal img{max-width:95vw;max-height:90vh;border-radius:3px;}
-.photo-modal-close{position:absolute;top:16px;right:20px;color:white;font-size:2rem;cursor:pointer;background:none;border:none;}
+.item-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--sand);flex-wrap:wrap;}
+.item-row:last-child{border-bottom:none;}
+.pick-btn{width:36px;height:36px;border-radius:50%;border:2px solid var(--border);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s;font-size:1rem;color:transparent;margin-top:2px;}
+.pick-btn.picked{background:var(--green);border-color:var(--green);color:white;}
+.pick-btn.partial{background:rgba(74,124,89,0.25);border-color:var(--green);color:var(--green);}
+.item-partial .item-desc{opacity:0.6;}
+.item-serial{font-size:0.88rem;font-weight:600;color:var(--accent);min-width:44px;margin-top:6px;}
+.item-desc{flex:1;font-size:1.05rem;line-height:1.5;margin-top:4px;}
+.item-picked .item-desc{text-decoration:line-through;opacity:0.45;}
+.item-del{background:none;border:none;color:var(--border);cursor:pointer;font-size:1.1rem;padding:4px;transition:color 0.15s;flex-shrink:0;margin-top:2px;}
+.item-del:hover{color:var(--red);}
+.item-notes{width:100%;background:none;border:none;border-top:1px dashed var(--sand);padding:8px 0 4px;font-family:'Jost',sans-serif;font-size:0.9rem;color:var(--muted);outline:none;resize:none;margin-top:8px;margin-left:48px;}
+.item-notes:focus{color:var(--ink);border-top-color:var(--accent);}
+.item-notes::placeholder{color:var(--border);}
 
-/* Done banner */
-.done-banner{display:none;background:rgba(74,124,89,0.1);border:1px solid rgba(74,124,89,0.3);border-radius:2px;padding:22px;text-align:center;margin-bottom:16px;}
-.done-banner.show{display:block;}
-.done-title{font-size:1.5rem;font-weight:600;color:var(--green);}
-.done-sub{font-size:0.88rem;color:var(--muted);margin-top:5px;}
+.add-item-row{display:flex;gap:10px;margin-top:14px;}
+.add-input{flex:1;background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:12px 14px;font-family:'Jost',sans-serif;font-size:1rem;color:var(--ink);outline:none;}
+.add-input:focus{border-color:var(--accent);}
+.room-select{background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:12px;font-family:'Jost',sans-serif;font-size:0.9rem;color:var(--ink);outline:none;}
 
-.loading{text-align:center;padding:60px 20px;color:var(--muted);}
-.spinner{width:22px;height:22px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px;}
-@keyframes spin{to{transform:rotate(360deg);}}
+.loading{text-align:center;padding:60px;color:var(--muted);font-size:1rem;}
+.empty{text-align:center;padding:60px 24px;}
+.empty-title{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;color:var(--muted);margin-bottom:8px;}
+.empty-sub{font-size:0.9rem;color:var(--muted);}
+footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;font-size:0.7rem;color:var(--muted);letter-spacing:0.08em;}
 </style>
 </head>
 <body>
-
-<div class="hdr">
-  <div class="hdr-top">
-    <div class="hdr-logo">LUMA Warehouse</div>
-    <div id="status-badge" class="pill pill-readyload">Ready to Load</div>
+<header>
+  <div class="logo">LUMA <em>Design</em> Co</div>
+  <div class="nav-links">
+    <a href="/" class="nav-link">Labels</a>
+    <a href="/jobs" class="nav-link active">Jobs</a>
   </div>
-  <div class="hdr-ref" id="job-ref">—</div>
-  <div class="hdr-addr" id="job-addr"></div>
-  <div class="hdr-owner" id="job-owner"></div>
-  <div class="prog-wrap">
-    <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
-    <div class="prog-txt" id="prog-txt">0 / 0</div>
+</header>
+<div class="main">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;">
+    <div>
+      <div class="page-title">Active Jobs</div>
+      <div class="page-sub">Click a job to manage items and update status</div>
+    </div>
+    <button class="btn btn-outline" id="archived-toggle" onclick="toggleArchived()" style="font-size:0.75rem;">Show Archived</button>
+  </div>
+  <div class="jobs-grid" id="jobs-grid"><div class="loading">Loading jobs…</div></div>
+</div>
+
+<!-- Role modal -->
+<div class="panel-overlay" id="role-overlay" onclick="closeRole()"></div>
+<div class="role-modal" id="role-modal">
+  <div class="role-modal-header">
+    <div class="role-job-ref" id="role-ref"></div>
+    <div class="role-job-addr" id="role-addr"></div>
+    <button class="role-close" onclick="closeRole()">✕</button>
+  </div>
+  <div class="role-btns">
+    <button class="role-btn" onclick="openAsStylist()">
+      <div class="role-label">Stylist</div>
+      <div class="role-sub">Pick items & manage job</div>
+    </button>
+    <button class="role-btn" onclick="openAsDriver()">
+      <div class="role-label">Driver</div>
+      <div class="role-sub">Load truck & check items</div>
+    </button>
   </div>
 </div>
 
-<div class="truck-section">
-  <div class="truck-label">Truck</div>
-  <input type="text" class="truck-input" id="truck-input" placeholder="Enter truck name or number"/>
-  <button class="truck-save" onclick="saveTruck()">Save</button>
-</div>
-
-<div class="action-bar" id="action-bar"></div>
-
-<div class="content">
-  <div class="done-banner" id="done-banner">
-    <div class="done-title">All Items Loaded</div>
-    <div class="done-sub">Tap the button above to complete</div>
+<!-- Stylist panel -->
+<div class="panel-overlay" id="overlay" onclick="closePanel()"></div>
+<div class="panel" id="panel">
+  <div class="panel-header">
+    <button class="panel-close" onclick="closePanel()">←</button>
+    <div class="panel-title">
+      <div class="panel-job-ref" id="panel-ref"></div>
+      <div class="panel-address" id="panel-address"></div>
+      <div class="panel-owner" id="panel-owner"></div>
+    </div>
+    <div id="panel-status-badge"></div>
   </div>
-  <div id="items-container">
-    <div class="loading"><div class="spinner"></div>Loading job…</div>
-  </div>
+  <div class="panel-actions" id="panel-actions"></div>
+  <div class="panel-body" id="panel-body"><div class="loading">Loading…</div></div>
 </div>
 
-<!-- Photo viewer modal -->
-<div class="photo-modal" id="photo-modal" onclick="closePhoto()">
-  <button class="photo-modal-close" onclick="closePhoto()">✕</button>
-  <img id="photo-modal-img" src="" alt="Item photo"/>
-</div>
+<footer>LUMA Design Co · Warehouse Operations · lumadesignco.com.au</footer>
 
 <script>
-function showPhoto(url){
-  document.getElementById('photo-modal-img').src=url;
-  document.getElementById('photo-modal').classList.add('open');
-}
-function closePhoto(){
-  document.getElementById('photo-modal').classList.remove('open');
+const SB_URL='https://aqgxojawmohhogkhcxdb.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxZ3hvamF3bW9oaG9na2hjeGRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NDc5ODYsImV4cCI6MjA5NDMyMzk4Nn0.-2UOdGY52jDEmCmBBtQA2XEy6dVT8ZPA_AIPcM7RFX4';
+
+async function uploadPhoto(file, itemId){
+  // Compress image before upload
+  const compressed = await compressImage(file, 800, 0.6);
+  const path = `${itemId}.jpg`;
+  const res = await fetch(`${SB_URL}/storage/v1/object/item-photos/${path}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SB_KEY}`,
+      'Content-Type': 'image/jpeg',
+      'x-upsert': 'true',
+      'cache-control': '3600',
+    },
+    body: compressed,
+  });
+  if(!res.ok){
+    const err = await res.text();
+    console.error('Upload error:', res.status, err);
+    throw new Error(`Upload failed (${res.status}): ${err}`);
+  }
+  return `${SB_URL}/storage/v1/object/public/item-photos/${path}`;
 }
 
-const jobId=window.location.pathname.split('/').pop();
-let job=null,items=[];
-const STATUS_PILLS={ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed'};
-const STATUS_LABELS={ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed'};
+function compressImage(file, maxWidth, quality){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const scale=Math.min(1,maxWidth/img.width);
+      const canvas=document.createElement('canvas');
+      canvas.width=img.width*scale;
+      canvas.height=img.height*scale;
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      canvas.toBlob(blob=>resolve(blob),'image/jpeg',quality);
+      URL.revokeObjectURL(url);
+    };
+    img.onerror=reject;
+    img.src=url;
+  });
+}
 
-async function loadJob(){
+async function handlePhotoUpload(input, ids, btnId){
+  const file=input.files[0];
+  if(!file)return;
+  const btn=document.getElementById(btnId);
+  btn.textContent='Uploading…';btn.disabled=true;
+  try{
+    const idList=ids.split(',');
+    const url=await uploadPhoto(file,idList[0]);
+    // Save url to all items in group
+    await Promise.all(idList.map(id=>
+      fetch('/api/items/'+id+'/check',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo_url:url})})
+    ));
+    // Update allItems
+    idList.forEach(id=>{const item=allItems.find(i=>i.id===id);if(item)item.photo_url=url;});
+    btn.textContent='Photo ✓';btn.classList.add('has-photo');
+  }catch(e){
+    btn.textContent='Failed';
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+let currentJob=null,allItems=[],showArchived=false,pendingJobId=null;
+const COLOUR_MAP={Red:'#E85C47',Blue:'#4A9EE8',Green:'#4CAF7D',Yellow:'#E8C547',Purple:'#A04AE8',Orange:'#E87E47',Pink:'#E84A9E'};
+const STATUS_LABELS={ready:'Job Assigned',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',archived:'Archived'};
+const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',archived:'pill-archived'};
+
+function toggleArchived(){
+  showArchived=!showArchived;
+  const btn=document.getElementById('archived-toggle');
+  btn.textContent=showArchived?'Hide Archived':'Show Archived';
+  btn.style.color=showArchived?'var(--accent)':'';
+  btn.style.borderColor=showArchived?'var(--accent)':'';
+  loadJobs();
+}
+
+async function loadJobs(){
+  const res=await fetch('/api/jobs');
+  const allJobs=await res.json();
+  // Sort by installation date descending (most recent first)
+  // stage_date format: "12 May 2026"
+  const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  const parseStageDate=s=>{
+    if(!s)return 0;
+    const parts=s.trim().split(/\s+/);
+    if(parts.length===3){
+      const d=parseInt(parts[0]),m=MONTHS[parts[1].toLowerCase().slice(0,3)],y=parseInt(parts[2]);
+      if(!isNaN(d)&&m!==undefined&&!isNaN(y)) return new Date(y,m,d).getTime();
+    }
+    const fallback=new Date(s);
+    return isNaN(fallback)?0:fallback.getTime();
+  };
+  allJobs.sort((a,b)=>parseStageDate(a.stage_date)-parseStageDate(b.stage_date));
+  const jobs=showArchived?allJobs:allJobs.filter(j=>j.status!=='archived');
+  const grid=document.getElementById('jobs-grid');
+  if(!jobs.length){
+    const msg=showArchived?'No jobs found':'No active jobs';
+    grid.innerHTML=`<div class="empty"><div class="empty-title">No jobs yet</div><div class="empty-sub">${msg}</div></div>`;
+    return;
+  }
+  grid.innerHTML=jobs.map(job=>{
+    const colour=COLOUR_MAP[job.colour]||'#888';
+    const pill=STATUS_PILLS[job.status]||'pill-ready',label=STATUS_LABELS[job.status]||job.status;
+    const truck=job.truck?`${job.truck}`:'',owner=job.job_owner?`${job.job_owner}`:'';
+    return `<div class="job-card" onclick="openJob('${job.id}')">
+      <div class="job-card-top">
+        <div class="colour-swatch" style="background:${colour}"></div>
+        <div class="job-info">
+          <div class="job-ref-row">
+            <div class="job-ref">${job.job_ref||job.job_number}</div>
+            <span class="pill ${pill}">${label}</span>
+          </div>
+          <div class="job-address">${job.address}</div>
+          <div class="job-meta">
+            ${job.stage_date?`<span>${job.stage_date}</span>`:''}
+            <span>${job.item_count} items</span>
+            ${owner?`<span>${owner}</span>`:''}
+            ${truck?`<span>${truck}</span>`:''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function openJob(jobId){
+  pendingJobId=jobId;
   const res=await fetch(`/api/jobs/${jobId}`);
   const data=await res.json();
-  job=data.job;items=data.items;
-  document.getElementById('job-ref').textContent=job.job_ref||job.job_number;
-  document.getElementById('job-addr').textContent=job.address;
-  document.getElementById('job-owner').textContent=job.job_owner||'';
-  if(job.truck)document.getElementById('truck-input').value=job.truck;
-  renderStatusBar();renderRooms();updateProgress();
+  currentJob=data.job;allItems=data.items;
+  document.getElementById('role-ref').textContent=currentJob.job_ref||currentJob.job_number;
+  document.getElementById('role-addr').textContent=currentJob.address+' · '+currentJob.stage_date;
+  document.getElementById('role-overlay').classList.add('open');
+  document.getElementById('role-modal').classList.add('open');
 }
 
-function renderStatusBar(){
-  const s=job.status;
-  const badge=document.getElementById('status-badge');
-  badge.className='pill '+(STATUS_PILLS[s]||'pill-readyload');
-  badge.textContent=STATUS_LABELS[s]||s;
-  const bar=document.getElementById('action-bar');
-  if(s==='ready_to_load') bar.innerHTML=`<button class="action-btn btn-start" onclick="setStatus('loading')">Start Loading</button>`;
-  else if(s==='loading')  bar.innerHTML=`<button class="action-btn btn-finish" onclick="finishLoading()">Loading Finished</button>`;
-  else if(s==='loaded')   bar.innerHTML=`<button class="action-btn btn-installed" onclick="setStatus('installed')">Installed</button>`;
-  else if(s==='installed')bar.innerHTML=`<div class="action-status-msg">Installation complete</div>`;
-  else bar.innerHTML=`<div class="action-status-msg">Waiting for stylist to complete picking…</div>`;
+function closeRole(){
+  document.getElementById('role-overlay').classList.remove('open');
+  document.getElementById('role-modal').classList.remove('open');
+  pendingJobId=null;
 }
 
-// ── Item type categories ──
-const ITEM_CATEGORIES = [
-  { label: 'Sofas',            keywords: ['sofa','settee','lounge'] },
-  { label: 'Chairs',          keywords: ['chair','barstool','stool','bench seat'] },
-  { label: 'Tables',          keywords: ['table','desk'] },
-  { label: 'Beds & Mattresses', keywords: ['ensemble','mattress','bed frame','headboard','bedhead'] },
-  { label: 'Storage & Consoles', keywords: ['console','buffet','dresser','entertainment unit','etu','shelv','bookshelf','wardrobe'] },
-  { label: 'Rugs',            keywords: ['rug'] },
-  { label: 'Lamps & Lighting',keywords: ['lamp','plant','floor lamp'] },
-  { label: 'Artwork',         keywords: ['artwork'] },
-  { label: 'Soft Furnishings',keywords: ['cushion','throw','linen','coverlet','pillow','towel'] },
-  { label: 'Outdoor',         keywords: ['outdoor'] },
-  { label: 'Accessories',     keywords: ['accessor','centrepiece','mirror'] },
-];
-
-function getCategory(desc){
-  if(!desc) return 'Extras';
-  const d = desc.toLowerCase();
-  for(const cat of ITEM_CATEGORIES){
-    if(cat.keywords.length && cat.keywords.some(k=>d.includes(k))) return cat.label;
-  }
-  return 'Other';
+function openAsStylist(){
+  closeRole();
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('panel').classList.add('open');
+  document.getElementById('panel-body').innerHTML='<div class="loading">Loading…</div>';
+  document.getElementById('panel-ref').textContent=currentJob.job_ref||currentJob.job_number;
+  document.getElementById('panel-address').textContent=currentJob.address+' · '+currentJob.stage_date;
+  document.getElementById('panel-owner').textContent=currentJob.job_owner?currentJob.job_owner:'';
+  renderStatus();renderPanelItems();
 }
 
-function groupItems(list){
-  const groups=[];let i=0;
-  while(i<list.length){
-    const desc=list[i].description||'';
+function openAsDriver(){
+  closeRole();
+  window.open(`/driver/${currentJob.id}`,'_blank');
+}
+
+function closePanel(){
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('panel').classList.remove('open');
+  currentJob=null;loadJobs();
+}
+
+function renderStatus(){
+  const s=currentJob.status;
+  document.getElementById('panel-status-badge').innerHTML=`<span class="pill ${STATUS_PILLS[s]||'pill-ready'}">${STATUS_LABELS[s]||s}</span>`;
+  const truck=currentJob.truck?` · ${currentJob.truck}`:'';
+  let btns='';
+  if(s==='ready') btns=`<button class="btn btn-gold" onclick="setStatus('picking')">Start Picking</button>`;
+  else if(s==='picking') btns=`<button class="btn btn-green" onclick="setStatus('ready_to_load')">Picking Complete</button>`;
+  else if(s==='ready_to_load') btns=`<span style="font-size:0.88rem;color:var(--muted);">Waiting for driver</span>`;
+  else if(s==='loading') btns=`<span style="font-size:0.88rem;color:var(--red);">Driver is loading…</span>`;
+  else if(s==='loaded') btns=`<span style="font-size:0.88rem;color:var(--green);font-weight:500;">Truck loaded</span>`;
+  else if(s==='installed') btns=`<span style="font-size:0.88rem;color:var(--green);font-weight:600;">Installed</span>`;
+  else if(s==='archived') btns=`<button class="btn btn-outline" onclick="setStatus('ready')">Restore Job</button>`;
+  const archiveBtn=s!=='archived'?`<button class="btn btn-outline" onclick="archiveJob()" style="color:var(--muted);font-size:0.72rem;">Archive</button>`:'';
+  document.getElementById('panel-actions').innerHTML=`
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;width:100%;">
+      ${btns}
+      <div class="driver-link" style="margin-left:auto;">Driver: <a href="/driver/${currentJob.id}" target="_blank">open →</a>${truck}</div>
+      ${archiveBtn}
+    </div>`;
+}
+
+async function setStatus(s){
+  await fetch(`/api/jobs/${currentJob.id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:s})});
+  currentJob.status=s;renderStatus();
+}
+
+async function archiveJob(){
+  if(!confirm('Archive this job? It will be hidden from the main view but can be restored.'))return;
+  await setStatus('archived');closePanel();
+}
+
+function groupItems(itemList){
+  // Group consecutive identical descriptions into one row
+  const groups=[];
+  let i=0;
+  while(i<itemList.length){
+    const item=itemList[i];
+    const desc=item.description||'';
     let j=i+1;
-    while(j<list.length&&(list[j].description||'')===desc)j++;
-    groups.push({count:j-i,description:desc,firstSerial:list[i].serial,lastSerial:list[j-1].serial,
-      items:list.slice(i,j),allChecked:list.slice(i,j).every(x=>x.checked),notes:list[i].notes||'',
-      photo_url:list.slice(i,j).find(x=>x.photo_url)?.photo_url||null,
-      category:getCategory(desc)});
+    while(j<itemList.length && (itemList[j].description||'')=== desc) j++;
+    const count=j-i;
+    groups.push({
+      count,
+      description: desc,
+      firstSerial: itemList[i].serial,
+      lastSerial:  itemList[j-1].serial,
+      items:       itemList.slice(i,j),
+      // For pick/check state — group is fully picked/checked if all are
+      allPicked:   itemList.slice(i,j).every(x=>x.picked),
+      somePicked:  itemList.slice(i,j).some(x=>x.picked),
+      allChecked:  itemList.slice(i,j).every(x=>x.checked),
+      someChecked: itemList.slice(i,j).some(x=>x.checked),
+      notes:       itemList[i].notes||'',
+    });
     i=j;
   }
   return groups;
 }
 
-function renderRooms(){
-  const container=document.getElementById('items-container');
-  const allGrouped=groupItems(items.filter(i=>!i.is_extra));
-  // Build category map
-  const catMap={};
-  for(const grp of allGrouped){
-    if(!catMap[grp.category])catMap[grp.category]=[];
-    catMap[grp.category].push(grp);
-  }
-  // Add stylist-added extras only if they exist
-  const extraGrouped=groupItems(items.filter(i=>i.is_extra));
-  if(extraGrouped.length) catMap['Extras']=[...(catMap['Extras']||[]),...extraGrouped];
-
-  // Render in defined order, skip empty categories
-  const orderedCats=ITEM_CATEGORIES.map(c=>c.label).filter(l=>catMap[l]);
-  Object.keys(catMap).forEach(c=>{if(!orderedCats.includes(c))orderedCats.push(c);});
-
-  let html='';
-  for(const cat of orderedCats){
-    const groups=catMap[cat];
-    const catItems=groups.flatMap(g=>g.items);
-    const checked=catItems.filter(i=>i.checked).length;
-    const total=catItems.length;
-    const done=checked===total&&total>0;
-    const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
-    const key=cat.replace(/[^a-zA-Z0-9]/g,'_');
-    html+=`<div class="room-card${done?' done':''}" id="room-${key}">
-      <div class="room-card-header" onclick="toggleRoomCard(this)">
-        <div class="ring-wrap">
-          <svg width="48" height="48" viewBox="0 0 48 48">
-            <circle class="ring-bg" cx="24" cy="24" r="${r}"/>
-            <circle class="ring-fill${done?' ring-done':''}" cx="24" cy="24" r="${r}"
-              stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
-          </svg>
-          <div class="ring-txt">${done?'<span class="ring-done-icon">✓</span>':`${checked}/${total}`}</div>
-        </div>
-        <div class="room-card-info">
-          <div class="room-card-name">${cat}</div>
-          <div class="room-card-sub">${groups.length} line${groups.length!==1?'s':''} · ${total} item${total!==1?'s':''}</div>
-        </div>
-        <div class="room-chevron" id="chev-${key}">▼</div>
-      </div>
-      <div class="room-items" id="items-${key}">
-        ${groups.map(g=>groupRowHTML(g)).join('')}
-      </div>
-    </div>`;
-  }
-  container.innerHTML=html;
-}
-
-function groupRowHTML(grp){
-  const cls=grp.allChecked?'group-row checked':'group-row';
-  const ids=grp.items.map(i=>i.id).join(',');
-  const serial=grp.count>1?`#${grp.firstSerial}–#${grp.lastSerial}`:`#${grp.firstSerial}`;
-  const desc=grp.count>1?`${grp.count}×  ${grp.description||'blank'}`:(grp.description||'<span style="opacity:0.5">blank extra</span>');
-  const note=grp.notes?`<div class="group-note">${grp.notes}</div>`:'';
-  const photoUrl=grp.photo_url||null;
-  const photoBtn=photoUrl?`<div class="photo-thumb-wrap"><button class="photo-thumb-btn" onclick="event.stopPropagation();showPhoto('${photoUrl}')">View Photo</button></div>`:'';
-  return `<div class="${cls}" id="grp-${grp.firstSerial}" onclick="toggleGroup('${ids}',this)">
-    <button class="check-btn" onclick="toggleGroup('${ids}',this.closest('.group-row'));event.stopPropagation()">
-      <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
-    </button>
-    <div class="group-info">
-      <div class="group-serial">${serial}</div>
-      <div class="group-desc">${desc}</div>
-      ${note}
-      ${photoBtn}
-    </div>
-  </div>`;
-}
-
 function toggleRoomCard(header){
   const card=header.closest('.room-card');
-  const key=card.id.replace('room-','');
-  const itemsDiv=document.getElementById('items-'+key);
-  const chev=document.getElementById('chev-'+key);
+  const itemsDiv=card.querySelector('.room-items');
+  const chev=card.querySelector('.room-chevron');
   const isOpen=itemsDiv.classList.contains('open');
   itemsDiv.classList.toggle('open',!isOpen);
   chev.classList.toggle('open',!isOpen);
 }
 
-async function toggleGroup(ids,el){
-  if(job.status==='installed')return;
-  const idList=ids.split(',');
-  const first=items.find(i=>i.id===idList[0]);
-  if(!first)return;
-  const newChecked=!first.checked;
-  for(const id of idList){const item=items.find(i=>i.id===id);if(item)item.checked=newChecked;}
-  if(newChecked)el.classList.add('checked');else el.classList.remove('checked');
-  updateProgress();
-  rerenderRoomProgress();
-  await Promise.all(idList.map(id=>
-    fetch(`/api/items/${id}/check`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({checked:newChecked})})
-  ));
+function roomCardHTML(room, roomItemList, isExtra=false){
+  const picked=roomItemList.filter(i=>i.picked).length;
+  const total=roomItemList.length;
+  const done=picked===total;
+  const pct=total?picked/total:0;
+  const r=16,circ=2*Math.PI*r,offset=circ*(1-pct);
+  const groups=isExtra
+    ? groupItems(roomItemList)
+    : groupItems(roomItemList);
+  const key=(room||'extra').replace(/[^a-zA-Z0-9]/g,'_');
+  return `<div class="room-card${done?' done':''}" id="stylist-room-${key}">
+    <div class="room-card-header" onclick="toggleRoomCard(this)">
+      <div class="ring-wrap">
+        <svg width="44" height="44" viewBox="0 0 44 44">
+          <circle class="ring-bg" cx="22" cy="22" r="${r}"/>
+          <circle class="ring-fill" cx="22" cy="22" r="${r}"
+            stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"/>
+        </svg>
+        <div class="ring-txt">${done?'<span class="ring-done-icon">✓</span>':`${picked}/${total}`}</div>
+      </div>
+      <div class="room-card-info">
+        <div class="room-card-name">${room||'Extras'}</div>
+        <div class="room-card-sub">${groups.length} line${groups.length!==1?'s':''} · ${total} item${total!==1?'s':''}</div>
+      </div>
+      <span class="room-chevron">▼</span>
+    </div>
+    <div class="room-items">${groups.map(groupRow).join('')}</div>
+  </div>`;
 }
 
 function rerenderRoomProgress(){
-  const allGrouped=groupItems(items.filter(i=>!i.is_extra));
-  const catMap={};
-  for(const grp of allGrouped){if(!catMap[grp.category])catMap[grp.category]=[];catMap[grp.category].push(grp);}
-  const extraGrouped=groupItems(items.filter(i=>i.is_extra));
-  if(extraGrouped.length)catMap['Extras']=[...(catMap['Extras']||[]),...extraGrouped];
-  for(const[cat,groups] of Object.entries(catMap)){
-    const key=cat.replace(/[^a-zA-Z0-9]/g,'_');
-    const card=document.getElementById('room-'+key);if(!card)continue;
-    const catItems=groups.flatMap(g=>g.items);
-    const checked=catItems.filter(i=>i.checked).length,total=catItems.length,done=checked===total&&total>0;
-    const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
-    const rf=card.querySelector('.ring-fill'),rt=card.querySelector('.ring-txt');
-    if(rf)rf.setAttribute('stroke-dashoffset',offset.toFixed(1));
-    if(rt)rt.innerHTML=done?'<span class="ring-done-icon">✓</span>':`${checked}/${total}`;
+  const regular=allItems.filter(i=>!i.is_extra),extras=allItems.filter(i=>i.is_extra);
+  const rooms={};
+  for(const item of regular){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
+  if(extras.length)rooms['Extras']=extras;
+  for(const[room,roomItems] of Object.entries(rooms)){
+    const key=(room||'extra').replace(/[^a-zA-Z0-9]/g,'_');
+    const card=document.getElementById('stylist-room-'+key);if(!card)continue;
+    const picked=roomItems.filter(i=>i.picked).length,total=roomItems.length,done=picked===total;
+    const pct=total?picked/total:0,r=16,circ=2*Math.PI*r,offset=circ*(1-pct);
+    const ringFill=card.querySelector('.ring-fill');
+    const ringTxt=card.querySelector('.ring-txt');
+    if(ringFill)ringFill.setAttribute('stroke-dashoffset',offset.toFixed(2));
+    if(ringTxt)ringTxt.innerHTML=done?'<span class="ring-done-icon">✓</span>':`${picked}/${total}`;
     if(done)card.classList.add('done');else card.classList.remove('done');
   }
 }
 
-function updateProgress(){
-  const total=items.length,checked=items.filter(i=>i.checked).length,pct=total?Math.round(checked/total*100):0;
-  document.getElementById('prog-fill').style.width=pct+'%';
-  document.getElementById('prog-txt').textContent=`${checked} / ${total}`;
-  const allDone=total>0&&checked===total;
-  document.getElementById('done-banner').classList.toggle('show',allDone&&job.status==='loading');
+function renderPanelItems(){
+  const body=document.getElementById('panel-body');
+  const regular=allItems.filter(i=>!i.is_extra),extras=allItems.filter(i=>i.is_extra);
+  const rooms={};
+  for(const item of regular){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
+  let html='';
+  for(const[room,roomItemList] of Object.entries(rooms)){
+    html+=roomCardHTML(room, roomItemList);
+  }
+
+  const rooms_list=[...new Set(allItems.map(i=>i.room).filter(r=>r))];
+  html+=`<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+    <div style="font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px;">Add Item</div>
+    <div class="add-item-row">
+      <select class="room-select" id="new-room">${rooms_list.map(r=>`<option>${r}</option>`).join('')}<option value="">— Extra</option></select>
+      <input class="add-input" id="new-desc" placeholder="Item description" onkeydown="if(event.key==='Enter')addItem()"/>
+      <button class="btn btn-gold" onclick="addItem()">Add</button>
+    </div></div>`;
+  body.innerHTML=html;
 }
 
-async function setStatus(newStatus){
-  const truck=document.getElementById('truck-input').value.trim();
-  await fetch(`/api/jobs/${job.id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:newStatus,truck:truck||job.truck||''})});
-  job.status=newStatus;if(truck)job.truck=truck;renderStatusBar();
+function groupRow(grp){
+  const picked  = grp.allPicked;
+  const partial = grp.somePicked && !grp.allPicked;
+  const serialTxt = grp.count>1 ? `#${grp.firstSerial}–#${grp.lastSerial}` : `#${grp.firstSerial}`;
+  const descTxt   = grp.count>1 ? `${grp.count}×  ${grp.description||'blank extra'}` : (grp.description||'<span style="color:var(--muted);font-style:italic">blank extra</span>');
+  const rowCls  = picked?'item-row item-picked':partial?'item-row item-partial':'item-row';
+  const btnCls  = picked?'pick-btn picked':partial?'pick-btn partial':'pick-btn';
+  const ids     = grp.items.map(i=>i.id).join(',');
+  const hasPhoto= grp.items.some(i=>i.photo_url);
+  const btnId   = `photo-btn-${grp.firstSerial}`;
+  const inputId = `photo-input-${grp.firstSerial}`;
+  const camColour = hasPhoto ? 'var(--green)' : 'var(--border)';
+  const camTitle  = hasPhoto ? 'Photo taken — tap to replace' : 'Take photo';
+  const camIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${camColour}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
+  return `<div class="${rowCls}" id="group-${grp.firstSerial}" style="align-items:center;">
+    <button class="${btnCls}" onclick="toggleGroupPicked('${ids}', this)" style="margin-top:0;">✓</button>
+    <div class="item-serial" style="margin-top:0;">${serialTxt}</div>
+    <div style="flex:1;display:flex;align-items:center;gap:8px;">
+      <span class="item-desc" style="margin-top:0;">${descTxt}</span>
+      <input type="file" accept="image/*" capture="environment" id="${inputId}" style="display:none;"
+        onchange="handlePhotoUpload(this,'${ids}','${btnId}')"/>
+      <button id="${btnId}" title="${camTitle}"
+        style="background:none;border:none;padding:2px;cursor:pointer;line-height:0;flex-shrink:0;"
+        onclick="document.getElementById('${inputId}').click()">${camIcon}</button>
+    </div>
+    <textarea class="item-notes" rows="1" placeholder="Add note for driver…"
+      onblur="saveNote('${grp.items[0].id}',this.value)"
+      oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+    >${grp.notes}</textarea>
+  </div>`;
 }
 
-async function saveTruck(){
-  const truck=document.getElementById('truck-input').value.trim();if(!truck)return;
-  await fetch(`/api/jobs/${job.id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:job.status,truck})});
-  job.truck=truck;const btn=document.querySelector('.truck-save');
-  btn.textContent='Saved ✓';setTimeout(()=>btn.textContent='Save',1500);
+
+function itemRow(item){
+  // kept for add-item single rows
+  const notes=item.notes||'',picked=item.picked||false;
+  return `<div class="${picked?'item-row item-picked':'item-row'}" id="item-${item.id}">
+    <button class="${picked?'pick-btn picked':'pick-btn'}" id="pick-${item.id}" onclick="togglePicked('${item.id}')">✓</button>
+    <div class="item-serial">#${item.serial}</div>
+    <div class="item-desc">${item.description||'<span style="color:var(--muted);font-style:italic">blank extra</span>'}</div>
+    <button class="item-del" onclick="deleteItem('${item.id}')">✕</button>
+    <textarea class="item-notes" rows="1" placeholder="Add note for driver…"
+      onblur="saveNote('${item.id}',this.value)"
+      oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+    >${notes}</textarea></div>`;
 }
 
-async function finishLoading(){
-  const checked=items.filter(i=>i.checked).length,total=items.length;
-  if(checked<total){if(!confirm(`${total-checked} items not checked off. Mark as loaded anyway?`))return;}
-  await setStatus('loaded');
+async function toggleGroupPicked(ids, btn){
+  const idList = ids.split(',');
+  const firstItem = allItems.find(i=>i.id===idList[0]);
+  if(!firstItem) return;
+  const newPicked = !firstItem.picked;
+  for(const id of idList){
+    const item=allItems.find(i=>i.id===id);
+    if(!item) continue;
+    item.picked=newPicked;
+  }
+  // Update button style
+  btn.classList.toggle('picked', newPicked);
+  const row=btn.closest('.item-row');
+  if(row){ row.classList.toggle('item-picked', newPicked); }
+  rerenderRoomProgress();
+  // Persist all
+  await Promise.all(idList.map(id=>
+    fetch('/api/items/'+id+'/check',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({picked:newPicked})})
+  ));
 }
 
-loadJob();
+async function togglePicked(itemId){
+  const item=allItems.find(i=>i.id===itemId);if(!item)return;
+  item.picked=!item.picked;
+  const row=document.getElementById('item-'+itemId),btn=document.getElementById('pick-'+itemId);
+  if(item.picked){row.classList.add('item-picked');btn.classList.add('picked');}
+  else{row.classList.remove('item-picked');btn.classList.remove('picked');}
+  rerenderRoomProgress();
+  await fetch('/api/items/'+itemId+'/check',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({picked:item.picked})});
+}
+
+async function saveNote(itemId,notes){
+  await fetch('/api/items/'+itemId+'/check',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes})});
+  const item=allItems.find(i=>i.id===itemId);if(item)item.notes=notes;
+}
+
+async function deleteItem(itemId){
+  await fetch(`/api/items/${itemId}`,{method:'DELETE'});
+  allItems=allItems.filter(i=>i.id!==itemId);renderPanelItems();
+}
+
+async function addItem(){
+  const desc=document.getElementById('new-desc').value.trim(),room=document.getElementById('new-room').value;
+  if(!desc)return;
+  const lastSerial=allItems.length?Math.max(...allItems.map(i=>parseInt(i.serial)||0)):0;
+  const newSerial=String(lastSerial+1).padStart(3,'0');
+  const res=await fetch(`/api/jobs/${currentJob.id}/items`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serial:newSerial,room,description:desc,is_extra:!room})});
+  const newItem=await res.json();
+  allItems.push(newItem);document.getElementById('new-desc').value='';renderPanelItems();
+}
+
+loadJobs();
 </script>
 </body>
 </html>

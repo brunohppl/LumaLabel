@@ -86,6 +86,13 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .group-desc{font-size:1rem;color:var(--ink);margin-top:3px;line-height:1.4;font-weight:500;}
 .group-row.checked .group-desc{color:var(--muted);}
 .group-note{font-size:0.82rem;color:var(--accent);margin-top:5px;font-style:italic;padding:4px 8px;background:rgba(184,147,90,0.08);border-radius:2px;}
+.photo-thumb-wrap{margin-top:6px;}
+.photo-thumb-btn{background:none;border:1px solid var(--border);border-radius:2px;padding:4px 10px;font-size:0.72rem;color:var(--muted);cursor:pointer;}
+.photo-thumb-btn:active{background:var(--warm);}
+.photo-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;align-items:center;justify-content:center;}
+.photo-modal.open{display:flex;}
+.photo-modal img{max-width:95vw;max-height:90vh;border-radius:3px;}
+.photo-modal-close{position:absolute;top:16px;right:20px;color:white;font-size:2rem;cursor:pointer;background:none;border:none;}
 
 /* Done banner */
 .done-banner{display:none;background:rgba(74,124,89,0.1);border:1px solid rgba(74,124,89,0.3);border-radius:2px;padding:22px;text-align:center;margin-bottom:16px;}
@@ -132,7 +139,21 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
   </div>
 </div>
 
+<!-- Photo viewer modal -->
+<div class="photo-modal" id="photo-modal" onclick="closePhoto()">
+  <button class="photo-modal-close" onclick="closePhoto()">✕</button>
+  <img id="photo-modal-img" src="" alt="Item photo"/>
+</div>
+
 <script>
+function showPhoto(url){
+  document.getElementById('photo-modal-img').src=url;
+  document.getElementById('photo-modal').classList.add('open');
+}
+function closePhoto(){
+  document.getElementById('photo-modal').classList.remove('open');
+}
+
 const jobId=window.location.pathname.split('/').pop();
 let job=null,items=[];
 const STATUS_PILLS={ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed'};
@@ -169,7 +190,8 @@ function groupItems(list){
     let j=i+1;
     while(j<list.length&&(list[j].description||'')===desc)j++;
     groups.push({count:j-i,description:desc,firstSerial:list[i].serial,lastSerial:list[j-1].serial,
-      items:list.slice(i,j),allChecked:list.slice(i,j).every(x=>x.checked),notes:list[i].notes||''});
+      items:list.slice(i,j),allChecked:list.slice(i,j).every(x=>x.checked),notes:list[i].notes||'',
+      photo_url:list.slice(i,j).find(x=>x.photo_url)?.photo_url||null});
     i=j;
   }
   return groups;
@@ -221,6 +243,8 @@ function groupRowHTML(grp){
   const serial=grp.count>1?`#${grp.firstSerial}–#${grp.lastSerial}`:`#${grp.firstSerial}`;
   const desc=grp.count>1?`${grp.count}×  ${grp.description||'blank'}`:(grp.description||'<span style="opacity:0.5">blank extra</span>');
   const note=grp.notes?`<div class="group-note">${grp.notes}</div>`:'';
+  const photoUrl=grp.items.find(i=>i.photo_url)?.photo_url||null;
+  const photoBtn=photoUrl?`<div class="photo-thumb-wrap"><button class="photo-thumb-btn" onclick="event.stopPropagation();showPhoto('${photoUrl}')">View Photo</button></div>`:'';
   return `<div class="${cls}" id="grp-${grp.firstSerial}" onclick="toggleGroup('${ids}',this)">
     <button class="check-btn" onclick="toggleGroup('${ids}',this.closest('.group-row'));event.stopPropagation()">
       <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
@@ -229,6 +253,7 @@ function groupRowHTML(grp){
       <div class="group-serial">${serial}</div>
       <div class="group-desc">${desc}</div>
       ${note}
+      ${photoBtn}
     </div>
   </div>`;
 }

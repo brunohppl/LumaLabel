@@ -231,9 +231,7 @@ function renderRooms(){
     if(!catMap[grp.category])catMap[grp.category]=[];
     catMap[grp.category].push(grp);
   }
-  // Add stylist-added extras only if they exist
-  const extraGrouped=groupItems(items.filter(i=>i.is_extra));
-  if(extraGrouped.length) catMap['Extras']=[...(catMap['Extras']||[]),...extraGrouped];
+
 
   // Render in defined order, skip empty categories
   const orderedCats=ITEM_CATEGORIES.map(c=>c.label).filter(l=>catMap[l]);
@@ -322,8 +320,7 @@ function rerenderRoomProgress(){
   const allGrouped=groupItems(items.filter(i=>!i.is_extra));
   const catMap={};
   for(const grp of allGrouped){if(!catMap[grp.category])catMap[grp.category]=[];catMap[grp.category].push(grp);}
-  const extraGrouped=groupItems(items.filter(i=>i.is_extra));
-  if(extraGrouped.length)catMap['Extras']=[...(catMap['Extras']||[]),...extraGrouped];
+
   for(const[cat,groups] of Object.entries(catMap)){
     const key=cat.replace(/[^a-zA-Z0-9]/g,'_');
     const card=document.getElementById('room-'+key);if(!card)continue;

@@ -501,27 +501,27 @@ function groupRow(grp){
   const hasPhoto= grp.items.some(i=>i.photo_url);
   const btnId   = `photo-btn-${grp.firstSerial}`;
   const inputId = `photo-input-${grp.firstSerial}`;
-  const photoBtnTxt = hasPhoto ? 'Photo ✓' : '📷 Add Photo';
-  const photoBtnCls = hasPhoto ? 'photo-btn has-photo' : 'photo-btn';
-  return `<div class="${rowCls}" id="group-${grp.firstSerial}">
-    <button class="${btnCls}" onclick="toggleGroupPicked('${ids}', this)">✓</button>
-    <div class="item-serial">${serialTxt}</div>
-    <div class="item-desc" style="flex:1;">${descTxt}</div>
-    <input type="file" accept="image/*" capture="environment" class="photo-input" id="${inputId}"
-      onchange="handlePhotoUpload(this,'${ids}','${btnId}')"/>
-    <button class="${photoBtnCls}" id="${btnId}" title="${hasPhoto?'Photo taken':'Take photo'}"
-      onclick="document.getElementById('${inputId}').click()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-        <circle cx="12" cy="13" r="4"/>
-      </svg>
-    </button>
+  const camColour = hasPhoto ? 'var(--green)' : 'var(--border)';
+  const camTitle  = hasPhoto ? 'Photo taken — tap to replace' : 'Take photo';
+  const camIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${camColour}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
+  return `<div class="${rowCls}" id="group-${grp.firstSerial}" style="align-items:center;">
+    <button class="${btnCls}" onclick="toggleGroupPicked('${ids}', this)" style="margin-top:0;">✓</button>
+    <div class="item-serial" style="margin-top:0;">${serialTxt}</div>
+    <div style="flex:1;display:flex;align-items:center;gap:8px;">
+      <span class="item-desc" style="margin-top:0;">${descTxt}</span>
+      <input type="file" accept="image/*" capture="environment" id="${inputId}" style="display:none;"
+        onchange="handlePhotoUpload(this,'${ids}','${btnId}')"/>
+      <button id="${btnId}" title="${camTitle}"
+        style="background:none;border:none;padding:2px;cursor:pointer;line-height:0;flex-shrink:0;"
+        onclick="document.getElementById('${inputId}').click()">${camIcon}</button>
+    </div>
     <textarea class="item-notes" rows="1" placeholder="Add note for driver…"
       onblur="saveNote('${grp.items[0].id}',this.value)"
       oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
     >${grp.notes}</textarea>
   </div>`;
 }
+
 
 function itemRow(item){
   // kept for add-item single rows

@@ -183,6 +183,31 @@ function renderStatusBar(){
   else bar.innerHTML=`<div class="action-status-msg">Waiting for stylist to complete picking…</div>`;
 }
 
+// ── Item type categories ──
+const ITEM_CATEGORIES = [
+  { label: 'Sofas',            keywords: ['sofa','settee','lounge'] },
+  { label: 'Chairs',          keywords: ['chair','barstool','stool','bench seat'] },
+  { label: 'Tables',          keywords: ['table','desk'] },
+  { label: 'Beds & Mattresses', keywords: ['ensemble','mattress','bed frame','headboard','bedhead'] },
+  { label: 'Storage & Consoles', keywords: ['console','buffet','dresser','entertainment unit','etu','shelv','bookshelf','wardrobe'] },
+  { label: 'Rugs',            keywords: ['rug'] },
+  { label: 'Lamps & Lighting',keywords: ['lamp','plant','floor lamp'] },
+  { label: 'Artwork',         keywords: ['artwork'] },
+  { label: 'Soft Furnishings',keywords: ['cushion','throw','linen','coverlet','pillow','towel'] },
+  { label: 'Outdoor',         keywords: ['outdoor'] },
+  { label: 'Accessories',     keywords: ['accessor','centrepiece','mirror'] },
+  { label: 'Extras',          keywords: [] },  // catch-all
+];
+
+function getCategory(desc){
+  if(!desc) return 'Extras';
+  const d = desc.toLowerCase();
+  for(const cat of ITEM_CATEGORIES){
+    if(cat.keywords.length && cat.keywords.some(k=>d.includes(k))) return cat.label;
+  }
+  return 'Other';
+}
+
 function groupItems(list){
   const groups=[];let i=0;
   while(i<list.length){
@@ -191,7 +216,8 @@ function groupItems(list){
     while(j<list.length&&(list[j].description||'')===desc)j++;
     groups.push({count:j-i,description:desc,firstSerial:list[i].serial,lastSerial:list[j-1].serial,
       items:list.slice(i,j),allChecked:list.slice(i,j).every(x=>x.checked),notes:list[i].notes||'',
-      photo_url:list.slice(i,j).find(x=>x.photo_url)?.photo_url||null});
+      photo_url:list.slice(i,j).find(x=>x.photo_url)?.photo_url||null,
+      category:getCategory(desc)});
     i=j;
   }
   return groups;
@@ -199,37 +225,47 @@ function groupItems(list){
 
 function renderRooms(){
   const container=document.getElementById('items-container');
-  const regular=items.filter(i=>!i.is_extra),extras=items.filter(i=>i.is_extra);
-  const rooms={};
-  for(const item of regular){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
-  if(extras.length) rooms['Extras']=extras;
+  const allGrouped=groupItems(items.filter(i=>!i.is_extra));
+  const extraGrouped=groupItems(items.filter(i=>i.is_extra));
+
+  // Build category map
+  const catMap={};
+  for(const grp of allGrouped){
+    if(!catMap[grp.category])catMap[grp.category]=[];
+    catMap[grp.category].push(grp);
+  }
+  if(extraGrouped.length) catMap['Extras']=[...(catMap['Extras']||[]),...extraGrouped];
+
+  // Render in defined order, skip empty categories
+  const orderedCats=ITEM_CATEGORIES.map(c=>c.label).filter(l=>catMap[l]);
+  Object.keys(catMap).forEach(c=>{if(!orderedCats.includes(c))orderedCats.push(c);});
 
   let html='';
-  for(const[room,roomItems] of Object.entries(rooms)){
-    const checked=roomItems.filter(i=>i.checked).length;
-    const total=roomItems.length;
-    const done=checked===total;
-    const pct=total?checked/total:0;
-    const r=20,circ=2*Math.PI*r,offset=circ*(1-pct);
-    const groups=groupItems(roomItems);
-
-    html+=`<div class="room-card${done?' done':''}" id="room-${room.replace(/\s/g,'_')}">
+  for(const cat of orderedCats){
+    const groups=catMap[cat];
+    const catItems=groups.flatMap(g=>g.items);
+    const checked=catItems.filter(i=>i.checked).length;
+    const total=catItems.length;
+    const done=checked===total&&total>0;
+    const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
+    const key=cat.replace(/[^a-zA-Z0-9]/g,'_');
+    html+=`<div class="room-card${done?' done':''}" id="room-${key}">
       <div class="room-card-header" onclick="toggleRoomCard(this)">
         <div class="ring-wrap">
           <svg width="48" height="48" viewBox="0 0 48 48">
             <circle class="ring-bg" cx="24" cy="24" r="${r}"/>
             <circle class="ring-fill${done?' ring-done':''}" cx="24" cy="24" r="${r}"
-              stroke-dasharray="${circ}" stroke-dashoffset="${offset}"/>
+              stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
           </svg>
           <div class="ring-txt">${done?'<span class="ring-done-icon">✓</span>':`${checked}/${total}`}</div>
         </div>
         <div class="room-card-info">
-          <div class="room-card-name">${room}</div>
+          <div class="room-card-name">${cat}</div>
           <div class="room-card-sub">${groups.length} line${groups.length!==1?'s':''} · ${total} item${total!==1?'s':''}</div>
         </div>
-        <div class="room-chevron" id="chev-${room.replace(/\s/g,'_')}">▼</div>
+        <div class="room-chevron" id="chev-${key}">▼</div>
       </div>
-      <div class="room-items" id="items-${room.replace(/\s/g,'_')}">
+      <div class="room-items" id="items-${key}">
         ${groups.map(g=>groupRowHTML(g)).join('')}
       </div>
     </div>`;
@@ -243,7 +279,7 @@ function groupRowHTML(grp){
   const serial=grp.count>1?`#${grp.firstSerial}–#${grp.lastSerial}`:`#${grp.firstSerial}`;
   const desc=grp.count>1?`${grp.count}×  ${grp.description||'blank'}`:(grp.description||'<span style="opacity:0.5">blank extra</span>');
   const note=grp.notes?`<div class="group-note">${grp.notes}</div>`:'';
-  const photoUrl=grp.items.find(i=>i.photo_url)?.photo_url||null;
+  const photoUrl=grp.photo_url||null;
   const photoBtn=photoUrl?`<div class="photo-thumb-wrap"><button class="photo-thumb-btn" onclick="event.stopPropagation();showPhoto('${photoUrl}')">View Photo</button></div>`:'';
   return `<div class="${cls}" id="grp-${grp.firstSerial}" onclick="toggleGroup('${ids}',this)">
     <button class="check-btn" onclick="toggleGroup('${ids}',this.closest('.group-row'));event.stopPropagation()">
@@ -260,9 +296,9 @@ function groupRowHTML(grp){
 
 function toggleRoomCard(header){
   const card=header.closest('.room-card');
-  const roomKey=card.id.replace('room-','');
-  const itemsDiv=document.getElementById('items-'+roomKey);
-  const chev=document.getElementById('chev-'+roomKey);
+  const key=card.id.replace('room-','');
+  const itemsDiv=document.getElementById('items-'+key);
+  const chev=document.getElementById('chev-'+key);
   const isOpen=itemsDiv.classList.contains('open');
   itemsDiv.classList.toggle('open',!isOpen);
   chev.classList.toggle('open',!isOpen);
@@ -284,20 +320,20 @@ async function toggleGroup(ids,el){
 }
 
 function rerenderRoomProgress(){
-  const regular=items.filter(i=>!i.is_extra),extras=items.filter(i=>i.is_extra);
-  const rooms={};
-  for(const item of regular){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
-  if(extras.length)rooms['Extras']=extras;
-  for(const[room,roomItems] of Object.entries(rooms)){
-    const key=room.replace(/\s/g,'_');
-    const card=document.getElementById('room-'+key);
-    if(!card)continue;
-    const checked=roomItems.filter(i=>i.checked).length,total=roomItems.length,done=checked===total;
-    const pct=total?checked/total:0,r=20,circ=2*Math.PI*r,offset=circ*(1-pct);
-    const ringFill=card.querySelector('.ring-fill');
-    const ringTxt=card.querySelector('.ring-txt');
-    if(ringFill)ringFill.setAttribute('stroke-dashoffset',offset);
-    if(ringTxt)ringTxt.innerHTML=done?'<span class="ring-done-icon">✓</span>':`${checked}/${total}`;
+  const allGrouped=groupItems(items.filter(i=>!i.is_extra));
+  const extraGrouped=groupItems(items.filter(i=>i.is_extra));
+  const catMap={};
+  for(const grp of allGrouped){if(!catMap[grp.category])catMap[grp.category]=[];catMap[grp.category].push(grp);}
+  if(extraGrouped.length)catMap['Extras']=[...(catMap['Extras']||[]),...extraGrouped];
+  for(const[cat,groups] of Object.entries(catMap)){
+    const key=cat.replace(/[^a-zA-Z0-9]/g,'_');
+    const card=document.getElementById('room-'+key);if(!card)continue;
+    const catItems=groups.flatMap(g=>g.items);
+    const checked=catItems.filter(i=>i.checked).length,total=catItems.length,done=checked===total&&total>0;
+    const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
+    const rf=card.querySelector('.ring-fill'),rt=card.querySelector('.ring-txt');
+    if(rf)rf.setAttribute('stroke-dashoffset',offset.toFixed(1));
+    if(rt)rt.innerHTML=done?'<span class="ring-done-icon">✓</span>':`${checked}/${total}`;
     if(done)card.classList.add('done');else card.classList.remove('done');
   }
 }

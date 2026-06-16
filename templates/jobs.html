@@ -184,6 +184,68 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
 <footer>LUMA Design Co · Warehouse Operations · lumadesignco.com.au</footer>
 
 <script>
+const SB_URL='https://aqgxojawmohhogkhcxdb.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxZ3hvamF3bW9oaG9na2hjeGRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NDc5ODYsImV4cCI6MjA5NDMyMzk4Nn0.-2UOdGY52jDEmCmBBtQA2XEy6dVT8ZPA_AIPcM7RFX4';
+
+async function uploadPhoto(file, itemId){
+  // Compress image before upload
+  const compressed = await compressImage(file, 800, 0.6);
+  const ext = 'jpg';
+  const path = `${itemId}.${ext}`;
+  const res = await fetch(`${SB_URL}/storage/v1/object/item-photos/${path}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SB_KEY}`,
+      'Content-Type': 'image/jpeg',
+      'x-upsert': 'true',
+    },
+    body: compressed,
+  });
+  if(!res.ok) throw new Error('Upload failed');
+  const publicUrl = `${SB_URL}/storage/v1/object/public/item-photos/${path}`;
+  return publicUrl;
+}
+
+function compressImage(file, maxWidth, quality){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const scale=Math.min(1,maxWidth/img.width);
+      const canvas=document.createElement('canvas');
+      canvas.width=img.width*scale;
+      canvas.height=img.height*scale;
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      canvas.toBlob(blob=>resolve(blob),'image/jpeg',quality);
+      URL.revokeObjectURL(url);
+    };
+    img.onerror=reject;
+    img.src=url;
+  });
+}
+
+async function handlePhotoUpload(input, ids, btnId){
+  const file=input.files[0];
+  if(!file)return;
+  const btn=document.getElementById(btnId);
+  btn.textContent='Uploading…';btn.disabled=true;
+  try{
+    const idList=ids.split(',');
+    const url=await uploadPhoto(file,idList[0]);
+    // Save url to all items in group
+    await Promise.all(idList.map(id=>
+      fetch('/api/items/'+id+'/check',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo_url:url})})
+    ));
+    // Update allItems
+    idList.forEach(id=>{const item=allItems.find(i=>i.id===id);if(item)item.photo_url=url;});
+    btn.textContent='Photo ✓';btn.classList.add('has-photo');
+  }catch(e){
+    btn.textContent='Failed';
+  }finally{
+    btn.disabled=false;
+  }
+}
+
 let currentJob=null,allItems=[],showArchived=false,pendingJobId=null;
 const COLOUR_MAP={Red:'#E85C47',Blue:'#4A9EE8',Green:'#4CAF7D',Yellow:'#E8C547',Purple:'#A04AE8',Orange:'#E87E47',Pink:'#E84A9E'};
 const STATUS_LABELS={ready:'Job Assigned',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',archived:'Archived'};
@@ -426,13 +488,18 @@ function renderPanelItems(){
 }
 
 function groupRow(grp){
-  const picked = grp.allPicked;
+  const picked  = grp.allPicked;
   const partial = grp.somePicked && !grp.allPicked;
   const serialTxt = grp.count>1 ? `#${grp.firstSerial}–#${grp.lastSerial}` : `#${grp.firstSerial}`;
   const descTxt   = grp.count>1 ? `${grp.count}×  ${grp.description||'blank extra'}` : (grp.description||'<span style="color:var(--muted);font-style:italic">blank extra</span>');
-  const rowCls    = picked?'item-row item-picked':partial?'item-row item-partial':'item-row';
-  const btnCls    = picked?'pick-btn picked':partial?'pick-btn partial':'pick-btn';
-  const ids       = grp.items.map(i=>i.id).join(',');
+  const rowCls  = picked?'item-row item-picked':partial?'item-row item-partial':'item-row';
+  const btnCls  = picked?'pick-btn picked':partial?'pick-btn partial':'pick-btn';
+  const ids     = grp.items.map(i=>i.id).join(',');
+  const hasPhoto= grp.items.some(i=>i.photo_url);
+  const btnId   = `photo-btn-${grp.firstSerial}`;
+  const inputId = `photo-input-${grp.firstSerial}`;
+  const photoBtnTxt = hasPhoto ? 'Photo ✓' : '📷 Add Photo';
+  const photoBtnCls = hasPhoto ? 'photo-btn has-photo' : 'photo-btn';
   return `<div class="${rowCls}" id="group-${grp.firstSerial}">
     <button class="${btnCls}" onclick="toggleGroupPicked('${ids}', this)">✓</button>
     <div class="item-serial">${serialTxt}</div>
@@ -440,7 +507,11 @@ function groupRow(grp){
     <textarea class="item-notes" rows="1" placeholder="Add note for driver…"
       onblur="saveNote('${grp.items[0].id}',this.value)"
       oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
-    >${grp.notes}</textarea></div>`;
+    >${grp.notes}</textarea>
+    <input type="file" accept="image/*" capture="environment" class="photo-input" id="${inputId}"
+      onchange="handlePhotoUpload(this,'${ids}','${btnId}')"/>
+    <button class="${photoBtnCls}" id="${btnId}" onclick="document.getElementById('${inputId}').click()">${photoBtnTxt}</button>
+  </div>`;
 }
 
 function itemRow(item){

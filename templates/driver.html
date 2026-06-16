@@ -196,7 +196,6 @@ const ITEM_CATEGORIES = [
   { label: 'Soft Furnishings',keywords: ['cushion','throw','linen','coverlet','pillow','towel'] },
   { label: 'Outdoor',         keywords: ['outdoor'] },
   { label: 'Accessories',     keywords: ['accessor','centrepiece','mirror'] },
-  { label: 'Extras',          keywords: [] },  // catch-all
 ];
 
 function getCategory(desc){
@@ -226,14 +225,14 @@ function groupItems(list){
 function renderRooms(){
   const container=document.getElementById('items-container');
   const allGrouped=groupItems(items.filter(i=>!i.is_extra));
-  const extraGrouped=groupItems(items.filter(i=>i.is_extra));
-
   // Build category map
   const catMap={};
   for(const grp of allGrouped){
     if(!catMap[grp.category])catMap[grp.category]=[];
     catMap[grp.category].push(grp);
   }
+  // Add stylist-added extras only if they exist
+  const extraGrouped=groupItems(items.filter(i=>i.is_extra));
   if(extraGrouped.length) catMap['Extras']=[...(catMap['Extras']||[]),...extraGrouped];
 
   // Render in defined order, skip empty categories
@@ -321,9 +320,9 @@ async function toggleGroup(ids,el){
 
 function rerenderRoomProgress(){
   const allGrouped=groupItems(items.filter(i=>!i.is_extra));
-  const extraGrouped=groupItems(items.filter(i=>i.is_extra));
   const catMap={};
   for(const grp of allGrouped){if(!catMap[grp.category])catMap[grp.category]=[];catMap[grp.category].push(grp);}
+  const extraGrouped=groupItems(items.filter(i=>i.is_extra));
   if(extraGrouped.length)catMap['Extras']=[...(catMap['Extras']||[]),...extraGrouped];
   for(const[cat,groups] of Object.entries(catMap)){
     const key=cat.replace(/[^a-zA-Z0-9]/g,'_');

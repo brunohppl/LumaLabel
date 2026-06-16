@@ -107,6 +107,7 @@ def save_job_to_db(meta, items, colour_name, job_owner=''):
                 'description': item.get('description', ''),
                 'is_extra':    item.get('is_extra', False),
                 'checked':     False,
+                'photo_url':   None,
             }
             for item in items
         ]
@@ -1153,9 +1154,10 @@ def api_job_status(job_id):
 def api_item_check(item_id):
     data    = request.get_json()
     payload = {}
-    if 'checked' in data: payload['checked'] = data['checked']
-    if 'notes'   in data: payload['notes']   = data['notes']
-    if 'picked'  in data: payload['picked']  = data['picked']
+    if 'checked'   in data: payload['checked']   = data['checked']
+    if 'notes'     in data: payload['notes']     = data['notes']
+    if 'picked'    in data: payload['picked']    = data['picked']
+    if 'photo_url' in data: payload['photo_url'] = data['photo_url']
     result = sb_patch('items', f'id=eq.{item_id}', payload)
     return jsonify({'success': bool(result)})
 

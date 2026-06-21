@@ -29,9 +29,14 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .pill-loading{background:rgba(232,92,71,0.12);color:var(--red);}
 .pill-loaded{background:rgba(74,124,89,0.12);color:var(--green);}
 .pill-installed{background:rgba(74,124,89,0.2);color:var(--green);font-weight:700;}
+.pill-returned{background:rgba(21,101,192,0.15);color:#1565C0;font-weight:700;}
 .pill-archived{background:rgba(155,150,145,0.12);color:var(--muted);}
 
-.jobs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:18px;}
+.jobs-grid{display:flex;flex-direction:column;gap:28px;}
+.status-section{}
+.status-section-header{font-size:0.75rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.status-section-count{background:var(--sand);color:var(--ink);border-radius:10px;padding:1px 9px;font-size:0.7rem;font-weight:600;}
+.jobs-grid-inner{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:18px;}
 .job-card{background:white;border:1px solid var(--border);border-radius:2px;overflow:hidden;cursor:pointer;transition:border-color 0.2s,box-shadow 0.2s;}
 .job-card:hover{border-color:var(--accent);box-shadow:0 4px 24px rgba(0,0,0,0.07);}
 .job-card-top{padding:22px;display:flex;align-items:flex-start;gap:14px;}
@@ -251,8 +256,8 @@ async function handlePhotoUpload(input, ids, btnId){
 
 let currentJob=null,allItems=[],showArchived=false,pendingJobId=null;
 const COLOUR_MAP={Red:'#E85C47',Blue:'#4A9EE8',Green:'#4CAF7D',Yellow:'#E8C547',Purple:'#A04AE8',Orange:'#E87E47',Pink:'#E84A9E'};
-const STATUS_LABELS={ready:'Job Assigned',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',archived:'Archived'};
-const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',archived:'pill-archived'};
+const STATUS_LABELS={ready:'Job Assigned',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',returned:'Returned',archived:'Archived'};
+const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',returned:'pill-returned',archived:'pill-archived'};
 
 function toggleArchived(){
   showArchived=!showArchived;
@@ -263,23 +268,52 @@ function toggleArchived(){
   loadJobs();
 }
 
+// Status display order — installed/returned always last
+const STATUS_ORDER=['ready','picking','ready_to_load','loading','loaded','installed','returned'];
+const STATUS_SECTION_LABELS={
+  ready:'Job Assigned', picking:'Picking', ready_to_load:'Ready to Load',
+  loading:'Loading', loaded:'Loaded', installed:'Installed', returned:'Returned'
+};
+
+const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+function parseStageDate(s){
+  if(!s)return 0;
+  const parts=s.trim().split(/\s+/);
+  if(parts.length===3){
+    const d=parseInt(parts[0]),m=MONTHS[parts[1].toLowerCase().slice(0,3)],y=parseInt(parts[2]);
+    if(!isNaN(d)&&m!==undefined&&!isNaN(y)) return new Date(y,m,d).getTime();
+  }
+  const fallback=new Date(s);
+  return isNaN(fallback)?0:fallback.getTime();
+}
+
+function jobCardHTML(job){
+  const colour=COLOUR_MAP[job.colour]||'#888';
+  const pill=STATUS_PILLS[job.status]||'pill-ready',label=STATUS_LABELS[job.status]||job.status;
+  const truck=job.truck?`${job.truck}`:'',owner=job.job_owner?`${job.job_owner}`:'';
+  return `<div class="job-card" onclick="openJob('${job.id}')">
+    <div class="job-card-top">
+      <div class="colour-swatch" style="background:${colour}"></div>
+      <div class="job-info">
+        <div class="job-ref-row">
+          <div class="job-ref">${job.job_ref||job.job_number}</div>
+          <span class="pill ${pill}">${label}</span>
+        </div>
+        <div class="job-address">${job.address}</div>
+        <div class="job-meta">
+          ${job.stage_date?`<span>${job.stage_date}</span>`:''}
+          <span>${job.item_count} items</span>
+          ${owner?`<span>${owner}</span>`:''}
+          ${truck?`<span>${truck}</span>`:''}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 async function loadJobs(){
   const res=await fetch('/api/jobs');
   const allJobs=await res.json();
-  // Sort by installation date descending (most recent first)
-  // stage_date format: "12 May 2026"
-  const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-  const parseStageDate=s=>{
-    if(!s)return 0;
-    const parts=s.trim().split(/\s+/);
-    if(parts.length===3){
-      const d=parseInt(parts[0]),m=MONTHS[parts[1].toLowerCase().slice(0,3)],y=parseInt(parts[2]);
-      if(!isNaN(d)&&m!==undefined&&!isNaN(y)) return new Date(y,m,d).getTime();
-    }
-    const fallback=new Date(s);
-    return isNaN(fallback)?0:fallback.getTime();
-  };
-  allJobs.sort((a,b)=>parseStageDate(a.stage_date)-parseStageDate(b.stage_date));
   const jobs=showArchived?allJobs:allJobs.filter(j=>j.status!=='archived');
   const grid=document.getElementById('jobs-grid');
   if(!jobs.length){
@@ -287,29 +321,31 @@ async function loadJobs(){
     grid.innerHTML=`<div class="empty"><div class="empty-title">No jobs yet</div><div class="empty-sub">${msg}</div></div>`;
     return;
   }
-  grid.innerHTML=jobs.map(job=>{
-    const colour=COLOUR_MAP[job.colour]||'#888';
-    const pill=STATUS_PILLS[job.status]||'pill-ready',label=STATUS_LABELS[job.status]||job.status;
-    const truck=job.truck?`${job.truck}`:'',owner=job.job_owner?`${job.job_owner}`:'';
-    return `<div class="job-card" onclick="openJob('${job.id}')">
-      <div class="job-card-top">
-        <div class="colour-swatch" style="background:${colour}"></div>
-        <div class="job-info">
-          <div class="job-ref-row">
-            <div class="job-ref">${job.job_ref||job.job_number}</div>
-            <span class="pill ${pill}">${label}</span>
-          </div>
-          <div class="job-address">${job.address}</div>
-          <div class="job-meta">
-            ${job.stage_date?`<span>${job.stage_date}</span>`:''}
-            <span>${job.item_count} items</span>
-            ${owner?`<span>${owner}</span>`:''}
-            ${truck?`<span>${truck}</span>`:''}
-          </div>
-        </div>
-      </div>
+
+  // Group by status, sort each group by stage date ascending
+  const groups={};
+  for(const job of jobs){
+    const status=job.status||'ready';
+    if(!groups[status])groups[status]=[];
+    groups[status].push(job);
+  }
+  for(const status in groups){
+    groups[status].sort((a,b)=>parseStageDate(a.stage_date)-parseStageDate(b.stage_date));
+  }
+
+  // Render sections in defined status order; skip empty/unlisted statuses safely
+  const orderedStatuses=STATUS_ORDER.filter(s=>groups[s]&&groups[s].length);
+  Object.keys(groups).forEach(s=>{if(!orderedStatuses.includes(s))orderedStatuses.push(s);});
+
+  let html='';
+  for(const status of orderedStatuses){
+    const label=STATUS_SECTION_LABELS[status]||status;
+    html+=`<div class="status-section">
+      <div class="status-section-header">${label} <span class="status-section-count">${groups[status].length}</span></div>
+      <div class="jobs-grid-inner">${groups[status].map(jobCardHTML).join('')}</div>
     </div>`;
-  }).join('');
+  }
+  grid.innerHTML=html;
 }
 
 async function openJob(jobId){

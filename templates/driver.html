@@ -19,6 +19,7 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .pill-loading{background:rgba(232,92,71,0.2);color:#E8856A;}
 .pill-loaded{background:rgba(74,124,89,0.25);color:#6BBF8A;}
 .pill-installed{background:rgba(74,124,89,0.45);color:#9FFFCE;font-weight:800;}
+.pill-returned{background:rgba(74,126,184,0.3);color:#8ABAEE;font-weight:800;}
 .hdr-ref{font-size:2.6rem;font-weight:700;color:var(--accent);line-height:1;letter-spacing:-0.01em;}
 .hdr-addr{font-size:0.92rem;color:rgba(250,248,244,0.6);margin-top:2px;}
 .hdr-owner{font-size:0.8rem;color:rgba(250,248,244,0.35);margin-top:1px;}
@@ -41,6 +42,7 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .btn-start{background:var(--accent);color:white;}
 .btn-finish{background:var(--green);color:white;}
 .btn-installed{background:var(--ink);color:var(--cream);}
+.btn-returned{background:#1565C0;color:white;}
 .action-status-msg{font-size:0.88rem;color:var(--muted);text-align:center;padding:4px 0;}
 
 /* ── CONTENT ── */
@@ -156,8 +158,8 @@ function closePhoto(){
 
 const jobId=window.location.pathname.split('/').pop();
 let job=null,items=[];
-const STATUS_PILLS={ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed'};
-const STATUS_LABELS={ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed'};
+const STATUS_PILLS={ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',returned:'pill-returned'};
+const STATUS_LABELS={ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',returned:'Returned'};
 
 async function loadJob(){
   const res=await fetch(`/api/jobs/${jobId}`);
@@ -179,7 +181,8 @@ function renderStatusBar(){
   if(s==='ready_to_load') bar.innerHTML=`<button class="action-btn btn-start" onclick="setStatus('loading')">Start Loading</button>`;
   else if(s==='loading')  bar.innerHTML=`<button class="action-btn btn-finish" onclick="finishLoading()">Loading Finished</button>`;
   else if(s==='loaded')   bar.innerHTML=`<button class="action-btn btn-installed" onclick="setStatus('installed')">Installed</button>`;
-  else if(s==='installed')bar.innerHTML=`<div class="action-status-msg">Installation complete</div>`;
+  else if(s==='installed')bar.innerHTML=`<button class="action-btn btn-returned" onclick="setStatus('returned')">Mark Returned</button>`;
+  else if(s==='returned') bar.innerHTML=`<div class="action-status-msg">Truck returned to warehouse</div>`;
   else bar.innerHTML=`<div class="action-status-msg">Waiting for stylist to complete picking…</div>`;
 }
 
@@ -302,7 +305,7 @@ function toggleRoomCard(header){
 }
 
 async function toggleGroup(ids,el){
-  if(job.status==='installed')return;
+  if(job.status==='installed'||job.status==='returned')return;
   const idList=ids.split(',');
   const first=items.find(i=>i.id===idList[0]);
   if(!first)return;

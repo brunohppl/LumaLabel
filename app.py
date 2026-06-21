@@ -167,7 +167,7 @@ def notify_slack(meta, item_count, colour_name, label_filename):
         pass  # Never let Slack failure break label generation
 
 
-# ── Colour cycle — 7 maximally distinct colours ──
+# ── Colour cycle — 14 maximally distinct colours ──
 COLOURS = [
     {'hex': '#D62828', 'name': 'Red'},
     {'hex': '#1565C0', 'name': 'Blue'},
@@ -176,6 +176,13 @@ COLOURS = [
     {'hex': '#6A0DAD', 'name': 'Purple'},
     {'hex': '#E65100', 'name': 'Orange'},
     {'hex': '#00838F', 'name': 'Teal'},
+    {'hex': '#AD1457', 'name': 'Magenta'},
+    {'hex': '#4E342E', 'name': 'Brown'},
+    {'hex': '#558B2F', 'name': 'Olive'},
+    {'hex': '#283593', 'name': 'Indigo'},
+    {'hex': '#00ACC1', 'name': 'Cyan'},
+    {'hex': '#F06292', 'name': 'Pink'},
+    {'hex': '#757575', 'name': 'Grey'},
 ]
 
 # Persistent colour index stored in a simple file

@@ -22,6 +22,14 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .page-title{font-family:'Cormorant Garamond',serif;font-size:2.6rem;font-weight:300;margin-bottom:4px;}
 .page-sub{font-size:0.9rem;color:var(--muted);margin-bottom:0;}
 
+.search-bar{display:flex;align-items:center;gap:10px;background:white;border:1px solid var(--border);border-radius:2px;padding:11px 16px;margin-bottom:24px;transition:border-color 0.15s;}
+.search-bar:focus-within{border-color:var(--accent);}
+.search-bar svg{color:var(--muted);flex-shrink:0;}
+.search-bar input{flex:1;border:none;outline:none;font-family:'Jost',sans-serif;font-size:0.95rem;color:var(--ink);background:none;}
+.search-bar input::placeholder{color:var(--muted);}
+#search-clear{background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.9rem;padding:2px 6px;display:flex;align-items:center;border-radius:50%;transition:background 0.15s,color 0.15s;}
+#search-clear:hover{background:var(--warm);color:var(--ink);}
+
 .pill{display:inline-block;padding:5px 14px;border-radius:1px;font-size:0.68rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;}
 .pill-ready{background:rgba(74,126,184,0.12);color:var(--blue);}
 .pill-picking{background:rgba(232,197,71,0.15);color:#B8972A;}
@@ -134,12 +142,17 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
   </div>
 </header>
 <div class="main">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:14px;">
     <div>
       <div class="page-title">Active Jobs</div>
       <div class="page-sub">Click a job to manage items and update status</div>
     </div>
     <button class="btn btn-outline" id="archived-toggle" onclick="toggleArchived()" style="font-size:0.75rem;">Show Completed Jobs</button>
+  </div>
+  <div class="search-bar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+    <input type="text" id="job-search" placeholder="Search by job number or address…" oninput="handleSearchInput(this.value)" />
+    <button id="search-clear" onclick="clearSearch()" style="display:none;">✕</button>
   </div>
   <div class="jobs-grid" id="jobs-grid"><div class="loading">Loading jobs…</div></div>
 </div>
@@ -239,7 +252,7 @@ function toggleArchived(){
   btn.textContent=showArchived?'Hide Completed Jobs':'Show Completed Jobs';
   btn.style.color=showArchived?'var(--accent)':'';
   btn.style.borderColor=showArchived?'var(--accent)':'';
-  loadJobs();
+  renderJobs();
 }
 
 // Status display order — installed is the last visible step before a job
@@ -296,14 +309,34 @@ function jobCardHTML(job){
   </div>`;
 }
 
+let lastFetchedJobs=[]; // cached so search can re-filter without refetching
+let searchQuery='';
+
 async function loadJobs(){
   const res=await fetch('/api/jobs');
-  const allJobs=await res.json();
-  const jobs=showArchived?allJobs:allJobs.filter(j=>j.status!=='archived');
+  lastFetchedJobs=await res.json();
+  renderJobs();
+}
+
+function renderJobs(){
   const grid=document.getElementById('jobs-grid');
+  let jobs=showArchived?lastFetchedJobs:lastFetchedJobs.filter(j=>j.status!=='archived');
+
+  if(searchQuery.trim()){
+    const q=searchQuery.trim().toLowerCase();
+    jobs=jobs.filter(j=>{
+      const ref=(j.job_ref||'').toLowerCase();
+      const num=(j.job_number||'').toLowerCase();
+      const addr=(j.address||'').toLowerCase();
+      return ref.includes(q)||num.includes(q)||addr.includes(q);
+    });
+  }
+
   if(!jobs.length){
-    const msg=showArchived?'No completed jobs found':'No active jobs';
-    grid.innerHTML=`<div class="empty"><div class="empty-title">No jobs yet</div><div class="empty-sub">${msg}</div></div>`;
+    const msg=searchQuery.trim()
+      ? `No jobs match "${searchQuery.trim()}"`
+      : (showArchived?'No completed jobs found':'No active jobs');
+    grid.innerHTML=`<div class="empty"><div class="empty-title">No jobs found</div><div class="empty-sub">${msg}</div></div>`;
     return;
   }
 
@@ -331,6 +364,20 @@ async function loadJobs(){
     </div>`;
   }
   grid.innerHTML=html;
+}
+
+function handleSearchInput(value){
+  searchQuery=value;
+  const clearBtn=document.getElementById('search-clear');
+  clearBtn.style.display=value?'flex':'none';
+  renderJobs();
+}
+
+function clearSearch(){
+  searchQuery='';
+  document.getElementById('job-search').value='';
+  document.getElementById('search-clear').style.display='none';
+  renderJobs();
 }
 
 async function openAsStylist(jobId){

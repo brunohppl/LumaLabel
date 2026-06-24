@@ -37,9 +37,16 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .status-section-header{font-size:0.75rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
 .status-section-count{background:var(--sand);color:var(--ink);border-radius:10px;padding:1px 9px;font-size:0.7rem;font-weight:600;}
 .jobs-grid-inner{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:18px;}
-.job-card{background:white;border:1px solid var(--border);border-radius:2px;overflow:hidden;cursor:pointer;transition:border-color 0.2s,box-shadow 0.2s;}
+.job-card{background:white;border:1px solid var(--border);border-radius:2px;overflow:hidden;transition:border-color 0.2s,box-shadow 0.2s;}
 .job-card:hover{border-color:var(--accent);box-shadow:0 4px 24px rgba(0,0,0,0.07);}
 .job-card-top{padding:22px;display:flex;align-items:flex-start;gap:14px;}
+.job-card-actions{display:flex;border-top:1px solid var(--border);}
+.job-action-btn{flex:1;padding:13px;background:none;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:7px;transition:background 0.15s;}
+.job-action-btn:first-child{border-right:1px solid var(--border);}
+.job-action-stylist{color:var(--accent);}
+.job-action-stylist:hover{background:rgba(184,147,90,0.08);}
+.job-action-driver{color:var(--blue);}
+.job-action-driver:hover{background:rgba(74,126,184,0.08);}
 .colour-swatch{width:10px;align-self:stretch;border-radius:1px;min-height:70px;flex-shrink:0;}
 .job-info{flex:1;min-width:0;}
 .job-ref-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
@@ -47,22 +54,9 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .job-address{font-size:1rem;color:var(--ink);margin-top:4px;}
 .job-meta{font-size:0.85rem;color:var(--muted);margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;line-height:1.7;}
 
-/* Role modal */
+/* Stylist panel backdrop */
 .panel-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.5);z-index:100;}
 .panel-overlay.open{display:block;}
-.role-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.95);background:white;border-radius:3px;z-index:102;width:calc(100% - 40px);max-width:440px;box-shadow:0 24px 64px rgba(0,0,0,0.18);opacity:0;pointer-events:none;transition:all 0.2s ease;}
-.role-modal.open{opacity:1;pointer-events:all;transform:translate(-50%,-50%) scale(1);}
-.role-modal-header{padding:24px 28px 18px;border-bottom:1px solid var(--border);position:relative;}
-.role-job-ref{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:400;color:var(--accent);line-height:1;}
-.role-job-addr{font-size:0.9rem;color:var(--muted);margin-top:4px;}
-.role-close{position:absolute;top:18px;right:20px;background:none;border:none;font-size:1.3rem;color:var(--muted);cursor:pointer;padding:4px;}
-.role-btns{display:grid;grid-template-columns:1fr 1fr;gap:0;}
-.role-btn{background:none;border:none;padding:34px 24px;cursor:pointer;text-align:center;transition:background 0.15s;border-top:1px solid var(--border);}
-.role-btn:first-child{border-right:1px solid var(--border);}
-.role-btn:hover{background:var(--warm);}
-.role-btn:active{background:var(--sand);}
-.role-label{font-size:1.3rem;font-weight:600;color:var(--ink);margin-bottom:6px;font-family:'Jost',sans-serif;letter-spacing:0.04em;}
-.role-sub{font-size:0.82rem;color:var(--muted);}
 
 /* Stylist panel */
 .panel{position:fixed;right:0;top:0;bottom:0;width:100%;max-width:600px;background:white;z-index:101;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s ease;}
@@ -150,26 +144,6 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
   <div class="jobs-grid" id="jobs-grid"><div class="loading">Loading jobs…</div></div>
 </div>
 
-<!-- Role modal -->
-<div class="panel-overlay" id="role-overlay" onclick="closeRole()"></div>
-<div class="role-modal" id="role-modal">
-  <div class="role-modal-header">
-    <div class="role-job-ref" id="role-ref"></div>
-    <div class="role-job-addr" id="role-addr"></div>
-    <button class="role-close" onclick="closeRole()">✕</button>
-  </div>
-  <div class="role-btns">
-    <button class="role-btn" onclick="openAsStylist()">
-      <div class="role-label">Stylist</div>
-      <div class="role-sub">Pick items & manage job</div>
-    </button>
-    <button class="role-btn" onclick="openAsDriver()">
-      <div class="role-label">Driver</div>
-      <div class="role-sub">Load truck & check items</div>
-    </button>
-  </div>
-</div>
-
 <!-- Stylist panel -->
 <div class="panel-overlay" id="overlay" onclick="closePanel()"></div>
 <div class="panel" id="panel">
@@ -254,7 +228,7 @@ async function handlePhotoUpload(input, ids, btnId){
   }
 }
 
-let currentJob=null,allItems=[],showArchived=false,pendingJobId=null;
+let currentJob=null,allItems=[],showArchived=false;
 const COLOUR_MAP={Red:'#D62828',Blue:'#1565C0',Green:'#2E7D32',Yellow:'#F9A825',Purple:'#6A0DAD',Orange:'#E65100',Teal:'#00838F',Magenta:'#AD1457',Brown:'#4E342E',Olive:'#558B2F',Indigo:'#283593',Cyan:'#00ACC1',Pink:'#F06292',Grey:'#757575'};
 const STATUS_LABELS={ready:'Job Assigned',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',archived:'Returned'};
 const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',archived:'pill-returned'};
@@ -292,7 +266,7 @@ function jobCardHTML(job){
   const colour=COLOUR_MAP[job.colour]||'#888';
   const pill=STATUS_PILLS[job.status]||'pill-ready',label=STATUS_LABELS[job.status]||job.status;
   const truck=job.truck?`${job.truck}`:'',owner=job.job_owner?`${job.job_owner}`:'';
-  return `<div class="job-card" onclick="openJob('${job.id}')">
+  return `<div class="job-card">
     <div class="job-card-top">
       <div class="colour-swatch" style="background:${colour}"></div>
       <div class="job-info">
@@ -308,6 +282,16 @@ function jobCardHTML(job){
           ${truck?`<span>${truck}</span>`:''}
         </div>
       </div>
+    </div>
+    <div class="job-card-actions">
+      <button class="job-action-btn job-action-stylist" onclick="openAsStylist('${job.id}')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.71 4.04c.39-.39.39-1.05 0-1.44l-2.31-2.31a.996.996 0 0 0-1.41 0L15.13 2.16l3.71 3.71M3 17.25V21h3.75L20.81 6.94l-3.75-3.75z"/></svg>
+        Stylist
+      </button>
+      <button class="job-action-btn job-action-driver" onclick="openAsDriver('${job.id}')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>
+        Driver
+      </button>
     </div>
   </div>`;
 }
@@ -349,25 +333,10 @@ async function loadJobs(){
   grid.innerHTML=html;
 }
 
-async function openJob(jobId){
-  pendingJobId=jobId;
+async function openAsStylist(jobId){
   const res=await fetch(`/api/jobs/${jobId}`);
   const data=await res.json();
   currentJob=data.job;allItems=data.items;
-  document.getElementById('role-ref').textContent=currentJob.job_ref||currentJob.job_number;
-  document.getElementById('role-addr').textContent=currentJob.address+' · '+currentJob.stage_date;
-  document.getElementById('role-overlay').classList.add('open');
-  document.getElementById('role-modal').classList.add('open');
-}
-
-function closeRole(){
-  document.getElementById('role-overlay').classList.remove('open');
-  document.getElementById('role-modal').classList.remove('open');
-  pendingJobId=null;
-}
-
-function openAsStylist(){
-  closeRole();
   document.getElementById('overlay').classList.add('open');
   document.getElementById('panel').classList.add('open');
   document.getElementById('panel-body').innerHTML='<div class="loading">Loading…</div>';
@@ -377,9 +346,8 @@ function openAsStylist(){
   renderStatus();renderPanelItems();
 }
 
-function openAsDriver(){
-  closeRole();
-  window.open(`/driver/${currentJob.id}`,'_blank');
+function openAsDriver(jobId){
+  window.open(`/driver/${jobId}`,'_blank');
 }
 
 function closePanel(){

@@ -730,7 +730,7 @@ generateBtn.addEventListener('click', async () => {
     }
 
     // Read metadata from response headers
-    const jobNumber  = response.headers.get('X-Job-Number')  || '—';
+    const jobRef     = response.headers.get('X-Job-Ref')     || '—';
     const itemCount  = response.headers.get('X-Item-Count')  || '—';
     const colour     = response.headers.get('X-Colour')      || '—';
     const address    = response.headers.get('X-Address')     || '—';
@@ -756,7 +756,7 @@ generateBtn.addEventListener('click', async () => {
     statusTitle.textContent = 'Labels Downloaded';
     statusBody.innerHTML = `
       <div class="meta-grid">
-        <div class="meta-item"><span class="meta-label">Job</span><span class="meta-value">${jobNumber}</span></div>
+        <div class="meta-item"><span class="meta-label">Job</span><span class="meta-value">${jobRef}</span></div>
         <div class="meta-item"><span class="meta-label">Items</span><span class="meta-value">${itemCount} labels</span></div>
         <div class="meta-item"><span class="meta-label">Date</span><span class="meta-value">${stageDate}</span></div>
         <div class="meta-item"><span class="meta-label">Colour</span><span class="meta-value">${colour}</span></div>
@@ -770,7 +770,7 @@ generateBtn.addEventListener('click', async () => {
       <div class="next-action-row">
         <button class="btn-next-action btn-next-primary" id="goto-jobs-btn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          View ${jobNumber} in Jobs
+          View Job ${jobRef} in Jobs
         </button>
         <button class="btn-next-action btn-next-secondary" id="another-label-btn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>

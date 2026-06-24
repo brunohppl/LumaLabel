@@ -342,6 +342,55 @@
     font-style: italic;
   }
 
+  /* ── COLOUR PICKER FIELD ── */
+  #colour-swatches { flex-wrap: wrap; }
+  .colour-field {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px;
+  }
+  .colour-field-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .swatch {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.12s, border-color 0.12s;
+    flex-shrink: 0;
+  }
+  .swatch:hover { transform: scale(1.1); }
+  .swatch.selected { border-color: var(--ink); transform: scale(1.12); }
+  .swatch.selected::after {
+    content: '✓';
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .swatch.taken { opacity: 0.28; cursor: not-allowed; }
+  .swatch.taken:hover { transform: none; }
+  .swatch-auto {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: 2px dashed var(--border);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.02em;
+    color: var(--muted);
+    background: var(--warm);
+    transition: transform 0.12s, border-color 0.12s;
+    flex-shrink: 0;
+  }
+  .swatch-auto:hover { transform: scale(1.1); }
+  .swatch-auto.selected { border-color: var(--accent); border-style: solid; color: var(--accent); transform: scale(1.12); }
+
   /* ── DIVIDER ── */
   .divider {
     height: 1px;
@@ -431,7 +480,7 @@
 
     <div class="eyebrow">Warehouse Operations</div>
     <h1>Generate <em>Job</em><br>Labels</h1>
-    <p class="subtitle">Upload a packing list PDF and download a print-ready label sheet in seconds. 18 labels per A4 page, numbered, and colour-coded by job.</p>
+    <p class="subtitle">Upload a packing list PDF and download a print-ready label sheet in seconds. 9 labels per A4 page, colour-coded by job.</p>
 
     <div class="upload-zone" id="upload-zone">
       <svg class="upload-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -456,7 +505,15 @@
       <span class="date-hint">Optional</span>
     </div>
 
-
+    <div class="date-field colour-field">
+      <div class="colour-field-top">
+        <label>Label Colour</label>
+        <span class="date-hint" style="text-align:right;">Pick a colour, or let Auto choose one that isn't already out at the warehouse</span>
+      </div>
+      <div id="colour-swatches" style="display:flex;flex-wrap:wrap;gap:10px;">
+        <!-- swatches injected by JS -->
+      </div>
+    </div>
 
     <button class="btn-generate" id="generate-btn" disabled>
       <div class="spinner"></div>
@@ -513,6 +570,50 @@ const statusBody  = document.getElementById('status-body');
 
 let selectedFile = null;
 
+// ── Colour picker ──
+const COLOURS = [
+  {name:'Red',hex:'#D62828'},{name:'Blue',hex:'#1565C0'},{name:'Green',hex:'#2E7D32'},
+  {name:'Yellow',hex:'#F9A825'},{name:'Purple',hex:'#6A0DAD'},{name:'Orange',hex:'#E65100'},
+  {name:'Teal',hex:'#00838F'},{name:'Magenta',hex:'#AD1457'},{name:'Brown',hex:'#4E342E'},
+  {name:'Olive',hex:'#558B2F'},{name:'Indigo',hex:'#283593'},{name:'Cyan',hex:'#00ACC1'},
+  {name:'Pink',hex:'#F06292'},{name:'Grey',hex:'#757575'},
+];
+let selectedColour = null;   // null = Auto
+let takenColours = [];       // colour names currently out at the warehouse
+
+async function loadTakenColours(){
+  try{
+    const res = await fetch('/api/jobs');
+    const jobs = await res.json();
+    // "Out at the warehouse" = jobs assigned but not yet returned/archived
+    takenColours = jobs
+      .filter(j => j.status === 'ready')
+      .map(j => j.colour)
+      .filter(Boolean);
+  }catch(e){
+    takenColours = [];
+  }
+  renderSwatches();
+}
+
+function renderSwatches(){
+  const container = document.getElementById('colour-swatches');
+  let html = `<div class="swatch-auto${selectedColour===null?' selected':''}" title="Auto — let the system choose" onclick="pickColour(null)">A</div>`;
+  html += COLOURS.map(c => {
+    const isTaken = takenColours.includes(c.name) && selectedColour !== c.name;
+    const cls = `swatch${selectedColour===c.name?' selected':''}${isTaken?' taken':''}`;
+    return `<div class="${cls}" style="background:${c.hex}" title="${c.name}${isTaken?' — already out at the warehouse':''}" onclick="${isTaken?'':`pickColour('${c.name}')`}"></div>`;
+  }).join('');
+  container.innerHTML = html;
+}
+
+function pickColour(name){
+  selectedColour = name;
+  renderSwatches();
+}
+
+loadTakenColours();
+
 // Click to browse
 uploadZone.addEventListener('click', () => fileInput.click());
 
@@ -567,7 +668,8 @@ generateBtn.addEventListener('click', async () => {
         fileName:    selectedFile.name,
         installDate: installDate || null,
         jobOwner:    document.getElementById('job-owner').value.trim() || '',
-        labelFormat: 18
+        labelFormat: 18,
+        colourName:  selectedColour
       })
     });
 
@@ -649,7 +751,8 @@ document.getElementById('checklist-btn').addEventListener('click', async () => {
         fileName:    selectedFile.name,
         installDate: installDate || null,
         jobOwner:    document.getElementById('job-owner').value.trim() || '',
-        labelFormat: 18
+        labelFormat: 18,
+        colourName:  selectedColour
       })
     });
 

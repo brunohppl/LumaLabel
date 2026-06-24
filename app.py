@@ -188,12 +188,32 @@ COLOURS = [
 # Persistent colour index stored in a simple file
 COLOUR_INDEX_FILE = '/tmp/luma_colour_index.txt'
 
-def get_next_colour():
+def get_colours_out_at_warehouse():
+    """Colours currently in use by jobs that are assigned but not yet picked up (status='ready')."""
+    try:
+        jobs = sb_get('jobs', "status=eq.ready&select=colour")
+        return [j['colour'] for j in jobs if j.get('colour')]
+    except Exception:
+        return []
+
+def get_next_colour(manual_name=None):
     import random as _random
+
+    # ── Manual selection takes priority ──
+    if manual_name:
+        match = next((c for c in COLOURS if c['name'] == manual_name), None)
+        if match:
+            return match
+        # Unknown name — fall through to auto logic below
+
+    # ── Auto selection: avoid any colour currently out at the warehouse ──
+    taken = set(get_colours_out_at_warehouse())
+    available = [c for c in COLOURS if c['name'] not in taken]
+    pool = available if available else COLOURS  # if every colour is taken, allow reuse
+
     try:
         with open(COLOUR_INDEX_FILE, 'r') as f:
             idx = int(f.read().strip())
-        # File exists — pick next in sequence
         next_idx = (idx + 1) % len(COLOURS)
     except:
         # File missing = restart — look up last used colour from Supabase
@@ -206,10 +226,9 @@ def get_next_colour():
         except:
             pass
         if last_colour:
-            # Find index of last colour and pick a random different one
             used_idx  = next((i for i, c in enumerate(COLOURS) if c['name'] == last_colour), None)
-            available = [i for i in range(len(COLOURS)) if i != used_idx]
-            next_idx  = _random.choice(available)
+            available_idx = [i for i in range(len(COLOURS)) if i != used_idx]
+            next_idx  = _random.choice(available_idx)
         else:
             next_idx = _random.randint(0, len(COLOURS) - 1)
         idx = next_idx
@@ -217,7 +236,12 @@ def get_next_colour():
 
     with open(COLOUR_INDEX_FILE, 'w') as f:
         f.write(str(next_idx))
-    return COLOURS[idx]
+
+    chosen = COLOURS[idx]
+    # If the sequential pick is taken and alternatives exist, swap to one that's free
+    if chosen['name'] in taken and available:
+        chosen = _random.choice(available)
+    return chosen
 
 # ── Room headers detected dynamically — no hardcoded list needed ──
 SKIP_WORDS = [
@@ -1081,6 +1105,7 @@ def generate():
         install_date = data.get('installDate')
         job_owner    = data.get('jobOwner', '')
         label_format = int(data.get('labelFormat', 18))  # 9 or 18 per page
+        colour_name  = data.get('colourName')  # manual colour choice, or None for Auto
         meta, items  = parse_packing_list(pdf_bytes)
 
         if not items:
@@ -1094,7 +1119,7 @@ def generate():
             except:
                 pass  # keep whatever the parser found
 
-        colour         = get_next_colour()
+        colour         = get_next_colour(colour_name)
         pdf_bytes_out  = generate_labels(meta, items, colour, label_format)
         label_filename = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
 

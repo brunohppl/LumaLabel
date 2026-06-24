@@ -295,6 +295,50 @@
 
   .btn-download:hover { background: #3d6b4a; }
 
+  .next-action-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-next-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 18px;
+    border-radius: 1px;
+    font-family: 'Jost', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    border: 1px solid transparent;
+    flex: 1;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .btn-next-primary {
+    background: var(--accent);
+    color: white;
+  }
+  .btn-next-primary:hover { background: #a07840; }
+
+  .btn-next-secondary {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--ink);
+  }
+  .btn-next-secondary:hover { border-color: var(--ink); }
+
+  @media (max-width: 480px) {
+    .next-action-row { flex-direction: column; }
+  }
+
   /* ── DATE FIELD ── */
   .date-field {
     background: white;
@@ -634,6 +678,22 @@ function setFile(file) {
   statusEl.className = 'status';
 }
 
+function resetUploadForm() {
+  selectedFile = null;
+  fileInput.value = '';
+  fileNameEl.textContent = '';
+  uploadZone.classList.remove('has-file', 'dragover');
+  generateBtn.disabled = true;
+  document.getElementById('install-date').value = '';
+  document.getElementById('job-owner').value = '';
+  selectedColour = null;
+  statusEl.className = 'status';
+  statusBody.innerHTML = '';
+  statusTitle.textContent = '';
+  loadTakenColours(); // refresh — the colour just used is now "out at the warehouse"
+  window.scrollTo({ top: uploadZone.offsetTop - 100, behavior: 'smooth' });
+}
+
 // Generate
 generateBtn.addEventListener('click', async () => {
   if (!selectedFile) return;
@@ -692,7 +752,7 @@ generateBtn.addEventListener('click', async () => {
     // Clean up after 10 minutes
     setTimeout(() => URL.revokeObjectURL(url), 600000);
 
-    // Show success summary with re-download button
+    // Show success summary with next-step actions
     statusTitle.textContent = 'Labels Downloaded';
     statusBody.innerHTML = `
       <div class="meta-grid">
@@ -706,9 +766,26 @@ generateBtn.addEventListener('click', async () => {
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M7 9L4 6M7 9l3-3M1 11h12v2H1z" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Download Labels PDF
       </a>
-      <div style="font-size:0.68rem;color:var(--muted);margin-top:10px;">Print on Avery 89x62-R label sheets · 9 labels per page</div>
+      <div style="font-size:0.68rem;color:var(--muted);margin:10px 0 16px;">Print on Avery 62x42-R label sheets · 18 labels per page</div>
+      <div class="next-action-row">
+        <button class="btn-next-action btn-next-primary" id="goto-jobs-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          View ${jobNumber} in Jobs
+        </button>
+        <button class="btn-next-action btn-next-secondary" id="another-label-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Generate Another Label
+        </button>
+      </div>
     `;
     statusEl.className = 'status success';
+
+    document.getElementById('goto-jobs-btn').addEventListener('click', () => {
+      window.location.href = '/jobs';
+    });
+    document.getElementById('another-label-btn').addEventListener('click', () => {
+      resetUploadForm();
+    });
 
   } catch (err) {
     statusTitle.textContent = 'Something went wrong';

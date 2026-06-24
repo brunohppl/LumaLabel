@@ -531,38 +531,16 @@ def generate_labels(meta, items, colour, label_format=18):
 
     PAGE_W, PAGE_H = A4
 
-    if label_format == 9:
-        # Avery 89x62-R — 9 per page, 3 cols x 3 rows
-        SX    = 0.921 * cm
-        SY    = 0.998 * cm
-        GX    = 0.499 * cm
-        GY    = 0.499 * cm
-        COLS  = 3
-        ROWS  = 3
-        LBL_W = 6.20 * cm
-        LBL_H = 8.90 * cm
-    elif label_format == 12:
-        # Avery 80x45-R — 12 per page, 4 cols x 3 rows
-        # Label portrait: 45mm wide x 80mm tall
-        # Equal spacing: SX=6mm, SY=14.25mm
-        SX    = 6.00  * mm
-        SY    = 14.25 * mm
-        GX    = SX
-        GY    = SY
-        COLS  = 4
-        ROWS  = 3
-        LBL_W = 45 * mm   # 45mm wide
-        LBL_H = 80 * mm   # 80mm tall
-    else:
-        # Avery 62x42-R — 18 per page, 3 cols x 6 rows
-        SX    = 6.00 * mm
-        SY    = 6.43 * mm
-        GX    = SX
-        GY    = SY
-        COLS  = 3
-        ROWS  = 6
-        LBL_W = 62 * mm
-        LBL_H = 42 * mm
+    # Avery 62x42-R — 18 per page, 3 cols x 6 rows
+    # Equal spacing throughout: 6mm horizontal, 6.43mm vertical
+    SX    = 6.00 * mm
+    SY    = 6.43 * mm
+    GX    = SX
+    GY    = SY
+    COLS  = 3
+    ROWS  = 6
+    LBL_W = 62 * mm
+    LBL_H = 42 * mm
 
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -579,8 +557,7 @@ def generate_labels(meta, items, colour, label_format=18):
     def draw_label(x, y, item):
         w, h  = LBL_W, LBL_H
         pad   = 0.18 * cm
-        # Wider colour bar for 12pp (45mm wide label) — 0.38 vs 0.28
-        bar_w = w * (0.38 if abs(w - 45*mm) < 1 else 0.28)
+        bar_w = w * 0.28
 
         # Colour bar
         c.setFillColor(C_ACCENT)
@@ -648,36 +625,19 @@ def generate_labels(meta, items, colour, label_format=18):
         c.setFillColor(C_INK); c.setFont('Helvetica-Bold', date_sz)
         c.drawString(rxe - dw, baseline, date_txt)
 
-        # ── Fixed zones for 18pp — calculated upfront, no overlap possible ──
-        if h < 60:
-            # 18pp: all positions fixed in points from label edges
-            ROOM_FONT  = 7          # fixed font — no auto-sizing
-            ROOM_Y     = y + 4      # shifted down
-            ID_FONT    = 9
-            ID_Y       = div_y - ID_FONT * 1.4 - 2  # just below divider
+        # ── Fixed label zones — all positions fixed in points from label edges ──
+        ROOM_FONT  = 7          # fixed font — no auto-sizing
+        ROOM_Y     = y + 4      # shifted down
+        ID_FONT    = 9
+        ID_Y       = div_y - ID_FONT * 1.4 - 2  # just below divider
 
-            # Item number
-            id_txt = f'#{item["serial"]}'
-            id_w   = c.stringWidth(id_txt, 'Helvetica-Bold', ID_FONT)
-            c.setFillColor(C_MUTED); c.setFont('Helvetica-Bold', ID_FONT)
-            c.drawString(rx + (rw - id_w) / 2, ID_Y, id_txt)
+        # Item number
+        id_txt = f'#{item["serial"]}'
+        id_w   = c.stringWidth(id_txt, 'Helvetica-Bold', ID_FONT)
+        c.setFillColor(C_MUTED); c.setFont('Helvetica-Bold', ID_FONT)
+        c.drawString(rx + (rw - id_w) / 2, ID_Y, id_txt)
 
-            # Room name removed — left blank for stylist to write manually
-        else:
-            # 9pp — auto-size room to fill middle zone
-            # Room name removed — blank for stylist to write manually
-            pass
-
-
-            # Item number for 9pp
-            id_size = 18
-            id_txt  = f'#{item["serial"]}'
-            id_w    = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
-            while id_w > rw and id_size > 7:
-                id_size -= 1
-                id_w = c.stringWidth(id_txt, 'Helvetica-Bold', id_size)
-            c.setFillColor(C_MUTED); c.setFont('Helvetica-Bold', id_size)
-            c.drawString(rx + (rw - id_w) / 2, y + pad + 0.6 * cm, id_txt)
+        # Room name removed — left blank for stylist to write manually
 
     # Adjust extras count to fill last page for this specific format
     ppp       = COLS * ROWS

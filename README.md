@@ -155,11 +155,10 @@ The `/jobs` page groups job tiles **by status** (one section per status, in the 
 
 `generate_labels()` in `app.py` is the most fiddly function in the codebase because it's positioning text on physical Avery label sheets with zero tolerance for misalignment. Current state:
 
-- **Only one format is wired into the UI: 18 per page, Avery 62×42-R** (62mm × 42mm, 3 cols × 6 rows, equal 6mm/6.43mm margins-and-gaps).
-- The function signature still accepts `label_format` (9, 12, or 18) and has working layouts for all three — 9pp (Avery 89×62-R) and 12pp (Avery 80×45-R, portrait) are dead code paths, kept in case the format is reintroduced. If you remove the selector permanently, consider deleting the unused branches; if you re-add format choice, the logic is already there.
+- **Only one format exists: 18 per page, Avery 62×42-R** (62mm × 42mm, 3 cols × 6 rows, equal 6mm/6.43mm margins-and-gaps). The 9pp (Avery 89×62-R) and 12pp (Avery 80×45-R) code paths that used to live alongside this have been removed entirely — `generate_labels()` only contains 18pp geometry now. The `label_format` parameter is still accepted for backward compatibility but is currently a no-op; if a second format is ever needed again, it'll need to be rebuilt rather than re-enabled.
 - **Room name is intentionally not printed on labels.** That space is left blank for the stylist to hand-write — this was a deliberate product decision, not an oversight. Don't "fix" this by re-adding room text without checking with the product owner first.
-- Each label shows: colour bar with rotated invoice suffix, date + address on one line at the bottom, item number above that. Font sizes for the 18pp format are mostly hardcoded (not auto-fit) after repeated iteration to stop room/date text colliding — see the long comment trail in git history if you need context on why before touching positions again.
-- Extras (blank filler labels) are calculated per-format to round the page count up to a full page, then capped/extended to avoid huge waste.
+- Each label shows: colour bar with rotated invoice suffix, date + address on one line at the bottom, item number above that. Font sizes are mostly hardcoded (not auto-fit) after repeated iteration to stop room/date text colliding — see the long comment trail in git history if you need context on why before touching positions again.
+- Extras (blank filler labels) are calculated to round the page count up to a full page, then capped/extended to avoid huge waste.
 
 If you need to adjust positions: change one offset at a time and re-render a real job's PDF before touching anything else. Small constant tweaks compound fast on a 42mm-tall label.
 
@@ -252,5 +251,5 @@ Render's free tier sleeps the instance after ~15 minutes of inactivity, causing 
 ## Known rough edges (not bugs, just things worth knowing)
 
 - `checked_count` on `jobs` is written nowhere currently — it exists in the schema but isn't kept in sync. Don't assume it's accurate if you build a feature against it.
-- The label generator's `label_format=9` and `=12` code paths are untested against the *current* layout logic — they predate several rounds of position tweaks that were only verified against `=18`. Re-verify visually before re-exposing them in the UI.
+- The label generator previously supported 9pp and 12pp formats; both were removed for simplicity (see [Label generation](#label-generation--the-part-most-likely-to-need-care)). If you're hunting for that code in git history, it predates the cleanup that dropped it.
 - The role-selection modal (Stylist vs Driver) on `/jobs` re-fetches the job just to populate the modal header, then the chosen view re-fetches it again. Minor redundant network call, not worth fixing unless touching that code anyway.

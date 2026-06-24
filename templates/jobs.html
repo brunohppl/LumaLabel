@@ -145,7 +145,7 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
       <div class="page-title">Active Jobs</div>
       <div class="page-sub">Click a job to manage items and update status</div>
     </div>
-    <button class="btn btn-outline" id="archived-toggle" onclick="toggleArchived()" style="font-size:0.75rem;">Show Archived</button>
+    <button class="btn btn-outline" id="archived-toggle" onclick="toggleArchived()" style="font-size:0.75rem;">Show Completed Jobs</button>
   </div>
   <div class="jobs-grid" id="jobs-grid"><div class="loading">Loading jobs…</div></div>
 </div>
@@ -256,23 +256,24 @@ async function handlePhotoUpload(input, ids, btnId){
 
 let currentJob=null,allItems=[],showArchived=false,pendingJobId=null;
 const COLOUR_MAP={Red:'#D62828',Blue:'#1565C0',Green:'#2E7D32',Yellow:'#F9A825',Purple:'#6A0DAD',Orange:'#E65100',Teal:'#00838F',Magenta:'#AD1457',Brown:'#4E342E',Olive:'#558B2F',Indigo:'#283593',Cyan:'#00ACC1',Pink:'#F06292',Grey:'#757575'};
-const STATUS_LABELS={ready:'Job Assigned',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',returned:'Returned',archived:'Archived'};
-const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',returned:'pill-returned',archived:'pill-archived'};
+const STATUS_LABELS={ready:'Job Assigned',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',archived:'Returned'};
+const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',archived:'pill-returned'};
 
 function toggleArchived(){
   showArchived=!showArchived;
   const btn=document.getElementById('archived-toggle');
-  btn.textContent=showArchived?'Hide Archived':'Show Archived';
+  btn.textContent=showArchived?'Hide Completed Jobs':'Show Completed Jobs';
   btn.style.color=showArchived?'var(--accent)':'';
   btn.style.borderColor=showArchived?'var(--accent)':'';
   loadJobs();
 }
 
-// Status display order — installed/returned always last
-const STATUS_ORDER=['ready','picking','ready_to_load','loading','loaded','installed','returned'];
+// Status display order — installed is the last visible step before a job
+// auto-archives once the driver marks it Returned (handled server-side)
+const STATUS_ORDER=['ready','picking','ready_to_load','loading','loaded','installed'];
 const STATUS_SECTION_LABELS={
   ready:'Job Assigned', picking:'Picking', ready_to_load:'Ready to Load',
-  loading:'Loading', loaded:'Loaded', installed:'Installed', returned:'Returned'
+  loading:'Loading', loaded:'Loaded', installed:'Installed'
 };
 
 const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
@@ -317,7 +318,7 @@ async function loadJobs(){
   const jobs=showArchived?allJobs:allJobs.filter(j=>j.status!=='archived');
   const grid=document.getElementById('jobs-grid');
   if(!jobs.length){
-    const msg=showArchived?'No jobs found':'No active jobs';
+    const msg=showArchived?'No completed jobs found':'No active jobs';
     grid.innerHTML=`<div class="empty"><div class="empty-title">No jobs yet</div><div class="empty-sub">${msg}</div></div>`;
     return;
   }
@@ -398,24 +399,17 @@ function renderStatus(){
   else if(s==='loading') btns=`<span style="font-size:0.88rem;color:var(--red);">Driver is loading…</span>`;
   else if(s==='loaded') btns=`<span style="font-size:0.88rem;color:var(--green);font-weight:500;">Truck loaded</span>`;
   else if(s==='installed') btns=`<span style="font-size:0.88rem;color:var(--green);font-weight:600;">Installed</span>`;
-  else if(s==='archived') btns=`<button class="btn btn-outline" onclick="setStatus('ready')">Restore Job</button>`;
-  const archiveBtn=s!=='archived'?`<button class="btn btn-outline" onclick="archiveJob()" style="color:var(--muted);font-size:0.72rem;">Archive</button>`:'';
+  else if(s==='archived') btns=`<span style="font-size:0.88rem;color:var(--muted);">Job complete — truck returned to warehouse</span>`;
   document.getElementById('panel-actions').innerHTML=`
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;width:100%;">
       ${btns}
       <div class="driver-link" style="margin-left:auto;">Driver: <a href="/driver/${currentJob.id}" target="_blank">open →</a>${truck}</div>
-      ${archiveBtn}
     </div>`;
 }
 
 async function setStatus(s){
   await fetch(`/api/jobs/${currentJob.id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:s})});
   currentJob.status=s;renderStatus();
-}
-
-async function archiveJob(){
-  if(!confirm('Archive this job? It will be hidden from the main view but can be restored.'))return;
-  await setStatus('archived');closePanel();
 }
 
 function groupItems(itemList){

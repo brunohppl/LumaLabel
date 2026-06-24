@@ -1139,7 +1139,13 @@ def api_job(job_id):
 @app.route('/api/jobs/<job_id>/status', methods=['PATCH'])
 def api_job_status(job_id):
     data    = request.get_json()
-    payload = {'status': data['status']}
+    status  = data['status']
+    # "Returned" is a terminal action — once the truck is back at the warehouse,
+    # the job is done. Auto-archive it immediately rather than requiring a
+    # separate manual archive step.
+    if status == 'returned':
+        status = 'archived'
+    payload = {'status': status}
     if 'truck' in data: payload['truck'] = data['truck']
     result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})

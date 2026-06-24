@@ -1090,12 +1090,14 @@ def generate():
         notify_slack(meta, len(items), colour['name'], label_filename)
 
         # Send PDF directly to browser as a download — no third-party hosting needed
+        job_ref = re.sub(r'\D', '', meta['job_number'])[-3:] if meta['job_number'] else '000'
         return Response(
             pdf_bytes_out,
             mimetype='application/pdf',
             headers={
                 'Content-Disposition': f'attachment; filename="{label_filename}"',
                 'X-Job-Number':  meta['job_number'],
+                'X-Job-Ref':     job_ref,
                 'X-Item-Count':  str(len(items)),
                 'X-Colour':      colour['name'],
                 'X-Address':     meta['address'],

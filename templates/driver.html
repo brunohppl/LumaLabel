@@ -158,8 +158,8 @@ function closePhoto(){
 
 const jobId=window.location.pathname.split('/').pop();
 let job=null,items=[];
-const STATUS_PILLS={ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',returned:'pill-returned'};
-const STATUS_LABELS={ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',returned:'Returned'};
+const STATUS_PILLS={ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',returned:'pill-returned',archived:'pill-returned'};
+const STATUS_LABELS={ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',returned:'Returned',archived:'Returned'};
 
 async function loadJob(){
   const res=await fetch(`/api/jobs/${jobId}`);
@@ -182,7 +182,7 @@ function renderStatusBar(){
   else if(s==='loading')  bar.innerHTML=`<button class="action-btn btn-finish" onclick="finishLoading()">Loading Finished</button>`;
   else if(s==='loaded')   bar.innerHTML=`<button class="action-btn btn-installed" onclick="setStatus('installed')">Installed</button>`;
   else if(s==='installed')bar.innerHTML=`<button class="action-btn btn-returned" onclick="setStatus('returned')">Mark Returned</button>`;
-  else if(s==='returned') bar.innerHTML=`<div class="action-status-msg">Truck returned to warehouse</div>`;
+  else if(s==='returned'||s==='archived') bar.innerHTML=`<div class="action-status-msg">Truck returned to warehouse — job complete</div>`;
   else bar.innerHTML=`<div class="action-status-msg">Waiting for stylist to complete picking…</div>`;
 }
 
@@ -305,7 +305,7 @@ function toggleRoomCard(header){
 }
 
 async function toggleGroup(ids,el){
-  if(job.status==='installed'||job.status==='returned')return;
+  if(job.status==='installed'||job.status==='returned'||job.status==='archived')return;
   const idList=ids.split(',');
   const first=items.find(i=>i.id===idList[0]);
   if(!first)return;
@@ -348,7 +348,9 @@ function updateProgress(){
 async function setStatus(newStatus){
   const truck=document.getElementById('truck-input').value.trim();
   await fetch(`/api/jobs/${job.id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:newStatus,truck:truck||job.truck||''})});
-  job.status=newStatus;if(truck)job.truck=truck;renderStatusBar();
+  // The backend auto-archives jobs marked "returned" — mirror that locally
+  job.status=(newStatus==='returned')?'archived':newStatus;
+  if(truck)job.truck=truck;renderStatusBar();
 }
 
 async function saveTruck(){

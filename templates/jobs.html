@@ -88,6 +88,12 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .driver-link a:hover{text-decoration:underline;}
 .panel-body{flex:1;overflow-y:auto;padding:20px 28px;}
 
+.styling-notes-box{background:var(--warm);border:1px solid var(--sand);border-radius:2px;padding:14px 16px;margin-bottom:22px;}
+.styling-notes-label{display:flex;align-items:center;gap:8px;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:8px;}
+.styling-notes-input{width:100%;background:white;border:1px solid var(--border);border-radius:2px;padding:10px 12px;font-family:'Jost',sans-serif;font-size:0.95rem;color:var(--ink);outline:none;resize:none;line-height:1.5;transition:border-color 0.15s;}
+.styling-notes-input:focus{border-color:var(--accent);}
+.styling-notes-input::placeholder{color:var(--muted);}
+
 /* Room cards — matches driver interface */
 .room-card{margin-bottom:8px;border:1px solid var(--border);border-radius:3px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
 .room-card.done .room-card-header{background:rgba(74,124,89,0.06);}
@@ -170,7 +176,19 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
     <div id="panel-status-badge"></div>
   </div>
   <div class="panel-actions" id="panel-actions"></div>
-  <div class="panel-body" id="panel-body"><div class="loading">Loading…</div></div>
+  <div class="panel-body" id="panel-body">
+    <div class="styling-notes-box">
+      <div class="styling-notes-label">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+        Styling Notes
+      </div>
+      <textarea id="styling-notes" class="styling-notes-input" rows="2"
+        placeholder="Notes for the other stylists picking this job…"
+        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+        onblur="saveStylingNotes(this.value)"></textarea>
+    </div>
+    <div id="panel-items-container"><div class="loading">Loading…</div></div>
+  </div>
 </div>
 
 <footer>LUMA Design Co · Warehouse Operations · lumadesignco.com.au</footer>
@@ -386,11 +404,21 @@ async function openAsStylist(jobId){
   currentJob=data.job;allItems=data.items;
   document.getElementById('overlay').classList.add('open');
   document.getElementById('panel').classList.add('open');
-  document.getElementById('panel-body').innerHTML='<div class="loading">Loading…</div>';
+  document.getElementById('panel-items-container').innerHTML='<div class="loading">Loading…</div>';
   document.getElementById('panel-ref').textContent=currentJob.job_ref||currentJob.job_number;
   document.getElementById('panel-address').textContent=currentJob.address+' · '+currentJob.stage_date;
   document.getElementById('panel-owner').textContent=currentJob.job_owner?currentJob.job_owner:'';
+  const notesEl=document.getElementById('styling-notes');
+  notesEl.value=currentJob.styling_notes||'';
+  notesEl.style.height='auto';
+  notesEl.style.height=notesEl.scrollHeight+'px';
   renderStatus();renderPanelItems();
+}
+
+async function saveStylingNotes(value){
+  if(!currentJob)return;
+  currentJob.styling_notes=value;
+  await fetch(`/api/jobs/${currentJob.id}/notes`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({styling_notes:value})});
 }
 
 function openAsDriver(jobId){
@@ -513,7 +541,7 @@ function rerenderRoomProgress(){
 }
 
 function renderPanelItems(){
-  const body=document.getElementById('panel-body');
+  const body=document.getElementById('panel-items-container');
   const regular=allItems.filter(i=>!i.is_extra),extras=allItems.filter(i=>i.is_extra);
   const rooms={};
   for(const item of regular){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}

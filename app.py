@@ -1150,6 +1150,13 @@ def api_job_status(job_id):
     result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})
 
+@app.route('/api/jobs/<job_id>/notes', methods=['PATCH'])
+def api_job_notes(job_id):
+    """Save lead stylist's styling notes for the job — independent of status."""
+    data   = request.get_json()
+    result = sb_patch('jobs', f'id=eq.{job_id}', {'styling_notes': data.get('styling_notes', '')})
+    return jsonify({'success': bool(result)})
+
 @app.route('/api/items/<item_id>/check', methods=['PATCH'])
 def api_item_check(item_id):
     data    = request.get_json()

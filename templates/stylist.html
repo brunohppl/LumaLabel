@@ -50,6 +50,9 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .styling-notes-input{width:100%;background:white;border:1px solid var(--border);border-radius:2px;padding:10px 12px;font-family:'Jost',sans-serif;font-size:0.95rem;color:var(--ink);outline:none;resize:none;line-height:1.5;transition:border-color 0.15s;}
 .styling-notes-input:focus{border-color:var(--accent);}
 .styling-notes-input::placeholder{color:var(--muted);}
+.driver-notes-box{background:rgba(74,126,184,0.07);border-color:rgba(74,126,184,0.3);}
+.driver-notes-label{color:var(--blue);}
+.driver-notes-box .styling-notes-input:focus{border-color:var(--blue);}
 
 /* Room cards — matches driver interface */
 .room-card{margin-bottom:8px;border:1px solid var(--border);border-radius:3px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
@@ -123,6 +126,16 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
       oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
       onblur="saveStylingNotes(this.value)"></textarea>
   </div>
+  <div class="styling-notes-box driver-notes-box">
+    <div class="styling-notes-label driver-notes-label">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>
+      Notes for Driver
+    </div>
+    <textarea id="driver-notes" class="styling-notes-input" rows="2"
+      placeholder="Anything the driver needs to know — transfers, access, parking…"
+      oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+      onblur="saveDriverNotes(this.value)"></textarea>
+  </div>
   <div id="items-container"><div class="loading"><div class="spinner"></div>Loading job…</div></div>
 </div>
 
@@ -154,6 +167,11 @@ async function loadJob(){
   notesEl.style.height = 'auto';
   notesEl.style.height = notesEl.scrollHeight + 'px';
 
+  const driverNotesEl = document.getElementById('driver-notes');
+  driverNotesEl.value = currentJob.driver_notes || '';
+  driverNotesEl.style.height = 'auto';
+  driverNotesEl.style.height = driverNotesEl.scrollHeight + 'px';
+
   renderStatus();
   renderItems();
 }
@@ -162,6 +180,12 @@ async function saveStylingNotes(value){
   if(!currentJob) return;
   currentJob.styling_notes = value;
   await fetch(`/api/jobs/${currentJob.id}/notes`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({styling_notes:value})});
+}
+
+async function saveDriverNotes(value){
+  if(!currentJob) return;
+  currentJob.driver_notes = value;
+  await fetch(`/api/jobs/${currentJob.id}/notes`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({driver_notes:value})});
 }
 
 function renderStatus(){

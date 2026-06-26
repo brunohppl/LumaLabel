@@ -259,7 +259,7 @@ SKIP_WORDS = [
     'Description','Quantity','EXTENSIONRATE','LUMADesignCoPtyLtd',
     'Unit223PerivaleSt','DARRAQLD4076','AUSTRALIA','ABN','Reference',
     'InvoiceDate','InvoiceNumber','PACKINGSLIP','96675056201',
-    'EXTENSIONRATE',
+    'EXTENSIONRATE','PACKING','SLIP',
 ]
 SKIP_PATTERNS_WORDS = [
     r'^QU-',r'^\d+\.\d{2}$',r'^96\d+',r'p/week',r'weekhire',
@@ -267,23 +267,33 @@ SKIP_PATTERNS_WORDS = [
     r'extensionrate',r'Paymentof',r'Ifnotextending',r'Extensionrate',
 ]
 
-def is_room_header(word, next_word):
+def is_room_header(word, next_word=None):
     """Detect room headers dynamically.
-    A word is a room header if:
-    - Its significant letters are uppercase (ignoring ordinals like 2nd, 3rd)
-    - The next word is a quantity like 1.00 or 2.00
+    A word is a room header if its significant letters are all uppercase
+    (ignoring ordinals like 2nd, 3rd).
+
+    Previously this also required the next word to be a quantity like
+    "1.00", on the theory that a genuine item description would never be
+    fully uppercase. Real packing slips confirmed that assumption holds —
+    but the quantity-adjacency check itself was unreliable: pdfplumber's
+    word extraction interleaves the right-hand quantity column into the
+    word stream based on visual position, and if a room's quantity value
+    is missing from the source PDF for any reason (seen in practice — see
+    "7 Forfar St" job, where LIVING ROOM had no "1.00" on its row at all),
+    the room header was silently swallowed as an item under the previous
+    room instead of starting a new group. The `next_word` parameter is
+    kept for backward compatibility with any external callers but is no
+    longer used.
     """
     import re as _re
-    # Next word must be a quantity
-    if not next_word or not _re.match(r'^\d+\.\d{2}$', next_word):
-        return False
     # Strip leading ordinal prefix (2nd, 3rd etc.) before checking case
     stripped = _re.sub(r'^\d+(st|nd|rd|th)', '', word, flags=_re.I)
     letters_only = _re.sub(r'[^a-zA-Z]', '', stripped)
     if not letters_only:
         return False
-    # Must be all uppercase
-    return letters_only == letters_only.upper()
+    # Must be all uppercase, and at least 2 letters (avoid single stray
+    # capital letters or initials being mistaken for a room)
+    return letters_only == letters_only.upper() and len(letters_only) >= 2
 
 def format_room_name(raw):
     """Convert merged all-caps room names to readable format.
@@ -544,26 +554,6 @@ def parse_packing_list(pdf_bytes):
             items.append({'serial': f'{serial:03d}', 'room': current_room, 'description': description})
             serial += 1
 
-    # ── Add extras to fill last label page ──
-    # Default extras — generate_labels will use the correct per_page
-    per_page = 18
-    current_count = len(items)
-    remainder = current_count % per_page
-    # Fill remainder of current page, then add one more full page worth
-    extras_to_fill = (per_page - remainder) % per_page   # slots left on current page
-    extras_count   = extras_to_fill + per_page            # fill page + one full extra page
-    # Keep it between 9 and 18 (1-2 pages worth)
-    extras_count = max(9, min(18, extras_count))
-
-    for i in range(extras_count):
-        items.append({
-            'serial':      f'{serial:03d}',
-            'room':        '',          # no location
-            'description': '',          # blank
-            'is_extra':    True,
-        })
-        serial += 1
-
     meta['room_notes'] = room_notes
     return meta, items
 
@@ -697,25 +687,8 @@ def generate_labels(meta, items, colour, label_format=18):
 
         # Room name removed — left blank for stylist to write manually
 
-    # Adjust extras count to fill last page for this specific format
-    ppp       = COLS * ROWS
-    regular   = [i for i in items if not i.get('is_extra')]
-    extras    = [i for i in items if i.get('is_extra')]
-    remainder = len(regular) % ppp
-    needed    = (ppp - remainder) % ppp + ppp  # fill page + one full page
-    needed    = max(ppp, min(ppp * 2, needed))
-    # Trim or extend extras to match needed count
-    if len(extras) > needed:
-        extras = extras[:needed]
-    elif len(extras) < needed:
-        last_serial = int(extras[-1]['serial']) if extras else int(regular[-1]['serial']) if regular else 0
-        while len(extras) < needed:
-            last_serial += 1
-            extras.append({'serial': f'{last_serial:03d}', 'room': '', 'description': '', 'is_extra': True})
-    items = regular + extras
-
     # Paginate
-    per_page = ppp
+    per_page = COLS * ROWS
     total    = len(items)
     pages    = (total + per_page - 1) // per_page
 

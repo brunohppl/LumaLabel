@@ -59,6 +59,7 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .job-info{flex:1;min-width:0;}
 .job-ref-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
 .job-ref{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:400;color:var(--accent);line-height:1;}
+.transfer-tag{font-family:'Jost',sans-serif;font-size:0.75rem;font-weight:600;color:var(--blue);letter-spacing:0.04em;margin-left:6px;}
 .job-address{font-size:1rem;color:var(--ink);margin-top:4px;}
 .job-meta{font-size:0.85rem;color:var(--muted);margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;line-height:1.7;}
 
@@ -138,12 +139,13 @@ function jobCardHTML(job){
   const colour=COLOUR_MAP[job.colour]||'#888';
   const pill=STATUS_PILLS[job.status]||'pill-ready',label=STATUS_LABELS[job.status]||job.status;
   const truck=job.truck?`${job.truck}`:'',owner=job.job_owner?`${job.job_owner}`:'';
+  const transferTag=job.is_transfer?`<span class="transfer-tag">— Transfer</span>`:'';
   return `<div class="job-card">
     <div class="job-card-top">
       <div class="colour-swatch" style="background:${colour}"></div>
       <div class="job-info">
         <div class="job-ref-row">
-          <div class="job-ref">${job.job_ref||job.job_number}</div>
+          <div class="job-ref">${job.job_ref||job.job_number}${transferTag}</div>
           <span class="pill ${pill}">${label}</span>
         </div>
         <div class="job-address">${job.address}</div>

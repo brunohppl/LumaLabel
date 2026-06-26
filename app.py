@@ -487,16 +487,19 @@ def parse_packing_list(pdf_bytes):
         if idx <= skip_until: continue
         if w in SKIP_WORDS: continue
         if any(re.search(p, w, re.I) for p in SKIP_PATTERNS_WORDS): continue
-        # Dynamic room header detection: all-caps word followed by quantity
-        next_w = all_words[idx + 1] if idx + 1 < len(all_words) else ''
-        if is_room_header(w, next_w):
-            current_room = format_room_name(w)
-            continue
         # Bracket notes — e.g. "[MOVECHAISEFORSOFATOMEDIA]" — are stylist
-        # instructions for the room, not pickable items. They may come
-        # through as a single merged word or split across multiple words
-        # if the PDF inserted spaces inside the brackets; either way,
-        # consume everything from '[' to the matching ']' and skip it.
+        # instructions for the room, not pickable items, and must NEVER be
+        # treated as a room header even though they're often written in
+        # all-caps just like real room names (confirmed on a real job —
+        # "16 Hillview St" — where every bracket note in the document was
+        # misidentified as its own room because is_room_header() only
+        # checks letter casing). This check runs BEFORE the room-header
+        # check below for exactly that reason: a bracket note's casing is
+        # irrelevant to whether it's a room, so it must be ruled out first
+        # rather than racing against the uppercase check on equal footing.
+        # They may come through as a single merged word or split across
+        # multiple words if the PDF inserted spaces inside the brackets;
+        # either way, consume everything from '[' to the matching ']'.
         if '[' in w:
             bracket_parts = [w]
             j = idx
@@ -511,6 +514,11 @@ def parse_packing_list(pdf_bytes):
             note_text = format_room_note(' '.join(bracket_parts))
             if note_text and current_room:
                 room_notes.setdefault(current_room, []).append(note_text)
+            continue
+        # Dynamic room header detection: all-caps word
+        next_w = all_words[idx + 1] if idx + 1 < len(all_words) else ''
+        if is_room_header(w, next_w):
+            current_room = format_room_name(w)
             continue
         if re.match(r'^\d+\.\d{2}$', w): continue
         if not current_room: continue

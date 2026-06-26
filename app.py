@@ -1110,6 +1110,20 @@ def generate():
             except:
                 pass  # keep whatever the parser found
 
+        # If this exact job already exists (re-uploading the same packing
+        # slip), keep its existing colour rather than picking a new one.
+        # This must happen *before* get_next_colour() so the printed
+        # labels and the saved database row always agree on the colour —
+        # correcting it only in save_job_to_db (after labels are already
+        # rendered) would let the PDF and the database disagree.
+        if not colour_name:
+            try:
+                existing_job = sb_get('jobs', f'job_number=eq.{meta["job_number"]}')
+                if existing_job and existing_job[0].get('colour'):
+                    colour_name = existing_job[0]['colour']
+            except Exception:
+                pass  # fall through to normal auto-selection if this lookup fails
+
         colour         = get_next_colour(colour_name)
         pdf_bytes_out  = generate_labels(meta, items, colour, label_format)
         label_filename = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'

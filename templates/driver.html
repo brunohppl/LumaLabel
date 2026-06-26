@@ -6,7 +6,7 @@
 <title>LUMA — Driver</title>
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--ink:#1A1714;--muted:#9A8F80;--border:#D8CFBF;--warm:#F2EDE4;--cream:#FAF8F4;--accent:#B8935A;--green:#4A7C59;--green-light:rgba(74,124,89,0.1);--red:#A63D2F;}
+:root{--ink:#1A1714;--muted:#9A8F80;--border:#D8CFBF;--warm:#F2EDE4;--cream:#FAF8F4;--accent:#B8935A;--green:#4A7C59;--green-light:rgba(74,124,89,0.1);--red:#A63D2F;--blue:#4A7EB8;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weight:400;font-size:17px;min-height:100vh;max-width:540px;margin:0 auto;}
 
@@ -32,6 +32,8 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .driver-notes-banner{background:rgba(184,147,90,0.08);border-bottom:1px solid rgba(184,147,90,0.3);padding:14px 20px;}
 .driver-notes-label{display:flex;align-items:center;gap:8px;font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:6px;}
 #driver-notes-text{font-size:0.92rem;color:var(--ink);line-height:1.5;}
+.transfer-banner{background:rgba(74,126,184,0.1);border-bottom:1px solid rgba(74,126,184,0.35);padding:12px 20px;font-size:0.88rem;color:var(--ink);line-height:1.4;}
+.transfer-banner b{color:var(--blue);}
 .truck-section{background:white;border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;}
 .truck-label{font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap;font-weight:600;}
 .truck-input{flex:1;background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:10px 13px;font-family:'Jost',sans-serif;font-size:1rem;color:var(--ink);outline:none;}
@@ -91,6 +93,12 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .group-desc{font-size:1rem;color:var(--ink);margin-top:3px;line-height:1.4;font-weight:500;}
 .group-row.checked .group-desc{color:var(--muted);}
 .group-location{font-size:0.85rem;font-weight:400;color:var(--muted);}
+
+.group-row-transfer{display:flex;align-items:center;padding:0;border-bottom:1px solid var(--warm);background:rgba(74,126,184,0.08);}
+.group-row-transfer:last-child{border-bottom:none;}
+.transfer-row-icon{width:64px;min-height:64px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--blue);}
+.transfer-row-tag{font-size:0.78rem;font-weight:600;color:var(--blue);margin-top:5px;letter-spacing:0.02em;}
+.group-row-transfer .group-desc{color:var(--blue);}
 .group-note{font-size:0.82rem;color:var(--accent);margin-top:5px;font-style:italic;padding:4px 8px;background:rgba(184,147,90,0.08);border-radius:2px;}
 .photo-thumb-wrap{margin-top:6px;}
 .photo-thumb-btn{background:none;border:1px solid var(--border);border-radius:2px;padding:4px 10px;font-size:0.72rem;color:var(--muted);cursor:pointer;}
@@ -134,6 +142,8 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
   </div>
   <div id="driver-notes-text"></div>
 </div>
+
+<div class="transfer-banner" id="transfer-banner" style="display:none;"></div>
 
 <div class="truck-section">
   <div class="truck-label">Truck</div>
@@ -190,6 +200,25 @@ async function loadJob(){
     notesBanner.style.display='none';
   }
 
+  const transferBanner=document.getElementById('transfer-banner');
+  if(job.is_transfer){
+    if(job.transfer_from_job_id){
+      try{
+        const srcRes=await fetch(`/api/jobs/${job.transfer_from_job_id}`);
+        const srcData=await srcRes.json();
+        const src=srcData.job;
+        transferBanner.innerHTML=`This is a <b>Transfer Job</b> — items marked "Transfer" below are already in the truck from ${src.job_ref||src.job_number} (${src.address||''})`;
+      }catch(e){
+        transferBanner.innerHTML=`This is a <b>Transfer Job</b> — items marked "Transfer" below are already in the truck`;
+      }
+    } else {
+      transferBanner.innerHTML=`This is a <b>Transfer Job</b> — items marked "Transfer" below are already in the truck`;
+    }
+    transferBanner.style.display='block';
+  } else {
+    transferBanner.style.display='none';
+  }
+
   renderStatusBar();renderRooms();updateProgress();
 }
 
@@ -241,6 +270,7 @@ function groupItems(list){
     groups.push({count:j-i,description:desc,room:room,firstSerial:list[i].serial,lastSerial:list[j-1].serial,
       items:list.slice(i,j),allChecked:list.slice(i,j).every(x=>x.checked),notes:list[i].notes||'',
       photo_url:list.slice(i,j).find(x=>x.photo_url)?.photo_url||null,
+      isTransferItem:list.slice(i,j).every(x=>x.is_transfer_item),
       category:getCategory(desc)});
     i=j;
   }
@@ -266,8 +296,9 @@ function renderRooms(){
   for(const cat of orderedCats){
     const groups=catMap[cat];
     const catItems=groups.flatMap(g=>g.items);
-    const checked=catItems.filter(i=>i.checked).length;
-    const total=catItems.length;
+    const loadable=catItems.filter(i=>!i.is_transfer_item);
+    const checked=loadable.filter(i=>i.checked).length;
+    const total=loadable.length;
     const done=checked===total&&total>0;
     const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
     const key=cat.replace(/[^a-zA-Z0-9]/g,'_');
@@ -296,6 +327,24 @@ function renderRooms(){
 }
 
 function groupRowHTML(grp){
+  if(grp.isTransferItem){
+    const serial=grp.count>1?`#${grp.firstSerial}–#${grp.lastSerial}`:`#${grp.firstSerial}`;
+    const desc=grp.count>1?`${grp.count}×  ${grp.description||'blank'}`:(grp.description||'<span style="opacity:0.5">blank extra</span>');
+    const location=grp.room?` <span class="group-location">(${grp.room})</span>`:'';
+    const note=grp.notes?`<div class="group-note">${grp.notes}</div>`:'';
+    return `<div class="group-row group-row-transfer">
+      <div class="transfer-row-icon" title="Already in truck — transferring from another job">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>
+      </div>
+      <div class="group-info">
+        <div class="group-serial">${serial}</div>
+        <div class="group-desc">${desc}${location}</div>
+        <div class="transfer-row-tag">Already in truck — no need to load</div>
+        ${note}
+      </div>
+    </div>`;
+  }
+
   const cls=grp.allChecked?'group-row checked':'group-row';
   const ids=grp.items.map(i=>i.id).join(',');
   const serial=grp.count>1?`#${grp.firstSerial}–#${grp.lastSerial}`:`#${grp.firstSerial}`;
@@ -351,7 +400,8 @@ function rerenderRoomProgress(){
     const key=cat.replace(/[^a-zA-Z0-9]/g,'_');
     const card=document.getElementById('room-'+key);if(!card)continue;
     const catItems=groups.flatMap(g=>g.items);
-    const checked=catItems.filter(i=>i.checked).length,total=catItems.length,done=checked===total&&total>0;
+    const loadable=catItems.filter(i=>!i.is_transfer_item);
+    const checked=loadable.filter(i=>i.checked).length,total=loadable.length,done=checked===total&&total>0;
     const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
     const rf=card.querySelector('.ring-fill'),rt=card.querySelector('.ring-txt');
     if(rf)rf.setAttribute('stroke-dashoffset',offset.toFixed(1));
@@ -361,7 +411,8 @@ function rerenderRoomProgress(){
 }
 
 function updateProgress(){
-  const total=items.length,checked=items.filter(i=>i.checked).length,pct=total?Math.round(checked/total*100):0;
+  const loadable=items.filter(i=>!i.is_transfer_item);
+  const total=loadable.length,checked=loadable.filter(i=>i.checked).length,pct=total?Math.round(checked/total*100):0;
   document.getElementById('prog-fill').style.width=pct+'%';
   document.getElementById('prog-txt').textContent=`${checked} / ${total}`;
   const allDone=total>0&&checked===total;
@@ -384,7 +435,8 @@ async function saveTruck(){
 }
 
 async function finishLoading(){
-  const checked=items.filter(i=>i.checked).length,total=items.length;
+  const loadable=items.filter(i=>!i.is_transfer_item);
+  const checked=loadable.filter(i=>i.checked).length,total=loadable.length;
   if(checked<total){if(!confirm(`${total-checked} items not checked off. Mark as loaded anyway?`))return;}
   await setStatus('loaded');
 }

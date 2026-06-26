@@ -87,6 +87,7 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .group-serial{font-size:0.75rem;font-weight:700;color:var(--accent);letter-spacing:0.08em;}
 .group-desc{font-size:1rem;color:var(--ink);margin-top:3px;line-height:1.4;font-weight:500;}
 .group-row.checked .group-desc{color:var(--muted);}
+.group-location{font-size:0.85rem;font-weight:400;color:var(--muted);}
 .group-note{font-size:0.82rem;color:var(--accent);margin-top:5px;font-style:italic;padding:4px 8px;background:rgba(184,147,90,0.08);border-radius:2px;}
 .photo-thumb-wrap{margin-top:6px;}
 .photo-thumb-btn{background:none;border:1px solid var(--border);border-radius:2px;padding:4px 10px;font-size:0.72rem;color:var(--muted);cursor:pointer;}
@@ -214,9 +215,10 @@ function groupItems(list){
   const groups=[];let i=0;
   while(i<list.length){
     const desc=list[i].description||'';
+    const room=list[i].room||'';
     let j=i+1;
-    while(j<list.length&&(list[j].description||'')===desc)j++;
-    groups.push({count:j-i,description:desc,firstSerial:list[i].serial,lastSerial:list[j-1].serial,
+    while(j<list.length&&(list[j].description||'')===desc&&(list[j].room||'')===room)j++;
+    groups.push({count:j-i,description:desc,room:room,firstSerial:list[i].serial,lastSerial:list[j-1].serial,
       items:list.slice(i,j),allChecked:list.slice(i,j).every(x=>x.checked),notes:list[i].notes||'',
       photo_url:list.slice(i,j).find(x=>x.photo_url)?.photo_url||null,
       category:getCategory(desc)});
@@ -278,6 +280,7 @@ function groupRowHTML(grp){
   const ids=grp.items.map(i=>i.id).join(',');
   const serial=grp.count>1?`#${grp.firstSerial}–#${grp.lastSerial}`:`#${grp.firstSerial}`;
   const desc=grp.count>1?`${grp.count}×  ${grp.description||'blank'}`:(grp.description||'<span style="opacity:0.5">blank extra</span>');
+  const location=grp.room?` <span class="group-location">(${grp.room})</span>`:'';
   const note=grp.notes?`<div class="group-note">${grp.notes}</div>`:'';
   const photoUrl=grp.photo_url||null;
   const photoBtn=photoUrl?`<div class="photo-thumb-wrap"><button class="photo-thumb-btn" onclick="event.stopPropagation();showPhoto('${photoUrl}')">View Photo</button></div>`:'';
@@ -287,7 +290,7 @@ function groupRowHTML(grp){
     </button>
     <div class="group-info">
       <div class="group-serial">${serial}</div>
-      <div class="group-desc">${desc}</div>
+      <div class="group-desc">${desc}${location}</div>
       ${note}
       ${photoBtn}
     </div>

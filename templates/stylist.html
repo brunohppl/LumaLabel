@@ -197,8 +197,14 @@ function renderStatus(){
   const truck = currentJob.truck ? ` · ${currentJob.truck}` : '';
   let btns = '';
   if(s==='ready') btns = `<button class="btn btn-gold" onclick="setStatus('picking')">Start Picking</button>`;
-  else if(s==='picking') btns = `<button class="btn btn-green" onclick="setStatus('ready_to_load')">Picking Complete</button>`;
-  else if(s==='ready_to_load') btns = `<span style="font-size:0.88rem;color:var(--muted);">Waiting for driver</span>`;
+  else if(s==='picking') btns = `
+    <button class="btn btn-green" onclick="setStatus('ready_to_load')">Picking Complete</button>
+    <button class="btn btn-outline" onclick="if(confirm('Move this job back to Job Assigned?'))setStatus('ready')" style="margin-left:10px;font-size:0.7rem;">Back to Job Assigned</button>
+  `;
+  else if(s==='ready_to_load') btns = `
+    <span style="font-size:0.88rem;color:var(--muted);">Waiting for driver</span>
+    <button class="btn btn-outline" onclick="if(confirm('Move this job back to Picking?'))setStatus('picking')" style="margin-left:10px;font-size:0.7rem;">Back to Picking</button>
+  `;
   else if(s==='loading') btns = `<span style="font-size:0.88rem;color:var(--red);">Driver is loading…</span>`;
   else if(s==='loaded') btns = `<span style="font-size:0.88rem;color:var(--green);font-weight:500;">Truck loaded</span>`;
   else if(s==='installed') btns = `<span style="font-size:0.88rem;color:var(--green);font-weight:600;">Installed</span>`;

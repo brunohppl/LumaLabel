@@ -29,6 +29,9 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .prog-txt{font-size:0.82rem;color:rgba(250,248,244,0.55);white-space:nowrap;font-weight:600;}
 
 /* ── TRUCK ── */
+.driver-notes-banner{background:rgba(184,147,90,0.08);border-bottom:1px solid rgba(184,147,90,0.3);padding:14px 20px;}
+.driver-notes-label{display:flex;align-items:center;gap:8px;font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:6px;}
+#driver-notes-text{font-size:0.92rem;color:var(--ink);line-height:1.5;}
 .truck-section{background:white;border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;}
 .truck-label{font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap;font-weight:600;}
 .truck-input{flex:1;background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:10px 13px;font-family:'Jost',sans-serif;font-size:1rem;color:var(--ink);outline:none;}
@@ -124,6 +127,14 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
   </div>
 </div>
 
+<div class="driver-notes-banner" id="driver-notes-banner" style="display:none;">
+  <div class="driver-notes-label">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+    Notes from Stylist
+  </div>
+  <div id="driver-notes-text"></div>
+</div>
+
 <div class="truck-section">
   <div class="truck-label">Truck</div>
   <input type="text" class="truck-input" id="truck-input" placeholder="Enter truck name or number"/>
@@ -170,6 +181,15 @@ async function loadJob(){
   document.getElementById('job-addr').textContent=job.address;
   document.getElementById('job-owner').textContent=job.job_owner||'';
   if(job.truck)document.getElementById('truck-input').value=job.truck;
+
+  const notesBanner=document.getElementById('driver-notes-banner');
+  if(job.driver_notes && job.driver_notes.trim()){
+    document.getElementById('driver-notes-text').textContent=job.driver_notes;
+    notesBanner.style.display='block';
+  } else {
+    notesBanner.style.display='none';
+  }
+
   renderStatusBar();renderRooms();updateProgress();
 }
 

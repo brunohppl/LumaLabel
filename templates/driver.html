@@ -223,7 +223,7 @@ const ITEM_CATEGORIES = [
 ];
 
 function getCategory(desc){
-  if(!desc) return 'Extras';
+  if(!desc) return 'Other';
   const d = desc.toLowerCase();
   for(const cat of ITEM_CATEGORIES){
     if(cat.keywords.length && cat.keywords.some(k=>d.includes(k))) return cat.label;

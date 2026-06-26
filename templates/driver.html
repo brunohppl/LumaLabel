@@ -34,6 +34,8 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 #driver-notes-text{font-size:0.92rem;color:var(--ink);line-height:1.5;}
 .transfer-banner{background:rgba(74,126,184,0.1);border-bottom:1px solid rgba(74,126,184,0.35);padding:12px 20px;font-size:0.88rem;color:var(--ink);line-height:1.4;}
 .transfer-banner b{color:var(--blue);}
+.transfer-banner-out{background:rgba(184,147,90,0.1);border-bottom:1px solid rgba(184,147,90,0.35);}
+.transfer-banner-out b{color:var(--accent);}
 .truck-section{background:white;border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;}
 .truck-label{font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap;font-weight:600;}
 .truck-input{flex:1;background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:10px 13px;font-family:'Jost',sans-serif;font-size:1rem;color:var(--ink);outline:none;}
@@ -58,6 +60,12 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .room-card-header{padding:16px 18px;display:flex;align-items:center;gap:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background 0.15s;}
 .room-card-header:active{background:var(--warm);}
 .room-card.done .room-card-header{background:var(--green-light);}
+
+.not-transferring-card{border:2px solid var(--accent);}
+.not-transferring-card .room-card-header{background:rgba(184,147,90,0.08);}
+.not-transferring-card .room-card-name{color:var(--accent);}
+.not-transferring-card.done .room-card-header{background:var(--green-light);}
+.not-transferring-card.done .room-card-name{color:var(--green);}
 
 /* Progress ring */
 .ring-wrap{flex-shrink:0;width:48px;height:48px;position:relative;}
@@ -99,6 +107,9 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .transfer-row-icon{width:64px;min-height:64px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--blue);}
 .transfer-row-tag{font-size:0.78rem;font-weight:600;color:var(--blue);margin-top:5px;letter-spacing:0.02em;}
 .group-row-transfer .group-desc{color:var(--blue);}
+.group-row-not-transferring{background:rgba(184,147,90,0.06);}
+.group-row-not-transferring .group-desc{color:var(--accent);}
+.not-transferring-row-tag{font-size:0.78rem;font-weight:600;color:var(--accent);margin-top:5px;letter-spacing:0.02em;}
 .group-note{font-size:0.82rem;color:var(--accent);margin-top:5px;font-style:italic;padding:4px 8px;background:rgba(184,147,90,0.08);border-radius:2px;}
 .photo-thumb-wrap{margin-top:6px;}
 .photo-thumb-btn{background:none;border:1px solid var(--border);border-radius:2px;padding:4px 10px;font-size:0.72rem;color:var(--muted);cursor:pointer;}
@@ -144,6 +155,7 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 </div>
 
 <div class="transfer-banner" id="transfer-banner" style="display:none;"></div>
+<div class="transfer-banner transfer-banner-out" id="transfer-out-banner" style="display:none;"></div>
 
 <div class="truck-section">
   <div class="truck-label">Truck</div>
@@ -207,16 +219,26 @@ async function loadJob(){
         const srcRes=await fetch(`/api/jobs/${job.transfer_from_job_id}`);
         const srcData=await srcRes.json();
         const src=srcData.job;
-        transferBanner.innerHTML=`This is a <b>Transfer Job</b> — items marked "Transfer" below are already in the truck from ${src.job_ref||src.job_number} (${src.address||''})`;
+        transferBanner.innerHTML=`<b>Transfer From</b> — items marked "Transfer" below are already in the truck from ${src.job_ref||src.job_number} (${src.address||''})`;
       }catch(e){
-        transferBanner.innerHTML=`This is a <b>Transfer Job</b> — items marked "Transfer" below are already in the truck`;
+        transferBanner.innerHTML=`<b>Transfer From</b> — items marked "Transfer" below are already in the truck`;
       }
     } else {
-      transferBanner.innerHTML=`This is a <b>Transfer Job</b> — items marked "Transfer" below are already in the truck`;
+      transferBanner.innerHTML=`<b>Transfer From</b> — items marked "Transfer" below are already in the truck`;
     }
     transferBanner.style.display='block';
   } else {
     transferBanner.style.display='none';
+  }
+
+  const transferOutBanner=document.getElementById('transfer-out-banner');
+  const transferringTo=data.transferring_to||[];
+  if(transferringTo.length){
+    const links=transferringTo.map(j=>`${j.job_ref||j.job_number} (${j.address||''})`).join(', ');
+    transferOutBanner.innerHTML=`<b>Transferring To</b> — items marked "Not Transferring" below stay behind; everything else goes to ${links}`;
+    transferOutBanner.style.display='block';
+  } else {
+    transferOutBanner.style.display='none';
   }
 
   renderStatusBar();renderRooms();updateProgress();
@@ -265,12 +287,14 @@ function groupItems(list){
   while(i<list.length){
     const desc=list[i].description||'';
     const room=list[i].room||'';
+    const notTransferring=!!list[i].not_transferring;
     let j=i+1;
-    while(j<list.length&&(list[j].description||'')===desc&&(list[j].room||'')===room)j++;
+    while(j<list.length&&(list[j].description||'')===desc&&(list[j].room||'')===room&&!!list[j].not_transferring===notTransferring)j++;
     groups.push({count:j-i,description:desc,room:room,firstSerial:list[i].serial,lastSerial:list[j-1].serial,
       items:list.slice(i,j),allChecked:list.slice(i,j).every(x=>x.checked),notes:list[i].notes||'',
       photo_url:list.slice(i,j).find(x=>x.photo_url)?.photo_url||null,
       isTransferItem:list.slice(i,j).every(x=>x.is_transfer_item),
+      isNotTransferring:notTransferring,
       category:getCategory(desc)});
     i=j;
   }
@@ -280,9 +304,19 @@ function groupItems(list){
 function renderRooms(){
   const container=document.getElementById('items-container');
   const allGrouped=groupItems(items.filter(i=>!i.is_extra));
+
+  // "Not Transferring" items sit in their own group at the top, separate
+  // from the item-type categories — these are real loadable items (going
+  // back to warehouse rather than on to the next job), not excluded from
+  // progress the way is_transfer_item is on the receiving end. Pulled out
+  // before building the category map so they don't also appear under
+  // their normal category.
+  const notTransferGroups = allGrouped.filter(g=>g.isNotTransferring);
+  const categoryGrouped   = allGrouped.filter(g=>!g.isNotTransferring);
+
   // Build category map
   const catMap={};
-  for(const grp of allGrouped){
+  for(const grp of categoryGrouped){
     if(!catMap[grp.category])catMap[grp.category]=[];
     catMap[grp.category].push(grp);
   }
@@ -293,6 +327,35 @@ function renderRooms(){
   Object.keys(catMap).forEach(c=>{if(!orderedCats.includes(c))orderedCats.push(c);});
 
   let html='';
+
+  if(notTransferGroups.length){
+    const ntItems=notTransferGroups.flatMap(g=>g.items);
+    const checked=ntItems.filter(i=>i.checked).length;
+    const total=ntItems.length;
+    const done=checked===total&&total>0;
+    const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
+    html+=`<div class="room-card not-transferring-card${done?' done':''}" id="room-not_transferring">
+      <div class="room-card-header" onclick="toggleRoomCard(this)">
+        <div class="ring-wrap">
+          <svg width="48" height="48" viewBox="0 0 48 48">
+            <circle class="ring-bg" cx="24" cy="24" r="${r}"/>
+            <circle class="ring-fill${done?' ring-done':''}" cx="24" cy="24" r="${r}"
+              stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
+          </svg>
+          <div class="ring-txt">${done?'<span class="ring-done-icon">✓</span>':`${checked}/${total}`}</div>
+        </div>
+        <div class="room-card-info">
+          <div class="room-card-name">Not Transferring</div>
+          <div class="room-card-sub">${notTransferGroups.length} line${notTransferGroups.length!==1?'s':''} · ${total} item${total!==1?'s':''} — staying behind</div>
+        </div>
+        <div class="room-chevron open" id="chev-not_transferring">▼</div>
+      </div>
+      <div class="room-items open" id="items-not_transferring">
+        ${notTransferGroups.map(g=>groupRowHTML(g)).join('')}
+      </div>
+    </div>`;
+  }
+
   for(const cat of orderedCats){
     const groups=catMap[cat];
     const catItems=groups.flatMap(g=>g.items);
@@ -345,12 +408,13 @@ function groupRowHTML(grp){
     </div>`;
   }
 
-  const cls=grp.allChecked?'group-row checked':'group-row';
+  const cls=(grp.allChecked?'group-row checked':'group-row')+(grp.isNotTransferring?' group-row-not-transferring':'');
   const ids=grp.items.map(i=>i.id).join(',');
   const serial=grp.count>1?`#${grp.firstSerial}–#${grp.lastSerial}`:`#${grp.firstSerial}`;
   const desc=grp.count>1?`${grp.count}×  ${grp.description||'blank'}`:(grp.description||'<span style="opacity:0.5">blank extra</span>');
   const location=grp.room?` <span class="group-location">(${grp.room})</span>`:'';
   const note=grp.notes?`<div class="group-note">${grp.notes}</div>`:'';
+  const notTransferTag=grp.isNotTransferring?`<div class="not-transferring-row-tag">Staying behind — not part of the transfer</div>`:'';
   const photoUrl=grp.photo_url||null;
   const photoBtn=photoUrl?`<div class="photo-thumb-wrap"><button class="photo-thumb-btn" onclick="event.stopPropagation();showPhoto('${photoUrl}')">View Photo</button></div>`:'';
   return `<div class="${cls}" id="grp-${grp.firstSerial}" onclick="toggleGroup('${ids}',this)">
@@ -360,6 +424,7 @@ function groupRowHTML(grp){
     <div class="group-info">
       <div class="group-serial">${serial}</div>
       <div class="group-desc">${desc}${location}</div>
+      ${notTransferTag}
       ${note}
       ${photoBtn}
     </div>
@@ -393,8 +458,24 @@ async function toggleGroup(ids,el){
 
 function rerenderRoomProgress(){
   const allGrouped=groupItems(items.filter(i=>!i.is_extra));
+  const notTransferGroups=allGrouped.filter(g=>g.isNotTransferring);
+  const categoryGrouped=allGrouped.filter(g=>!g.isNotTransferring);
+
+  if(notTransferGroups.length){
+    const card=document.getElementById('room-not_transferring');
+    if(card){
+      const ntItems=notTransferGroups.flatMap(g=>g.items);
+      const checked=ntItems.filter(i=>i.checked).length,total=ntItems.length,done=checked===total&&total>0;
+      const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
+      const rf=card.querySelector('.ring-fill'),rt=card.querySelector('.ring-txt');
+      if(rf)rf.setAttribute('stroke-dashoffset',offset.toFixed(1));
+      if(rt)rt.innerHTML=done?'<span class="ring-done-icon">✓</span>':`${checked}/${total}`;
+      if(done)card.classList.add('done');else card.classList.remove('done');
+    }
+  }
+
   const catMap={};
-  for(const grp of allGrouped){if(!catMap[grp.category])catMap[grp.category]=[];catMap[grp.category].push(grp);}
+  for(const grp of categoryGrouped){if(!catMap[grp.category])catMap[grp.category]=[];catMap[grp.category].push(grp);}
 
   for(const[cat,groups] of Object.entries(catMap)){
     const key=cat.replace(/[^a-zA-Z0-9]/g,'_');

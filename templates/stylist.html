@@ -57,6 +57,9 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .transfer-banner{background:rgba(74,126,184,0.1);border-bottom:1px solid rgba(74,126,184,0.35);padding:12px 28px;font-size:0.85rem;color:var(--ink);}
 .transfer-banner b{color:var(--blue);}
 .transfer-banner a{color:var(--blue);text-decoration:underline;}
+.transfer-banner-out{background:rgba(184,147,90,0.1);border-bottom:1px solid rgba(184,147,90,0.35);}
+.transfer-banner-out b{color:var(--accent);}
+.transfer-banner-out a{color:var(--accent);text-decoration:underline;}
 
 /* Room cards — matches driver interface */
 .room-card{margin-bottom:8px;border:1px solid var(--border);border-radius:3px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
@@ -97,6 +100,11 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .transfer-checkbox-label{display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;color:var(--blue);font-weight:600;cursor:pointer;white-space:nowrap;background:rgba(74,126,184,0.1);padding:4px 9px;border-radius:10px;}
 .transfer-checkbox-label input{accent-color:var(--blue);width:14px;height:14px;cursor:pointer;}
 
+.item-not-transferring{background:rgba(184,147,90,0.06);}
+.item-not-transferring .item-desc{color:var(--accent);}
+.not-transferring-checkbox-label{color:var(--accent);background:rgba(184,147,90,0.12);}
+.not-transferring-checkbox-label input{accent-color:var(--accent);}
+
 .add-item-row{display:flex;gap:10px;margin-top:14px;}
 .add-input{flex:1;background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:12px 14px;font-family:'Jost',sans-serif;font-size:1rem;color:var(--ink);outline:none;}
 .add-input:focus{border-color:var(--accent);}
@@ -123,6 +131,7 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 </div>
 
 <div class="transfer-banner" id="transfer-banner" style="display:none;"></div>
+<div class="transfer-banner transfer-banner-out" id="transfer-out-banner" style="display:none;"></div>
 
 <div class="actions-bar" id="actions-bar"></div>
 
@@ -156,6 +165,7 @@ const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 
 const jobId = window.location.pathname.split('/').pop();
 let currentJob=null, allItems=[], roomNotes={};
+let currentJobIsTransferSource=false; // true if another job names this one as its transfer source
 
 const STATUS_LABELS={ready:'Job Assigned',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',archived:'Returned'};
 const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',archived:'pill-returned'};
@@ -179,17 +189,30 @@ async function loadJob(){
       const srcRes = await fetch(`/api/jobs/${currentJob.transfer_from_job_id}`);
       const srcData = await srcRes.json();
       const src = srcData.job;
-      transferBanner.innerHTML = `This is a <b>Transfer Job</b> — items are coming from <a href="/stylist/${src.id}" target="_blank">${src.job_ref||src.job_number} — ${src.address||''}</a>`;
+      transferBanner.innerHTML = `<b>Transfer From</b> — items are coming from <a href="/stylist/${src.id}" target="_blank">${src.job_ref||src.job_number} — ${src.address||''}</a>`;
       transferBanner.style.display = 'block';
     }catch(e){
-      transferBanner.innerHTML = `This is a <b>Transfer Job</b> — items are coming from another job`;
+      transferBanner.innerHTML = `<b>Transfer From</b> — items are coming from another job`;
       transferBanner.style.display = 'block';
     }
   } else if(currentJob.is_transfer){
-    transferBanner.innerHTML = `This is a <b>Transfer Job</b>`;
+    transferBanner.innerHTML = `<b>Transfer From</b> — items are coming from another job`;
     transferBanner.style.display = 'block';
   } else {
     transferBanner.style.display = 'none';
+  }
+
+  const transferOutBanner = document.getElementById('transfer-out-banner');
+  const transferringTo = data.transferring_to || [];
+  currentJobIsTransferSource = transferringTo.length > 0;
+  if(transferringTo.length){
+    const links = transferringTo.map(j =>
+      `<a href="/stylist/${j.id}" target="_blank">${j.job_ref||j.job_number} — ${j.address||''}</a>`
+    ).join(', ');
+    transferOutBanner.innerHTML = `<b>Transferring To</b> — some items from this job are going to ${links}`;
+    transferOutBanner.style.display = 'block';
+  } else {
+    transferOutBanner.style.display = 'none';
   }
 
   const notesEl = document.getElementById('styling-notes');
@@ -271,6 +294,7 @@ function groupItems(itemList){
       allChecked:  itemList.slice(i,j).every(x=>x.checked),
       someChecked: itemList.slice(i,j).some(x=>x.checked),
       allTransfer: itemList.slice(i,j).every(x=>x.is_transfer_item),
+      allNotTransferring: itemList.slice(i,j).every(x=>x.not_transferring),
       notes:       itemList[i].notes||'',
     });
     i=j;
@@ -361,7 +385,7 @@ function groupRow(grp){
   const serialTxt = grp.count>1 ? `#${grp.firstSerial}–#${grp.lastSerial}` : `#${grp.firstSerial}`;
   const descTxt   = grp.count>1 ? `${grp.count}×  ${grp.description||'blank extra'}` : (grp.description||'<span style="color:var(--muted);font-style:italic">blank extra</span>');
   const isTransferItem = grp.allTransfer;
-  const rowCls  = isTransferItem?'item-row item-transfer-item':picked?'item-row item-picked':partial?'item-row item-partial':'item-row';
+  const rowCls  = (isTransferItem?'item-row item-transfer-item':picked?'item-row item-picked':partial?'item-row item-partial':'item-row') + (grp.allNotTransferring?' item-not-transferring':'');
   const btnCls  = picked?'pick-btn picked':partial?'pick-btn partial':'pick-btn';
   const ids     = grp.items.map(i=>i.id).join(',');
   const hasPhoto= grp.items.some(i=>i.photo_url);
@@ -378,12 +402,20 @@ function groupRow(grp){
       <span>Transfer</span>
     </label>` : '';
 
+  const notTransferring = grp.allNotTransferring;
+  const notTransferringCheckbox = currentJobIsTransferSource ? `
+    <label class="transfer-checkbox-label not-transferring-checkbox-label" title="Mark as NOT transferring — stays behind / returns to warehouse instead">
+      <input type="checkbox" class="transfer-checkbox" ${notTransferring?'checked':''} onchange="toggleNotTransferring('${ids}', this.checked, this)" />
+      <span>Not Transferring</span>
+    </label>` : '';
+
   return `<div class="${rowCls}" id="group-${grp.firstSerial}" style="align-items:center;">
     <button class="${btnCls}" onclick="toggleGroupPicked('${ids}', this)" style="margin-top:0;">✓</button>
     <div class="item-serial" style="margin-top:0;">${serialTxt}</div>
     <div style="flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
       <span class="item-desc" style="margin-top:0;">${descTxt}</span>
       ${transferCheckbox}
+      ${notTransferringCheckbox}
       <input type="file" accept="image/*" capture="environment" id="${inputId}" style="display:none;"
         onchange="handlePhotoUpload(this,'${ids}','${btnId}')"/>
       <button id="${btnId}" title="${camTitle}"
@@ -396,6 +428,19 @@ function groupRow(grp){
       oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
     >${grp.notes}</textarea>
   </div>`;
+}
+
+async function toggleNotTransferring(ids, checked, el){
+  const idList = ids.split(',');
+  for(const id of idList){
+    const item = allItems.find(i=>i.id===id);
+    if(item) item.not_transferring = checked;
+  }
+  const row = el.closest('.item-row');
+  if(row) row.classList.toggle('item-not-transferring', checked);
+  await Promise.all(idList.map(id=>
+    fetch('/api/items/'+id+'/check',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({not_transferring:checked})})
+  ));
 }
 
 async function toggleTransferItem(ids, checked, el){

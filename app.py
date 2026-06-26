@@ -90,6 +90,7 @@ def save_job_to_db(meta, items, colour_name, job_owner=''):
         if existing:
             job_id = existing[0]['id']
             sb_delete('items', f'job_id=eq.{job_id}')
+            sb_delete('room_notes', f'job_id=eq.{job_id}')
             sb_patch('jobs', f'id=eq.{job_id}', job_data)
         else:
             result = sb_post('jobs', job_data)
@@ -112,6 +113,16 @@ def save_job_to_db(meta, items, colour_name, job_owner=''):
             for item in items
         ]
         sb_post('items', items_data)
+
+        # Insert room notes parsed from bracket text, e.g. "[MOVE...]"
+        room_notes = meta.get('room_notes', {})
+        notes_data = [
+            {'job_id': job_id, 'room': room, 'note': note}
+            for room, notes in room_notes.items()
+            for note in notes
+        ]
+        if notes_data:
+            sb_post('room_notes', notes_data)
     except Exception as e:
         pass  # Never let DB failure break label generation
 
@@ -358,9 +369,33 @@ def clean_word(w):
         s = re.sub(pat, repl, s)
     return s.strip()
 
+def format_room_note(raw):
+    """Convert a merged all-caps bracket note into readable text.
+    e.g. MOVECHAISEFORSOFATOMEDIA -> Move chaise for sofa to media
+
+    Note text is free-form stylist instructions, not a fixed vocabulary
+    like room/item names, so we can't rely on a known word list the way
+    format_room_name() and clean_word() do. wordninja segments merged
+    text using English word-frequency statistics — not perfect on every
+    short or unusual word, but far more readable than leaving it unspaced.
+    """
+    text = raw.strip('[]').strip()
+    if not text:
+        return ''
+    try:
+        import wordninja
+        words = wordninja.split(text)
+    except Exception:
+        words = [text]  # fall back to the raw merged text if segmentation fails
+    if not words:
+        return ''
+    sentence = ' '.join(words)
+    return sentence[0].upper() + sentence[1:].lower()
+
 def parse_packing_list(pdf_bytes):
     meta = {'pl_number': '', 'job_number': '', 'address': '', 'stage_date': ''}
     items = []
+    room_notes = {}  # room name -> list of note strings, e.g. "[MOVECHAISETOMEDIA]"
 
     with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
         all_words = []
@@ -434,13 +469,35 @@ def parse_packing_list(pdf_bytes):
 
     current_room = None
     serial = 1
+    skip_until = -1  # index up to which words have already been consumed by a multi-word bracket note
     for idx, w in enumerate(all_words):
+        if idx <= skip_until: continue
         if w in SKIP_WORDS: continue
         if any(re.search(p, w, re.I) for p in SKIP_PATTERNS_WORDS): continue
         # Dynamic room header detection: all-caps word followed by quantity
         next_w = all_words[idx + 1] if idx + 1 < len(all_words) else ''
         if is_room_header(w, next_w):
             current_room = format_room_name(w)
+            continue
+        # Bracket notes — e.g. "[MOVECHAISEFORSOFATOMEDIA]" — are stylist
+        # instructions for the room, not pickable items. They may come
+        # through as a single merged word or split across multiple words
+        # if the PDF inserted spaces inside the brackets; either way,
+        # consume everything from '[' to the matching ']' and skip it.
+        if '[' in w:
+            bracket_parts = [w]
+            j = idx
+            if ']' not in w:
+                j += 1
+                while j < len(all_words) and ']' not in all_words[j]:
+                    bracket_parts.append(all_words[j])
+                    j += 1
+                if j < len(all_words):
+                    bracket_parts.append(all_words[j])
+            skip_until = j  # don't reprocess the consumed words as items
+            note_text = format_room_note(' '.join(bracket_parts))
+            if note_text and current_room:
+                room_notes.setdefault(current_room, []).append(note_text)
             continue
         if re.match(r'^\d+\.\d{2}$', w): continue
         if not current_room: continue
@@ -507,6 +564,7 @@ def parse_packing_list(pdf_bytes):
         })
         serial += 1
 
+    meta['room_notes'] = room_notes
     return meta, items
 
 def format_date(raw):
@@ -1118,6 +1176,11 @@ def jobs_page():
     with open('templates/jobs.html', 'r') as f:
         return f.read()
 
+@app.route('/stylist/<job_id>', methods=['GET'])
+def stylist_page(job_id):
+    with open('templates/stylist.html', 'r') as f:
+        return f.read()
+
 @app.route('/driver/<job_id>', methods=['GET'])
 def driver_page(job_id):
     with open('templates/driver.html', 'r') as f:
@@ -1135,6 +1198,18 @@ def api_job(job_id):
     if not job:
         return jsonify({'error': 'Job not found'}), 404
     return jsonify({'job': job[0], 'items': items})
+
+@app.route('/api/jobs/<job_id>/room-notes', methods=['GET'])
+def api_job_room_notes(job_id):
+    """Stylist-only — room-level notes parsed from packing-slip bracket
+    text. Deliberately not included in /api/jobs/<job_id> so the driver
+    page has no code path to this data at all."""
+    notes = sb_get('room_notes', f'job_id=eq.{job_id}')
+    # Group into {room: [note, note, ...]} for easy lookup on the frontend
+    by_room = {}
+    for n in notes:
+        by_room.setdefault(n['room'], []).append(n['note'])
+    return jsonify(by_room)
 
 @app.route('/api/jobs/<job_id>/status', methods=['PATCH'])
 def api_job_status(job_id):

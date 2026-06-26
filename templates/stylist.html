@@ -283,10 +283,8 @@ function roomCardHTML(room, roomItemList, isExtra=false){
 }
 
 function rerenderRoomProgress(){
-  const regular=allItems.filter(i=>!i.is_extra),extras=allItems.filter(i=>i.is_extra);
   const rooms={};
-  for(const item of regular){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
-  if(extras.length)rooms['Extras']=extras;
+  for(const item of allItems){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
   for(const[room,roomItems] of Object.entries(rooms)){
     const key=(room||'extra').replace(/[^a-zA-Z0-9]/g,'_');
     const card=document.getElementById('stylist-room-'+key);if(!card)continue;
@@ -302,22 +300,18 @@ function rerenderRoomProgress(){
 
 function renderItems(){
   const body=document.getElementById('items-container');
-  const regular=allItems.filter(i=>!i.is_extra),extras=allItems.filter(i=>i.is_extra);
   const rooms={};
-  for(const item of regular){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
+  for(const item of allItems){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
   let html='';
   for(const[room,roomItemList] of Object.entries(rooms)){
     html+=roomCardHTML(room, roomItemList);
-  }
-  if(extras.length){
-    html+=roomCardHTML('Extras', extras, true);
   }
 
   const rooms_list=[...new Set(allItems.map(i=>i.room).filter(r=>r))];
   html+=`<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
     <div style="font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px;">Add Item</div>
     <div class="add-item-row">
-      <select class="room-select" id="new-room">${rooms_list.map(r=>`<option>${r}</option>`).join('')}<option value="">— Extra</option></select>
+      <select class="room-select" id="new-room">${rooms_list.map(r=>`<option>${r}</option>`).join('')}</select>
       <input class="add-input" id="new-desc" placeholder="Item description" onkeydown="if(event.key==='Enter')addItem()"/>
       <button class="btn btn-gold" onclick="addItem()">Add</button>
     </div></div>`;
@@ -454,7 +448,7 @@ async function addItem(){
   if(!desc)return;
   const lastSerial=allItems.length?Math.max(...allItems.map(i=>parseInt(i.serial)||0)):0;
   const newSerial=String(lastSerial+1).padStart(3,'0');
-  const res=await fetch(`/api/jobs/${currentJob.id}/items`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serial:newSerial,room,description:desc,is_extra:!room})});
+  const res=await fetch(`/api/jobs/${currentJob.id}/items`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serial:newSerial,room,description:desc,is_extra:false})});
   const newItem=await res.json();
   allItems.push(newItem);document.getElementById('new-desc').value='';renderItems();
 }

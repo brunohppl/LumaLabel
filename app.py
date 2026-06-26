@@ -69,7 +69,7 @@ def sb_delete(table, params):
     except Exception as e:
         return False
 
-def save_job_to_db(meta, items, colour_name, job_owner=''):
+def save_job_to_db(meta, items, colour_name, job_owner='', is_transfer=False, transfer_from_job_id=None):
     """Save job and items to Supabase. Called after label generation."""
     try:
         meta['job_owner'] = job_owner
@@ -84,6 +84,8 @@ def save_job_to_db(meta, items, colour_name, job_owner=''):
             'status':      'ready',
             'job_owner':   meta.get('job_owner', ''),
             'item_count':  len([i for i in items if not i.get('is_extra')]),
+            'is_transfer': is_transfer,
+            'transfer_from_job_id': transfer_from_job_id if is_transfer else None,
         }
         # Delete existing job+items if re-generating
         existing = sb_get('jobs', f'job_number=eq.{meta["job_number"]}')
@@ -102,13 +104,14 @@ def save_job_to_db(meta, items, colour_name, job_owner=''):
         # Insert items
         items_data = [
             {
-                'job_id':      job_id,
-                'serial':      item['serial'],
-                'room':        item['room'],
-                'description': item.get('description', ''),
-                'is_extra':    item.get('is_extra', False),
-                'checked':     False,
-                'photo_url':   None,
+                'job_id':           job_id,
+                'serial':           item['serial'],
+                'room':             item['room'],
+                'description':      item.get('description', ''),
+                'is_extra':         item.get('is_extra', False),
+                'checked':          False,
+                'photo_url':        None,
+                'is_transfer_item': False,
             }
             for item in items
         ]
@@ -1097,6 +1100,8 @@ def generate():
         job_owner    = data.get('jobOwner', '')
         label_format = int(data.get('labelFormat', 18))  # 9 or 18 per page
         colour_name  = data.get('colourName')  # manual colour choice, or None for Auto
+        is_transfer  = bool(data.get('isTransfer', False))
+        transfer_from_job_id = data.get('transferFromJobId') or None
         meta, items  = parse_packing_list(pdf_bytes)
 
         if not items:
@@ -1129,7 +1134,7 @@ def generate():
         label_filename = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
 
         # Save job to database (non-blocking)
-        save_job_to_db(meta, items, colour['name'], job_owner)
+        save_job_to_db(meta, items, colour['name'], job_owner, is_transfer, transfer_from_job_id)
 
         # Notify Slack (non-blocking — failure won't affect PDF delivery)
         notify_slack(meta, len(items), colour['name'], label_filename)
@@ -1228,10 +1233,11 @@ def api_job_notes(job_id):
 def api_item_check(item_id):
     data    = request.get_json()
     payload = {}
-    if 'checked'   in data: payload['checked']   = data['checked']
-    if 'notes'     in data: payload['notes']     = data['notes']
-    if 'picked'    in data: payload['picked']    = data['picked']
-    if 'photo_url' in data: payload['photo_url'] = data['photo_url']
+    if 'checked'          in data: payload['checked']          = data['checked']
+    if 'notes'            in data: payload['notes']            = data['notes']
+    if 'picked'           in data: payload['picked']           = data['picked']
+    if 'photo_url'        in data: payload['photo_url']        = data['photo_url']
+    if 'is_transfer_item' in data: payload['is_transfer_item'] = data['is_transfer_item']
     result = sb_patch('items', f'id=eq.{item_id}', payload)
     return jsonify({'success': bool(result)})
 

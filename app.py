@@ -1227,9 +1227,14 @@ def api_job_status(job_id):
 
 @app.route('/api/jobs/<job_id>/notes', methods=['PATCH'])
 def api_job_notes(job_id):
-    """Save lead stylist's styling notes for the job — independent of status."""
-    data   = request.get_json()
-    result = sb_patch('jobs', f'id=eq.{job_id}', {'styling_notes': data.get('styling_notes', '')})
+    """Save job-level notes — independent of status.
+    styling_notes: lead stylist's notes for other stylists picking the job.
+    driver_notes: stylist's notes for the driver (e.g. transfer items, access info) — shown on both /stylist and /driver."""
+    data    = request.get_json()
+    payload = {}
+    if 'styling_notes' in data: payload['styling_notes'] = data['styling_notes']
+    if 'driver_notes'  in data: payload['driver_notes']  = data['driver_notes']
+    result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})
 
 @app.route('/api/items/<item_id>/check', methods=['PATCH'])

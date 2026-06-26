@@ -432,6 +432,31 @@
   .swatch-auto:hover { transform: scale(1.1); }
   .swatch-auto.selected { border-color: var(--accent); border-style: solid; color: var(--accent); transform: scale(1.12); }
 
+  /* ── TRANSFER TOGGLE ── */
+  .transfer-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .transfer-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .transfer-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .transfer-switch-track { position: absolute; inset: 0; background: var(--border); border-radius: 12px; cursor: pointer; transition: background 0.2s; }
+  .transfer-switch-track::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: transform 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+  .transfer-switch input:checked + .transfer-switch-track { background: var(--accent); }
+  .transfer-switch input:checked + .transfer-switch-track::before { transform: translateX(20px); }
+
+  .transfer-search-wrap { margin-top: 12px; position: relative; }
+  .transfer-search-input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 1px; font-family: 'Jost', sans-serif; font-size: 0.85rem; background: white; outline: none; transition: border-color 0.15s; }
+  .transfer-search-input:focus { border-color: var(--accent); }
+  .transfer-search-results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 1px; max-height: 220px; overflow-y: auto; z-index: 20; box-shadow: 0 4px 16px rgba(0,0,0,0.1); display: none; }
+  .transfer-search-results.open { display: block; }
+  .transfer-result-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  .transfer-result-item:last-child { border-bottom: none; }
+  .transfer-result-item:hover { background: var(--cream); }
+  .transfer-result-ref { font-weight: 600; color: var(--accent); font-size: 0.85rem; }
+  .transfer-result-addr { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+  .transfer-selected-job { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--cream); border: 1px solid var(--accent); border-radius: 1px; }
+  .transfer-selected-job-text { font-size: 0.85rem; }
+  .transfer-selected-job-text b { color: var(--accent); }
+  .transfer-selected-clear { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.9rem; padding: 4px; }
+  .transfer-selected-clear:hover { color: var(--red); }
+
   /* ── DIVIDER ── */
   .divider {
     height: 1px;
@@ -556,6 +581,24 @@
       </div>
     </div>
 
+    <div class="date-field colour-field">
+      <div class="transfer-toggle-row">
+        <div>
+          <label>Transfer Job</label>
+          <div class="date-hint">Items are transferring from another job already in the truck</div>
+        </div>
+        <label class="transfer-switch">
+          <input type="checkbox" id="transfer-toggle" onchange="onTransferToggle(this.checked)" />
+          <span class="transfer-switch-track"></span>
+        </label>
+      </div>
+      <div class="transfer-search-wrap" id="transfer-search-wrap" style="display:none;">
+        <input type="text" class="transfer-search-input" id="transfer-search" placeholder="Search by job number or address…" oninput="handleTransferSearch(this.value)" autocomplete="off" />
+        <div class="transfer-search-results" id="transfer-search-results"></div>
+        <div id="transfer-selected" style="display:none;"></div>
+      </div>
+    </div>
+
     <button class="btn-generate" id="generate-btn" disabled>
       <div class="spinner"></div>
       <span class="btn-text">Generate Labels</span>
@@ -616,13 +659,14 @@ const COLOURS = [
 ];
 let selectedColour = null;   // null = Auto
 let takenColours = [];       // colour names currently out at the warehouse
+let allJobsCache = [];       // cached job list, shared by colour-taken check and transfer search
 
 async function loadTakenColours(){
   try{
     const res = await fetch('/api/jobs');
-    const jobs = await res.json();
+    allJobsCache = await res.json();
     // "Out at the warehouse" = jobs assigned but not yet returned/archived
-    takenColours = jobs
+    takenColours = allJobsCache
       .filter(j => j.status === 'ready')
       .map(j => j.colour)
       .filter(Boolean);
@@ -649,6 +693,86 @@ function pickColour(name){
 }
 
 loadTakenColours();
+
+// ── Transfer job picker ──
+let isTransferJob = false;
+let selectedTransferJob = null; // { id, job_ref, job_number, address }
+
+function onTransferToggle(checked){
+  isTransferJob = checked;
+  document.getElementById('transfer-search-wrap').style.display = checked ? 'block' : 'none';
+  if(!checked){
+    selectedTransferJob = null;
+    document.getElementById('transfer-search').value = '';
+    renderTransferSelected();
+  }
+}
+
+function handleTransferSearch(value){
+  const resultsEl = document.getElementById('transfer-search-results');
+  const q = value.trim().toLowerCase();
+  if(!q){
+    resultsEl.classList.remove('open');
+    resultsEl.innerHTML = '';
+    return;
+  }
+  const matches = allJobsCache.filter(j => {
+    const ref = (j.job_ref||'').toLowerCase();
+    const num = (j.job_number||'').toLowerCase();
+    const addr = (j.address||'').toLowerCase();
+    return ref.includes(q) || num.includes(q) || addr.includes(q);
+  }).slice(0, 8);
+
+  if(!matches.length){
+    resultsEl.innerHTML = `<div class="transfer-result-item" style="color:var(--muted);cursor:default;">No matching jobs</div>`;
+    resultsEl.classList.add('open');
+    return;
+  }
+
+  resultsEl.innerHTML = matches.map(j => `
+    <div class="transfer-result-item" onclick='pickTransferJob(${JSON.stringify(j).replace(/'/g,"&#39;")})'>
+      <div class="transfer-result-ref">${j.job_ref||j.job_number}</div>
+      <div class="transfer-result-addr">${j.address||''}</div>
+    </div>
+  `).join('');
+  resultsEl.classList.add('open');
+}
+
+function pickTransferJob(job){
+  selectedTransferJob = job;
+  document.getElementById('transfer-search-results').classList.remove('open');
+  document.getElementById('transfer-search').value = '';
+  renderTransferSelected();
+}
+
+function clearTransferJob(){
+  selectedTransferJob = null;
+  renderTransferSelected();
+}
+
+function renderTransferSelected(){
+  const el = document.getElementById('transfer-selected');
+  if(!selectedTransferJob){
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="transfer-selected-job">
+      <div class="transfer-selected-job-text">Transferring from <b>${selectedTransferJob.job_ref||selectedTransferJob.job_number}</b> — ${selectedTransferJob.address||''}</div>
+      <button class="transfer-selected-clear" onclick="clearTransferJob()">✕</button>
+    </div>
+  `;
+}
+
+// Close transfer search results when clicking outside
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('transfer-search-wrap');
+  if(wrap && !wrap.contains(e.target)){
+    document.getElementById('transfer-search-results').classList.remove('open');
+  }
+});
 
 // Click to browse
 uploadZone.addEventListener('click', () => fileInput.click());
@@ -687,6 +811,8 @@ function resetUploadForm() {
   document.getElementById('install-date').value = '';
   document.getElementById('job-owner').value = '';
   selectedColour = null;
+  document.getElementById('transfer-toggle').checked = false;
+  onTransferToggle(false);
   statusEl.className = 'status';
   statusBody.innerHTML = '';
   statusTitle.textContent = '';
@@ -720,7 +846,9 @@ generateBtn.addEventListener('click', async () => {
         installDate: installDate || null,
         jobOwner:    document.getElementById('job-owner').value.trim() || '',
         labelFormat: 18,
-        colourName:  selectedColour
+        colourName:  selectedColour,
+        isTransfer:        isTransferJob,
+        transferFromJobId: isTransferJob && selectedTransferJob ? selectedTransferJob.id : null
       })
     });
 
@@ -754,6 +882,9 @@ generateBtn.addEventListener('click', async () => {
 
     // Show success summary with next-step actions
     statusTitle.textContent = 'Labels Downloaded';
+    const transferLine = isTransferJob
+      ? `<div class="meta-item" style="grid-column:1/-1"><span class="meta-label">Transfer</span><span class="meta-value">From ${selectedTransferJob ? (selectedTransferJob.job_ref||selectedTransferJob.job_number) : 'another job'}</span></div>`
+      : '';
     statusBody.innerHTML = `
       <div class="meta-grid">
         <div class="meta-item"><span class="meta-label">Job</span><span class="meta-value">${jobRef}</span></div>
@@ -761,6 +892,7 @@ generateBtn.addEventListener('click', async () => {
         <div class="meta-item"><span class="meta-label">Date</span><span class="meta-value">${stageDate}</span></div>
         <div class="meta-item"><span class="meta-label">Colour</span><span class="meta-value">${colour}</span></div>
         <div class="meta-item" style="grid-column:1/-1"><span class="meta-label">Address</span><span class="meta-value">${address}</span></div>
+        ${transferLine}
       </div>
       <a class="btn-download" href="${url}" download="${pdfFilename}">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M7 9L4 6M7 9l3-3M1 11h12v2H1z" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>

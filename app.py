@@ -112,6 +112,7 @@ def save_job_to_db(meta, items, colour_name, job_owner='', is_transfer=False, tr
                 'checked':          False,
                 'photo_url':        None,
                 'is_transfer_item': False,
+                'not_transferring': False,
             }
             for item in items
         ]
@@ -515,6 +516,27 @@ def parse_packing_list(pdf_bytes):
             if note_text and current_room:
                 room_notes.setdefault(current_room, []).append(note_text)
             continue
+        # Standalone all-caps parenthetical annotations — e.g. "(NO STYLING)"
+        # — are the same class of problem as bracket notes (uppercase text
+        # that isn't a room) but carry no useful instruction, so they're
+        # discarded entirely rather than kept as a room note or turned into
+        # a placeholder item. This check must run before the room-header
+        # check below for the same reason as the bracket check above: a
+        # room with "(NO STYLING)" right after it (e.g. KITCHEN, BATHROOM)
+        # was being misread as a brand new room, silently reassigning
+        # current_room for anything that followed. Genuine item
+        # descriptions that happen to contain parentheses (e.g.
+        # "FloorRug(std)", "DiningTable(2.2max)") always have lowercase
+        # letters inside, so checking that the parenthetical content is
+        # fully uppercase safely distinguishes an annotation from a real
+        # item. A room whose only content is "(NO STYLING)" intentionally
+        # ends up with zero items and doesn't appear anywhere downstream —
+        # that's the desired behaviour, not a bug to fix with a
+        # placeholder.
+        if re.match(r'^\(.*\)$', w):
+            inner_letters = re.sub(r'[^a-zA-Z]', '', w)
+            if inner_letters and inner_letters == inner_letters.upper():
+                continue
         # Dynamic room header detection: all-caps word
         next_w = all_words[idx + 1] if idx + 1 < len(all_words) else ''
         if is_room_header(w, next_w):
@@ -1197,7 +1219,14 @@ def api_job(job_id):
     items = sb_get('items', f'job_id=eq.{job_id}&order=serial.asc')
     if not job:
         return jsonify({'error': 'Job not found'}), 404
-    return jsonify({'job': job[0], 'items': items})
+    # "Transferring to" is the inverse of "transfer from" — rather than
+    # storing a second pointer on this job (which could fall out of sync
+    # with the receiving job's transfer_from_job_id if either side is ever
+    # edited independently), it's derived here by querying for any job
+    # that names this one as its transfer source. This job has no record
+    # of being a transfer source itself; it's purely a query result.
+    transferring_to = sb_get('jobs', f'transfer_from_job_id=eq.{job_id}')
+    return jsonify({'job': job[0], 'items': items, 'transferring_to': transferring_to})
 
 @app.route('/api/jobs/<job_id>/room-notes', methods=['GET'])
 def api_job_room_notes(job_id):
@@ -1246,6 +1275,7 @@ def api_item_check(item_id):
     if 'picked'           in data: payload['picked']           = data['picked']
     if 'photo_url'        in data: payload['photo_url']        = data['photo_url']
     if 'is_transfer_item' in data: payload['is_transfer_item'] = data['is_transfer_item']
+    if 'not_transferring' in data: payload['not_transferring'] = data['not_transferring']
     result = sb_patch('items', f'id=eq.{item_id}', payload)
     return jsonify({'success': bool(result)})
 

@@ -16,6 +16,9 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
 .back-link{display:flex;align-items:center;gap:6px;color:rgba(250,248,244,0.55);text-decoration:none;font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;transition:color 0.15s;}
 .back-link:hover{color:var(--accent);}
+.export-btn{background:none;border:1px solid rgba(250,248,244,0.25);border-radius:2px;color:rgba(250,248,244,0.7);padding:6px 8px;cursor:pointer;display:flex;align-items:center;transition:all 0.15s;}
+.export-btn:hover{border-color:var(--accent);color:var(--accent);}
+.export-btn:disabled{opacity:0.4;cursor:wait;}
 .pill{display:inline-block;padding:5px 14px;border-radius:1px;font-size:0.68rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;}
 .pill-ready{background:rgba(74,126,184,0.25);color:#8ABAEE;}
 .pill-picking{background:rgba(232,197,71,0.25);color:#E8D27A;}
@@ -129,7 +132,12 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
       All Jobs
     </a>
-    <span id="status-badge" class="pill pill-ready">Job Assigned</span>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button id="export-btn" class="export-btn" onclick="exportSummary()" title="Export job summary as PDF">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+      <span id="status-badge" class="pill pill-ready">Job Assigned</span>
+    </div>
   </div>
   <div class="hdr-ref" id="job-ref">—</div>
   <div class="hdr-address" id="job-address"></div>
@@ -233,6 +241,31 @@ async function loadJob(){
 
   renderStatus();
   renderItems();
+}
+
+async function exportSummary(){
+  const btn = document.getElementById('export-btn');
+  btn.disabled = true;
+  const originalHTML = btn.innerHTML;
+  btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite;"><path d="M21 12a9 9 0 1 1-9-9"/></svg>';
+  try{
+    const res = await fetch(`/api/jobs/${jobId}/summary-pdf`);
+    if(!res.ok) throw new Error('Export failed');
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const nameMatch = disposition.match(/filename="([^"]+)"/);
+    const filename = nameMatch ? nameMatch[1] : 'LUMA_Job_Summary.pdf';
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 30000);
+  }catch(e){
+    alert('Could not export summary — please try again.');
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
 }
 
 async function saveStylingNotes(value){

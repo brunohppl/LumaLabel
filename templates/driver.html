@@ -40,7 +40,7 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .transfer-banner-out b{color:var(--accent);}
 .truck-section{background:white;border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;}
 .truck-label{font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap;font-weight:600;}
-.truck-input{flex:1;background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:10px 13px;font-family:'Jost',sans-serif;font-size:1rem;color:var(--ink);outline:none;}
+.truck-input{flex:1;background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:10px 13px;font-family:'Jost',sans-serif;font-size:1rem;color:var(--ink);outline:none;-webkit-appearance:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239A8F80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:16px;padding-right:36px;}
 .truck-input:focus{border-color:var(--accent);}
 .truck-save{padding:10px 16px;background:var(--accent);color:white;border:none;border-radius:1px;font-family:'Jost',sans-serif;font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;}
 
@@ -161,7 +161,12 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 
 <div class="truck-section">
   <div class="truck-label">Truck</div>
-  <input type="text" class="truck-input" id="truck-input" placeholder="Enter truck name or number"/>
+  <select class="truck-input" id="truck-input">
+    <option value="" disabled selected>Select driver…</option>
+    <option value="Nigel">Nigel</option>
+    <option value="Bruce">Bruce</option>
+    <option value="Nemo">Nemo</option>
+  </select>
   <button class="truck-save" onclick="saveTruck()">Save</button>
 </div>
 

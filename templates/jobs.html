@@ -67,6 +67,7 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .job-address{font-size:1rem;color:var(--ink);margin-top:4px;display:block;text-decoration:none;cursor:pointer;}
 .job-address:hover{color:var(--blue);text-decoration:underline;}
 .job-meta{font-size:0.85rem;color:var(--muted);margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;line-height:1.7;}
+.eta-tag{color:var(--green);font-weight:600;}
 
 .btn{padding:12px 20px;border-radius:1px;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.82rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--ink);}
@@ -158,6 +159,18 @@ function jobCardHTML(job){
     const link=`<a href="/stylist/${dest.id}" target="_blank" onclick="event.stopPropagation()" class="transfer-tag-link transfer-tag-link-out">${linkText}</a>`;
     transferTag=`<span class="transfer-tag transfer-tag-out">— Transferring To ${link}</span>`;
   }
+
+  // ETA is only meaningful for a little while — if it's more than 30
+  // minutes old, showing it without context would look like a current
+  // estimate when it almost certainly isn't anymore.
+  let etaTag='';
+  if(job.eta_text && job.eta_calculated_at){
+    const ageMinutes=(Date.now()-new Date(job.eta_calculated_at).getTime())/60000;
+    if(ageMinutes<=30){
+      etaTag=`<span class="eta-tag" title="Calculated ${Math.round(ageMinutes)} min ago">🚛 ETA ${job.eta_text}</span>`;
+    }
+  }
+
   return `<div class="job-card">
     <div class="job-card-top">
       <div class="colour-swatch" style="background:${colour}"></div>
@@ -172,6 +185,7 @@ function jobCardHTML(job){
           <span>${job.item_count} items</span>
           ${owner?`<span>${owner}</span>`:''}
           ${truck?`<span>${truck}</span>`:''}
+          ${etaTag}
         </div>
       </div>
     </div>

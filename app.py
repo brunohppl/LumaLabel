@@ -5,6 +5,7 @@ import tempfile
 import json
 import urllib.request
 import urllib.parse
+import urllib.error
 from io import BytesIO
 from datetime import datetime
 
@@ -193,11 +194,15 @@ def get_truck_eta(lat, lng, destination_address):
     Returns the human-readable duration string (e.g. "14 mins") on
     success, or None on any failure (missing key, network error, address
     not found, etc.) — callers should treat None as "couldn't calculate
-    an ETA right now" and fail quietly, the same way notify_slack() does
-    when its webhook isn't configured.
+    an ETA right now" and fail quietly toward the driver, the same way
+    notify_slack() does when its webhook isn't configured. Every failure
+    path is printed to stdout (visible in Render's logs) since this
+    silently returning None gave no way to diagnose a misconfigured key,
+    disabled API, or billing issue from outside the server.
     """
     api_key = os.environ.get('GOOGLE_MAPS_API_KEY')
     if not api_key:
+        print('[ETA] GOOGLE_MAPS_API_KEY is not set')
         return None
     try:
         params = urllib.parse.urlencode({
@@ -210,11 +215,21 @@ def get_truck_eta(lat, lng, destination_address):
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=8) as r:
             result = json.loads(r.read())
+        print(f'[ETA] Distance Matrix response: {result}')
+        if result.get('status') != 'OK':
+            print(f'[ETA] Top-level status not OK: {result.get("status")} — {result.get("error_message", "")}')
+            return None
         element = result['rows'][0]['elements'][0]
         if element.get('status') != 'OK':
+            print(f'[ETA] Element status not OK: {element.get("status")}')
             return None
         return element['duration']['text']
-    except Exception:
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors='replace')
+        print(f'[ETA] HTTPError {e.code}: {body}')
+        return None
+    except Exception as e:
+        print(f'[ETA] Unexpected error: {type(e).__name__}: {e}')
         return None
 
 

@@ -173,8 +173,8 @@ function jobCardHTML(job){
     const iconPart = icon ? `${icon} ` : '';
     return `<span class="eta-tag ${extraClass}" title="Calculated ${Math.round(ageMinutes)} min ago">${iconPart}${label} ${text}</span>`;
   }
-  const truckEtaTag   = etaTagHTML(job.truck_eta_text,   job.truck_eta_calculated_at,   '🚛', 'Truck',   'eta-tag-truck');
-  const stylistEtaTag = etaTagHTML(job.stylist_eta_text, job.stylist_eta_calculated_at, '',   'Stylist', 'eta-tag-stylist');
+  const truckEtaTag   = etaTagHTML(job.truck_eta_text,   job.truck_eta_calculated_at,   '🚛', 'Truck ETA',   'eta-tag-truck');
+  const stylistEtaTag = etaTagHTML(job.stylist_eta_text, job.stylist_eta_calculated_at, '',   'Stylist ETA', 'eta-tag-stylist');
 
   return `<div class="job-card">
     <div class="job-card-top">

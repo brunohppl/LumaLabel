@@ -37,6 +37,7 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .pill-loading{background:rgba(232,92,71,0.12);color:var(--red);}
 .pill-loaded{background:rgba(74,124,89,0.12);color:var(--green);}
 .pill-installed{background:rgba(74,124,89,0.2);color:var(--green);font-weight:700;}
+.pill-readycollect{background:rgba(106,13,173,0.12);color:#6A0DAD;font-weight:700;}
 .pill-returned{background:rgba(21,101,192,0.15);color:#1565C0;font-weight:700;}
 .pill-archived{background:rgba(155,150,145,0.12);color:var(--muted);}
 
@@ -110,8 +111,8 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
 <script>
 let showArchived=false;
 const COLOUR_MAP={Red:'#D62828',Blue:'#1565C0',Green:'#2E7D32',Yellow:'#F9A825',Purple:'#6A0DAD',Orange:'#E65100',Teal:'#00838F',Magenta:'#AD1457',Brown:'#4E342E',Olive:'#558B2F',Indigo:'#283593',Cyan:'#00ACC1',Pink:'#F06292',Grey:'#757575'};
-const STATUS_LABELS={ready:'Job Assigned',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',archived:'Returned'};
-const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',archived:'pill-returned'};
+const STATUS_LABELS={ready:'Ready to Pick',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',ready_to_collect:'Ready to Collect',archived:'Returned'};
+const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',ready_to_collect:'pill-readycollect',archived:'pill-returned'};
 
 function toggleArchived(){
   showArchived=!showArchived;
@@ -122,12 +123,12 @@ function toggleArchived(){
   renderJobs();
 }
 
-// Status display order — installed is the last visible step before a job
-// auto-archives once the driver marks it Returned (handled server-side)
-const STATUS_ORDER=['ready','picking','ready_to_load','loading','loaded','installed'];
+// Status display order — strict order of execution, matching the
+// actual job lifecycle from start to finish.
+const STATUS_ORDER=['ready','picking','ready_to_load','loading','loaded','installed','ready_to_collect'];
 const STATUS_SECTION_LABELS={
-  ready:'Job Assigned', picking:'Picking', ready_to_load:'Ready to Load',
-  loading:'Loading', loaded:'Loaded', installed:'Installed'
+  ready:'Ready to Pick', picking:'Picking', ready_to_load:'Ready to Load',
+  loading:'Loading', loaded:'Loaded', installed:'Installed', ready_to_collect:'Ready to Collect'
 };
 
 const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};

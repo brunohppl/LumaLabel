@@ -301,7 +301,8 @@ function renderStatusBar(){
   if(s==='ready_to_load') bar.innerHTML=`<button class="action-btn btn-start" onclick="setStatus('loading')">Start Loading</button>`;
   else if(s==='loading')  bar.innerHTML=`<button class="action-btn btn-finish" onclick="finishLoading()">Loading Finished</button>`;
   else if(s==='loaded')   bar.innerHTML=`<button class="action-btn btn-installed" onclick="setStatus('installed')">Installed</button>`;
-  else if(s==='installed')bar.innerHTML=`<button class="action-btn btn-returned" onclick="setStatus('returned')">Mark Returned</button>`;
+  else if(s==='installed') bar.innerHTML=`<div class="action-status-msg">Waiting for job to be marked Ready to Collect…</div>`;
+  else if(s==='ready_to_collect') bar.innerHTML=`<button class="action-btn btn-returned" onclick="setStatus('returned')">Mark Returned</button>`;
   else if(s==='returned'||s==='archived') bar.innerHTML=`<div class="action-status-msg">Truck returned to warehouse — job complete</div>`;
   else bar.innerHTML=`<div class="action-status-msg">Waiting for stylist to complete picking…</div>`;
 }

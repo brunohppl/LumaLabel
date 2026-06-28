@@ -64,10 +64,11 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .transfer-tag-link{color:var(--blue);text-decoration:underline;font-weight:700;}
 .transfer-tag-link:hover{color:var(--ink);}
 .transfer-tag-link-out{color:var(--accent);}
-.job-address{font-size:1rem;color:var(--ink);margin-top:4px;display:block;text-decoration:none;cursor:pointer;}
-.job-address:hover{color:var(--blue);text-decoration:underline;}
+.job-address{font-size:1rem;color:var(--ink);margin-top:4px;}
 .job-meta{font-size:0.85rem;color:var(--muted);margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;line-height:1.7;}
-.eta-tag{color:var(--green);font-weight:600;}
+.eta-tag{font-weight:600;}
+.eta-tag-truck{color:var(--blue);}
+.eta-tag-stylist{color:var(--accent);}
 
 .btn{padding:12px 20px;border-radius:1px;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.82rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--ink);}
@@ -162,14 +163,18 @@ function jobCardHTML(job){
 
   // ETA is only meaningful for a little while — if it's more than 30
   // minutes old, showing it without context would look like a current
-  // estimate when it almost certainly isn't anymore.
-  let etaTag='';
-  if(job.eta_text && job.eta_calculated_at){
-    const ageMinutes=(Date.now()-new Date(job.eta_calculated_at).getTime())/60000;
-    if(ageMinutes<=30){
-      etaTag=`<span class="eta-tag" title="Calculated ${Math.round(ageMinutes)} min ago">🚛 Arriving ${job.eta_text}</span>`;
-    }
+  // estimate when it almost certainly isn't anymore. Truck and stylist
+  // ETAs are fully independent — either, both, or neither can be present
+  // depending on who's tapped their address link.
+  function etaTagHTML(text, calculatedAt, icon, label, extraClass){
+    if(!text || !calculatedAt) return '';
+    const ageMinutes=(Date.now()-new Date(calculatedAt).getTime())/60000;
+    if(ageMinutes>30) return '';
+    const iconPart = icon ? `${icon} ` : '';
+    return `<span class="eta-tag ${extraClass}" title="Calculated ${Math.round(ageMinutes)} min ago">${iconPart}${label} ${text}</span>`;
   }
+  const truckEtaTag   = etaTagHTML(job.truck_eta_text,   job.truck_eta_calculated_at,   '🚛', 'Truck',   'eta-tag-truck');
+  const stylistEtaTag = etaTagHTML(job.stylist_eta_text, job.stylist_eta_calculated_at, '',   'Stylist', 'eta-tag-stylist');
 
   return `<div class="job-card">
     <div class="job-card-top">
@@ -179,13 +184,14 @@ function jobCardHTML(job){
           <div class="job-ref">${job.job_ref||job.job_number}${transferTag}</div>
           <span class="pill ${pill}">${label}</span>
         </div>
-        <a class="job-address" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address||'')}" target="_blank" onclick="event.stopPropagation()">${job.address}</a>
+        <div class="job-address">${job.address}</div>
         <div class="job-meta">
           ${job.stage_date?`<span>${job.stage_date}</span>`:''}
           <span>${job.item_count} items</span>
           ${owner?`<span>${owner}</span>`:''}
           ${truck?`<span>${truck}</span>`:''}
-          ${etaTag}
+          ${truckEtaTag}
+          ${stylistEtaTag}
         </div>
       </div>
     </div>

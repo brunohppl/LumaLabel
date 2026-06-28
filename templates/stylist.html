@@ -30,11 +30,12 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .pill-returned{background:rgba(21,101,192,0.3);color:#8ABAEE;font-weight:700;}
 
 .hdr-ref{font-family:'Cormorant Garamond',serif;font-size:2.2rem;font-weight:400;color:var(--accent);line-height:1;}
-.hdr-address-row{font-size:0.95rem;margin-top:4px;}
-.hdr-address{color:rgba(250,248,244,0.6);text-decoration:none;cursor:pointer;}
-.hdr-address:hover{color:var(--accent);text-decoration:underline;}
-.hdr-address-date{color:rgba(250,248,244,0.6);}
-.hdr-address-date:not(:empty)::before{content:" · ";}
+.hdr-address-row{font-size:0.95rem;margin-top:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.hdr-address{display:inline-flex;align-items:center;gap:8px;color:rgba(250,248,244,0.6);text-decoration:none;cursor:pointer;}
+.hdr-address:hover{color:rgba(250,248,244,0.8);}
+.hdr-address-navigate{display:inline-flex;align-items:center;gap:4px;background:rgba(184,147,90,0.18);color:var(--accent);border:1px solid rgba(184,147,90,0.4);border-radius:12px;padding:3px 10px 3px 8px;font-size:0.74rem;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;flex-shrink:0;transition:background 0.15s;}
+.hdr-address:hover .hdr-address-navigate{background:rgba(184,147,90,0.3);}
+.hdr-address-date{color:rgba(250,248,244,0.6);margin-left:8px;}
 .hdr-owner{font-size:0.85rem;color:rgba(250,248,244,0.4);margin-top:2px;font-weight:500;}
 
 /* ── ACTIONS BAR ── */
@@ -146,7 +147,13 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
   </div>
   <div class="hdr-ref" id="job-ref">—</div>
   <div class="hdr-address-row">
-    <a class="hdr-address" id="job-address" href="#" target="_blank" onclick="return onAddressClick(event)"></a>
+    <a class="hdr-address" id="job-address" href="#" target="_blank" onclick="return onAddressClick(event)">
+      <span id="job-address-text"></span>
+      <span class="hdr-address-navigate">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        Navigate
+      </span>
+    </a>
     <span class="hdr-address-date" id="job-stage-date"></span>
   </div>
   <div class="hdr-owner" id="job-owner"></div>
@@ -203,7 +210,7 @@ async function loadJob(){
 
   document.getElementById('job-ref').textContent = currentJob.job_ref || currentJob.job_number;
   const addrLink = document.getElementById('job-address');
-  addrLink.textContent = currentJob.address;
+  document.getElementById('job-address-text').textContent = currentJob.address;
   addrLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(currentJob.address||'')}`;
   document.getElementById('job-stage-date').textContent = currentJob.stage_date || '';
   document.getElementById('job-owner').textContent = currentJob.job_owner || '';

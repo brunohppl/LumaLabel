@@ -276,9 +276,11 @@ function onAddressClick(event){
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,role:'stylist'})
       }).then(r=>r.json()).then(data=>{
+        // Calculating the ETA, saving it, and posting to Slack all
+        // happen together server-side in one request now — no separate
+        // confirm step. See /api/jobs/<id>/eta in app.py.
         console.log('[ETA] response:', data);
         window.open(mapsUrl, '_blank');
-        if(data.success && data.eta_text) promptSlackPost('stylist', data.eta_text);
       }).catch(err=>{
         console.log('[ETA] fetch failed:', err);
         window.open(mapsUrl, '_blank');
@@ -707,21 +709,7 @@ async function addItem(){
   allItems.push(newItem);document.getElementById('new-desc').value='';renderItems();
 }
 
-function promptSlackPost(role, etaText){
-  const label = role==='truck' ? 'Truck' : 'Stylist';
-  if(!confirm(`Post ${label} ETA (${etaText}) to Slack?`)) return;
-  fetch(`/api/jobs/${jobId}/eta/post-to-slack`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({role})
-  }).then(r=>r.json()).then(data=>{
-    console.log('[ETA Slack]', data);
-    if(!data.success) alert('Could not post to Slack — check the webhook is configured.');
-  }).catch(err=>{
-    console.log('[ETA Slack] fetch failed:', err);
-    alert('Could not post to Slack — please try again.');
-  });
-}
+
 
 loadJob();
 </script>

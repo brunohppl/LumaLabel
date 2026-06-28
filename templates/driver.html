@@ -273,9 +273,16 @@ function onAddressClick(event){
         body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,role:'truck'})
       }).then(r=>r.json()).then(data=>{
         console.log('[ETA] response:', data);
+        // Maps opens first, immediately — the Slack prompt is a separate
+        // follow-up step afterward, not bundled into the same instant.
+        // A confirm() dialog firing at the same moment as window.open()
+        // risks the browser treating the popup as not a direct result of
+        // the click and blocking it; sequencing them avoids that risk
+        // entirely rather than relying on browsers tolerating it.
+        window.open(mapsUrl, '_blank');
+        if(data.success && data.eta_text) promptSlackPost('truck', data.eta_text);
       }).catch(err=>{
         console.log('[ETA] fetch failed:', err);
-      }).finally(()=>{
         window.open(mapsUrl, '_blank');
       });
     },
@@ -564,6 +571,22 @@ async function finishLoading(){
   const checked=loadable.filter(i=>i.checked).length,total=loadable.length;
   if(checked<total){if(!confirm(`${total-checked} items not checked off. Mark as loaded anyway?`))return;}
   await setStatus('loaded');
+}
+
+function promptSlackPost(role, etaText){
+  const label = role==='truck' ? 'Truck' : 'Stylist';
+  if(!confirm(`Post ${label} ETA (${etaText}) to Slack?`)) return;
+  fetch(`/api/jobs/${job.id}/eta/post-to-slack`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({role})
+  }).then(r=>r.json()).then(data=>{
+    console.log('[ETA Slack]', data);
+    if(!data.success) alert('Could not post to Slack — check the webhook is configured.');
+  }).catch(err=>{
+    console.log('[ETA Slack] fetch failed:', err);
+    alert('Could not post to Slack — please try again.');
+  });
 }
 
 loadJob();

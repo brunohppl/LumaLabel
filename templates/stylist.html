@@ -29,7 +29,11 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .pill-returned{background:rgba(21,101,192,0.3);color:#8ABAEE;font-weight:700;}
 
 .hdr-ref{font-family:'Cormorant Garamond',serif;font-size:2.2rem;font-weight:400;color:var(--accent);line-height:1;}
-.hdr-address{font-size:0.95rem;color:rgba(250,248,244,0.6);margin-top:4px;}
+.hdr-address-row{font-size:0.95rem;margin-top:4px;}
+.hdr-address{color:rgba(250,248,244,0.6);text-decoration:none;cursor:pointer;}
+.hdr-address:hover{color:var(--accent);text-decoration:underline;}
+.hdr-address-date{color:rgba(250,248,244,0.6);}
+.hdr-address-date:not(:empty)::before{content:" · ";}
 .hdr-owner{font-size:0.85rem;color:rgba(250,248,244,0.4);margin-top:2px;font-weight:500;}
 
 /* ── ACTIONS BAR ── */
@@ -140,7 +144,10 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
     </div>
   </div>
   <div class="hdr-ref" id="job-ref">—</div>
-  <div class="hdr-address" id="job-address"></div>
+  <div class="hdr-address-row">
+    <a class="hdr-address" id="job-address" href="#" target="_blank" onclick="return onAddressClick(event)"></a>
+    <span class="hdr-address-date" id="job-stage-date"></span>
+  </div>
   <div class="hdr-owner" id="job-owner"></div>
 </div>
 
@@ -194,7 +201,10 @@ async function loadJob(){
   currentJob = data.job; allItems = data.items;
 
   document.getElementById('job-ref').textContent = currentJob.job_ref || currentJob.job_number;
-  document.getElementById('job-address').textContent = currentJob.address + ' · ' + currentJob.stage_date;
+  const addrLink = document.getElementById('job-address');
+  addrLink.textContent = currentJob.address;
+  addrLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(currentJob.address||'')}`;
+  document.getElementById('job-stage-date').textContent = currentJob.stage_date || '';
   document.getElementById('job-owner').textContent = currentJob.job_owner || '';
 
   const transferBanner = document.getElementById('transfer-banner');
@@ -241,6 +251,45 @@ async function loadJob(){
 
   renderStatus();
   renderItems();
+}
+
+function onAddressClick(event){
+  event.preventDefault();
+  const mapsUrl = event.currentTarget.href;
+
+  // Same approach as driver.html's address click: wait for geolocation to
+  // resolve (success or failure) before opening Maps, rather than racing
+  // both at once. Racing them meant switching to the Maps app could
+  // suspend this page's JS before the async ETA request finished sending
+  // — it would work once, then silently stop working on every later
+  // click, since the request never completed but nothing threw an error.
+  if(!navigator.geolocation){
+    console.log('[ETA] geolocation not supported on this device/browser');
+    window.open(mapsUrl, '_blank');
+    return false;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      fetch(`/api/jobs/${jobId}/eta`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,role:'stylist'})
+      }).then(r=>r.json()).then(data=>{
+        console.log('[ETA] response:', data);
+      }).catch(err=>{
+        console.log('[ETA] fetch failed:', err);
+      }).finally(()=>{
+        window.open(mapsUrl, '_blank');
+      });
+    },
+    (err)=>{
+      console.log('[ETA] geolocation error:', err);
+      window.open(mapsUrl, '_blank');
+    },
+    {timeout:8000}
+  );
+  return false;
 }
 
 async function exportSummary(){

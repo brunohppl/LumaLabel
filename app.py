@@ -199,12 +199,12 @@ def notify_slack_eta(job, role, eta_text):
         return False
 
     role_label = 'Truck' if role == 'truck' else 'Stylist'
-    role_emoji = '🚛' if role == 'truck' else '✂️'
+    role_emoji = '🚛' if role == 'truck' else '🚗'
     ref = job.get('job_ref') or job.get('job_number') or ''
 
     message = {
         'username': 'Luma Warehouse',
-        'icon_emoji': ':truck:' if role == 'truck' else ':scissors:',
+        'icon_emoji': ':truck:' if role == 'truck' else ':car:',
         'blocks': [
             {
                 'type': 'header',

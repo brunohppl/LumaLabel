@@ -1645,6 +1645,34 @@ def api_job_notes(job_id):
     result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})
 
+@app.route('/api/jobs/<job_id>/runsheet', methods=['PATCH'])
+def api_job_runsheet(job_id):
+    """Manually schedule (or unschedule) a job onto a specific day's
+    transport runsheet. This is deliberately independent of stage_date —
+    the install date on the packing slip — since installs and pickups
+    get assigned to a specific day's run by a person, often the day
+    before, not derived automatically from any date already on the job.
+
+    Body: {runsheet_date, runsheet_type} where runsheet_date is
+    "YYYY-MM-DD" or null (null clears it — removes the job from any
+    runsheet) and runsheet_type is "install" or "pickup".
+
+    No permission check yet — anyone who can open /jobs can set this,
+    same as every other action in this app today. The plan to eventually
+    gate this behind an admin account (so admin can set or override what
+    a stylist/driver has already set) is a future change, not implemented
+    here — see the README for context if picking this up later."""
+    data = request.get_json()
+    runsheet_date = data.get('runsheet_date')
+    runsheet_type = data.get('runsheet_type')
+    if runsheet_date is not None and runsheet_type not in ('install', 'pickup'):
+        return jsonify({'success': False, 'error': 'runsheet_type must be "install" or "pickup" when setting a date'}), 400
+    result = sb_patch('jobs', f'id=eq.{job_id}', {
+        'runsheet_date': runsheet_date,
+        'runsheet_type': runsheet_type if runsheet_date else None,
+    })
+    return jsonify({'success': bool(result)})
+
 @app.route('/api/jobs/<job_id>/eta', methods=['POST'])
 def api_job_eta(job_id):
     """Calculate driving ETA from someone's current position (sent by

@@ -1592,18 +1592,29 @@ def api_job_notes(job_id):
 
 @app.route('/api/jobs/<job_id>/eta', methods=['POST'])
 def api_job_eta(job_id):
-    """Calculate driving ETA from the driver's current position (sent by
+    """Calculate driving ETA from someone's current position (sent by
     the browser via the Geolocation API, triggered when they tap the
-    address on /driver/<job_id>) to this job's address, and save it on
-    the job so it shows on the /jobs tile. See get_truck_eta() for the
-    actual Distance Matrix call and why it fails silently rather than
-    erroring — a missing API key or a network hiccup shouldn't block the
-    driver from just opening Maps, which is the primary action here."""
+    address on /driver/<job_id> or /stylist/<job_id>) to this job's
+    address, and save it on the job so it shows on the /jobs tile.
+
+    Body: {lat, lng, role} where role is "truck" or "stylist" — decides
+    which pair of columns gets written (truck_eta_text/calculated_at or
+    stylist_eta_text/calculated_at). Kept as one endpoint with a role
+    flag rather than two separate routes, since the calculation itself
+    is identical either way — only the destination column differs.
+
+    See get_truck_eta() for the actual Distance Matrix call and why it
+    fails silently rather than erroring — a missing API key or a network
+    hiccup shouldn't block the driver/stylist from just opening Maps,
+    which is the primary action either click triggers."""
     data = request.get_json()
     lat  = data.get('lat')
     lng  = data.get('lng')
+    role = data.get('role', 'truck')
     if lat is None or lng is None:
         return jsonify({'success': False, 'error': 'lat/lng required'}), 400
+    if role not in ('truck', 'stylist'):
+        return jsonify({'success': False, 'error': 'role must be "truck" or "stylist"'}), 400
 
     job_rows = sb_get('jobs', f'id=eq.{job_id}')
     if not job_rows:
@@ -1616,11 +1627,13 @@ def api_job_eta(job_id):
         # overwriting a good value with nothing just because this attempt failed.
         return jsonify({'success': False, 'eta_text': None})
 
+    text_col = f'{role}_eta_text'
+    time_col = f'{role}_eta_calculated_at'
     sb_patch('jobs', f'id=eq.{job_id}', {
-        'eta_text': eta_text,
-        'eta_calculated_at': datetime.utcnow().isoformat(),
+        text_col: eta_text,
+        time_col: datetime.utcnow().isoformat(),
     })
-    return jsonify({'success': True, 'eta_text': eta_text})
+    return jsonify({'success': True, 'eta_text': eta_text, 'role': role})
 
 @app.route('/api/items/<item_id>/check', methods=['PATCH'])
 def api_item_check(item_id):

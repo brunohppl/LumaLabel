@@ -1602,7 +1602,15 @@ def api_job_runsheet(job_id):
 
     Body: {runsheet_date, runsheet_type} where runsheet_date is
     "YYYY-MM-DD" or null (null clears it — removes the job from any
-    runsheet) and runsheet_type is "install" or "pickup".
+    runsheet) and runsheet_type is "install", "pickup", or "to_load".
+    "to_load" covers the afternoon-before step — unloading a truck that
+    did a pickup and loading it with the next day's jobs — distinct from
+    "install"/"pickup" which represent the actual morning run.
+
+    A job can appear on the runsheet with no owner or truck assigned at
+    all — those aren't required here, only a runsheet_date and a valid
+    runsheet_type. The runsheet is also used to plan ahead before a
+    truck/driver has been locked in for a job.
 
     No permission check yet — anyone who can open /jobs can set this,
     same as every other action in this app today. The plan to eventually
@@ -1612,8 +1620,8 @@ def api_job_runsheet(job_id):
     data = request.get_json()
     runsheet_date = data.get('runsheet_date')
     runsheet_type = data.get('runsheet_type')
-    if runsheet_date is not None and runsheet_type not in ('install', 'pickup'):
-        return jsonify({'success': False, 'error': 'runsheet_type must be "install" or "pickup" when setting a date'}), 400
+    if runsheet_date is not None and runsheet_type not in ('install', 'pickup', 'to_load'):
+        return jsonify({'success': False, 'error': 'runsheet_type must be "install", "pickup", or "to_load" when setting a date'}), 400
     result = sb_patch('jobs', f'id=eq.{job_id}', {
         'runsheet_date': runsheet_date,
         'runsheet_type': runsheet_type if runsheet_date else None,

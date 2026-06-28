@@ -93,7 +93,7 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 /* ── ADD TO RUNSHEET POPOVER ── */
 .runsheet-popover-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.35);z-index:200;}
 .runsheet-popover-overlay.open{display:block;}
-.runsheet-popover{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:4px;box-shadow:0 12px 40px rgba(0,0,0,0.2);padding:22px;width:280px;z-index:201;}
+.runsheet-popover{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:4px;box-shadow:0 12px 40px rgba(0,0,0,0.2);padding:22px;width:320px;z-index:201;}
 .runsheet-popover.open{display:block;}
 .runsheet-popover-title{font-family:'Cormorant Garamond',serif;font-size:1.3rem;margin-bottom:14px;color:var(--ink);}
 .runsheet-popover-label{display:block;font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px;margin-top:12px;}
@@ -171,6 +171,7 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
   <div class="runsheet-popover-type-row">
     <button class="runsheet-type-btn" id="runsheet-type-install" onclick="selectRunsheetType('install')">Install</button>
     <button class="runsheet-type-btn" id="runsheet-type-pickup" onclick="selectRunsheetType('pickup')">Pickup</button>
+    <button class="runsheet-type-btn" id="runsheet-type-to_load" onclick="selectRunsheetType('to_load')">To Load</button>
   </div>
   <div class="runsheet-popover-actions">
     <button class="btn btn-outline" onclick="removeFromRunsheet()" id="runsheet-remove-btn" style="font-size:0.72rem;display:none;">Remove from Runsheet</button>
@@ -222,7 +223,8 @@ function jobCardHTML(job){
   const truckIcon=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>`;
   const ownerBadge=job.job_owner?`<span class="assignment-badge assignment-badge-owner">${ownerIcon}${job.job_owner}</span>`:'';
   const truckBadge=job.truck?`<span class="assignment-badge assignment-badge-truck">${truckIcon}${job.truck}</span>`:'';
-  const runsheetBadge=job.runsheet_date?`<span class="assignment-badge assignment-badge-runsheet">${formatRunsheetBadgeDate(job.runsheet_date)} — ${job.runsheet_type==='pickup'?'Pickup':'Install'}</span>`:'';
+  const RUNSHEET_TYPE_LABELS={install:'Install', pickup:'Pickup', to_load:'To Load'};
+  const runsheetBadge=job.runsheet_date?`<span class="assignment-badge assignment-badge-runsheet">${formatRunsheetBadgeDate(job.runsheet_date)} — ${RUNSHEET_TYPE_LABELS[job.runsheet_type]||job.runsheet_type}</span>`:'';
   let transferTag='';
   if(job.is_transfer){
     const src=job.transfer_from_job_id?jobsById.get(job.transfer_from_job_id):null;
@@ -364,12 +366,13 @@ function renderRunsheet(){
   const isToday=localDateStr(new Date())===todayStr;
   label.textContent=runsheetViewDate.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})+(isToday?' (Today)':'');
 
-  // Only jobs explicitly scheduled on this date AND with a truck
-  // assigned show here — matches the actual requirement: this isn't a
-  // filtered view of stage_date, it's a deliberate day-ahead selection a
-  // person makes, and it shouldn't show a job nobody's actually
-  // organised transport for yet.
-  const scheduled=lastFetchedJobs.filter(j=>j.runsheet_date===todayStr && j.truck);
+  // Any job with a runsheet date set for this day shows here — owner and
+  // truck assignment are no longer required. The runsheet is also used
+  // to plan ahead (e.g. loading trucks the afternoon before a job goes
+  // out), so a job often won't have a truck/owner locked in yet at the
+  // point someone's organising which day it falls on.
+  const scheduled=lastFetchedJobs.filter(j=>j.runsheet_date===todayStr);
+  const toLoad=scheduled.filter(j=>j.runsheet_type==='to_load');
   const installs=scheduled.filter(j=>j.runsheet_type==='install');
   const pickups=scheduled.filter(j=>j.runsheet_type==='pickup');
 
@@ -392,20 +395,31 @@ function renderRunsheet(){
       <div class="jobs-grid-inner">${pickups.map(jobCardHTML).join('')}</div>
     </div>`;
   }
+  if(toLoad.length){
+    html+=`<div class="runsheet-section">
+      <div class="runsheet-section-title">To Load <span class="count">${toLoad.length}</span></div>
+      <div class="jobs-grid-inner">${toLoad.map(jobCardHTML).join('')}</div>
+    </div>`;
+  }
   content.innerHTML=html;
 }
 
 // ── Add to Runsheet popover ──
 let runsheetPopoverJobId=null;
 let runsheetPopoverType=null;
+const RUNSHEET_TYPES=['install','pickup','to_load'];
+function updateRunsheetTypeButtons(selectedType){
+  RUNSHEET_TYPES.forEach(t=>{
+    document.getElementById('runsheet-type-'+t).classList.toggle('selected', t===selectedType);
+  });
+}
 function openRunsheetPopover(jobId, btnEl){
   runsheetPopoverJobId=jobId;
   const job=jobsById.get(jobId);
   runsheetPopoverType=job?.runsheet_type||null;
 
   document.getElementById('runsheet-popover-date').value=job?.runsheet_date||'';
-  document.getElementById('runsheet-type-install').classList.toggle('selected', runsheetPopoverType==='install');
-  document.getElementById('runsheet-type-pickup').classList.toggle('selected', runsheetPopoverType==='pickup');
+  updateRunsheetTypeButtons(runsheetPopoverType);
   document.getElementById('runsheet-remove-btn').style.display=job?.runsheet_date?'inline-block':'none';
 
   document.getElementById('runsheet-popover-overlay').classList.add('open');
@@ -418,13 +432,12 @@ function closeRunsheetPopover(){
 }
 function selectRunsheetType(type){
   runsheetPopoverType=type;
-  document.getElementById('runsheet-type-install').classList.toggle('selected', type==='install');
-  document.getElementById('runsheet-type-pickup').classList.toggle('selected', type==='pickup');
+  updateRunsheetTypeButtons(type);
 }
 async function saveRunsheetEntry(){
   const date=document.getElementById('runsheet-popover-date').value;
   if(!date){ alert('Pick a date first.'); return; }
-  if(!runsheetPopoverType){ alert('Choose Install or Pickup.'); return; }
+  if(!runsheetPopoverType){ alert('Choose Install, Pickup, or To Load.'); return; }
   await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
     method:'PATCH', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({runsheet_date:date, runsheet_type:runsheetPopoverType})

@@ -4,6 +4,7 @@ import base64
 import tempfile
 import json
 import urllib.request
+import urllib.parse
 from io import BytesIO
 from datetime import datetime
 
@@ -180,6 +181,41 @@ def notify_slack(meta, item_count, colour_name, label_filename):
         urllib.request.urlopen(req, timeout=5)
     except Exception:
         pass  # Never let Slack failure break label generation
+
+
+def get_truck_eta(lat, lng, destination_address):
+    """Look up driving time from (lat, lng) to destination_address using
+    Google's Distance Matrix API. Set GOOGLE_MAPS_API_KEY as an
+    environment variable in Render. The destination is passed as plain
+    text — Google geocodes it server-side, so no separate geocoding step
+    is needed here.
+
+    Returns the human-readable duration string (e.g. "14 mins") on
+    success, or None on any failure (missing key, network error, address
+    not found, etc.) — callers should treat None as "couldn't calculate
+    an ETA right now" and fail quietly, the same way notify_slack() does
+    when its webhook isn't configured.
+    """
+    api_key = os.environ.get('GOOGLE_MAPS_API_KEY')
+    if not api_key:
+        return None
+    try:
+        params = urllib.parse.urlencode({
+            'origins':      f'{lat},{lng}',
+            'destinations': destination_address,
+            'units':        'metric',
+            'key':          api_key,
+        })
+        url = f'https://maps.googleapis.com/maps/api/distancematrix/json?{params}'
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=8) as r:
+            result = json.loads(r.read())
+        element = result['rows'][0]['elements'][0]
+        if element.get('status') != 'OK':
+            return None
+        return element['duration']['text']
+    except Exception:
+        return None
 
 
 # ── Colour cycle — 14 maximally distinct colours ──
@@ -1515,6 +1551,38 @@ def api_job_notes(job_id):
     if 'driver_notes'  in data: payload['driver_notes']  = data['driver_notes']
     result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})
+
+@app.route('/api/jobs/<job_id>/eta', methods=['POST'])
+def api_job_eta(job_id):
+    """Calculate driving ETA from the driver's current position (sent by
+    the browser via the Geolocation API, triggered when they tap the
+    address on /driver/<job_id>) to this job's address, and save it on
+    the job so it shows on the /jobs tile. See get_truck_eta() for the
+    actual Distance Matrix call and why it fails silently rather than
+    erroring — a missing API key or a network hiccup shouldn't block the
+    driver from just opening Maps, which is the primary action here."""
+    data = request.get_json()
+    lat  = data.get('lat')
+    lng  = data.get('lng')
+    if lat is None or lng is None:
+        return jsonify({'success': False, 'error': 'lat/lng required'}), 400
+
+    job_rows = sb_get('jobs', f'id=eq.{job_id}')
+    if not job_rows:
+        return jsonify({'success': False, 'error': 'Job not found'}), 404
+    address = job_rows[0].get('address', '')
+
+    eta_text = get_truck_eta(lat, lng, address)
+    if eta_text is None:
+        # Couldn't calculate — leave any previous ETA untouched rather than
+        # overwriting a good value with nothing just because this attempt failed.
+        return jsonify({'success': False, 'eta_text': None})
+
+    sb_patch('jobs', f'id=eq.{job_id}', {
+        'eta_text': eta_text,
+        'eta_calculated_at': datetime.utcnow().isoformat(),
+    })
+    return jsonify({'success': True, 'eta_text': eta_text})
 
 @app.route('/api/items/<item_id>/check', methods=['PATCH'])
 def api_item_check(item_id):

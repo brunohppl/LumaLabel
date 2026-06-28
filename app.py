@@ -1058,6 +1058,230 @@ def generate_checklist(meta, items):
     buffer.seek(0)
     return buffer.getvalue()
 
+
+def generate_job_summary(job, items, room_notes=None):
+    """Export a live snapshot of a job's current state from the stylist
+    page — picked status, per-item notes, transfer markings, room notes,
+    and job-level notes. Unlike generate_checklist() (which produces a
+    blank form from a freshly parsed packing slip, meant to be filled in
+    by hand), this reflects whatever has actually happened to the job so
+    far in the database: what's been picked, what notes have been added,
+    which items are tagged as transferring. Takes live Supabase rows
+    directly rather than parser output, since that's what the stylist
+    page itself is showing when someone asks to export it.
+    """
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+
+    room_notes = room_notes or {}
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        topMargin    = 1.2 * cm,
+        bottomMargin = 1.2 * cm,
+        leftMargin   = 1.2 * cm,
+        rightMargin  = 1.2 * cm,
+    )
+
+    C_INK    = HexColor('#1A1714')
+    C_MUTED  = HexColor('#9A8F80')
+    C_ACCENT = HexColor('#B8935A')
+    C_GREEN  = HexColor('#4A7C59')
+    C_BLUE   = HexColor('#4A7EB8')
+    C_LIGHT  = HexColor('#F5F0E8')
+    C_BORDER = HexColor('#D8CFBF')
+
+    title_style = ParagraphStyle('title', fontName='Helvetica-Bold', fontSize=20, textColor=C_INK, spaceAfter=2)
+    sub_style   = ParagraphStyle('sub', fontName='Helvetica', fontSize=11, textColor=C_MUTED, spaceAfter=2)
+    meta_style  = ParagraphStyle('meta', fontName='Helvetica-Bold', fontSize=10, textColor=C_INK, spaceAfter=0)
+    cell_style  = ParagraphStyle('cell', fontName='Helvetica', fontSize=10, textColor=C_INK, leading=13)
+    note_style  = ParagraphStyle('note', fontName='Helvetica-Oblique', fontSize=8.5, textColor=C_ACCENT, leading=11)
+    hdr_style   = ParagraphStyle('hdr', fontName='Helvetica-Bold', fontSize=10, textColor=colors.white, alignment=TA_CENTER)
+    room_section_style = ParagraphStyle('room_section', fontName='Helvetica-Bold', fontSize=11, textColor=colors.white)
+
+    story = []
+    story.append(Paragraph('LUMA <font color="#B8935A">Design</font> Co', title_style))
+    story.append(Spacer(1, 14))
+    story.append(Paragraph('Job Summary — current state', sub_style))
+    story.append(Spacer(1, 8))
+
+    # ── Job meta block ──
+    pickable = [i for i in items if not i.get('is_extra')]
+    picked_count = len([i for i in pickable if i.get('picked')])
+    inv_suffix = re.sub(r'\D', '', job.get('job_number', '') or '')[-3:] or job.get('job_ref', '')
+
+    meta_lines = [
+        [Paragraph(f'<b>Job Ref:</b> {inv_suffix}', meta_style)],
+        [Paragraph(f'<b>Address:</b> {job.get("address","")}', meta_style)],
+        [Paragraph(f'<b>Installation Date:</b> {job.get("stage_date","")}', meta_style)],
+        [Paragraph(f'<b>Job Owner:</b> {job.get("job_owner") or "—"}', meta_style)],
+        [Paragraph(f'<b>Status:</b> {(job.get("status") or "").replace("_"," ").title() or "—"}', meta_style)],
+        [Paragraph(f'<b>Picked:</b> {picked_count} / {len(pickable)} items', meta_style)],
+    ]
+    if job.get('is_transfer'):
+        meta_lines.append([Paragraph('<b>Transfer From:</b> another job', meta_style)])
+    meta_table = Table(meta_lines, colWidths=[18.5*cm])
+    meta_table.setStyle(TableStyle([
+        ('BACKGROUND',   (0,0), (-1,-1), C_LIGHT),
+        ('BOX',          (0,0), (-1,-1), 0.5, C_BORDER),
+        ('TOPPADDING',   (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING',(0,0), (-1,-1), 6),
+        ('LEFTPADDING',  (0,0), (-1,-1), 10),
+        ('RIGHTPADDING', (0,0), (-1,-1), 10),
+    ]))
+    story.append(meta_table)
+    story.append(Spacer(1, 10))
+
+    # ── Job-level notes ──
+    if job.get('styling_notes'):
+        story.append(Paragraph(f'<b>Styling Notes:</b> {job["styling_notes"]}', cell_style))
+        story.append(Spacer(1, 4))
+    if job.get('driver_notes'):
+        story.append(Paragraph(f'<b>Notes for Driver:</b> {job["driver_notes"]}', cell_style))
+        story.append(Spacer(1, 4))
+    story.append(Spacer(1, 6))
+
+    # ── Table: # | Item | Status | Notes ──
+    col_widths = [2.4*cm, 8.5*cm, 2.5*cm, 5.1*cm]
+    headers = [
+        Paragraph('#', hdr_style),
+        Paragraph('Item', hdr_style),
+        Paragraph('Status', hdr_style),
+        Paragraph('Notes', hdr_style),
+    ]
+    rows = [headers]
+    style_cmds = [
+        ('BACKGROUND',   (0,0), (-1,0), C_INK),
+        ('FONTNAME',     (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE',     (0,0), (-1,0), 10),
+        ('TOPPADDING',   (0,0), (-1,0), 9),
+        ('BOTTOMPADDING',(0,0), (-1,0), 9),
+        ('LEFTPADDING',  (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+        ('VALIGN',       (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN',        (0,0), (0,-1), 'CENTER'),
+        ('ALIGN',        (2,0), (2,-1), 'CENTER'),
+        ('GRID',         (0,0), (-1,-1), 0.4, C_BORDER),
+        ('LINEBELOW',    (0,0), (-1,0), 1.0, C_INK),
+    ]
+    data_row_idx = 1
+
+    # Group live items by room, preserving the order rooms first appear in
+    rooms_in_order = []
+    by_room = {}
+    for item in pickable:
+        r = item.get('room') or ''
+        if r not in by_room:
+            by_room[r] = []
+            rooms_in_order.append(r)
+        by_room[r].append(item)
+
+    for room in rooms_in_order:
+        room_items = by_room[room]
+
+        section_cells = [Paragraph((room or 'Uncategorised').upper(), room_section_style), '', '', '']
+        notes_for_room = room_notes.get(room) or []
+        rows.append(section_cells)
+        style_cmds += [
+            ('BACKGROUND',   (0, data_row_idx), (-1, data_row_idx), C_ACCENT),
+            ('SPAN',         (0, data_row_idx), (-1, data_row_idx)),
+            ('TOPPADDING',   (0, data_row_idx), (-1, data_row_idx), 7),
+            ('BOTTOMPADDING',(0, data_row_idx), (-1, data_row_idx), 7),
+        ]
+        data_row_idx += 1
+
+        if notes_for_room:
+            rows.append([Paragraph(' · '.join(notes_for_room), note_style), '', '', ''])
+            style_cmds += [
+                ('BACKGROUND', (0, data_row_idx), (-1, data_row_idx), C_LIGHT),
+                ('SPAN',       (0, data_row_idx), (-1, data_row_idx)),
+                ('TOPPADDING', (0, data_row_idx), (-1, data_row_idx), 5),
+                ('BOTTOMPADDING', (0, data_row_idx), (-1, data_row_idx), 5),
+            ]
+            data_row_idx += 1
+
+        # Group consecutive identical descriptions, same as the checklist —
+        # but split on transfer-status boundaries too, since merging a
+        # transferring item with a non-transferring one of the same
+        # description would hide which is which.
+        grouped = []
+        i = 0
+        while i < len(room_items):
+            item = room_items[i]
+            desc = item.get('description', '')
+            is_transfer_item = bool(item.get('is_transfer_item'))
+            not_transferring  = bool(item.get('not_transferring'))
+            j = i + 1
+            while (j < len(room_items)
+                   and room_items[j].get('description', '') == desc
+                   and bool(room_items[j].get('is_transfer_item')) == is_transfer_item
+                   and bool(room_items[j].get('not_transferring')) == not_transferring):
+                j += 1
+            chunk = room_items[i:j]
+            grouped.append({
+                'count': j - i,
+                'description': desc,
+                'first_serial': item['serial'],
+                'last_serial': room_items[j-1]['serial'],
+                'all_picked': all(x.get('picked') for x in chunk),
+                'any_picked': any(x.get('picked') for x in chunk),
+                'is_transfer_item': is_transfer_item,
+                'not_transferring': not_transferring,
+                'notes': item.get('notes') or '',
+            })
+            i = j
+
+        for i, grp in enumerate(grouped):
+            bg = colors.white if i % 2 == 0 else C_LIGHT
+            serial_txt = f'#{grp["first_serial"]}' if grp['count'] == 1 else f'#{grp["first_serial"]}–#{grp["last_serial"]}'
+            item_txt = f'{grp["count"]}×  {grp["description"]}' if grp['count'] > 1 else grp['description']
+
+            if grp['is_transfer_item']:
+                status_txt, status_colour = 'Transfer', C_BLUE
+            elif grp['not_transferring']:
+                status_txt, status_colour = 'Not Transferring', C_ACCENT
+            elif grp['all_picked']:
+                status_txt, status_colour = 'Picked', C_GREEN
+            elif grp['any_picked']:
+                status_txt, status_colour = 'Partial', C_ACCENT
+            else:
+                status_txt, status_colour = 'Not Picked', C_MUTED
+
+            serial_style = ParagraphStyle('num', fontName='Helvetica-Bold', fontSize=10, textColor=C_ACCENT, alignment=TA_CENTER)
+            status_style = ParagraphStyle('status', fontName='Helvetica-Bold', fontSize=8.5, textColor=status_colour, alignment=TA_CENTER)
+
+            rows.append([
+                Paragraph(serial_txt, serial_style),
+                Paragraph(item_txt, cell_style),
+                Paragraph(status_txt, status_style),
+                Paragraph(grp['notes'], note_style) if grp['notes'] else Paragraph('', cell_style),
+            ])
+            style_cmds += [
+                ('BACKGROUND',   (0, data_row_idx), (-1, data_row_idx), bg),
+                ('FONTNAME',     (0, data_row_idx), (-1, data_row_idx), 'Helvetica'),
+                ('FONTSIZE',     (0, data_row_idx), (-1, data_row_idx), 10),
+                ('TOPPADDING',   (0, data_row_idx), (-1, data_row_idx), 7),
+                ('BOTTOMPADDING',(0, data_row_idx), (-1, data_row_idx), 7),
+            ]
+            data_row_idx += 1
+
+    table = Table(rows, colWidths=col_widths, repeatRows=1)
+    table.setStyle(TableStyle(style_cmds))
+    story.append(table)
+
+    story.append(Spacer(1, 16))
+    story.append(Paragraph(
+        f'Exported from LUMA Warehouse · {datetime.now().strftime("%-d %b %Y, %-I:%M%p")}',
+        ParagraphStyle('footer', fontName='Helvetica', fontSize=7, textColor=C_MUTED, alignment=TA_CENTER)
+    ))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
 # ════════════════════════════════════════════════
 # API ROUTES
 # ════════════════════════════════════════════════
@@ -1239,6 +1463,32 @@ def api_job_room_notes(job_id):
     for n in notes:
         by_room.setdefault(n['room'], []).append(n['note'])
     return jsonify(by_room)
+
+@app.route('/api/jobs/<job_id>/summary-pdf', methods=['GET'])
+def api_job_summary_pdf(job_id):
+    """Stylist-only export — a PDF snapshot of the job's current live
+    state (picked status, notes, transfer markings) as shown on
+    /stylist/<id>. See generate_job_summary() for why this can't just
+    reuse generate_checklist()."""
+    job_rows = sb_get('jobs', f'id=eq.{job_id}')
+    if not job_rows:
+        return jsonify({'error': 'Job not found'}), 404
+    job   = job_rows[0]
+    items = sb_get('items', f'job_id=eq.{job_id}&order=serial.asc')
+
+    notes = sb_get('room_notes', f'job_id=eq.{job_id}')
+    room_notes = {}
+    for n in notes:
+        room_notes.setdefault(n['room'], []).append(n['note'])
+
+    pdf_bytes = generate_job_summary(job, items, room_notes)
+    ref = job.get('job_ref') or job.get('job_number') or job_id
+    filename = f'LUMA_Job_Summary_{ref}.pdf'
+    return Response(
+        pdf_bytes,
+        mimetype='application/pdf',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
 
 @app.route('/api/jobs/<job_id>/status', methods=['PATCH'])
 def api_job_status(job_id):

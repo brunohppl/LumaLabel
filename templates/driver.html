@@ -19,6 +19,7 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .pill-loading{background:rgba(232,92,71,0.2);color:#E8856A;}
 .pill-loaded{background:rgba(74,124,89,0.25);color:#6BBF8A;}
 .pill-installed{background:rgba(74,124,89,0.45);color:#9FFFCE;font-weight:800;}
+.pill-readycollect{background:rgba(106,13,173,0.35);color:#CB9FFF;font-weight:800;}
 .pill-returned{background:rgba(74,126,184,0.3);color:#8ABAEE;font-weight:800;}
 .hdr-ref{font-size:2.6rem;font-weight:700;color:var(--accent);line-height:1;letter-spacing:-0.01em;}
 .hdr-addr{font-size:0.92rem;color:rgba(250,248,244,0.6);margin-top:2px;display:block;text-decoration:none;cursor:pointer;}
@@ -193,8 +194,8 @@ function closePhoto(){
 
 const jobId=window.location.pathname.split('/').pop();
 let job=null,items=[];
-const STATUS_PILLS={ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',returned:'pill-returned',archived:'pill-returned'};
-const STATUS_LABELS={ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',returned:'Returned',archived:'Returned'};
+const STATUS_PILLS={ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',ready_to_collect:'pill-readycollect',returned:'pill-returned',archived:'pill-returned'};
+const STATUS_LABELS={ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',ready_to_collect:'Ready to Collect',returned:'Returned',archived:'Returned'};
 
 async function loadJob(){
   const res=await fetch(`/api/jobs/${jobId}`);

@@ -50,8 +50,10 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .job-card:hover{border-color:var(--accent);box-shadow:0 4px 24px rgba(0,0,0,0.07);}
 .job-card-top{padding:22px;display:flex;align-items:flex-start;gap:14px;}
 .job-card-actions{display:flex;border-top:1px solid var(--border);}
-.job-action-btn{flex:1;padding:13px;background:none;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:7px;transition:background 0.15s;}
-.job-action-btn:first-child{border-right:1px solid var(--border);}
+.job-action-btn{flex:1;padding:13px;background:none;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:7px;transition:background 0.15s;border-right:1px solid var(--border);}
+.job-action-btn:last-child{border-right:none;}
+.job-action-runsheet{flex:0 0 48px;color:var(--green);}
+.job-action-runsheet:hover{background:rgba(74,124,89,0.08);}
 .job-action-stylist{color:var(--accent);}
 .job-action-stylist:hover{background:rgba(184,147,90,0.08);}
 .job-action-driver{color:var(--blue);}
@@ -70,6 +72,37 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .assignment-badge{display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;font-weight:600;padding:4px 10px;border-radius:10px;}
 .assignment-badge-owner{background:rgba(184,147,90,0.12);color:var(--accent);}
 .assignment-badge-truck{background:rgba(74,126,184,0.12);color:var(--blue);}
+.assignment-badge-runsheet{background:rgba(74,124,89,0.12);color:var(--green);}
+
+/* ── VIEW TABS ── */
+.view-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px;}
+.view-tab{background:none;border:none;padding:10px 18px;font-family:'Jost',sans-serif;font-size:0.85rem;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color 0.15s,border-color 0.15s;}
+.view-tab:hover{color:var(--ink);}
+.view-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+
+/* ── RUNSHEET ── */
+.runsheet-date-row{display:flex;align-items:center;gap:10px;margin-bottom:20px;}
+.runsheet-nav-btn{background:white;border:1px solid var(--border);border-radius:2px;width:32px;height:32px;font-size:1.1rem;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color 0.15s;}
+.runsheet-nav-btn:hover{border-color:var(--accent);color:var(--accent);}
+.runsheet-date-label{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--ink);min-width:200px;text-align:center;}
+.runsheet-section{margin-bottom:28px;}
+.runsheet-section-title{font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:700;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.runsheet-section-title .count{background:var(--sand);color:var(--ink);border-radius:10px;padding:1px 8px;font-size:0.7rem;}
+.runsheet-empty{padding:40px 20px;text-align:center;color:var(--muted);font-size:0.9rem;background:white;border:1px dashed var(--border);border-radius:3px;}
+
+/* ── ADD TO RUNSHEET POPOVER ── */
+.runsheet-popover-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.35);z-index:200;}
+.runsheet-popover-overlay.open{display:block;}
+.runsheet-popover{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:4px;box-shadow:0 12px 40px rgba(0,0,0,0.2);padding:22px;width:280px;z-index:201;}
+.runsheet-popover.open{display:block;}
+.runsheet-popover-title{font-family:'Cormorant Garamond',serif;font-size:1.3rem;margin-bottom:14px;color:var(--ink);}
+.runsheet-popover-label{display:block;font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px;margin-top:12px;}
+.runsheet-popover-input{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:2px;font-family:'Jost',sans-serif;font-size:0.92rem;color:var(--ink);outline:none;}
+.runsheet-popover-input:focus{border-color:var(--accent);}
+.runsheet-popover-type-row{display:flex;gap:8px;}
+.runsheet-type-btn{flex:1;padding:9px;border:1px solid var(--border);border-radius:2px;background:white;font-family:'Jost',sans-serif;font-size:0.85rem;color:var(--muted);cursor:pointer;transition:all 0.15s;}
+.runsheet-type-btn.selected{border-color:var(--accent);background:rgba(184,147,90,0.1);color:var(--accent);font-weight:600;}
+.runsheet-popover-actions{display:flex;justify-content:space-between;align-items:center;margin-top:18px;gap:8px;}
 .job-meta{font-size:0.85rem;color:var(--muted);margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;line-height:1.7;}
 .eta-tag{font-weight:600;}
 .eta-tag-truck{color:var(--blue);}
@@ -97,17 +130,52 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
 <div class="main">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:14px;">
     <div>
-      <div class="page-title">Active Jobs</div>
-      <div class="page-sub">Click a job to manage items and update status</div>
+      <div class="page-title" id="page-title">Active Jobs</div>
+      <div class="page-sub" id="page-sub">Click a job to manage items and update status</div>
     </div>
     <button class="btn btn-outline" id="archived-toggle" onclick="toggleArchived()" style="font-size:0.75rem;">Show Completed Jobs</button>
   </div>
-  <div class="search-bar">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-    <input type="text" id="job-search" placeholder="Search by job number or address…" oninput="handleSearchInput(this.value)" />
-    <button id="search-clear" onclick="clearSearch()" style="display:none;">✕</button>
+
+  <div class="view-tabs">
+    <button class="view-tab active" id="tab-active" onclick="switchView('active')">Active Jobs</button>
+    <button class="view-tab" id="tab-runsheet" onclick="switchView('runsheet')">Runsheet</button>
   </div>
-  <div class="jobs-grid" id="jobs-grid"><div class="loading">Loading jobs…</div></div>
+
+  <div id="active-view">
+    <div class="search-bar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="job-search" placeholder="Search by job number or address…" oninput="handleSearchInput(this.value)" />
+      <button id="search-clear" onclick="clearSearch()" style="display:none;">✕</button>
+    </div>
+    <div class="jobs-grid" id="jobs-grid"><div class="loading">Loading jobs…</div></div>
+  </div>
+
+  <div id="runsheet-view" style="display:none;">
+    <div class="runsheet-date-row">
+      <button class="runsheet-nav-btn" onclick="shiftRunsheetDate(-1)">‹</button>
+      <div class="runsheet-date-label" id="runsheet-date-label"></div>
+      <button class="runsheet-nav-btn" onclick="shiftRunsheetDate(1)">›</button>
+      <button class="btn btn-outline" onclick="goToToday()" style="font-size:0.72rem;margin-left:10px;">Today</button>
+    </div>
+    <div id="runsheet-content"><div class="loading">Loading runsheet…</div></div>
+  </div>
+</div>
+
+<!-- Add to Runsheet popover -->
+<div class="runsheet-popover-overlay" id="runsheet-popover-overlay" onclick="closeRunsheetPopover()"></div>
+<div class="runsheet-popover" id="runsheet-popover">
+  <div class="runsheet-popover-title">Add to Runsheet</div>
+  <label class="runsheet-popover-label">Date</label>
+  <input type="date" id="runsheet-popover-date" class="runsheet-popover-input"/>
+  <label class="runsheet-popover-label">Type</label>
+  <div class="runsheet-popover-type-row">
+    <button class="runsheet-type-btn" id="runsheet-type-install" onclick="selectRunsheetType('install')">Install</button>
+    <button class="runsheet-type-btn" id="runsheet-type-pickup" onclick="selectRunsheetType('pickup')">Pickup</button>
+  </div>
+  <div class="runsheet-popover-actions">
+    <button class="btn btn-outline" onclick="removeFromRunsheet()" id="runsheet-remove-btn" style="font-size:0.72rem;display:none;">Remove from Runsheet</button>
+    <button class="btn btn-gold" onclick="saveRunsheetEntry()">Save</button>
+  </div>
 </div>
 
 <footer>LUMA Design Co · Warehouse Operations · lumadesignco.com.au</footer>
@@ -154,6 +222,7 @@ function jobCardHTML(job){
   const truckIcon=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>`;
   const ownerBadge=job.job_owner?`<span class="assignment-badge assignment-badge-owner">${ownerIcon}${job.job_owner}</span>`:'';
   const truckBadge=job.truck?`<span class="assignment-badge assignment-badge-truck">${truckIcon}${job.truck}</span>`:'';
+  const runsheetBadge=job.runsheet_date?`<span class="assignment-badge assignment-badge-runsheet">${formatRunsheetBadgeDate(job.runsheet_date)} — ${job.runsheet_type==='pickup'?'Pickup':'Install'}</span>`:'';
   let transferTag='';
   if(job.is_transfer){
     const src=job.transfer_from_job_id?jobsById.get(job.transfer_from_job_id):null;
@@ -193,7 +262,7 @@ function jobCardHTML(job){
           <span class="pill ${pill}">${label}</span>
         </div>
         <div class="job-address">${job.address}</div>
-        ${(ownerBadge||truckBadge)?`<div class="assignment-row">${ownerBadge}${truckBadge}</div>`:''}
+        ${(ownerBadge||truckBadge||runsheetBadge)?`<div class="assignment-row">${ownerBadge}${truckBadge}${runsheetBadge}</div>`:''}
         <div class="job-meta">
           ${job.stage_date?`<span>${job.stage_date}</span>`:''}
           <span>${job.item_count} items</span>
@@ -203,6 +272,9 @@ function jobCardHTML(job){
       </div>
     </div>
     <div class="job-card-actions">
+      <button class="job-action-btn job-action-runsheet" onclick="openRunsheetPopover('${job.id}', this)" title="Add to Runsheet">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </button>
       <button class="job-action-btn job-action-stylist" onclick="openAsStylist('${job.id}')">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.71 4.04c.39-.39.39-1.05 0-1.44l-2.31-2.31a.996.996 0 0 0-1.41 0L15.13 2.16l3.71 3.71M3 17.25V21h3.75L20.81 6.94l-3.75-3.75z"/></svg>
         Stylist
@@ -236,6 +308,143 @@ async function loadJobs(){
     lastFetchedJobs.filter(j=>j.is_transfer&&j.transfer_from_job_id).map(j=>[j.transfer_from_job_id,j])
   );
   renderJobs();
+  if(currentView==='runsheet') renderRunsheet();
+}
+
+// ── View switching ──
+let currentView='active';
+function switchView(view){
+  currentView=view;
+  document.getElementById('tab-active').classList.toggle('active', view==='active');
+  document.getElementById('tab-runsheet').classList.toggle('active', view==='runsheet');
+  document.getElementById('active-view').style.display = view==='active' ? 'block' : 'none';
+  document.getElementById('runsheet-view').style.display = view==='runsheet' ? 'block' : 'none';
+  document.getElementById('archived-toggle').style.display = view==='active' ? 'inline-block' : 'none';
+  const title=document.getElementById('page-title'), sub=document.getElementById('page-sub');
+  if(view==='runsheet'){
+    title.textContent='Runsheet';
+    sub.textContent='Jobs scheduled for transport — installs and pickups with a truck assigned';
+    renderRunsheet();
+  } else {
+    title.textContent='Active Jobs';
+    sub.textContent='Click a job to manage items and update status';
+  }
+}
+
+// ── Runsheet date navigation ──
+// Local calendar date as YYYY-MM-DD, not UTC — "today" must match the
+// date the person is actually looking at the screen on, not whatever
+// day it happens to be in UTC at that moment.
+function localDateStr(d){
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+let runsheetViewDate=new Date(); // the date currently shown on the runsheet tab — defaults to today
+function shiftRunsheetDate(deltaDays){
+  runsheetViewDate=new Date(runsheetViewDate.getTime());
+  runsheetViewDate.setDate(runsheetViewDate.getDate()+deltaDays);
+  renderRunsheet();
+}
+function goToToday(){
+  runsheetViewDate=new Date();
+  renderRunsheet();
+}
+function formatRunsheetBadgeDate(dateStr){
+  // dateStr is "YYYY-MM-DD" from the database — parse as local, not UTC,
+  // so it displays as the date that was actually picked, not shifted by
+  // a timezone offset.
+  const [y,m,d]=dateStr.split('-').map(Number);
+  const dt=new Date(y,m-1,d);
+  return dt.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+}
+
+function renderRunsheet(){
+  const todayStr=localDateStr(runsheetViewDate);
+  const label=document.getElementById('runsheet-date-label');
+  const isToday=localDateStr(new Date())===todayStr;
+  label.textContent=runsheetViewDate.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})+(isToday?' (Today)':'');
+
+  // Only jobs explicitly scheduled on this date AND with a truck
+  // assigned show here — matches the actual requirement: this isn't a
+  // filtered view of stage_date, it's a deliberate day-ahead selection a
+  // person makes, and it shouldn't show a job nobody's actually
+  // organised transport for yet.
+  const scheduled=lastFetchedJobs.filter(j=>j.runsheet_date===todayStr && j.truck);
+  const installs=scheduled.filter(j=>j.runsheet_type==='install');
+  const pickups=scheduled.filter(j=>j.runsheet_type==='pickup');
+
+  const content=document.getElementById('runsheet-content');
+  if(!scheduled.length){
+    content.innerHTML=`<div class="runsheet-empty">Nothing scheduled for this day yet.<br>Use the calendar icon on a job tile in Active Jobs to add one.</div>`;
+    return;
+  }
+
+  let html='';
+  if(installs.length){
+    html+=`<div class="runsheet-section">
+      <div class="runsheet-section-title">Installs <span class="count">${installs.length}</span></div>
+      <div class="jobs-grid-inner">${installs.map(jobCardHTML).join('')}</div>
+    </div>`;
+  }
+  if(pickups.length){
+    html+=`<div class="runsheet-section">
+      <div class="runsheet-section-title">Pickups <span class="count">${pickups.length}</span></div>
+      <div class="jobs-grid-inner">${pickups.map(jobCardHTML).join('')}</div>
+    </div>`;
+  }
+  content.innerHTML=html;
+}
+
+// ── Add to Runsheet popover ──
+let runsheetPopoverJobId=null;
+let runsheetPopoverType=null;
+function openRunsheetPopover(jobId, btnEl){
+  runsheetPopoverJobId=jobId;
+  const job=jobsById.get(jobId);
+  runsheetPopoverType=job?.runsheet_type||null;
+
+  document.getElementById('runsheet-popover-date').value=job?.runsheet_date||'';
+  document.getElementById('runsheet-type-install').classList.toggle('selected', runsheetPopoverType==='install');
+  document.getElementById('runsheet-type-pickup').classList.toggle('selected', runsheetPopoverType==='pickup');
+  document.getElementById('runsheet-remove-btn').style.display=job?.runsheet_date?'inline-block':'none';
+
+  document.getElementById('runsheet-popover-overlay').classList.add('open');
+  document.getElementById('runsheet-popover').classList.add('open');
+}
+function closeRunsheetPopover(){
+  document.getElementById('runsheet-popover-overlay').classList.remove('open');
+  document.getElementById('runsheet-popover').classList.remove('open');
+  runsheetPopoverJobId=null;
+}
+function selectRunsheetType(type){
+  runsheetPopoverType=type;
+  document.getElementById('runsheet-type-install').classList.toggle('selected', type==='install');
+  document.getElementById('runsheet-type-pickup').classList.toggle('selected', type==='pickup');
+}
+async function saveRunsheetEntry(){
+  const date=document.getElementById('runsheet-popover-date').value;
+  if(!date){ alert('Pick a date first.'); return; }
+  if(!runsheetPopoverType){ alert('Choose Install or Pickup.'); return; }
+  await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({runsheet_date:date, runsheet_type:runsheetPopoverType})
+  });
+  const job=jobsById.get(runsheetPopoverJobId);
+  if(job){ job.runsheet_date=date; job.runsheet_type=runsheetPopoverType; }
+  closeRunsheetPopover();
+  renderJobs();
+  if(currentView==='runsheet') renderRunsheet();
+}
+async function removeFromRunsheet(){
+  await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({runsheet_date:null, runsheet_type:null})
+  });
+  const job=jobsById.get(runsheetPopoverJobId);
+  if(job){ job.runsheet_date=null; job.runsheet_type=null; }
+  closeRunsheetPopover();
+  renderJobs();
+  if(currentView==='runsheet') renderRunsheet();
 }
 
 function renderJobs(){

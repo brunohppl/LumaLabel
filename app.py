@@ -1650,18 +1650,27 @@ def api_job_eta(job_id):
     """Calculate driving ETA from someone's current position (sent by
     the browser via the Geolocation API, triggered when they tap the
     address on /driver/<job_id> or /stylist/<job_id>) to this job's
-    address, and save it on the job so it shows on the /jobs tile.
+    address, save it on the job so it shows on the /jobs tile, and post
+    it to Slack — all as one continuous action with no separate
+    confirmation step. (An earlier version asked "post this to Slack?"
+    before posting; that extra tap meant nothing reached Slack unless
+    someone noticed and answered the prompt, which defeated the point —
+    the actual desired flow is: tap address, grant location, Maps opens,
+    Slack gets the message, no manual step in between.)
 
     Body: {lat, lng, role} where role is "truck" or "stylist" — decides
     which pair of columns gets written (truck_eta_text/calculated_at or
-    stylist_eta_text/calculated_at). Kept as one endpoint with a role
-    flag rather than two separate routes, since the calculation itself
-    is identical either way — only the destination column differs.
+    stylist_eta_text/calculated_at) and which label shows in the Slack
+    message. Kept as one endpoint with a role flag rather than two
+    separate routes, since the calculation itself is identical either
+    way — only the destination column and message wording differ.
 
     See get_truck_eta() for the actual Distance Matrix call and why it
     fails silently rather than erroring — a missing API key or a network
     hiccup shouldn't block the driver/stylist from just opening Maps,
-    which is the primary action either click triggers."""
+    which is the primary action either click triggers. Slack posting
+    follows the same philosophy: see notify_slack_eta() for why a failed
+    or unconfigured webhook never blocks anything either."""
     data = request.get_json()
     lat  = data.get('lat')
     lng  = data.get('lng')
@@ -1674,7 +1683,8 @@ def api_job_eta(job_id):
     job_rows = sb_get('jobs', f'id=eq.{job_id}')
     if not job_rows:
         return jsonify({'success': False, 'error': 'Job not found'}), 404
-    address = job_rows[0].get('address', '')
+    job     = job_rows[0]
+    address = job.get('address', '')
 
     eta_text = get_truck_eta(lat, lng, address)
     if eta_text is None:
@@ -1688,32 +1698,10 @@ def api_job_eta(job_id):
         text_col: eta_text,
         time_col: datetime.utcnow().isoformat(),
     })
-    return jsonify({'success': True, 'eta_text': eta_text, 'role': role})
 
-@app.route('/api/jobs/<job_id>/eta/post-to-slack', methods=['POST'])
-def api_job_eta_post_to_slack(job_id):
-    """Post an already-calculated ETA to Slack. Deliberately a separate
-    route from /eta itself — calculating an ETA never posts anything on
-    its own; this only runs when the person explicitly confirms "post
-    this to Slack?" after seeing the calculated time. Body: {role}
-    ("truck" or "stylist") — reads whichever ETA is currently saved for
-    that role and posts it as-is, rather than recalculating."""
-    data = request.get_json()
-    role = data.get('role', 'truck')
-    if role not in ('truck', 'stylist'):
-        return jsonify({'success': False, 'error': 'role must be "truck" or "stylist"'}), 400
+    slack_posted = notify_slack_eta(job, role, eta_text)
 
-    job_rows = sb_get('jobs', f'id=eq.{job_id}')
-    if not job_rows:
-        return jsonify({'success': False, 'error': 'Job not found'}), 404
-    job = job_rows[0]
-
-    eta_text = job.get(f'{role}_eta_text')
-    if not eta_text:
-        return jsonify({'success': False, 'error': 'No ETA calculated yet for this role'}), 400
-
-    posted = notify_slack_eta(job, role, eta_text)
-    return jsonify({'success': posted})
+    return jsonify({'success': True, 'eta_text': eta_text, 'role': role, 'slack_posted': slack_posted})
 
 @app.route('/api/items/<item_id>/check', methods=['PATCH'])
 def api_item_check(item_id):

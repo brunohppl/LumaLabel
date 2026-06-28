@@ -260,11 +260,17 @@ function onAddressClick(event){
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude})
-        }).catch(()=>{}); // best-effort — failure here shouldn't affect anything visible to the driver
+        }).then(r=>r.json()).then(data=>{
+          console.log('[ETA] response:', data);
+        }).catch(err=>{
+          console.log('[ETA] fetch failed:', err);
+        });
       },
-      ()=>{}, // permission denied or unavailable — silently skip, Maps still opens
+      (err)=>{ console.log('[ETA] geolocation error:', err); }, // permission denied or unavailable — logged, Maps still opens
       {timeout:8000}
     );
+  } else {
+    console.log('[ETA] geolocation not supported on this device/browser');
   }
   return true;
 }

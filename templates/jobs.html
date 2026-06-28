@@ -167,7 +167,7 @@ function jobCardHTML(job){
   if(job.eta_text && job.eta_calculated_at){
     const ageMinutes=(Date.now()-new Date(job.eta_calculated_at).getTime())/60000;
     if(ageMinutes<=30){
-      etaTag=`<span class="eta-tag" title="Calculated ${Math.round(ageMinutes)} min ago">🚛 ETA ${job.eta_text}</span>`;
+      etaTag=`<span class="eta-tag" title="Calculated ${Math.round(ageMinutes)} min ago">🚛 Arriving ${job.eta_text}</span>`;
     }
   }
 

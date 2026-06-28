@@ -26,6 +26,7 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .pill-loading{background:rgba(232,92,71,0.2);color:#E8856A;}
 .pill-loaded{background:rgba(74,124,89,0.25);color:#6BBF8A;}
 .pill-installed{background:rgba(74,124,89,0.4);color:#9FFFCE;font-weight:700;}
+.pill-readycollect{background:rgba(106,13,173,0.3);color:#CB9FFF;font-weight:700;}
 .pill-returned{background:rgba(21,101,192,0.3);color:#8ABAEE;font-weight:700;}
 
 .hdr-ref{font-family:'Cormorant Garamond',serif;font-size:2.2rem;font-weight:400;color:var(--accent);line-height:1;}
@@ -188,8 +189,8 @@ const jobId = window.location.pathname.split('/').pop();
 let currentJob=null, allItems=[], roomNotes={};
 let currentJobIsTransferSource=false; // true if another job names this one as its transfer source
 
-const STATUS_LABELS={ready:'Job Assigned',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',archived:'Returned'};
-const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',archived:'pill-returned'};
+const STATUS_LABELS={ready:'Ready to Pick',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',ready_to_collect:'Ready to Collect',archived:'Returned'};
+const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',ready_to_collect:'pill-readycollect',archived:'pill-returned'};
 
 async function loadJob(){
   const [jobRes, notesRes] = await Promise.all([
@@ -343,7 +344,7 @@ function renderStatus(){
   if(s==='ready') btns = `<button class="btn btn-gold" onclick="setStatus('picking')">Start Picking</button>`;
   else if(s==='picking') btns = `
     <button class="btn btn-green" onclick="setStatus('ready_to_load')">Picking Complete</button>
-    <button class="btn btn-outline" onclick="if(confirm('Move this job back to Job Assigned?'))setStatus('ready')" style="margin-left:10px;font-size:0.7rem;">Back to Job Assigned</button>
+    <button class="btn btn-outline" onclick="if(confirm('Move this job back to Ready to Pick?'))setStatus('ready')" style="margin-left:10px;font-size:0.7rem;">Back to Ready to Pick</button>
   `;
   else if(s==='ready_to_load') btns = `
     <span style="font-size:0.88rem;color:var(--muted);">Waiting for driver</span>
@@ -351,7 +352,14 @@ function renderStatus(){
   `;
   else if(s==='loading') btns = `<span style="font-size:0.88rem;color:var(--red);">Driver is loading…</span>`;
   else if(s==='loaded') btns = `<span style="font-size:0.88rem;color:var(--green);font-weight:500;">Truck loaded</span>`;
-  else if(s==='installed') btns = `<span style="font-size:0.88rem;color:var(--green);font-weight:600;">Installed</span>`;
+  else if(s==='installed') btns = `
+    <span style="font-size:0.88rem;color:var(--green);font-weight:600;">Installed</span>
+    <button class="btn btn-gold" onclick="setStatus('ready_to_collect')" style="margin-left:10px;">Mark Ready to Collect</button>
+  `;
+  else if(s==='ready_to_collect') btns = `
+    <span style="font-size:0.88rem;color:#6A0DAD;font-weight:600;">Ready to Collect</span>
+    <button class="btn btn-outline" onclick="if(confirm('Move this job back to Installed?'))setStatus('installed')" style="margin-left:10px;font-size:0.7rem;">Back to Installed</button>
+  `;
   else if(s==='archived') btns = `<span style="font-size:0.88rem;color:var(--muted);">Job complete — truck returned to warehouse</span>`;
 
   document.getElementById('actions-bar').innerHTML = `

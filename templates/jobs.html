@@ -64,7 +64,8 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .transfer-tag-link{color:var(--blue);text-decoration:underline;font-weight:700;}
 .transfer-tag-link:hover{color:var(--ink);}
 .transfer-tag-link-out{color:var(--accent);}
-.job-address{font-size:1rem;color:var(--ink);margin-top:4px;}
+.job-address{font-size:1rem;color:var(--ink);margin-top:4px;display:block;text-decoration:none;cursor:pointer;}
+.job-address:hover{color:var(--blue);text-decoration:underline;}
 .job-meta{font-size:0.85rem;color:var(--muted);margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;line-height:1.7;}
 
 .btn{padding:12px 20px;border-radius:1px;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.82rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
@@ -165,7 +166,7 @@ function jobCardHTML(job){
           <div class="job-ref">${job.job_ref||job.job_number}${transferTag}</div>
           <span class="pill ${pill}">${label}</span>
         </div>
-        <div class="job-address">${job.address}</div>
+        <a class="job-address" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address||'')}" target="_blank" onclick="event.stopPropagation()">${job.address}</a>
         <div class="job-meta">
           ${job.stage_date?`<span>${job.stage_date}</span>`:''}
           <span>${job.item_count} items</span>

@@ -186,19 +186,34 @@ def notify_slack(meta, item_count, colour_name, label_filename):
 
 def get_truck_eta(lat, lng, destination_address):
     """Look up driving time from (lat, lng) to destination_address using
-    Google's Distance Matrix API. Set GOOGLE_MAPS_API_KEY as an
-    environment variable in Render. The destination is passed as plain
-    text — Google geocodes it server-side, so no separate geocoding step
-    is needed here.
+    Google's Distance Matrix API, and return the estimated *arrival
+    clock time* (e.g. "9:15am") rather than a duration like "14 mins" —
+    a clock time is what actually shows on the job tile. Set
+    GOOGLE_MAPS_API_KEY as an environment variable in Render. The
+    destination is passed as plain text — Google geocodes it
+    server-side, so no separate geocoding step is needed here.
 
-    Returns the human-readable duration string (e.g. "14 mins") on
-    success, or None on any failure (missing key, network error, address
-    not found, etc.) — callers should treat None as "couldn't calculate
-    an ETA right now" and fail quietly toward the driver, the same way
-    notify_slack() does when its webhook isn't configured. Every failure
-    path is printed to stdout (visible in Render's logs) since this
-    silently returning None gave no way to diagnose a misconfigured key,
-    disabled API, or billing issue from outside the server.
+    Uses duration.value (seconds, an int) rather than parsing
+    duration.text ("1 hour 5 mins") back into minutes — far less fragile
+    than string-parsing Google's human-readable text.
+
+    Time zone: the arrival time is computed in UTC then explicitly
+    converted to Australia/Brisbane before formatting, rather than
+    trusting the server's local clock — Render's container could be
+    running in any timezone, and silently using server local time here
+    would show a clock time that's wrong by however many hours the
+    server's timezone differs from the warehouse's. Brisbane doesn't
+    observe daylight saving, so a fixed zone name is correct year-round
+    with no DST edge cases.
+
+    Returns the formatted arrival time string on success, or None on any
+    failure (missing key, network error, address not found, etc.) —
+    callers should treat None as "couldn't calculate an ETA right now"
+    and fail quietly toward the driver, the same way notify_slack() does
+    when its webhook isn't configured. Every failure path is printed to
+    stdout (visible in Render's logs) since this silently returning None
+    gave no way to diagnose a misconfigured key, disabled API, or
+    billing issue from outside the server.
     """
     api_key = os.environ.get('GOOGLE_MAPS_API_KEY')
     if not api_key:
@@ -223,7 +238,15 @@ def get_truck_eta(lat, lng, destination_address):
         if element.get('status') != 'OK':
             print(f'[ETA] Element status not OK: {element.get("status")}')
             return None
-        return element['duration']['text']
+
+        duration_seconds = element['duration']['value']
+        from zoneinfo import ZoneInfo
+        from datetime import timedelta, timezone as _tz
+        now_utc      = datetime.now(_tz.utc)
+        arrival_utc  = now_utc + timedelta(seconds=duration_seconds)
+        arrival_local = arrival_utc.astimezone(ZoneInfo('Australia/Brisbane'))
+        # e.g. "9:15am" — lowercase am/pm, no leading zero on the hour
+        return arrival_local.strftime('%-I:%M%p').lower()
     except urllib.error.HTTPError as e:
         body = e.read().decode(errors='replace')
         print(f'[ETA] HTTPError {e.code}: {body}')

@@ -22,8 +22,10 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .pill-readycollect{background:rgba(106,13,173,0.35);color:#CB9FFF;font-weight:800;}
 .pill-returned{background:rgba(74,126,184,0.3);color:#8ABAEE;font-weight:800;}
 .hdr-ref{font-size:2.6rem;font-weight:700;color:var(--accent);line-height:1;letter-spacing:-0.01em;}
-.hdr-addr{font-size:0.92rem;color:rgba(250,248,244,0.6);margin-top:2px;display:block;text-decoration:none;cursor:pointer;}
-.hdr-addr:hover{color:var(--accent);text-decoration:underline;}
+.hdr-addr{font-size:0.92rem;color:rgba(250,248,244,0.6);margin-top:2px;display:flex;align-items:center;gap:8px;text-decoration:none;cursor:pointer;flex-wrap:wrap;}
+.hdr-addr:hover{color:rgba(250,248,244,0.8);}
+.hdr-addr-navigate{display:inline-flex;align-items:center;gap:4px;background:rgba(184,147,90,0.18);color:var(--accent);border:1px solid rgba(184,147,90,0.4);border-radius:12px;padding:3px 10px 3px 8px;font-size:0.74rem;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;flex-shrink:0;transition:background 0.15s;}
+.hdr-addr:hover .hdr-addr-navigate{background:rgba(184,147,90,0.3);}
 .hdr-owner{font-size:0.8rem;color:rgba(250,248,244,0.35);margin-top:1px;}
 .prog-wrap{display:flex;align-items:center;gap:12px;margin-top:10px;}
 .prog-bar{flex:1;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;}
@@ -140,7 +142,13 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
     <div id="status-badge" class="pill pill-readyload">Ready to Load</div>
   </div>
   <div class="hdr-ref" id="job-ref">—</div>
-  <a class="hdr-addr" id="job-addr" href="#" target="_blank" onclick="return onAddressClick(event)"></a>
+  <a class="hdr-addr" id="job-addr" href="#" target="_blank" onclick="return onAddressClick(event)">
+    <span id="job-addr-text"></span>
+    <span class="hdr-addr-navigate">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+      Navigate
+    </span>
+  </a>
   <div class="hdr-owner" id="job-owner"></div>
   <div class="prog-wrap">
     <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
@@ -208,7 +216,7 @@ async function loadJob(){
   job=data.job;items=data.items;
   document.getElementById('job-ref').textContent=job.job_ref||job.job_number;
   const addrLink=document.getElementById('job-addr');
-  addrLink.textContent=job.address;
+  document.getElementById('job-addr-text').textContent=job.address;
   addrLink.href=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address||'')}`;
   document.getElementById('job-owner').textContent=job.job_owner||'';
   if(job.truck)document.getElementById('truck-input').value=job.truck;

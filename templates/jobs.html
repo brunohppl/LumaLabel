@@ -61,6 +61,9 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .job-ref{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:400;color:var(--accent);line-height:1;}
 .transfer-tag{font-family:'Jost',sans-serif;font-size:0.75rem;font-weight:600;color:var(--blue);letter-spacing:0.04em;margin-left:6px;}
 .transfer-tag-out{color:var(--accent);}
+.transfer-tag-link{color:var(--blue);text-decoration:underline;font-weight:700;}
+.transfer-tag-link:hover{color:var(--ink);}
+.transfer-tag-link-out{color:var(--accent);}
 .job-address{font-size:1rem;color:var(--ink);margin-top:4px;}
 .job-meta{font-size:0.85rem;color:var(--muted);margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;line-height:1.7;}
 
@@ -142,9 +145,17 @@ function jobCardHTML(job){
   const truck=job.truck?`${job.truck}`:'',owner=job.job_owner?`${job.job_owner}`:'';
   let transferTag='';
   if(job.is_transfer){
-    transferTag=`<span class="transfer-tag">— Transfer From</span>`;
-  } else if(transferSourceIds.has(job.id)){
-    transferTag=`<span class="transfer-tag transfer-tag-out">— Transferring To</span>`;
+    const src=job.transfer_from_job_id?jobsById.get(job.transfer_from_job_id):null;
+    const linkText=src?(src.job_ref||src.job_number):'job';
+    const link=src
+      ? `<a href="/stylist/${src.id}" target="_blank" onclick="event.stopPropagation()" class="transfer-tag-link">${linkText}</a>`
+      : `<span class="transfer-tag-link">${linkText}</span>`;
+    transferTag=`<span class="transfer-tag">— Transfer From ${link}</span>`;
+  } else if(transferringToMap.has(job.id)){
+    const dest=transferringToMap.get(job.id);
+    const linkText=dest.job_ref||dest.job_number;
+    const link=`<a href="/stylist/${dest.id}" target="_blank" onclick="event.stopPropagation()" class="transfer-tag-link transfer-tag-link-out">${linkText}</a>`;
+    transferTag=`<span class="transfer-tag transfer-tag-out">— Transferring To ${link}</span>`;
   }
   return `<div class="job-card">
     <div class="job-card-top">
@@ -186,13 +197,15 @@ function openAsDriver(jobId){
 
 let lastFetchedJobs=[]; // cached so search can re-filter without refetching
 let searchQuery='';
-let transferSourceIds=new Set(); // job IDs that another job names as its transfer source
+let jobsById=new Map(); // job id -> full job object, for quick lookup when rendering transfer links
+let transferringToMap=new Map(); // source job id -> the job that's transferring from it
 
 async function loadJobs(){
   const res=await fetch('/api/jobs');
   lastFetchedJobs=await res.json();
-  transferSourceIds=new Set(
-    lastFetchedJobs.filter(j=>j.is_transfer&&j.transfer_from_job_id).map(j=>j.transfer_from_job_id)
+  jobsById=new Map(lastFetchedJobs.map(j=>[j.id,j]));
+  transferringToMap=new Map(
+    lastFetchedJobs.filter(j=>j.is_transfer&&j.transfer_from_job_id).map(j=>[j.transfer_from_job_id,j])
   );
   renderJobs();
 }

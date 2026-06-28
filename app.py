@@ -184,6 +184,61 @@ def notify_slack(meta, item_count, colour_name, label_filename):
         pass  # Never let Slack failure break label generation
 
 
+def notify_slack_eta(job, role, eta_text):
+    """Post an ETA to Slack — only called when someone explicitly
+    confirms "post this to Slack?" on /driver or /stylist, never
+    automatically from the ETA calculation itself. Posts as the shared
+    "Luma Warehouse" bot identity (same as every other notification this
+    app sends) since there's no per-person Slack login here — see the
+    longer discussion on real per-person posting requiring a full OAuth
+    app and individual authorization, which this deliberately doesn't
+    attempt. Set SLACK_WEBHOOK_URL as an environment variable in Render.
+    """
+    webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
+    if not webhook_url:
+        return False
+
+    role_label = 'Truck' if role == 'truck' else 'Stylist'
+    role_emoji = '🚛' if role == 'truck' else '✂️'
+    ref = job.get('job_ref') or job.get('job_number') or ''
+
+    message = {
+        'username': 'Luma Warehouse',
+        'icon_emoji': ':truck:' if role == 'truck' else ':scissors:',
+        'blocks': [
+            {
+                'type': 'header',
+                'text': {'type': 'plain_text', 'text': f'{role_emoji}  {role_label} ETA'}
+            },
+            {
+                'type': 'section',
+                'fields': [
+                    {'type': 'mrkdwn', 'text': f'*Job*\n`{ref}`'},
+                    {'type': 'mrkdwn', 'text': f'*Address*\n{job.get("address","")}'},
+                    {'type': 'mrkdwn', 'text': f'*Arriving*\n{eta_text}'},
+                ]
+            },
+            {
+                'type': 'context',
+                'elements': [{'type': 'mrkdwn', 'text': 'Posted via LUMA Warehouse · lumalabel.onrender.com'}]
+            }
+        ]
+    }
+
+    try:
+        data = json.dumps(message).encode('utf-8')
+        req  = urllib.request.Request(
+            webhook_url,
+            data=data,
+            headers={'Content-Type': 'application/json'}
+        )
+        urllib.request.urlopen(req, timeout=5)
+        return True
+    except Exception as e:
+        print(f'[ETA Slack] Failed to post: {type(e).__name__}: {e}')
+        return False
+
+
 def get_truck_eta(lat, lng, destination_address):
     """Look up driving time from (lat, lng) to destination_address using
     Google's Distance Matrix API, and return the estimated *arrival
@@ -1634,6 +1689,31 @@ def api_job_eta(job_id):
         time_col: datetime.utcnow().isoformat(),
     })
     return jsonify({'success': True, 'eta_text': eta_text, 'role': role})
+
+@app.route('/api/jobs/<job_id>/eta/post-to-slack', methods=['POST'])
+def api_job_eta_post_to_slack(job_id):
+    """Post an already-calculated ETA to Slack. Deliberately a separate
+    route from /eta itself — calculating an ETA never posts anything on
+    its own; this only runs when the person explicitly confirms "post
+    this to Slack?" after seeing the calculated time. Body: {role}
+    ("truck" or "stylist") — reads whichever ETA is currently saved for
+    that role and posts it as-is, rather than recalculating."""
+    data = request.get_json()
+    role = data.get('role', 'truck')
+    if role not in ('truck', 'stylist'):
+        return jsonify({'success': False, 'error': 'role must be "truck" or "stylist"'}), 400
+
+    job_rows = sb_get('jobs', f'id=eq.{job_id}')
+    if not job_rows:
+        return jsonify({'success': False, 'error': 'Job not found'}), 404
+    job = job_rows[0]
+
+    eta_text = job.get(f'{role}_eta_text')
+    if not eta_text:
+        return jsonify({'success': False, 'error': 'No ETA calculated yet for this role'}), 400
+
+    posted = notify_slack_eta(job, role, eta_text)
+    return jsonify({'success': posted})
 
 @app.route('/api/items/<item_id>/check', methods=['PATCH'])
 def api_item_check(item_id):

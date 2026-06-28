@@ -21,7 +21,8 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .pill-installed{background:rgba(74,124,89,0.45);color:#9FFFCE;font-weight:800;}
 .pill-returned{background:rgba(74,126,184,0.3);color:#8ABAEE;font-weight:800;}
 .hdr-ref{font-size:2.6rem;font-weight:700;color:var(--accent);line-height:1;letter-spacing:-0.01em;}
-.hdr-addr{font-size:0.92rem;color:rgba(250,248,244,0.6);margin-top:2px;}
+.hdr-addr{font-size:0.92rem;color:rgba(250,248,244,0.6);margin-top:2px;display:block;text-decoration:none;cursor:pointer;}
+.hdr-addr:hover{color:var(--accent);text-decoration:underline;}
 .hdr-owner{font-size:0.8rem;color:rgba(250,248,244,0.35);margin-top:1px;}
 .prog-wrap{display:flex;align-items:center;gap:12px;margin-top:10px;}
 .prog-bar{flex:1;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;}
@@ -138,7 +139,7 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
     <div id="status-badge" class="pill pill-readyload">Ready to Load</div>
   </div>
   <div class="hdr-ref" id="job-ref">—</div>
-  <div class="hdr-addr" id="job-addr"></div>
+  <a class="hdr-addr" id="job-addr" href="#" target="_blank" onclick="return onAddressClick(event)"></a>
   <div class="hdr-owner" id="job-owner"></div>
   <div class="prog-wrap">
     <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
@@ -200,7 +201,9 @@ async function loadJob(){
   const data=await res.json();
   job=data.job;items=data.items;
   document.getElementById('job-ref').textContent=job.job_ref||job.job_number;
-  document.getElementById('job-addr').textContent=job.address;
+  const addrLink=document.getElementById('job-addr');
+  addrLink.textContent=job.address;
+  addrLink.href=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address||'')}`;
   document.getElementById('job-owner').textContent=job.job_owner||'';
   if(job.truck)document.getElementById('truck-input').value=job.truck;
 
@@ -242,6 +245,28 @@ async function loadJob(){
   }
 
   renderStatusBar();renderRooms();updateProgress();
+}
+
+function onAddressClick(event){
+  // Maps opens normally via the link's own href/target — this only adds
+  // a side effect alongside it. Returning true (not calling
+  // preventDefault) means the click proceeds as a normal link click even
+  // if geolocation is slow, denied, or unsupported; the driver should
+  // never be made to wait on this just to see the map.
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      (pos)=>{
+        fetch(`/api/jobs/${job.id}/eta`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude})
+        }).catch(()=>{}); // best-effort — failure here shouldn't affect anything visible to the driver
+      },
+      ()=>{}, // permission denied or unavailable — silently skip, Maps still opens
+      {timeout:8000}
+    );
+  }
+  return true;
 }
 
 function renderStatusBar(){

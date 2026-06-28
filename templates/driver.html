@@ -248,31 +248,44 @@ async function loadJob(){
 }
 
 function onAddressClick(event){
-  // Maps opens normally via the link's own href/target — this only adds
-  // a side effect alongside it. Returning true (not calling
-  // preventDefault) means the click proceeds as a normal link click even
-  // if geolocation is slow, denied, or unsupported; the driver should
-  // never be made to wait on this just to see the map.
-  if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(
-      (pos)=>{
-        fetch(`/api/jobs/${job.id}/eta`,{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude})
-        }).then(r=>r.json()).then(data=>{
-          console.log('[ETA] response:', data);
-        }).catch(err=>{
-          console.log('[ETA] fetch failed:', err);
-        });
-      },
-      (err)=>{ console.log('[ETA] geolocation error:', err); }, // permission denied or unavailable — logged, Maps still opens
-      {timeout:8000}
-    );
-  } else {
+  event.preventDefault();
+  const mapsUrl = event.currentTarget.href;
+
+  // Previously this let the link navigate immediately while geolocation
+  // ran in the background. On mobile, navigating away (especially when
+  // target="_blank" hands off to the native Maps app rather than a
+  // browser tab) can suspend this page's JS before the async geolocation
+  // callback fires — so the ETA request silently never completes, with
+  // no error since the page just stops running mid-flight. Fixed by
+  // waiting for geolocation to resolve (success or failure) before
+  // opening Maps at all, so the request is fully sent first.
+  if(!navigator.geolocation){
     console.log('[ETA] geolocation not supported on this device/browser');
+    window.open(mapsUrl, '_blank');
+    return false;
   }
-  return true;
+
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      fetch(`/api/jobs/${job.id}/eta`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude})
+      }).then(r=>r.json()).then(data=>{
+        console.log('[ETA] response:', data);
+      }).catch(err=>{
+        console.log('[ETA] fetch failed:', err);
+      }).finally(()=>{
+        window.open(mapsUrl, '_blank');
+      });
+    },
+    (err)=>{
+      console.log('[ETA] geolocation error:', err);
+      window.open(mapsUrl, '_blank'); // still open Maps even if location failed
+    },
+    {timeout:8000}
+  );
+  return false;
 }
 
 function renderStatusBar(){

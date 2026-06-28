@@ -270,7 +270,7 @@ function onAddressClick(event){
       fetch(`/api/jobs/${job.id}/eta`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude})
+        body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,role:'truck'})
       }).then(r=>r.json()).then(data=>{
         console.log('[ETA] response:', data);
       }).catch(err=>{

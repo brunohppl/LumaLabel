@@ -133,56 +133,6 @@ def save_job_to_db(meta, items, colour_name, job_owner='', is_transfer=False, tr
         pass  # Never let DB failure break label generation
 
 
-# ── Slack notification ──
-def notify_slack(meta, item_count, colour_name, label_filename):
-    """Post a notification to Slack when labels are generated.
-    Set SLACK_WEBHOOK_URL as an environment variable in Render."""
-    webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
-    if not webhook_url:
-        return  # Silently skip if not configured
-
-    colour_emoji = {
-        'Red': '🔴', 'Blue': '🔵', 'Green': '🟢',
-        'Yellow': '🟡', 'Purple': '🟣', 'Orange': '🟠', 'Pink': '🩷'
-    }.get(colour_name, '🏷️')
-
-    message = {
-        'username': 'Luma Warehouse',
-        'icon_emoji': ':package:',
-        'blocks': [
-            {
-                'type': 'header',
-                'text': {'type': 'plain_text', 'text': '🏷️  Labels Generated'}
-            },
-            {
-                'type': 'section',
-                'fields': [
-                    {'type': 'mrkdwn', 'text': f'*Job*\n`{meta["job_number"]}`'},
-                    {'type': 'mrkdwn', 'text': f'*Items*\n{item_count} labels'},
-                    {'type': 'mrkdwn', 'text': f'*Address*\n{meta["address"]}'},
-                    {'type': 'mrkdwn', 'text': f'*Date*\n{meta["stage_date"]}'},
-                    {'type': 'mrkdwn', 'text': f'*Colour*\n{colour_emoji} {colour_name}'},
-                    {'type': 'mrkdwn', 'text': f'*File*\n{label_filename}'},
-                ]
-            },
-            {
-                'type': 'context',
-                'elements': [{'type': 'mrkdwn', 'text': 'Generated via LUMA Warehouse · lumalabel.onrender.com'}]
-            }
-        ]
-    }
-
-    try:
-        data = json.dumps(message).encode('utf-8')
-        req  = urllib.request.Request(
-            webhook_url,
-            data=data,
-            headers={'Content-Type': 'application/json'}
-        )
-        urllib.request.urlopen(req, timeout=5)
-    except Exception:
-        pass  # Never let Slack failure break label generation
-
 
 def notify_slack_eta(job, role, eta_text):
     """Post an ETA to Slack — only called when someone explicitly
@@ -264,7 +214,7 @@ def get_truck_eta(lat, lng, destination_address):
     Returns the formatted arrival time string on success, or None on any
     failure (missing key, network error, address not found, etc.) —
     callers should treat None as "couldn't calculate an ETA right now"
-    and fail quietly toward the driver, the same way notify_slack() does
+    and fail quietly toward the driver, the same way notify_slack_eta() does
     when its webhook isn't configured. Every failure path is printed to
     stdout (visible in Render's logs) since this silently returning None
     gave no way to diagnose a misconfigured key, disabled API, or
@@ -1518,9 +1468,6 @@ def generate():
 
         # Save job to database (non-blocking)
         save_job_to_db(meta, items, colour['name'], job_owner, is_transfer, transfer_from_job_id)
-
-        # Notify Slack (non-blocking — failure won't affect PDF delivery)
-        notify_slack(meta, len(items), colour['name'], label_filename)
 
         # Send PDF directly to browser as a download — no third-party hosting needed
         job_ref = re.sub(r'\D', '', meta['job_number'])[-3:] if meta['job_number'] else '000'

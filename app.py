@@ -261,6 +261,25 @@ def get_truck_eta(lat, lng, destination_address):
         return None
 
 
+# ── Runsheet time slots — 07:30 to 15:30 in 30-minute increments ──
+# Matches the actual transport day: mornings are installs/pickups,
+# trucks are back and unloaded/reloaded by early afternoon. Generated
+# programmatically rather than hand-typed so the 30-minute steps can't
+# drift or have an off-by-one gap if this range is ever changed.
+def _build_runsheet_time_slots():
+    slots = []
+    h, m = 7, 30
+    while (h, m) <= (15, 30):
+        slots.append(f'{h:02d}:{m:02d}')
+        m += 30
+        if m == 60:
+            m = 0
+            h += 1
+    return slots
+
+RUNSHEET_TIME_SLOTS = _build_runsheet_time_slots()
+
+
 # ── Colour cycle — 14 maximally distinct colours ──
 COLOURS = [
     {'hex': '#D62828', 'name': 'Red'},
@@ -1513,6 +1532,14 @@ def api_jobs():
     jobs = sb_get('jobs', 'order=created_at.desc')
     return jsonify(jobs)
 
+@app.route('/api/runsheet-time-slots', methods=['GET'])
+def api_runsheet_time_slots():
+    """The canonical list of valid runsheet_time values — sourced from
+    the same RUNSHEET_TIME_SLOTS the /runsheet route validates against,
+    so the frontend's time dropdown can't silently drift out of sync
+    with what the backend will actually accept."""
+    return jsonify(RUNSHEET_TIME_SLOTS)
+
 @app.route('/api/jobs/<job_id>', methods=['GET'])
 def api_job(job_id):
     job   = sb_get('jobs',  f'id=eq.{job_id}')
@@ -1600,12 +1627,21 @@ def api_job_runsheet(job_id):
     get assigned to a specific day's run by a person, often the day
     before, not derived automatically from any date already on the job.
 
-    Body: {runsheet_date, runsheet_type} where runsheet_date is
-    "YYYY-MM-DD" or null (null clears it — removes the job from any
-    runsheet) and runsheet_type is "install", "pickup", or "to_load".
-    "to_load" covers the afternoon-before step — unloading a truck that
-    did a pickup and loading it with the next day's jobs — distinct from
-    "install"/"pickup" which represent the actual morning run.
+    Body: {runsheet_date, runsheet_type, runsheet_time} where
+    runsheet_date is "YYYY-MM-DD" or null (null clears it — removes the
+    job from any runsheet), runsheet_type is "install", "pickup", or
+    "to_load", and runsheet_time is one of RUNSHEET_TIME_SLOTS (e.g.
+    "09:00") or null. "to_load" covers the afternoon-before step —
+    unloading a truck that did a pickup and loading it with the next
+    day's jobs — distinct from "install"/"pickup" which represent the
+    actual morning run.
+
+    runsheet_time is optional — a job can be on a day's runsheet with no
+    specific time yet (shows in an "Unscheduled" bucket on the timeline
+    view) and a time can be set or changed independently of the
+    date/type. This mirrors how the transport team actually plans: the
+    day and install-vs-pickup decision often happens first, the specific
+    time slot gets refined afterward.
 
     A job can appear on the runsheet with no owner or truck assigned at
     all — those aren't required here, only a runsheet_date and a valid
@@ -1620,11 +1656,15 @@ def api_job_runsheet(job_id):
     data = request.get_json()
     runsheet_date = data.get('runsheet_date')
     runsheet_type = data.get('runsheet_type')
+    runsheet_time = data.get('runsheet_time')
     if runsheet_date is not None and runsheet_type not in ('install', 'pickup', 'to_load'):
         return jsonify({'success': False, 'error': 'runsheet_type must be "install", "pickup", or "to_load" when setting a date'}), 400
+    if runsheet_time is not None and runsheet_time not in RUNSHEET_TIME_SLOTS:
+        return jsonify({'success': False, 'error': f'runsheet_time must be one of {RUNSHEET_TIME_SLOTS} or null'}), 400
     result = sb_patch('jobs', f'id=eq.{job_id}', {
         'runsheet_date': runsheet_date,
         'runsheet_type': runsheet_type if runsheet_date else None,
+        'runsheet_time': runsheet_time if runsheet_date else None,
     })
     return jsonify({'success': bool(result)})
 

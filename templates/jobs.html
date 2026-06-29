@@ -54,6 +54,8 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .job-action-btn:last-child{border-right:none;}
 .job-action-runsheet{flex:0 0 48px;color:var(--green);}
 .job-action-runsheet:hover{background:rgba(74,124,89,0.08);}
+.job-action-transfer{flex:0 0 48px;color:#6A0DAD;}
+.job-action-transfer:hover{background:rgba(106,13,173,0.08);}
 .job-action-stylist{color:var(--accent);}
 .job-action-stylist:hover{background:rgba(184,147,90,0.08);}
 .job-action-driver{color:var(--blue);}
@@ -69,6 +71,31 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .transfer-tag-link-out{color:var(--accent);}
 .job-address{font-size:1rem;color:var(--ink);margin-top:4px;}
 .assignment-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.status-change-btn{display:inline-flex;align-items:center;gap:5px;background:none;border:none;padding:0;margin-top:9px;cursor:pointer;}
+.status-change-btn svg{color:var(--muted);transition:transform 0.15s;}
+.status-change-btn:hover svg{color:var(--ink);}
+.status-change-btn .pill{cursor:pointer;}
+.status-popover-list{display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+.status-popover-option{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:2px;background:white;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.88rem;color:var(--ink);text-align:left;transition:border-color 0.15s,background 0.15s;}
+.status-popover-option:hover{border-color:var(--accent);background:var(--cream);}
+.status-popover-option.current{border-color:var(--accent);background:rgba(184,147,90,0.08);font-weight:600;}
+.status-popover-option .pill{pointer-events:none;}
+
+.transfer-popover-hint{font-size:0.74rem;color:var(--muted);margin-top:6px;line-height:1.4;}
+.transfer-popover-current{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:rgba(106,13,173,0.07);border:1px solid rgba(106,13,173,0.3);border-radius:2px;margin-bottom:14px;font-size:0.82rem;}
+.transfer-popover-current b{color:#6A0DAD;}
+.transfer-search-wrap-popover{position:relative;}
+.transfer-search-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:white;border:1px solid var(--border);border-radius:1px;max-height:200px;overflow-y:auto;z-index:210;box-shadow:0 4px 16px rgba(0,0,0,0.1);display:none;}
+.transfer-search-results.open{display:block;}
+.transfer-result-item{padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.15s;}
+.transfer-result-item:last-child{border-bottom:none;}
+.transfer-result-item:hover{background:var(--cream);}
+.transfer-result-ref{font-weight:600;color:var(--accent);font-size:0.84rem;}
+.transfer-result-addr{font-size:0.76rem;color:var(--muted);margin-top:1px;}
+.transfer-popover-selected-job{margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;background:var(--cream);border:1px solid var(--accent);border-radius:2px;font-size:0.82rem;}
+.transfer-popover-selected-job b{color:var(--accent);}
+.transfer-popover-selected-clear{background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.85rem;padding:2px;}
+.transfer-popover-selected-clear:hover{color:var(--red);}
 .assignment-badge{display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;font-weight:600;padding:4px 10px;border-radius:10px;}
 .assignment-badge-owner{background:rgba(184,147,90,0.12);color:var(--accent);}
 .assignment-badge-truck{background:rgba(74,126,184,0.12);color:var(--blue);}
@@ -179,6 +206,40 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
   </div>
 </div>
 
+<!-- Status change popover -->
+<div class="runsheet-popover-overlay" id="status-popover-overlay" onclick="closeStatusPopover()"></div>
+<div class="runsheet-popover" id="status-popover">
+  <div class="runsheet-popover-title">Change Status</div>
+  <div class="status-popover-list" id="status-popover-list"></div>
+</div>
+
+<!-- Transfer setup popover -->
+<div class="runsheet-popover-overlay" id="transfer-popover-overlay" onclick="closeTransferPopover()"></div>
+<div class="runsheet-popover" id="transfer-popover" style="width:340px;">
+  <div class="runsheet-popover-title">Set up Transfer</div>
+
+  <div id="transfer-popover-current" style="display:none;"></div>
+
+  <label class="runsheet-popover-label">Direction</label>
+  <div class="runsheet-popover-type-row">
+    <button class="runsheet-type-btn" id="transfer-dir-from" onclick="selectTransferDirection('from')">Transfer From</button>
+    <button class="runsheet-type-btn" id="transfer-dir-to" onclick="selectTransferDirection('to')">Transfer To</button>
+  </div>
+  <div class="transfer-popover-hint" id="transfer-popover-hint"></div>
+
+  <label class="runsheet-popover-label">Job</label>
+  <div class="transfer-search-wrap-popover">
+    <input type="text" id="transfer-popover-search" class="runsheet-popover-input" placeholder="Search by job number or address…" oninput="handleTransferPopoverSearch(this.value)" autocomplete="off"/>
+    <div class="transfer-search-results" id="transfer-popover-results"></div>
+  </div>
+  <div id="transfer-popover-selected"></div>
+
+  <div class="runsheet-popover-actions">
+    <button class="btn btn-outline" onclick="removeTransfer()" id="transfer-remove-btn" style="font-size:0.72rem;display:none;">Remove Transfer</button>
+    <button class="btn btn-gold" onclick="saveTransferEntry()">Save</button>
+  </div>
+</div>
+
 <footer>LUMA Design Co · Warehouse Operations · lumadesignco.com.au</footer>
 
 <script>
@@ -266,6 +327,10 @@ function jobCardHTML(job){
         </div>
         <div class="job-address">${job.address}</div>
         ${(ownerBadge||truckBadge||runsheetBadge)?`<div class="assignment-row">${ownerBadge}${truckBadge}${runsheetBadge}</div>`:''}
+        <button class="status-change-btn" onclick="event.stopPropagation();openStatusPopover('${job.id}', this)">
+          <span class="pill ${pill}">${label}</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
         <div class="job-meta">
           ${job.stage_date?`<span>${job.stage_date}</span>`:''}
           <span>${job.item_count} items</span>
@@ -277,6 +342,9 @@ function jobCardHTML(job){
     <div class="job-card-actions">
       <button class="job-action-btn job-action-runsheet" onclick="openRunsheetPopover('${job.id}', this)" title="Add to Runsheet">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </button>
+      <button class="job-action-btn job-action-transfer" onclick="openTransferPopover('${job.id}', this)" title="Set up Transfer">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
       </button>
       <button class="job-action-btn job-action-stylist" onclick="openAsStylist('${job.id}')">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.71 4.04c.39-.39.39-1.05 0-1.44l-2.31-2.31a.996.996 0 0 0-1.41 0L15.13 2.16l3.71 3.71M3 17.25V21h3.75L20.81 6.94l-3.75-3.75z"/></svg>
@@ -459,6 +527,189 @@ async function removeFromRunsheet(){
   closeRunsheetPopover();
   renderJobs();
   if(currentView==='runsheet') renderRunsheet();
+}
+
+// ── Status change popover ──
+// Lists every status from STATUS_ORDER (the same list that drives the
+// Active Jobs section grouping) so this never falls out of sync with
+// what the rest of the app considers a valid, manually-settable status.
+// "archived" is deliberately excluded — it's reached automatically when
+// a driver marks a job Returned (see api_job_status in app.py, which
+// silently converts 'returned' to 'archived'), never picked directly.
+let statusPopoverJobId=null;
+function openStatusPopover(jobId, btnEl){
+  statusPopoverJobId=jobId;
+  const job=jobsById.get(jobId);
+  const list=document.getElementById('status-popover-list');
+  list.innerHTML=STATUS_ORDER.map(s=>{
+    const isCurrent=job&&job.status===s;
+    return `<button class="status-popover-option${isCurrent?' current':''}" onclick="changeJobStatus('${s}')">
+      <span class="pill ${STATUS_PILLS[s]||'pill-ready'}">${STATUS_LABELS[s]||s}</span>
+      ${isCurrent?'<span style="margin-left:auto;font-size:0.75rem;color:var(--accent);">Current</span>':''}
+    </button>`;
+  }).join('');
+  document.getElementById('status-popover-overlay').classList.add('open');
+  document.getElementById('status-popover').classList.add('open');
+}
+function closeStatusPopover(){
+  document.getElementById('status-popover-overlay').classList.remove('open');
+  document.getElementById('status-popover').classList.remove('open');
+  statusPopoverJobId=null;
+}
+async function changeJobStatus(newStatus){
+  const jobId=statusPopoverJobId;
+  await fetch(`/api/jobs/${jobId}/status`,{
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({status:newStatus})
+  });
+  const job=jobsById.get(jobId);
+  if(job) job.status=newStatus;
+  closeStatusPopover();
+  renderJobs();
+  if(currentView==='runsheet') renderRunsheet();
+}
+
+// ── Transfer setup popover ──
+// "Transfer From <job B>" writes directly to this job's own
+// is_transfer/transfer_from_job_id. "Transfer To <job B>" writes to job
+// B's is_transfer/transfer_from_job_id instead — the relationship always
+// lives on the receiving job, never on the source, so this popover picks
+// which job id to PATCH based on the direction rather than the backend
+// needing a second kind of relationship to track. See
+// /api/jobs/<id>/transfer in app.py for the single route both directions
+// call.
+let transferPopoverJobId=null;   // the job whose tile the icon was clicked on
+let transferPopoverDirection=null; // 'from' or 'to'
+let transferPopoverSelectedJob=null; // the other job picked from search
+
+function openTransferPopover(jobId, btnEl){
+  transferPopoverJobId=jobId;
+  transferPopoverSelectedJob=null;
+  document.getElementById('transfer-popover-search').value='';
+  document.getElementById('transfer-popover-results').classList.remove('open');
+  document.getElementById('transfer-popover-selected').innerHTML='';
+
+  const job=jobsById.get(jobId);
+  const alreadyFrom = job && job.is_transfer && job.transfer_from_job_id;
+  const alreadyToJob = transferringToMap.get(jobId); // job this one is already transferring to, if any
+
+  // Default direction: if this job already has a "from" set, show that;
+  // otherwise if it's already a source for another job, show "to";
+  // otherwise default to "from" since that's the more common case.
+  const initialDirection = alreadyFrom ? 'from' : (alreadyToJob ? 'to' : 'from');
+  selectTransferDirection(initialDirection);
+
+  document.getElementById('transfer-popover-overlay').classList.add('open');
+  document.getElementById('transfer-popover').classList.add('open');
+}
+function closeTransferPopover(){
+  document.getElementById('transfer-popover-overlay').classList.remove('open');
+  document.getElementById('transfer-popover').classList.remove('open');
+  transferPopoverJobId=null;
+}
+function selectTransferDirection(direction){
+  transferPopoverDirection=direction;
+  document.getElementById('transfer-dir-from').classList.toggle('selected', direction==='from');
+  document.getElementById('transfer-dir-to').classList.toggle('selected', direction==='to');
+
+  const job=jobsById.get(transferPopoverJobId);
+  const hint=document.getElementById('transfer-popover-hint');
+  const currentBox=document.getElementById('transfer-popover-current');
+  const removeBtn=document.getElementById('transfer-remove-btn');
+
+  if(direction==='from'){
+    hint.textContent="This job's items are arriving from another job already in the truck.";
+    const src = job && job.is_transfer && job.transfer_from_job_id ? jobsById.get(job.transfer_from_job_id) : null;
+    if(src){
+      currentBox.style.display='block';
+      currentBox.innerHTML=`<div class="transfer-popover-current">Currently transferring from <b>${src.job_ref||src.job_number}</b></div>`;
+      removeBtn.style.display='inline-block';
+    } else {
+      currentBox.style.display='none';
+      removeBtn.style.display='none';
+    }
+  } else {
+    hint.textContent="This job's items are going to another job — sets that job's \"Transfer From\" to this one.";
+    const dest = transferringToMap.get(transferPopoverJobId);
+    if(dest){
+      currentBox.style.display='block';
+      currentBox.innerHTML=`<div class="transfer-popover-current">Currently transferring to <b>${dest.job_ref||dest.job_number}</b></div>`;
+      removeBtn.style.display='inline-block';
+    } else {
+      currentBox.style.display='none';
+      removeBtn.style.display='none';
+    }
+  }
+}
+function handleTransferPopoverSearch(value){
+  const resultsEl=document.getElementById('transfer-popover-results');
+  const q=value.trim().toLowerCase();
+  if(!q){ resultsEl.classList.remove('open'); resultsEl.innerHTML=''; return; }
+  const matches=lastFetchedJobs.filter(j=>{
+    if(j.id===transferPopoverJobId) return false; // can't transfer with itself
+    const ref=(j.job_ref||'').toLowerCase(), num=(j.job_number||'').toLowerCase(), addr=(j.address||'').toLowerCase();
+    return ref.includes(q)||num.includes(q)||addr.includes(q);
+  }).slice(0,8);
+
+  if(!matches.length){
+    resultsEl.innerHTML=`<div class="transfer-result-item" style="color:var(--muted);cursor:default;">No matching jobs</div>`;
+    resultsEl.classList.add('open');
+    return;
+  }
+  resultsEl.innerHTML=matches.map(j=>`
+    <div class="transfer-result-item" onclick='pickTransferPopoverJob(${JSON.stringify({id:j.id,job_ref:j.job_ref,job_number:j.job_number,address:j.address}).replace(/'/g,"&#39;")})'>
+      <div class="transfer-result-ref">${j.job_ref||j.job_number}</div>
+      <div class="transfer-result-addr">${j.address||''}</div>
+    </div>
+  `).join('');
+  resultsEl.classList.add('open');
+}
+function pickTransferPopoverJob(job){
+  transferPopoverSelectedJob=job;
+  document.getElementById('transfer-popover-results').classList.remove('open');
+  document.getElementById('transfer-popover-search').value='';
+  document.getElementById('transfer-popover-selected').innerHTML=`
+    <div class="transfer-popover-selected-job">
+      <span>${transferPopoverDirection==='from'?'From':'To'} <b>${job.job_ref||job.job_number}</b> — ${job.address||''}</span>
+      <button class="transfer-popover-selected-clear" onclick="clearTransferPopoverSelection()">✕</button>
+    </div>`;
+}
+function clearTransferPopoverSelection(){
+  transferPopoverSelectedJob=null;
+  document.getElementById('transfer-popover-selected').innerHTML='';
+}
+async function saveTransferEntry(){
+  if(!transferPopoverSelectedJob){ alert('Search for and select a job first.'); return; }
+
+  // "From": this job's own transfer_from_job_id points at the selected job.
+  // "To": the SELECTED job's transfer_from_job_id points at this job instead.
+  const targetJobId = transferPopoverDirection==='from' ? transferPopoverJobId : transferPopoverSelectedJob.id;
+  const sourceJobId  = transferPopoverDirection==='from' ? transferPopoverSelectedJob.id : transferPopoverJobId;
+
+  await fetch(`/api/jobs/${targetJobId}/transfer`,{
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({transfer_from_job_id:sourceJobId})
+  });
+  closeTransferPopover();
+  await loadJobs(); // relationships span two jobs and transferringToMap is derived — simplest to refetch rather than hand-patch both sides locally
+}
+async function removeTransfer(){
+  if(transferPopoverDirection==='from'){
+    await fetch(`/api/jobs/${transferPopoverJobId}/transfer`,{
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({transfer_from_job_id:null})
+    });
+  } else {
+    const dest=transferringToMap.get(transferPopoverJobId);
+    if(dest){
+      await fetch(`/api/jobs/${dest.id}/transfer`,{
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({transfer_from_job_id:null})
+      });
+    }
+  }
+  closeTransferPopover();
+  await loadJobs();
 }
 
 function renderJobs(){

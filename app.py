@@ -1628,6 +1628,40 @@ def api_job_runsheet(job_id):
     })
     return jsonify({'success': bool(result)})
 
+@app.route('/api/jobs/<job_id>/transfer', methods=['PATCH'])
+def api_job_transfer(job_id):
+    """Set or clear this job's transfer-from relationship after it's
+    already been created. Previously this could only be set once, at
+    label-generation time, in save_job_to_db() — there was no way to
+    mark an existing job as a transfer after the fact.
+
+    Body: {transfer_from_job_id} — a job id to mark this job as
+    transferring from that job, or null to clear the transfer entirely
+    (sets is_transfer back to false).
+
+    There's no separate "transfer to" version of this route. Setting
+    "Transfer To <job B>" from job A's tile is really "set job B's
+    transfer-from to job A" — the frontend achieves that by calling this
+    same route, but with job B's id as the URL parameter and job A's id
+    in the body, not by adding a second endpoint. This keeps the
+    transfer relationship correct by construction: it's always stored as
+    is_transfer + transfer_from_job_id on the receiving job, the same
+    place it's always lived, "transferring to" is still only ever
+    derived (see /api/jobs/<id>'s transferring_to field) rather than
+    given a second, independently-editable home that could fall out of
+    sync with this one.
+
+    No self-reference allowed — a job can't transfer from itself."""
+    data = request.get_json()
+    transfer_from_job_id = data.get('transfer_from_job_id')
+    if transfer_from_job_id == job_id:
+        return jsonify({'success': False, 'error': 'A job cannot transfer from itself'}), 400
+    result = sb_patch('jobs', f'id=eq.{job_id}', {
+        'is_transfer': bool(transfer_from_job_id),
+        'transfer_from_job_id': transfer_from_job_id,
+    })
+    return jsonify({'success': bool(result)})
+
 @app.route('/api/jobs/<job_id>/eta', methods=['POST'])
 def api_job_eta(job_id):
     """Calculate driving ETA from someone's current position (sent by

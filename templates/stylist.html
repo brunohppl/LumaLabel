@@ -261,9 +261,24 @@ async function loadJob(){
   renderItems();
 }
 
+let addressClickCooldown = false;
 function onAddressClick(event){
   event.preventDefault();
   const mapsUrl = event.currentTarget.href;
+
+  // Each tap independently triggers a full ETA calculation + Slack post
+  // (see /api/jobs/<id>/eta in app.py) — there was no protection against
+  // a quick double-tap, or someone returning to this tab after Maps
+  // opened and tapping the address again just to double-check it,
+  // each firing its own Slack message. A short cooldown after each tap
+  // stops that without needing the person to think about it.
+  if(addressClickCooldown){
+    console.log('[ETA] ignoring tap — cooldown active');
+    window.open(mapsUrl, '_blank');
+    return false;
+  }
+  addressClickCooldown = true;
+  setTimeout(()=>{ addressClickCooldown = false; }, 15000);
 
   // Same approach as driver.html's address click: wait for geolocation to
   // resolve (success or failure) before opening Maps, rather than racing

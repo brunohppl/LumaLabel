@@ -134,45 +134,66 @@ def save_job_to_db(meta, items, colour_name, job_owner='', is_transfer=False, tr
 
 
 
+def street_only(address):
+    """Trim a stored address like "7 Forfar Street, Seventeen Mile" down
+    to just the number/street part — "7 Forfar Street" — for places like
+    the Slack ETA line where the suburb adds length without adding
+    anything useful (the job ref already tells you which job it is).
+    Addresses are consistently stored as "<number/street>, <suburb>"
+    (confirmed across every real packing slip on file), so splitting on
+    the first comma is reliable; if there's no comma — the
+    "Address not found" fallback, or a manually-typed address without
+    one — this just returns the address unchanged rather than mangling
+    it or producing an empty string.
+    """
+    if not address:
+        return address
+    return address.split(',')[0].strip()
+
+
 def notify_slack_eta(job, role, eta_text):
-    """Post an ETA to Slack — only called when someone explicitly
-    confirms "post this to Slack?" on /driver or /stylist, never
-    automatically from the ETA calculation itself. Posts as the shared
+    """Post an ETA to Slack — only called when someone explicitly taps
+    the address on /driver or /stylist and a location is captured, never
+    on a schedule or independently of that tap. Posts as the shared
     "Luma Warehouse" bot identity (same as every other notification this
     app sends) since there's no per-person Slack login here — see the
     longer discussion on real per-person posting requiring a full OAuth
     app and individual authorization, which this deliberately doesn't
     attempt. Set SLACK_WEBHOOK_URL as an environment variable in Render.
+
+    One-liner by request — a previous version used a full Block Kit
+    layout (header + a 3-field section + a footer context line), which
+    was more than needed for something meant to be glanced at quickly.
+    Truck name (e.g. "Nigel") is included for the truck role, since
+    that's genuinely useful here — multiple trucks could be out at once,
+    and "🚛 ETA" alone wouldn't say which one. There's no equivalent for
+    the stylist role since a stylist isn't a named vehicle; the line
+    just omits that part rather than printing a misleading placeholder.
+
+    Address is trimmed to just the street (see street_only()) — the
+    suburb doesn't add anything useful here and only makes the line
+    longer than it needs to be for something meant to be read at a
+    glance.
     """
     webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
     if not webhook_url:
         return False
 
-    role_label = 'Truck' if role == 'truck' else 'Stylist'
-    role_emoji = '🚛' if role == 'truck' else '🚗'
     ref = job.get('job_ref') or job.get('job_number') or ''
+    address = street_only(job.get('address', ''))
+
+    if role == 'truck':
+        truck_name = job.get('truck') or ''
+        who = f'🚛 {truck_name}' if truck_name else '🚛 Truck'
+    else:
+        who = '🚗 Stylist'
+
+    text = f'{who} — Job {ref} — {address} — ETA {eta_text}'
 
     message = {
         'username': 'Luma Warehouse',
         'icon_emoji': ':truck:' if role == 'truck' else ':car:',
-        'blocks': [
-            {
-                'type': 'header',
-                'text': {'type': 'plain_text', 'text': f'{role_emoji}  {role_label} ETA'}
-            },
-            {
-                'type': 'section',
-                'fields': [
-                    {'type': 'mrkdwn', 'text': f'*Job*\n`{ref}`'},
-                    {'type': 'mrkdwn', 'text': f'*Address*\n{job.get("address","")}'},
-                    {'type': 'mrkdwn', 'text': f'*Arriving*\n{eta_text}'},
-                ]
-            },
-            {
-                'type': 'context',
-                'elements': [{'type': 'mrkdwn', 'text': 'Posted via LUMA Warehouse · lumalabel.onrender.com'}]
-            }
-        ]
+        'text': text,
     }
 
     try:

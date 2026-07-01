@@ -60,6 +60,8 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .job-action-stylist:hover{background:rgba(184,147,90,0.08);}
 .job-action-driver{color:var(--blue);}
 .job-action-driver:hover{background:rgba(74,126,184,0.08);}
+.job-action-delete{flex:0 0 48px;color:var(--red);}
+.job-action-delete:hover{background:rgba(232,92,71,0.08);}
 .colour-swatch{width:10px;align-self:stretch;border-radius:1px;min-height:70px;flex-shrink:0;}
 .job-info{flex:1;min-width:0;}
 .job-ref-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
@@ -240,6 +242,17 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
   </div>
 </div>
 
+<!-- Delete confirmation popover -->
+<div class="runsheet-popover-overlay" id="delete-popover-overlay" onclick="closeDeletePopover()"></div>
+<div class="runsheet-popover" id="delete-popover">
+  <div class="runsheet-popover-title" style="color:var(--red);">Delete Job</div>
+  <p id="delete-popover-body" style="font-size:0.88rem;color:var(--ink);margin:10px 0 18px;line-height:1.5;"></p>
+  <div class="runsheet-popover-actions">
+    <button class="btn btn-outline" onclick="closeDeletePopover()">Cancel</button>
+    <button class="btn" id="delete-popover-confirm" style="background:var(--red);color:white;border-color:var(--red);" onclick="confirmDeleteJob()">Delete</button>
+  </div>
+</div>
+
 <footer>LUMA Design Co · Warehouse Operations · lumadesignco.com.au</footer>
 
 <script>
@@ -353,6 +366,9 @@ function jobCardHTML(job){
       <button class="job-action-btn job-action-driver" onclick="openAsDriver('${job.id}')">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>
         Driver
+      </button>
+      <button class="job-action-btn job-action-delete" onclick="deleteJob('${job.id}','${(job.job_ref||job.job_number||'').replace(/'/g,'')}','${(job.address||'').replace(/'/g,'')}')" title="Delete job">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
       </button>
     </div>
   </div>`;
@@ -710,6 +726,36 @@ async function removeTransfer(){
   }
   closeTransferPopover();
   await loadJobs();
+}
+
+// ── Delete job ──
+let deletePopoverJobId=null;
+function deleteJob(jobId, jobRef, address){
+  deletePopoverJobId=jobId;
+  document.getElementById('delete-popover-body').textContent=
+    `This will permanently delete job ${jobRef} — ${address} and all its items. This cannot be undone.`;
+  document.getElementById('delete-popover-overlay').classList.add('open');
+  document.getElementById('delete-popover').classList.add('open');
+}
+function closeDeletePopover(){
+  document.getElementById('delete-popover-overlay').classList.remove('open');
+  document.getElementById('delete-popover').classList.remove('open');
+  deletePopoverJobId=null;
+}
+async function confirmDeleteJob(){
+  const jobId=deletePopoverJobId;
+  const btn=document.getElementById('delete-popover-confirm');
+  btn.textContent='Deleting…';
+  btn.disabled=true;
+  await fetch(`/api/jobs/${jobId}`,{method:'DELETE'});
+  // Remove from local cache immediately so the tile disappears
+  // without waiting for a full refetch
+  lastFetchedJobs=lastFetchedJobs.filter(j=>j.id!==jobId);
+  jobsById.delete(jobId);
+  transferringToMap.forEach((v,k)=>{ if(v.id===jobId) transferringToMap.delete(k); });
+  closeDeletePopover();
+  renderJobs();
+  if(currentView==='runsheet') renderRunsheet();
 }
 
 function renderJobs(){

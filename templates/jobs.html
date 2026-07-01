@@ -133,6 +133,8 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .runsheet-type-btn.selected{border-color:var(--accent);background:rgba(184,147,90,0.1);color:var(--accent);font-weight:600;}
 .runsheet-popover-actions{display:flex;justify-content:space-between;align-items:center;margin-top:18px;gap:8px;}
 .job-meta{font-size:0.85rem;color:var(--muted);margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;line-height:1.7;}
+.tile-date-install{color:var(--green);font-weight:600;}
+.tile-date-load{color:var(--muted);}
 .eta-tag{font-weight:600;}
 .eta-tag-truck{color:var(--blue);}
 .eta-tag-stylist{color:var(--accent);}
@@ -345,7 +347,11 @@ function jobCardHTML(job){
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <div class="job-meta">
-          ${job.stage_date?`<span>${job.stage_date}</span>`:''}
+          ${job.runsheet_date
+            ? `<span class="tile-date tile-date-install">${formatRunsheetBadgeDate(job.runsheet_date)}</span>`
+            : job.stage_date
+              ? `<span class="tile-date tile-date-load">${job.stage_date}</span>`
+              : ''}
           <span>${job.item_count} items</span>
           ${truckEtaTag}
           ${stylistEtaTag}

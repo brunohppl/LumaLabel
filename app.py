@@ -1772,6 +1772,21 @@ def api_delete_item(item_id):
     result = sb_delete('items', f'id=eq.{item_id}')
     return jsonify({'success': result})
 
+@app.route('/api/jobs/<job_id>', methods=['DELETE'])
+def api_delete_job(job_id):
+    """Delete a job and all its associated data. Cascade order matters:
+    items and room_notes must go before the job row itself (Supabase
+    won't cascade these automatically since they have no FK deletion
+    rule — only transfer_from_job_id does, which is handled by the DB's
+    own ON DELETE SET NULL constraint and needs no code here).
+    This is a permanent, irreversible action — the confirmation prompt
+    is on the frontend, not the backend. If building per-user permissions
+    later, this route is the natural place to add a "admin only" check.
+    """
+    sb_delete('items',      f'job_id=eq.{job_id}')
+    sb_delete('room_notes', f'job_id=eq.{job_id}')
+    result = sb_delete('jobs', f'id=eq.{job_id}')
+    return jsonify({'success': bool(result)})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

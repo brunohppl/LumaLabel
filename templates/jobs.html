@@ -162,11 +162,12 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .rs-job-addr{font-size:0.8rem;color:#444;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
 .rs-job-type{font-size:0.68rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin-top:3px;color:#555;}
 .rs-job-actions{display:flex;border-top:1px solid rgba(0,0,0,0.08);margin-top:auto;}
-.rs-job-btn{flex:1;padding:5px 4px;background:none;border:none;cursor:pointer;font-size:0.65rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:4px;color:#555;transition:background 0.12s;border-right:1px solid rgba(0,0,0,0.08);}
-.rs-job-btn:last-child{border-right:none;}
+.rs-job-btn-gear{width:32px;flex-shrink:0;padding:5px 4px;background:none;border:none;border-right:1px solid rgba(0,0,0,0.08);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#888;transition:background 0.12s;}
+.rs-job-btn-gear:hover{background:rgba(0,0,0,0.06);}
+.rs-job-btn-stack{display:flex;flex-direction:column;flex:1;}
+.rs-job-btn{flex:1;padding:4px 6px;background:none;border:none;cursor:pointer;font-size:0.65rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:4px;transition:background 0.12s;}
 .rs-job-btn:hover{background:rgba(0,0,0,0.06);}
-.rs-job-btn-gear{flex:0 0 32px;color:#888;}
-.rs-job-btn-stylist{color:#8a6f2e;}
+.rs-job-btn-stylist{color:#8a6f2e;border-bottom:1px solid rgba(0,0,0,0.08);}
 .rs-job-btn-driver{color:#2e5a8a;}
 /* Unscheduled strip below grid */
 .rs-unscheduled{margin-top:18px;}
@@ -726,9 +727,11 @@ async function renderRunsheet(){
           ${typeLabel?`<div class="rs-job-type">${typeLabel}</div>`:''}
         </div>
         <div class="rs-job-actions">
-          <button class="rs-job-btn rs-job-btn-gear" onclick="openRunsheetPopover('${job.id}')" title="Edit schedule">${gearSVG}</button>
-          <button class="rs-job-btn rs-job-btn-stylist" onclick="window.open('/stylist/${job.id}','_blank')" title="Stylist">${stylistSVG} Stylist</button>
-          <button class="rs-job-btn rs-job-btn-driver" onclick="window.open('/driver/${job.id}','_blank')" title="Driver">${driverSVG} Driver</button>
+          <button class="rs-job-btn-gear" onclick="openRunsheetPopover('${job.id}')" title="Edit schedule">${gearSVG}</button>
+          <div class="rs-job-btn-stack">
+            <button class="rs-job-btn rs-job-btn-stylist" onclick="window.open('/stylist/${job.id}','_blank')" title="Stylist">${stylistSVG} Stylist</button>
+            <button class="rs-job-btn rs-job-btn-driver" onclick="window.open('/driver/${job.id}','_blank')" title="Driver">${driverSVG} Driver</button>
+          </div>
         </div>
       </div>`);
     });

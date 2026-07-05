@@ -282,6 +282,34 @@ def get_truck_eta(lat, lng, destination_address):
         return None
 
 
+# ── Runsheet schedule constants ──
+# Vehicles: van (Marlin, used by stylists) + three trucks.
+# Workers split by role — both lists are combined for the full
+# worker dropdown; keeping them separate lets the UI group them.
+RUNSHEET_VEHICLES = ['Marlin', 'Bruce', 'Nigel', 'Nemo']
+
+RUNSHEET_STYLISTS = ['Addy', 'Montie', 'Delphine', 'India', 'Hayley']
+RUNSHEET_DRIVERS  = ['Jo', 'Savio', 'Nick', 'Stefano', 'Yuri', 'Ayoub', 'Bruno', 'Phil']
+RUNSHEET_WORKERS  = RUNSHEET_STYLISTS + RUNSHEET_DRIVERS
+
+# Time slots: 07:30 to 15:30 in 30-minute increments — matches the
+# actual transport day. Generated rather than hand-typed to avoid gaps.
+def _build_time_slots():
+    slots = []
+    h, m = 7, 30
+    while (h, m) <= (15, 30):
+        slots.append(f'{h:02d}:{m:02d}')
+        m += 30
+        if m == 60:
+            m, h = 0, h + 1
+    return slots
+
+RUNSHEET_TIME_SLOTS = _build_time_slots()
+
+# Duration options in minutes — 30-min steps from 30 min to 4 hrs.
+RUNSHEET_DURATIONS = list(range(30, 270, 30))  # [30, 60, 90, ..., 240]
+
+
 # ── Colour cycle — 14 maximally distinct colours ──
 COLOURS = [
     {'hex': '#D62828', 'name': 'Red'},
@@ -1615,39 +1643,87 @@ def api_job_notes(job_id):
 
 @app.route('/api/jobs/<job_id>/runsheet', methods=['PATCH'])
 def api_job_runsheet(job_id):
-    """Manually schedule (or unschedule) a job onto a specific day's
-    transport runsheet. This is deliberately independent of stage_date —
-    the install date on the packing slip — since installs and pickups
-    get assigned to a specific day's run by a person, often the day
-    before, not derived automatically from any date already on the job.
+    """Schedule (or clear) a job's runsheet entry. All scheduling fields
+    are optional except runsheet_date + runsheet_type when adding — a
+    job can appear on the grid without a time, truck, or workers yet,
+    and those can be filled in later.
 
-    Body: {runsheet_date, runsheet_type} where runsheet_date is
-    "YYYY-MM-DD" or null (null clears it — removes the job from any
-    runsheet) and runsheet_type is "install", "pickup", or "to_load".
-    "to_load" covers the afternoon-before step — unloading a truck that
-    did a pickup and loading it with the next day's jobs — distinct from
-    "install"/"pickup" which represent the actual morning run.
+    Clearing (runsheet_date: null) wipes all scheduling fields together
+    so no stale values linger on a job that's been removed from the day.
 
-    A job can appear on the runsheet with no owner or truck assigned at
-    all — those aren't required here, only a runsheet_date and a valid
-    runsheet_type. The runsheet is also used to plan ahead before a
-    truck/driver has been locked in for a job.
-
-    No permission check yet — anyone who can open /jobs can set this,
-    same as every other action in this app today. The plan to eventually
-    gate this behind an admin account (so admin can set or override what
-    a stylist/driver has already set) is a future change, not implemented
-    here — see the README for context if picking this up later."""
+    runsheet_vehicles is an array — supports two-truck jobs where the
+    same job tile appears in multiple vehicle columns simultaneously.
+    runsheet_offsiders is also an array (multiple people per job)."""
     data = request.get_json()
     runsheet_date = data.get('runsheet_date')
     runsheet_type = data.get('runsheet_type')
+
     if runsheet_date is not None and runsheet_type not in ('install', 'pickup', 'to_load'):
-        return jsonify({'success': False, 'error': 'runsheet_type must be "install", "pickup", or "to_load" when setting a date'}), 400
-    result = sb_patch('jobs', f'id=eq.{job_id}', {
-        'runsheet_date': runsheet_date,
-        'runsheet_type': runsheet_type if runsheet_date else None,
-    })
+        return jsonify({'success': False, 'error': 'runsheet_type must be install, pickup, or to_load'}), 400
+
+    runsheet_time     = data.get('runsheet_time')
+    runsheet_duration = data.get('runsheet_duration')
+    runsheet_vehicles = data.get('runsheet_vehicles')
+    runsheet_lead     = data.get('runsheet_lead')
+    runsheet_offsiders = data.get('runsheet_offsiders')
+
+    if runsheet_time is not None and runsheet_time not in RUNSHEET_TIME_SLOTS:
+        return jsonify({'success': False, 'error': f'Invalid runsheet_time'}), 400
+    if runsheet_duration is not None and runsheet_duration not in RUNSHEET_DURATIONS:
+        return jsonify({'success': False, 'error': f'runsheet_duration must be a multiple of 30 between 30 and 240'}), 400
+    if runsheet_vehicles is not None:
+        bad = [v for v in runsheet_vehicles if v not in RUNSHEET_VEHICLES]
+        if bad:
+            return jsonify({'success': False, 'error': f'Unknown vehicles: {bad}'}), 400
+    if runsheet_lead is not None and runsheet_lead not in RUNSHEET_WORKERS:
+        return jsonify({'success': False, 'error': f'Unknown lead worker'}), 400
+    if runsheet_offsiders is not None:
+        bad = [w for w in runsheet_offsiders if w not in RUNSHEET_WORKERS]
+        if bad:
+            return jsonify({'success': False, 'error': f'Unknown offsiders: {bad}'}), 400
+
+    if runsheet_date:
+        payload = {
+            'runsheet_date':     runsheet_date,
+            'runsheet_type':     runsheet_type,
+            'runsheet_time':     runsheet_time,
+            'runsheet_duration': runsheet_duration,
+            'runsheet_vehicles': runsheet_vehicles,
+            'runsheet_lead':     runsheet_lead,
+            'runsheet_offsiders': runsheet_offsiders,
+        }
+    else:
+        # Clearing — wipe all scheduling fields together
+        payload = {
+            'runsheet_date':     None,
+            'runsheet_type':     None,
+            'runsheet_time':     None,
+            'runsheet_duration': None,
+            'runsheet_vehicles': None,
+            'runsheet_lead':     None,
+            'runsheet_offsiders': None,
+        }
+
+    result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})
+
+
+@app.route('/api/runsheet-config', methods=['GET'])
+def api_runsheet_config():
+    """Config endpoint — exposes all dropdown lists so the frontend
+    never hardcodes vehicles, workers, or time slots independently.
+    One source of truth: update the constants above, everything
+    picks them up automatically."""
+    return jsonify({
+        'vehicles':   RUNSHEET_VEHICLES,
+        'stylists':   RUNSHEET_STYLISTS,
+        'drivers':    RUNSHEET_DRIVERS,
+        'workers':    RUNSHEET_WORKERS,
+        'time_slots': RUNSHEET_TIME_SLOTS,
+        'durations':  RUNSHEET_DURATIONS,
+    })
+
+
 
 @app.route('/api/jobs/<job_id>/transfer', methods=['PATCH'])
 def api_job_transfer(job_id):

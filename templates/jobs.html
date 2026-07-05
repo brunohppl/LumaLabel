@@ -675,11 +675,15 @@ async function renderRunsheet(){
   vehicles.forEach((v,i)=>{
     const crew=crewByVehicle[v];
     const hasCrew=!!(crew?.lead||(crew?.offsiders||[]).length);
-    const crewText=hasCrew
-      ? [crew.lead,...(crew.offsiders||[])].filter(Boolean).join(', ')
-      : `+ Set crew`;
+    let crewText='+ Set crew';
+    if(hasCrew){
+      const leadLine=crew.lead?`<span style="opacity:0.55;font-weight:600;">Lead:</span> ${crew.lead}`:'';
+      const offsiderNames=(crew.offsiders||[]).filter(Boolean).join(', ');
+      const offLine=offsiderNames?`<span style="opacity:0.55;font-weight:600;">Offsider(s):</span> ${offsiderNames}`:'';
+      crewText=[leadLine,offLine].filter(Boolean).join('<br>');
+    }
     cells.push(`<div class="rs-team-cell${hasCrew?' has-crew':''}"
-      style="grid-column:${i+2};grid-row:2;"
+      style="grid-column:${i+2};grid-row:2;line-height:1.5;padding:6px 8px;"
       onclick="openCrewPopover('${v}','${todayStr}')"
       title="Click to set or update ${v} crew">${crewText}</div>`);
   });

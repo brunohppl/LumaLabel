@@ -178,6 +178,25 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .runsheet-popover-input:focus{border-color:var(--accent);}
 /* Two-column layout inside popover */
 .sched-two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.sched-entry-form{background:var(--cream);border-radius:3px;padding:10px;}
+.sched-entry-card{display:flex;flex-direction:column;gap:3px;padding:8px 10px;border:1px solid var(--border);border-radius:2px;background:white;margin-bottom:6px;}
+.sched-entry-card-header{display:flex;align-items:center;gap:8px;}
+.sched-entry-vehicle{font-weight:700;font-size:0.84rem;color:var(--accent);}
+.sched-entry-time{font-size:0.78rem;color:var(--muted);flex:1;}
+.sched-entry-actions{display:flex;gap:4px;}
+.sched-entry-actions button{background:none;border:none;cursor:pointer;font-size:0.82rem;color:var(--muted);padding:2px 5px;border-radius:2px;}
+.sched-entry-actions button:hover{background:var(--sand);}
+/* Grid team row cells — clickable to set crew */
+.rs-team-cell{padding:5px 8px;background:rgba(26,23,20,0.85);color:rgba(250,248,244,0.55);font-size:0.68rem;text-align:center;border-right:1px solid rgba(255,255,255,0.08);border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s;}
+.rs-team-cell:hover{background:rgba(184,147,90,0.25);color:var(--accent);}
+.rs-team-cell.has-crew{color:rgba(250,248,244,0.8);}
+.rs-team-cell:first-child{cursor:default;}
+.rs-team-cell:first-child:hover{background:rgba(26,23,20,0.85);}
+/* Crew chip row — toggle chips for offsider selection */
+.sched-chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
+.sched-chip{padding:5px 11px;border:1px solid var(--border);border-radius:12px;background:white;font-family:'Jost',sans-serif;font-size:0.78rem;color:var(--muted);cursor:pointer;transition:all 0.15s;}
+.sched-chip:hover{border-color:var(--accent);}
+.sched-chip.selected{border-color:var(--accent);background:rgba(184,147,90,0.1);color:var(--accent);font-weight:600;}
 /* Chip row — toggle chips for multi-select (vehicles, offsiders) */
 .sched-chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
 .sched-chip{padding:5px 11px;border:1px solid var(--border);border-radius:12px;background:white;font-family:'Jost',sans-serif;font-size:0.78rem;color:var(--muted);cursor:pointer;transition:all 0.15s;}
@@ -245,10 +264,11 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
   </div>
 </div>
 
-<!-- Schedule popover (Add to Runsheet / Edit schedule) -->
+<!-- Schedule popover: pick vehicle(s), start time, duration -->
 <div class="runsheet-popover-overlay" id="runsheet-popover-overlay" onclick="closeRunsheetPopover()"></div>
-<div class="runsheet-popover" id="runsheet-popover" style="width:360px;max-height:90vh;overflow-y:auto;">
+<div class="runsheet-popover" id="runsheet-popover" style="width:340px;">
   <div class="runsheet-popover-title">Schedule Job</div>
+  <div id="sched-popover-ref" style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;line-height:1.4;"></div>
 
   <div class="sched-two-col">
     <div>
@@ -266,35 +286,45 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
     </div>
   </div>
 
-  <div class="sched-two-col">
+  <label class="runsheet-popover-label">Vehicle(s) needed</label>
+  <div class="sched-chip-row" id="sched-vehicle-chips"></div>
+
+  <div class="sched-two-col" style="margin-top:12px;">
     <div>
       <label class="runsheet-popover-label">Start time</label>
-      <select id="runsheet-popover-time" class="runsheet-popover-input">
+      <select id="sched-start-time" class="runsheet-popover-input">
         <option value="">No time yet</option>
       </select>
     </div>
     <div>
       <label class="runsheet-popover-label">Duration</label>
-      <select id="runsheet-popover-duration" class="runsheet-popover-input">
-        <option value="">Default (1 hr)</option>
+      <select id="sched-duration" class="runsheet-popover-input">
+        <option value="">1 hr (default)</option>
       </select>
     </div>
   </div>
 
-  <label class="runsheet-popover-label">Vehicle(s)</label>
-  <div class="sched-chip-row" id="runsheet-popover-vehicles"></div>
-
-  <label class="runsheet-popover-label">Lead</label>
-  <select id="runsheet-popover-lead" class="runsheet-popover-input">
-    <option value="">No lead assigned</option>
-  </select>
-
-  <label class="runsheet-popover-label">Offsiders</label>
-  <div class="sched-chip-row" id="runsheet-popover-offsiders"></div>
-
   <div class="runsheet-popover-actions" style="margin-top:18px;">
     <button class="btn btn-outline" onclick="removeFromRunsheet()" id="runsheet-remove-btn" style="font-size:0.72rem;display:none;">Remove</button>
     <button class="btn btn-gold" onclick="saveRunsheetEntry()">Save</button>
+  </div>
+</div>
+
+<!-- Crew popover: lead + offsiders for one vehicle on one day -->
+<div class="runsheet-popover-overlay" id="crew-popover-overlay" onclick="closeCrewPopover()"></div>
+<div class="runsheet-popover" id="crew-popover" style="width:320px;">
+  <div class="runsheet-popover-title" id="crew-popover-title">Set Crew</div>
+  <input type="hidden" id="crew-popover-vehicle"/>
+  <input type="hidden" id="crew-popover-date"/>
+  <label class="runsheet-popover-label">Lead</label>
+  <select id="crew-popover-lead" class="runsheet-popover-input">
+    <option value="">No lead</option>
+  </select>
+  <label class="runsheet-popover-label">Offsiders</label>
+  <div class="sched-chip-row" id="crew-popover-offsiders"></div>
+  <div class="runsheet-popover-actions" style="margin-top:16px;">
+    <button class="btn btn-outline" onclick="closeCrewPopover()" style="font-size:0.75rem;">Cancel</button>
+    <button class="btn btn-gold" onclick="saveCrewEntry()">Save</button>
   </div>
 </div>
 
@@ -539,50 +569,6 @@ function formatRunsheetBadgeDate(dateStr){
   return dt.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
 }
 
-function renderRunsheet(){
-  const todayStr=localDateStr(runsheetViewDate);
-  const label=document.getElementById('runsheet-date-label');
-  const isToday=localDateStr(new Date())===todayStr;
-  label.textContent=runsheetViewDate.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})+(isToday?' (Today)':'');
-
-  // Any job with a runsheet date set for this day shows here — owner and
-  // truck assignment are not required. The runsheet is also used to
-  // plan ahead (e.g. loading trucks the afternoon before a job goes
-  // out), so a job often won't have a truck/owner locked in yet at the
-  // point someone's organising which day it falls on.
-  const scheduled=lastFetchedJobs.filter(j=>j.runsheet_date===todayStr);
-  const toLoad=scheduled.filter(j=>j.runsheet_type==='to_load');
-  const installs=scheduled.filter(j=>j.runsheet_type==='install');
-  const pickups=scheduled.filter(j=>j.runsheet_type==='pickup');
-
-  const content=document.getElementById('runsheet-content');
-  if(!scheduled.length){
-    content.innerHTML=`<div class="runsheet-empty">Nothing scheduled for this day yet.<br>Use the calendar icon on a job tile in Active Jobs to add one.</div>`;
-    return;
-  }
-
-  let html='';
-  if(installs.length){
-    html+=`<div class="runsheet-section">
-      <div class="runsheet-section-title">Installs <span class="count">${installs.length}</span></div>
-      <div class="jobs-grid-inner">${installs.map(jobCardHTML).join('')}</div>
-    </div>`;
-  }
-  if(pickups.length){
-    html+=`<div class="runsheet-section">
-      <div class="runsheet-section-title">Pickups <span class="count">${pickups.length}</span></div>
-      <div class="jobs-grid-inner">${pickups.map(jobCardHTML).join('')}</div>
-    </div>`;
-  }
-  if(toLoad.length){
-    html+=`<div class="runsheet-section">
-      <div class="runsheet-section-title">To Load <span class="count">${toLoad.length}</span></div>
-      <div class="jobs-grid-inner">${toLoad.map(jobCardHTML).join('')}</div>
-    </div>`;
-  }
-  content.innerHTML=html;
-}
-
 // ── Runsheet config (fetched once from /api/runsheet-config) ──
 let RS_CONFIG = {
   vehicles:['Marlin','Bruce','Nigel','Nemo'],
@@ -601,12 +587,12 @@ async function loadRunsheetConfig(){
 }
 
 const SLOT_H=46; // px per 30-min row — drives all vertical positioning
+const TOTAL_SLOTS=17; // 07:30 through 15:30 inclusive
 
-function timeToRow(t){
-  // Convert "HH:MM" → 0-based row index within the 07:30–15:30 grid.
-  // "07:30" → 0, "08:00" → 1, etc.
+function slotIndex(t){
+  // "07:30"→0, "08:00"→1, "08:30"→2 ... "15:30"→16
   const [h,m]=t.split(':').map(Number);
-  return (h-7)*2+(m===30?1:0)-(1); // -1: first slot is 07:30 (not 07:00)
+  return (h-7)*2+(m===30?1:0)-1;
 }
 function formatSlotLabel(t){
   const [h,m]=t.split(':').map(Number);
@@ -614,104 +600,134 @@ function formatSlotLabel(t){
   return `${h12}:${String(m).padStart(2,'0')}${p}`;
 }
 
-function renderRunsheet(){
+// Per-vehicle schedule data for the currently-viewed day.
+// Populated by renderRunsheet() from the /api/runsheet/<date> endpoint.
+let currentDaySchedule=[]; // job_schedule rows
+
+async function renderRunsheet(){
   const todayStr=localDateStr(runsheetViewDate);
   const label=document.getElementById('runsheet-date-label');
   const isToday=localDateStr(new Date())===todayStr;
   label.textContent=runsheetViewDate.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})+(isToday?' (Today)':'');
 
-  const scheduled=lastFetchedJobs.filter(j=>j.runsheet_date===todayStr);
   const content=document.getElementById('runsheet-content');
+  content.innerHTML='<div class="loading">Loading…</div>';
 
-  if(!scheduled.length){
+  // Fetch jobs + schedule entries + crew in one request
+  let dayJobs=[], daySchedule=[], dayCrew=[];
+  try{
+    const res=await fetch(`/api/runsheet/${todayStr}`);
+    const data=await res.json();
+    dayJobs=data.jobs||[];
+    daySchedule=data.schedule||[];
+    dayCrew=data.crew||[];
+  }catch(e){
+    dayJobs=lastFetchedJobs.filter(j=>j.runsheet_date===todayStr);
+  }
+  currentDaySchedule=daySchedule;
+
+  if(!dayJobs.length){
     content.innerHTML=`<div class="runsheet-empty">Nothing scheduled for this day yet.<br>Use the calendar icon on a job tile to schedule a job.</div>`;
     return;
   }
 
-  const vehicles=RS_CONFIG.vehicles; // ['Marlin','Bruce','Nigel','Nemo']
-  const slots=RS_CONFIG.time_slots;  // ['07:30','08:00',...,'15:30']
+  const vehicles=RS_CONFIG.vehicles;
+  const slots=RS_CONFIG.time_slots;
   const nCols=vehicles.length;
 
-  // Build lookup: vehicle → jobs in that column
-  // A job with multiple runsheet_vehicles appears in each of those columns.
-  // Jobs with no vehicles set appear in a special "unscheduled" strip below.
-  const byVehicle={};
-  vehicles.forEach(v=>{ byVehicle[v]=[]; });
-  const unscheduled=[];
-  for(const job of scheduled){
-    const vs=job.runsheet_vehicles||[];
-    if(!vs.length){ unscheduled.push(job); continue; }
-    vs.forEach(v=>{ if(byVehicle[v]) byVehicle[v].push(job); });
+  // Build vehicle→schedule entries lookup
+  const schedByVehicle={};
+  vehicles.forEach(v=>{schedByVehicle[v]=[];});
+  const jobById=Object.fromEntries(dayJobs.map(j=>[j.id,j]));
+  for(const entry of daySchedule){
+    const job=jobById[entry.job_id];
+    if(!job) continue;
+    if(schedByVehicle[entry.vehicle]) schedByVehicle[entry.vehicle].push({...entry,_job:job});
   }
 
-  // Build the team row text per vehicle column
-  // (shows the lead + offsiders names for any job assigned to that vehicle today)
-  const teamByVehicle={};
-  vehicles.forEach(v=>{
-    const jobs=byVehicle[v];
-    const people=new Set();
-    jobs.forEach(j=>{
-      if(j.runsheet_lead) people.add(j.runsheet_lead);
-      (j.runsheet_offsiders||[]).forEach(p=>people.add(p));
-    });
-    teamByVehicle[v]=Array.from(people).join(', ');
-  });
+  // Jobs with no schedule entries → unscheduled strip
+  const scheduledJobIds=new Set(daySchedule.map(e=>e.job_id));
+  const unscheduled=dayJobs.filter(j=>!scheduledJobIds.has(j.id));
 
-  // The LUNCH row — 12:30 in our slot list
+  // Vehicle crew from vehicle_day_crew table — keyed by vehicle
+  const crewByVehicle={};
+  dayCrew.forEach(c=>{ crewByVehicle[c.vehicle]=c; });
+
+  const HEADER_ROWS=2;
   const LUNCH_SLOT='12:30';
-  const LUNCH_ROW=timeToRow(LUNCH_SLOT);
+  let cells=[];
 
-  // Build the HTML entirely — using a CSS Grid with display:contents rows
-  // so the time column and all vehicle columns align perfectly.
-  let html=`<div class="rs-scroll"><div class="rs-grid" style="--rs-cols:60px repeat(${nCols},1fr);">`;
-
-  // Header row
-  html+=`<div class="rs-header">
-    <div class="rs-header-cell">Time</div>
-    ${vehicles.map(v=>`<div class="rs-header-cell">${v}</div>`).join('')}
-  </div>`;
-
-  // Team row
-  html+=`<div class="rs-header">
-    <div class="rs-team-cell"></div>
-    ${vehicles.map(v=>`<div class="rs-team-cell">${teamByVehicle[v]||''}</div>`).join('')}
-  </div>`;
-
-  // Body: one row per time slot
-  slots.forEach((slot,i)=>{
-    const isLunch=(slot===LUNCH_SLOT);
-    html+=`<div class="rs-row${isLunch?' rs-lunch-row':''}">`;
-    html+=`<div class="rs-time">${formatSlotLabel(slot)}</div>`;
-
-    vehicles.forEach(v=>{
-      // Find jobs for this vehicle that START in this slot
-      const jobsHere=(byVehicle[v]||[]).filter(j=>j.runsheet_time===slot);
-      let cellContent='';
-      if(isLunch) cellContent=`<div class="rs-lunch-label">Lunch</div>`;
-      jobsHere.forEach(j=>{
-        const dur=j.runsheet_duration||60;
-        const heightPx=Math.round((dur/30)*SLOT_H);
-        const typeClass=`rs-job-${j.runsheet_type||'install'}`;
-        const colour=COLOUR_MAP[j.colour]||'#888';
-        const ref=j.job_ref||j.job_number||'';
-        const addr=street_only_js(j.address||'');
-        const typeLabel=RUNSHEET_TYPE_LABELS[j.runsheet_type]||'';
-        const people=[j.runsheet_lead,...(j.runsheet_offsiders||[])].filter(Boolean).join(', ');
-        cellContent+=`<div class="rs-job ${typeClass}"
-          style="height:${heightPx}px;border-left-color:${colour};"
-          onclick="openRunsheetPopover('${j.id}')">
-          <div class="rs-job-ref">${ref}</div>
-          <div class="rs-job-addr">${addr}</div>
-          ${typeLabel?`<div class="rs-job-type">${typeLabel}</div>`:''}
-          ${people?`<div class="rs-job-people">${people}</div>`:''}
-        </div>`;
-      });
-      html+=`<div class="rs-cell">${cellContent}</div>`;
-    });
-    html+='</div>';
+  // Header row: Time + vehicle names
+  cells.push(`<div class="rs-header-cell" style="grid-column:1;grid-row:1;">Time</div>`);
+  vehicles.forEach((v,i)=>{
+    cells.push(`<div class="rs-header-cell" style="grid-column:${i+2};grid-row:1;">${v}</div>`);
   });
 
-  html+=`</div></div>`; // close rs-grid and rs-scroll
+  // Team row: clickable cells showing crew for each vehicle
+  // Tap to open the crew popover and set/edit lead + offsiders
+  cells.push(`<div class="rs-team-cell" style="grid-column:1;grid-row:2;cursor:default;"></div>`);
+  vehicles.forEach((v,i)=>{
+    const crew=crewByVehicle[v];
+    const hasCrew=!!(crew?.lead||(crew?.offsiders||[]).length);
+    const crewText=hasCrew
+      ? [crew.lead,...(crew.offsiders||[])].filter(Boolean).join(', ')
+      : `+ Set crew`;
+    const existingLead=crew?.lead||'';
+    const existingOffsiders=JSON.stringify(crew?.offsiders||[]).replace(/"/g,"'");
+    cells.push(`<div class="rs-team-cell${hasCrew?' has-crew':''}"
+      style="grid-column:${i+2};grid-row:2;"
+      onclick="openCrewPopover('${v}','${todayStr}','${existingLead}',JSON.parse('${existingOffsiders}'))"
+      title="Set ${v} crew for this day">${crewText}</div>`);
+  });
+
+  // Time labels + empty cells
+  slots.forEach((slot,si)=>{
+    const gridRow=HEADER_ROWS+si+1;
+    const isLunch=slot===LUNCH_SLOT;
+    cells.push(`<div class="rs-time${isLunch?' rs-lunch-time':''}" style="grid-column:1;grid-row:${gridRow};">${formatSlotLabel(slot)}</div>`);
+    vehicles.forEach((_,vi)=>{
+      cells.push(`<div class="rs-cell${isLunch?' rs-lunch-cell':''}" style="grid-column:${vi+2};grid-row:${gridRow};">${isLunch?'<span class="rs-lunch-label">Lunch</span>':''}</div>`);
+    });
+  });
+
+  // Job tiles — placed as extra grid items overlapping the cells
+  vehicles.forEach((v,vi)=>{
+    (schedByVehicle[v]||[]).forEach(entry=>{
+      const job=entry._job;
+      if(!entry.start_time) return; // no time → goes to unscheduled
+      const si=slotIndex(entry.start_time);
+      const dur=entry.duration||60;
+      const spanSlots=Math.max(1,Math.round(dur/30));
+      const rowStart=HEADER_ROWS+si+1;
+      const rowEnd=rowStart+spanSlots;
+      const typeClass=`rs-job-${job.runsheet_type||'install'}`;
+      const colour=COLOUR_MAP[job.colour]||'#888';
+      const ref=job.job_ref||job.job_number||'';
+      const addr=street_only_js(job.address||'');
+      const typeLabel=RUNSHEET_TYPE_LABELS[job.runsheet_type]||'';
+      const people=[entry.lead,...(entry.offsiders||[])].filter(Boolean).join(', ');
+      cells.push(`<div class="rs-job ${typeClass}"
+        style="grid-column:${vi+2};grid-row:${rowStart}/${rowEnd};border-left-color:${colour};z-index:2;"
+        onclick="openRunsheetPopover('${job.id}')">
+        <div class="rs-job-ref">${ref}</div>
+        <div class="rs-job-addr">${addr}</div>
+        ${typeLabel?`<div class="rs-job-type">${typeLabel}</div>`:''}
+        ${people?`<div class="rs-job-people">${people}</div>`:''}
+      </div>`);
+    });
+
+    // Jobs that have entries for this vehicle but no start_time → unscheduled
+    (schedByVehicle[v]||[]).filter(e=>!e.start_time).forEach(entry=>{
+      const job=entry._job;
+      if(!unscheduled.find(u=>u.id===job.id)) unscheduled.push(job);
+    });
+  });
+
+  let html=`<div class="rs-scroll">
+    <div class="rs-grid" style="grid-template-columns:60px repeat(${nCols},1fr);grid-template-rows:auto auto repeat(${TOTAL_SLOTS},${SLOT_H}px);">
+      ${cells.join('')}
+    </div>
+  </div>`;
 
   // Unscheduled strip
   if(unscheduled.length){
@@ -736,94 +752,74 @@ function street_only_js(addr){
   return addr.split(',')[0].trim();
 }
 
-// ── Schedule popover (calendar icon → full scheduling form) ──
+// ── Schedule popover: vehicle(s) + time + duration ──
 let runsheetPopoverJobId=null;
-let rsSelectedVehicles=[];
-let rsSelectedOffsiders=[];
+let schedVehicleSelected=[];
 
 function populateSchedPopoverDropdowns(){
-  // Time slots
-  const tSel=document.getElementById('runsheet-popover-time');
-  if(tSel){
-    tSel.innerHTML='<option value="">No time yet</option>'
-      +RS_CONFIG.time_slots.map(t=>`<option value="${t}">${formatSlotLabel(t)}</option>`).join('');
-  }
-  // Durations
-  const dSel=document.getElementById('runsheet-popover-duration');
-  if(dSel){
-    dSel.innerHTML='<option value="">Default (1 hr)</option>'
-      +RS_CONFIG.durations.map(d=>{
-        const h=Math.floor(d/60), m=d%60;
-        const lbl=h&&m?`${h}h ${m}m`:h?`${h} hr`:` ${m} min`;
-        return `<option value="${d}">${lbl}</option>`;
-      }).join('');
-  }
-  // Lead
-  const lSel=document.getElementById('runsheet-popover-lead');
-  if(lSel){
-    lSel.innerHTML='<option value="">No lead assigned</option>'
-      +['── Stylists ──',...RS_CONFIG.stylists,'── Drivers ──',...RS_CONFIG.drivers]
-        .map((w,i)=>w.startsWith('──')
-          ? `<option disabled>${w}</option>`
-          : `<option value="${w}">${w}</option>`).join('');
-  }
   // Vehicle chips
-  const vRow=document.getElementById('runsheet-popover-vehicles');
-  if(vRow){
-    vRow.innerHTML=RS_CONFIG.vehicles.map(v=>
-      `<button class="sched-chip" data-vehicle="${v}" onclick="toggleVehicleChip('${v}')">${v}</button>`
-    ).join('');
-  }
-  // Offsider chips
-  const oRow=document.getElementById('runsheet-popover-offsiders');
-  if(oRow){
-    oRow.innerHTML=[...RS_CONFIG.stylists,...RS_CONFIG.drivers].map(w=>
-      `<button class="sched-chip" data-worker="${w}" onclick="toggleOffsiderChip('${w}')">${w}</button>`
-    ).join('');
-  }
+  const vRow=document.getElementById('sched-vehicle-chips');
+  if(vRow) vRow.innerHTML=(RS_CONFIG.vehicles||[]).map(v=>
+    `<button class="sched-chip" data-sv="${v}" onclick="toggleSchedVehicle(this,'${v}')">${v}</button>`
+  ).join('');
+
+  // Time dropdown
+  const tSel=document.getElementById('sched-start-time');
+  if(tSel) tSel.innerHTML='<option value="">No time yet</option>'
+    +(RS_CONFIG.time_slots||[]).map(t=>`<option value="${t}">${formatSlotLabel(t)}</option>`).join('');
+
+  // Duration dropdown
+  const dSel=document.getElementById('sched-duration');
+  if(dSel) dSel.innerHTML='<option value="">1 hr (default)</option>'
+    +(RS_CONFIG.durations||[]).map(d=>{
+      const h=Math.floor(d/60), m=d%60;
+      return `<option value="${d}">${h&&m?`${h}h ${m}m`:h?`${h} hr`:`${m} min`}</option>`;
+    }).join('');
+
+  // Crew popover lead dropdown
+  const lSel=document.getElementById('crew-popover-lead');
+  if(lSel) lSel.innerHTML='<option value="">No lead</option>'
+    +['── Stylists ──',...(RS_CONFIG.stylists||[]),'── Drivers ──',...(RS_CONFIG.drivers||[])]
+      .map(w=>w.startsWith('──')?`<option disabled>${w}</option>`:`<option value="${w}">${w}</option>`).join('');
 }
 
-function toggleVehicleChip(v){
-  const idx=rsSelectedVehicles.indexOf(v);
-  if(idx===-1) rsSelectedVehicles.push(v);
-  else rsSelectedVehicles.splice(idx,1);
-  document.querySelectorAll(`[data-vehicle="${v}"]`).forEach(el=>
-    el.classList.toggle('selected', rsSelectedVehicles.includes(v)));
-}
-function toggleOffsiderChip(w){
-  const idx=rsSelectedOffsiders.indexOf(w);
-  if(idx===-1) rsSelectedOffsiders.push(w);
-  else rsSelectedOffsiders.splice(idx,1);
-  document.querySelectorAll(`[data-worker="${w}"]`).forEach(el=>
-    el.classList.toggle('selected', rsSelectedOffsiders.includes(w)));
+function toggleSchedVehicle(btn, v){
+  btn.classList.toggle('selected');
+  if(btn.classList.contains('selected')) schedVehicleSelected.push(v);
+  else schedVehicleSelected=schedVehicleSelected.filter(x=>x!==v);
 }
 
-function openRunsheetPopover(jobId){
+async function openRunsheetPopover(jobId){
   runsheetPopoverJobId=jobId;
-  const job=jobsById.get(jobId);
+  schedVehicleSelected=[];
+  const job=jobsById.get(jobId)||lastFetchedJobs.find(j=>j.id===jobId);
 
-  // Pre-fill all fields from the job's current runsheet state
+  document.getElementById('sched-popover-ref').textContent=
+    [job?.job_ref||job?.job_number, job?.address?street_only_js(job.address):null]
+      .filter(Boolean).join(' — ');
+
   document.getElementById('runsheet-popover-date').value=job?.runsheet_date||'';
   document.getElementById('runsheet-popover-type').value=job?.runsheet_type||'';
-  document.getElementById('runsheet-popover-time').value=job?.runsheet_time||'';
-  document.getElementById('runsheet-popover-duration').value=job?.runsheet_duration||'';
-  document.getElementById('runsheet-popover-lead').value=job?.runsheet_lead||'';
-
-  // Vehicles
-  rsSelectedVehicles=[...(job?.runsheet_vehicles||[])];
-  document.querySelectorAll('[data-vehicle]').forEach(el=>{
-    el.classList.toggle('selected', rsSelectedVehicles.includes(el.dataset.vehicle));
-  });
-
-  // Offsiders
-  rsSelectedOffsiders=[...(job?.runsheet_offsiders||[])];
-  document.querySelectorAll('[data-worker]').forEach(el=>{
-    el.classList.toggle('selected', rsSelectedOffsiders.includes(el.dataset.worker));
-  });
-
-  // Remove button only if already scheduled
   document.getElementById('runsheet-remove-btn').style.display=
-    job?.runsheet_date ? 'inline-block' : 'none';
+    job?.runsheet_date?'inline-block':'none';
+
+  // Pre-fill vehicles from existing schedule entries for this job
+  let existingEntries=[];
+  try{
+    const res=await fetch(`/api/jobs/${jobId}/schedule`);
+    existingEntries=await res.json();
+  }catch(e){}
+
+  // Show first entry's time/duration as defaults; vehicles = all entry vehicles
+  const firstEntry=existingEntries[0]||{};
+  schedVehicleSelected=[...new Set(existingEntries.map(e=>e.vehicle))];
+  document.getElementById('sched-start-time').value=firstEntry.start_time||'';
+  document.getElementById('sched-duration').value=firstEntry.duration||'';
+
+  // Reflect vehicle selection on chips
+  document.querySelectorAll('[data-sv]').forEach(el=>{
+    el.classList.toggle('selected', schedVehicleSelected.includes(el.dataset.sv));
+  });
 
   document.getElementById('runsheet-popover-overlay').classList.add('open');
   document.getElementById('runsheet-popover').classList.add('open');
@@ -833,53 +829,92 @@ function closeRunsheetPopover(){
   document.getElementById('runsheet-popover').classList.remove('open');
   runsheetPopoverJobId=null;
 }
+
 async function saveRunsheetEntry(){
   const date=document.getElementById('runsheet-popover-date').value;
   const type=document.getElementById('runsheet-popover-type').value;
   if(!date){ alert('Pick a date first.'); return; }
   if(!type){ alert('Choose a type — Install, Pickup, or To Load.'); return; }
 
-  const time=document.getElementById('runsheet-popover-time').value||null;
-  const dur=document.getElementById('runsheet-popover-duration').value;
-  const duration=dur?parseInt(dur):null;
-  const lead=document.getElementById('runsheet-popover-lead').value||null;
-  const vehicles=rsSelectedVehicles.length?rsSelectedVehicles:null;
-  const offsiders=rsSelectedOffsiders.length?rsSelectedOffsiders:null;
+  const time=document.getElementById('sched-start-time').value||null;
+  const durVal=document.getElementById('sched-duration').value;
+  const duration=durVal?parseInt(durVal):null;
 
-  const payload={
-    runsheet_date:date, runsheet_type:type,
-    runsheet_time:time, runsheet_duration:duration,
-    runsheet_vehicles:vehicles, runsheet_lead:lead,
-    runsheet_offsiders:offsiders,
-  };
+  // 1. Save date + type on the job
   await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
     method:'PATCH', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(payload)
+    body:JSON.stringify({runsheet_date:date, runsheet_type:type})
   });
-  // Update local cache immediately
   const job=jobsById.get(runsheetPopoverJobId);
-  if(job) Object.assign(job, payload);
+  if(job){ job.runsheet_date=date; job.runsheet_type=type; }
+
+  // 2. Replace schedule entries: delete all, then re-add one per selected vehicle
+  // This is simpler than diffing existing entries and handles re-saves cleanly.
+  const existingRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
+  const existing=await existingRes.json();
+  await Promise.all(existing.map(e=>fetch(`/api/schedule/${e.id}`,{method:'DELETE'})));
+  await Promise.all(schedVehicleSelected.map(v=>
+    fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({vehicle:v, start_time:time, duration})
+    })
+  ));
+
   closeRunsheetPopover();
   renderJobs();
-  if(currentView==='runsheet') renderRunsheet();
+  renderRunsheet();
 }
+
 async function removeFromRunsheet(){
-  const clearPayload={
-    runsheet_date:null, runsheet_type:null, runsheet_time:null,
-    runsheet_duration:null, runsheet_vehicles:null,
-    runsheet_lead:null, runsheet_offsiders:null,
-  };
+  if(!confirm('Remove this job from the runsheet and clear all vehicle assignments?')) return;
   await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
     method:'PATCH', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(clearPayload)
+    body:JSON.stringify({runsheet_date:null, runsheet_type:null})
   });
   const job=jobsById.get(runsheetPopoverJobId);
-  if(job) Object.assign(job, clearPayload);
+  if(job){ job.runsheet_date=null; job.runsheet_type=null; }
   closeRunsheetPopover();
   renderJobs();
-  if(currentView==='runsheet') renderRunsheet();
+  renderRunsheet();
 }
 
+// ── Crew popover: tap a vehicle's team cell to set lead + offsiders ──
+function openCrewPopover(vehicle, dateStr, existingLead, existingOffsiders){
+  document.getElementById('crew-popover-vehicle').value=vehicle;
+  document.getElementById('crew-popover-date').value=dateStr;
+  document.getElementById('crew-popover-title').textContent=`${vehicle} — Crew`;
+  document.getElementById('crew-popover-lead').value=existingLead||'';
+
+  // Offsider chips
+  const row=document.getElementById('crew-popover-offsiders');
+  const selected=existingOffsiders||[];
+  row.innerHTML=[...(RS_CONFIG.stylists||[]),...(RS_CONFIG.drivers||[])].map(w=>
+    `<button class="sched-chip${selected.includes(w)?' selected':''}"
+      onclick="this.classList.toggle('selected')">${w}</button>`
+  ).join('');
+
+  document.getElementById('crew-popover-overlay').classList.add('open');
+  document.getElementById('crew-popover').classList.add('open');
+}
+function closeCrewPopover(){
+  document.getElementById('crew-popover-overlay').classList.remove('open');
+  document.getElementById('crew-popover').classList.remove('open');
+}
+async function saveCrewEntry(){
+  const vehicle=document.getElementById('crew-popover-vehicle').value;
+  const dateStr=document.getElementById('crew-popover-date').value;
+  const lead=document.getElementById('crew-popover-lead').value||null;
+  const offsiders=Array.from(
+    document.querySelectorAll('#crew-popover-offsiders .sched-chip.selected')
+  ).map(el=>el.textContent);
+
+  await fetch(`/api/crew/${dateStr}/${vehicle}`,{
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({lead, offsiders})
+  });
+  closeCrewPopover();
+  renderRunsheet();
+}
 
 // ── Status change popover ──
 // Lists every status from STATUS_ORDER (the same list that drives the

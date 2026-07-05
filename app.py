@@ -1568,14 +1568,11 @@ def api_job(job_id):
     items = sb_get('items', f'job_id=eq.{job_id}&order=serial.asc')
     if not job:
         return jsonify({'error': 'Job not found'}), 404
-    # "Transferring to" is the inverse of "transfer from" — rather than
-    # storing a second pointer on this job (which could fall out of sync
-    # with the receiving job's transfer_from_job_id if either side is ever
-    # edited independently), it's derived here by querying for any job
-    # that names this one as its transfer source. This job has no record
-    # of being a transfer source itself; it's purely a query result.
     transferring_to = sb_get('jobs', f'transfer_from_job_id=eq.{job_id}')
-    return jsonify({'job': job[0], 'items': items, 'transferring_to': transferring_to})
+    schedule = sb_get('job_schedule', f'job_id=eq.{job_id}&order=start_time.asc')
+    return jsonify({'job': job[0], 'items': items,
+                    'transferring_to': transferring_to,
+                    'schedule': schedule or []})
 
 @app.route('/api/jobs/<job_id>/room-notes', methods=['GET'])
 def api_job_room_notes(job_id):
@@ -1643,77 +1640,119 @@ def api_job_notes(job_id):
 
 @app.route('/api/jobs/<job_id>/runsheet', methods=['PATCH'])
 def api_job_runsheet(job_id):
-    """Schedule (or clear) a job's runsheet entry. All scheduling fields
-    are optional except runsheet_date + runsheet_type when adding — a
-    job can appear on the grid without a time, truck, or workers yet,
-    and those can be filled in later.
-
-    Clearing (runsheet_date: null) wipes all scheduling fields together
-    so no stale values linger on a job that's been removed from the day.
-
-    runsheet_vehicles is an array — supports two-truck jobs where the
-    same job tile appears in multiple vehicle columns simultaneously.
-    runsheet_offsiders is also an array (multiple people per job)."""
+    """Set or clear the job-level runsheet fields (date + type only).
+    Clearing also deletes all job_schedule rows for this job."""
     data = request.get_json()
     runsheet_date = data.get('runsheet_date')
     runsheet_type = data.get('runsheet_type')
-
     if runsheet_date is not None and runsheet_type not in ('install', 'pickup', 'to_load'):
         return jsonify({'success': False, 'error': 'runsheet_type must be install, pickup, or to_load'}), 400
+    result = sb_patch('jobs', f'id=eq.{job_id}', {
+        'runsheet_date': runsheet_date,
+        'runsheet_type': runsheet_type if runsheet_date else None,
+    })
+    if not runsheet_date:
+        sb_delete('job_schedule', f'job_id=eq.{job_id}')
+    return jsonify({'success': bool(result)})
 
-    runsheet_time     = data.get('runsheet_time')
-    runsheet_duration = data.get('runsheet_duration')
-    runsheet_vehicles = data.get('runsheet_vehicles')
-    runsheet_lead     = data.get('runsheet_lead')
-    runsheet_offsiders = data.get('runsheet_offsiders')
 
-    if runsheet_time is not None and runsheet_time not in RUNSHEET_TIME_SLOTS:
-        return jsonify({'success': False, 'error': f'Invalid runsheet_time'}), 400
-    if runsheet_duration is not None and runsheet_duration not in RUNSHEET_DURATIONS:
-        return jsonify({'success': False, 'error': f'runsheet_duration must be a multiple of 30 between 30 and 240'}), 400
-    if runsheet_vehicles is not None:
-        bad = [v for v in runsheet_vehicles if v not in RUNSHEET_VEHICLES]
-        if bad:
-            return jsonify({'success': False, 'error': f'Unknown vehicles: {bad}'}), 400
-    if runsheet_lead is not None and runsheet_lead not in RUNSHEET_WORKERS:
-        return jsonify({'success': False, 'error': f'Unknown lead worker'}), 400
-    if runsheet_offsiders is not None:
-        bad = [w for w in runsheet_offsiders if w not in RUNSHEET_WORKERS]
-        if bad:
-            return jsonify({'success': False, 'error': f'Unknown offsiders: {bad}'}), 400
+@app.route('/api/runsheet/<date_str>', methods=['GET'])
+def api_runsheet_day(date_str):
+    """Jobs + schedule entries + crew for a specific date, in one request."""
+    jobs     = sb_get('jobs',            f'runsheet_date=eq.{date_str}')
+    crew     = sb_get('vehicle_day_crew', f'date=eq.{date_str}')
+    schedule = []
+    if jobs:
+        ids_str  = ','.join(j['id'] for j in jobs)
+        schedule = sb_get('job_schedule',
+                          f'job_id=in.({ids_str})&order=start_time.asc,created_at.asc') or []
+    return jsonify({'jobs': jobs or [], 'schedule': schedule, 'crew': crew or []})
 
-    if runsheet_date:
-        payload = {
-            'runsheet_date':     runsheet_date,
-            'runsheet_type':     runsheet_type,
-            'runsheet_time':     runsheet_time,
-            'runsheet_duration': runsheet_duration,
-            'runsheet_vehicles': runsheet_vehicles,
-            'runsheet_lead':     runsheet_lead,
-            'runsheet_offsiders': runsheet_offsiders,
-        }
+
+@app.route('/api/jobs/<job_id>/schedule', methods=['GET'])
+def api_job_schedule_list(job_id):
+    rows = sb_get('job_schedule', f'job_id=eq.{job_id}&order=start_time.asc')
+    return jsonify(rows or [])
+
+
+@app.route('/api/jobs/<job_id>/schedule', methods=['POST'])
+def api_job_schedule_add(job_id):
+    """Add a vehicle assignment. Body: {vehicle, start_time?, duration?}"""
+    data       = request.get_json()
+    vehicle    = data.get('vehicle')
+    start_time = data.get('start_time')
+    duration   = data.get('duration')
+    if vehicle not in RUNSHEET_VEHICLES:
+        return jsonify({'success': False, 'error': f'Unknown vehicle: {vehicle}'}), 400
+    if start_time is not None and start_time not in RUNSHEET_TIME_SLOTS:
+        return jsonify({'success': False, 'error': 'Invalid start_time'}), 400
+    if duration is not None and duration not in RUNSHEET_DURATIONS:
+        return jsonify({'success': False, 'error': 'Invalid duration'}), 400
+    result = sb_post('job_schedule', {'job_id': job_id, 'vehicle': vehicle,
+                                      'start_time': start_time, 'duration': duration})
+    return jsonify({'success': bool(result), 'row': result[0] if result else None})
+
+
+@app.route('/api/schedule/<entry_id>', methods=['PATCH'])
+def api_schedule_update(entry_id):
+    """Edit a vehicle assignment. Body: any of {vehicle, start_time, duration}"""
+    data    = request.get_json()
+    payload = {}
+    if 'vehicle' in data:
+        if data['vehicle'] not in RUNSHEET_VEHICLES:
+            return jsonify({'success': False, 'error': 'Unknown vehicle'}), 400
+        payload['vehicle'] = data['vehicle']
+    if 'start_time' in data:
+        if data['start_time'] is not None and data['start_time'] not in RUNSHEET_TIME_SLOTS:
+            return jsonify({'success': False, 'error': 'Invalid start_time'}), 400
+        payload['start_time'] = data['start_time']
+    if 'duration' in data:
+        if data['duration'] is not None and data['duration'] not in RUNSHEET_DURATIONS:
+            return jsonify({'success': False, 'error': 'Invalid duration'}), 400
+        payload['duration'] = data['duration']
+    result = sb_patch('job_schedule', f'id=eq.{entry_id}', payload)
+    return jsonify({'success': bool(result)})
+
+
+@app.route('/api/schedule/<entry_id>', methods=['DELETE'])
+def api_schedule_delete(entry_id):
+    result = sb_delete('job_schedule', f'id=eq.{entry_id}')
+    return jsonify({'success': bool(result)})
+
+
+# ── Vehicle day crew ──
+
+@app.route('/api/crew/<date_str>/<vehicle>', methods=['PUT'])
+def api_crew_upsert(date_str, vehicle):
+    """Set (or replace) the crew for a vehicle on a specific day.
+    Uses upsert on the unique (vehicle, date) constraint.
+    Body: {lead?, offsiders?[]}"""
+    if vehicle not in RUNSHEET_VEHICLES:
+        return jsonify({'success': False, 'error': 'Unknown vehicle'}), 400
+    data      = request.get_json()
+    lead      = data.get('lead')
+    offsiders = data.get('offsiders', [])
+    if lead is not None and lead not in RUNSHEET_WORKERS:
+        return jsonify({'success': False, 'error': 'Unknown lead'}), 400
+    bad = [w for w in offsiders if w not in RUNSHEET_WORKERS]
+    if bad:
+        return jsonify({'success': False, 'error': f'Unknown workers: {bad}'}), 400
+
+    # Try update first; if nothing matched, insert
+    existing = sb_get('vehicle_day_crew', f'vehicle=eq.{vehicle}&date=eq.{date_str}')
+    if existing:
+        result = sb_patch('vehicle_day_crew',
+                          f'vehicle=eq.{vehicle}&date=eq.{date_str}',
+                          {'lead': lead, 'offsiders': offsiders})
     else:
-        # Clearing — wipe all scheduling fields together
-        payload = {
-            'runsheet_date':     None,
-            'runsheet_type':     None,
-            'runsheet_time':     None,
-            'runsheet_duration': None,
-            'runsheet_vehicles': None,
-            'runsheet_lead':     None,
-            'runsheet_offsiders': None,
-        }
-
-    result = sb_patch('jobs', f'id=eq.{job_id}', payload)
+        result = sb_post('vehicle_day_crew',
+                         {'vehicle': vehicle, 'date': date_str,
+                          'lead': lead, 'offsiders': offsiders})
     return jsonify({'success': bool(result)})
 
 
 @app.route('/api/runsheet-config', methods=['GET'])
 def api_runsheet_config():
-    """Config endpoint — exposes all dropdown lists so the frontend
-    never hardcodes vehicles, workers, or time slots independently.
-    One source of truth: update the constants above, everything
-    picks them up automatically."""
     return jsonify({
         'vehicles':   RUNSHEET_VEHICLES,
         'stylists':   RUNSHEET_STYLISTS,
@@ -1722,7 +1761,6 @@ def api_runsheet_config():
         'time_slots': RUNSHEET_TIME_SLOTS,
         'durations':  RUNSHEET_DURATIONS,
     })
-
 
 
 @app.route('/api/jobs/<job_id>/transfer', methods=['PATCH'])

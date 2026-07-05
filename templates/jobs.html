@@ -841,24 +841,28 @@ async function saveRunsheetEntry(){
   const duration=durVal?parseInt(durVal):null;
 
   // 1. Save date + type on the job
-  await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
+  const r1=await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
     method:'PATCH', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({runsheet_date:date, runsheet_type:type})
   });
+  const d1=await r1.json();
+  if(!d1.success){ alert('Failed to save runsheet date/type: '+(d1.error||'unknown error')); return; }
   const job=jobsById.get(runsheetPopoverJobId);
   if(job){ job.runsheet_date=date; job.runsheet_type=type; }
 
-  // 2. Replace schedule entries: delete all, then re-add one per selected vehicle
-  // This is simpler than diffing existing entries and handles re-saves cleanly.
+  // 2. Replace schedule entries: delete all existing, re-add one per selected vehicle
   const existingRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
   const existing=await existingRes.json();
   await Promise.all(existing.map(e=>fetch(`/api/schedule/${e.id}`,{method:'DELETE'})));
-  await Promise.all(schedVehicleSelected.map(v=>
+
+  const insertResults=await Promise.all(schedVehicleSelected.map(v=>
     fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`,{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({vehicle:v, start_time:time, duration})
-    })
+    }).then(r=>r.json())
   ));
+  const failed=insertResults.filter(r=>!r.success);
+  if(failed.length) console.warn('[Schedule] Some vehicle inserts failed:', failed);
 
   closeRunsheetPopover();
   renderJobs();
@@ -908,10 +912,12 @@ async function saveCrewEntry(){
     document.querySelectorAll('#crew-popover-offsiders .sched-chip.selected')
   ).map(el=>el.textContent);
 
-  await fetch(`/api/crew/${dateStr}/${vehicle}`,{
+  const res=await fetch(`/api/crew/${dateStr}/${vehicle}`,{
     method:'PUT', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({lead, offsiders})
   });
+  const data=await res.json();
+  if(!data.success){ alert('Failed to save crew: '+(data.error||'unknown error')); return; }
   closeCrewPopover();
   renderRunsheet();
 }

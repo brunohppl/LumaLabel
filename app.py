@@ -286,7 +286,7 @@ def get_truck_eta(lat, lng, destination_address):
 # Vehicles: van (Marlin, used by stylists) + three trucks.
 # Workers split by role — both lists are combined for the full
 # worker dropdown; keeping them separate lets the UI group them.
-RUNSHEET_VEHICLES = ['Marlin', 'Bruce', 'Nigel', 'Nemo']
+RUNSHEET_VEHICLES = ['Marlin', 'Bruce', 'Nigel', 'Nemo', 'VUG']
 
 RUNSHEET_STYLISTS = ['Addy', 'Montie', 'Delphine', 'India', 'Hayley']
 RUNSHEET_DRIVERS  = ['Jo', 'Savio', 'Nick', 'Stefano', 'Yuri', 'Ayoub', 'Bruno', 'Phil']

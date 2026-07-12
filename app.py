@@ -1677,11 +1677,12 @@ def api_job_schedule_list(job_id):
 
 @app.route('/api/jobs/<job_id>/schedule', methods=['POST'])
 def api_job_schedule_add(job_id):
-    """Add a vehicle assignment. Body: {vehicle, start_time?, duration?}"""
+    """Add a vehicle assignment. Body: {vehicle, start_time?, duration?, notes?}"""
     data       = request.get_json()
     vehicle    = data.get('vehicle')
     start_time = data.get('start_time')
     duration   = data.get('duration')
+    notes      = data.get('notes') or None
     if vehicle not in RUNSHEET_VEHICLES:
         return jsonify({'success': False, 'error': f'Unknown vehicle: {vehicle}'}), 400
     if start_time is not None and start_time not in RUNSHEET_TIME_SLOTS:
@@ -1689,13 +1690,14 @@ def api_job_schedule_add(job_id):
     if duration is not None and duration not in RUNSHEET_DURATIONS:
         return jsonify({'success': False, 'error': 'Invalid duration'}), 400
     result = sb_post('job_schedule', {'job_id': job_id, 'vehicle': vehicle,
-                                      'start_time': start_time, 'duration': duration})
+                                      'start_time': start_time, 'duration': duration,
+                                      'notes': notes})
     return jsonify({'success': bool(result), 'row': result[0] if result else None})
 
 
 @app.route('/api/schedule/<entry_id>', methods=['PATCH'])
 def api_schedule_update(entry_id):
-    """Edit a vehicle assignment. Body: any of {vehicle, start_time, duration}"""
+    """Edit a vehicle assignment. Body: any of {vehicle, start_time, duration, notes}"""
     data    = request.get_json()
     payload = {}
     if 'vehicle' in data:
@@ -1710,6 +1712,8 @@ def api_schedule_update(entry_id):
         if data['duration'] is not None and data['duration'] not in RUNSHEET_DURATIONS:
             return jsonify({'success': False, 'error': 'Invalid duration'}), 400
         payload['duration'] = data['duration']
+    if 'notes' in data:
+        payload['notes'] = data['notes'] or None
     result = sb_patch('job_schedule', f'id=eq.{entry_id}', payload)
     return jsonify({'success': bool(result)})
 

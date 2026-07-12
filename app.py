@@ -1658,15 +1658,81 @@ def api_job_runsheet(job_id):
 
 @app.route('/api/runsheet/<date_str>', methods=['GET'])
 def api_runsheet_day(date_str):
-    """Jobs + schedule entries + crew for a specific date, in one request."""
+    """Jobs + schedule entries + crew + tasks for a specific date, in one request."""
     jobs     = sb_get('jobs',            f'runsheet_date=eq.{date_str}')
     crew     = sb_get('vehicle_day_crew', f'date=eq.{date_str}')
+    tasks    = sb_get('runsheet_tasks',   f'date=eq.{date_str}&order=start_time.asc')
     schedule = []
     if jobs:
         ids_str  = ','.join(j['id'] for j in jobs)
         schedule = sb_get('job_schedule',
                           f'job_id=in.({ids_str})&order=start_time.asc,created_at.asc') or []
-    return jsonify({'jobs': jobs or [], 'schedule': schedule, 'crew': crew or []})
+    return jsonify({'jobs': jobs or [], 'schedule': schedule,
+                    'crew': crew or [], 'tasks': tasks or []})
+
+
+@app.route('/api/tasks', methods=['POST'])
+def api_task_create():
+    """Create a freestanding runsheet task.
+    Body: {vehicle, date, title, notes?, start_time?, duration?}
+    vehicle is a vehicle name or 'ALL' for whole-team tasks."""
+    data       = request.get_json()
+    vehicle    = data.get('vehicle')
+    date_str   = data.get('date')
+    title      = (data.get('title') or '').strip()
+    notes      = data.get('notes') or None
+    start_time = data.get('start_time')
+    duration   = data.get('duration')
+
+    if not title:
+        return jsonify({'success': False, 'error': 'title is required'}), 400
+    if vehicle != 'ALL' and vehicle not in RUNSHEET_VEHICLES:
+        return jsonify({'success': False, 'error': f'Unknown vehicle: {vehicle}'}), 400
+    if start_time is not None and start_time not in RUNSHEET_TIME_SLOTS:
+        return jsonify({'success': False, 'error': 'Invalid start_time'}), 400
+    if duration is not None and duration not in RUNSHEET_DURATIONS:
+        return jsonify({'success': False, 'error': 'Invalid duration'}), 400
+
+    result = sb_post('runsheet_tasks', {
+        'vehicle': vehicle, 'date': date_str, 'title': title,
+        'notes': notes, 'start_time': start_time, 'duration': duration,
+    })
+    return jsonify({'success': bool(result), 'task': result[0] if result else None})
+
+
+@app.route('/api/tasks/<task_id>', methods=['PATCH'])
+def api_task_update(task_id):
+    """Edit a task. Body: any of {title, notes, vehicle, start_time, duration}"""
+    data    = request.get_json()
+    payload = {}
+    if 'title' in data:
+        title = (data['title'] or '').strip()
+        if not title:
+            return jsonify({'success': False, 'error': 'title cannot be empty'}), 400
+        payload['title'] = title
+    if 'notes'       in data: payload['notes']      = data['notes'] or None
+    if 'start_time'  in data:
+        if data['start_time'] is not None and data['start_time'] not in RUNSHEET_TIME_SLOTS:
+            return jsonify({'success': False, 'error': 'Invalid start_time'}), 400
+        payload['start_time'] = data['start_time']
+    if 'duration'    in data:
+        if data['duration'] is not None and data['duration'] not in RUNSHEET_DURATIONS:
+            return jsonify({'success': False, 'error': 'Invalid duration'}), 400
+        payload['duration'] = data['duration']
+    if 'vehicle'     in data:
+        v = data['vehicle']
+        if v != 'ALL' and v not in RUNSHEET_VEHICLES:
+            return jsonify({'success': False, 'error': f'Unknown vehicle: {v}'}), 400
+        payload['vehicle'] = v
+    result = sb_patch('runsheet_tasks', f'id=eq.{task_id}', payload)
+    return jsonify({'success': bool(result)})
+
+
+@app.route('/api/tasks/<task_id>', methods=['DELETE'])
+def api_task_delete(task_id):
+    result = sb_delete('runsheet_tasks', f'id=eq.{task_id}')
+    return jsonify({'success': bool(result)})
+
 
 
 @app.route('/api/jobs/<job_id>/schedule', methods=['GET'])

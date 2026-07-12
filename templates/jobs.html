@@ -162,6 +162,18 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .rs-job-addr{font-size:0.8rem;color:#444;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
 .rs-job-type{font-size:0.68rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin-top:3px;color:#555;}
 .rs-job-notes{font-size:0.75rem;color:#555;margin-top:4px;font-style:italic;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}
+/* Task tiles — distinct from job tiles: neutral grey, dashed border */
+.rs-task{border-radius:3px;overflow:hidden;border-left:4px dashed #aaa;
+  background:#f5f5f4;box-shadow:0 1px 4px rgba(0,0,0,0.08);
+  display:flex;flex-direction:column;transition:box-shadow 0.15s;cursor:pointer;}
+.rs-task:hover{box-shadow:0 2px 8px rgba(0,0,0,0.14);}
+.rs-task-content{padding:6px 8px 4px;flex:1;}
+.rs-task-title{font-size:0.88rem;font-weight:700;color:var(--ink);line-height:1.2;}
+.rs-task-notes{font-size:0.75rem;color:#666;margin-top:3px;font-style:italic;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}
+/* Clickable empty cells — subtle hover hint */
+.rs-cell-clickable{cursor:pointer;}
+.rs-cell-clickable:hover{background:rgba(184,147,90,0.06);}
+.rs-cell-clickable:hover::after{content:'+';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.1rem;color:rgba(184,147,90,0.4);pointer-events:none;}
 .rs-job-actions{display:flex;border-top:1px solid rgba(0,0,0,0.08);margin-top:auto;}
 .rs-job-btn-gear{width:32px;flex-shrink:0;padding:5px 4px;background:none;border:none;border-right:1px solid rgba(0,0,0,0.08);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#888;transition:background 0.12s;}
 .rs-job-btn-gear:hover{background:rgba(0,0,0,0.06);}
@@ -324,6 +336,52 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
   <div class="runsheet-popover-actions" style="margin-top:16px;">
     <button class="btn btn-outline" onclick="closeCrewPopover()" style="font-size:0.75rem;">Cancel</button>
     <button class="btn btn-gold" onclick="saveCrewEntry()">Save</button>
+  </div>
+</div>
+
+<!-- Task popover: create or edit a freestanding runsheet task -->
+<div class="runsheet-popover-overlay" id="task-popover-overlay" onclick="closeTaskPopover()"></div>
+<div class="runsheet-popover" id="task-popover" style="width:340px;">
+  <div class="runsheet-popover-title" id="task-popover-title">New Task</div>
+  <input type="hidden" id="task-popover-id"/>
+  <input type="hidden" id="task-popover-date"/>
+
+  <label class="runsheet-popover-label">Title</label>
+  <input type="text" id="task-popover-title-input" class="runsheet-popover-input"
+    placeholder="e.g. Unload truck, Team briefing…"/>
+
+  <label class="runsheet-popover-label">Vehicle</label>
+  <select id="task-popover-vehicle" class="runsheet-popover-input">
+    <option value="ALL">All Vehicles</option>
+  </select>
+
+  <div class="sched-two-col" style="margin-top:12px;">
+    <div>
+      <label class="runsheet-popover-label">Start time</label>
+      <select id="task-popover-time" class="runsheet-popover-input">
+        <option value="">No time yet</option>
+      </select>
+    </div>
+    <div>
+      <label class="runsheet-popover-label">Duration</label>
+      <select id="task-popover-duration" class="runsheet-popover-input">
+        <option value="">1 hr (default)</option>
+      </select>
+    </div>
+  </div>
+
+  <label class="runsheet-popover-label">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+  <textarea id="task-popover-notes" class="runsheet-popover-input"
+    placeholder="Any extra details…"
+    style="height:60px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
+
+  <div class="runsheet-popover-actions" style="margin-top:16px;">
+    <button class="btn btn-outline" onclick="deleteTask()" id="task-delete-btn"
+      style="font-size:0.72rem;display:none;color:var(--red);border-color:var(--red);">Delete</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-outline" onclick="closeTaskPopover()" style="font-size:0.75rem;">Cancel</button>
+      <button class="btn btn-gold" onclick="saveTask()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -613,20 +671,22 @@ async function renderRunsheet(){
   content.innerHTML='<div class="loading">Loading…</div>';
 
   // Fetch jobs + schedule entries + crew in one request
-  let dayJobs=[], daySchedule=[], dayCrew=[];
+  let dayJobs=[], daySchedule=[], dayCrew=[], dayTasks=[];
   try{
     const res=await fetch(`/api/runsheet/${todayStr}`);
     const data=await res.json();
     dayJobs=data.jobs||[];
     daySchedule=data.schedule||[];
     dayCrew=data.crew||[];
+    dayTasks=data.tasks||[];
   }catch(e){
     dayJobs=lastFetchedJobs.filter(j=>j.runsheet_date===todayStr);
   }
   currentDaySchedule=daySchedule;
+  currentDayTasksById=Object.fromEntries(dayTasks.map(t=>[t.id,t]));
 
-  if(!dayJobs.length){
-    content.innerHTML=`<div class="runsheet-empty">Nothing scheduled for this day yet.<br>Use the calendar icon on a job tile to schedule a job.</div>`;
+  if(!dayJobs.length && !dayTasks.length){
+    content.innerHTML=`<div class="runsheet-empty">Nothing scheduled for this day yet.<br>Use the calendar icon on a job tile to schedule a job, or tap any empty slot to add a task.</div>`;
     return;
   }
 
@@ -695,8 +755,14 @@ async function renderRunsheet(){
     const gridRow=HEADER_ROWS+si+1;
     const isLunch=slot===LUNCH_SLOT;
     cells.push(`<div class="rs-time${isLunch?' rs-lunch-time':''}" style="grid-column:1;grid-row:${gridRow};">${formatSlotLabel(slot)}</div>`);
-    vehicles.forEach((_,vi)=>{
-      cells.push(`<div class="rs-cell${isLunch?' rs-lunch-cell':''}" style="grid-column:${vi+2};grid-row:${gridRow};">${isLunch?'<span class="rs-lunch-label">Lunch</span>':''}</div>`);
+    vehicles.forEach((v,vi)=>{
+      if(isLunch){
+        cells.push(`<div class="rs-cell rs-lunch-cell" style="grid-column:${vi+2};grid-row:${gridRow};"><span class="rs-lunch-label">Lunch</span></div>`);
+      } else {
+        // Empty cells are clickable — tap to create a task pre-filled with this vehicle+time
+        cells.push(`<div class="rs-cell rs-cell-clickable" style="grid-column:${vi+2};grid-row:${gridRow};"
+          onclick="openTaskPopover(null,'${v}','${todayStr}','${slot}')"></div>`);
+      }
     });
   });
 
@@ -720,7 +786,6 @@ async function renderRunsheet(){
       const addr=street_only_js(job.address||'');
       const typeLabel=RUNSHEET_TYPE_LABELS[job.runsheet_type]||'';
       const notes=entry.notes||'';
-      // Tile has action buttons at the bottom — no whole-tile click to avoid accidental triggers
       cells.push(`<div class="rs-job ${typeClass}"
         style="grid-column:${vi+2};grid-row:${rowStart}/${rowEnd};border-left-color:${colour};z-index:2;">
         <div class="rs-job-content">
@@ -743,6 +808,31 @@ async function renderRunsheet(){
     (schedByVehicle[v]||[]).filter(e=>!e.start_time).forEach(entry=>{
       const job=entry._job;
       if(!unscheduled.find(u=>u.id===job.id)) unscheduled.push(job);
+    });
+  });
+
+  // Task tiles — freestanding grid entries (not tied to any job)
+  // vehicle="ALL" renders a tile in every column at the same time slot
+  dayTasks.forEach(task=>{
+    if(!task.start_time) return; // tasks without a time don't appear on the grid
+    const si=slotIndex(task.start_time);
+    if(si<0||si>=TOTAL_SLOTS) return;
+    const dur=task.duration||60;
+    const spanSlots=Math.max(1,Math.round(dur/30));
+    const rowStart=HEADER_ROWS+si+1;
+    const rowEnd=rowStart+spanSlots;
+    const targetCols=task.vehicle==='ALL'
+      ? vehicles.map((_,vi)=>vi+2)
+      : [vehicles.indexOf(task.vehicle)+2].filter(c=>c>=2);
+    targetCols.forEach(col=>{
+      cells.push(`<div class="rs-task"
+        style="grid-column:${col};grid-row:${rowStart}/${rowEnd};z-index:2;"
+        onclick="openTaskPopover('${task.id}','${task.vehicle}','${task.date}',null)">
+        <div class="rs-task-content">
+          <div class="rs-task-title">${task.title}</div>
+          ${task.notes?`<div class="rs-task-notes">${task.notes}</div>`:''}
+        </div>
+      </div>`);
     });
   });
 
@@ -972,6 +1062,101 @@ async function saveCrewEntry(){
   closeCrewPopover();
   renderRunsheet();
 }
+
+// ── Task popover ──
+// openTaskPopover(taskId, vehicle, dateStr, prefilledTime)
+// taskId=null → create mode; taskId=string → edit mode
+function openTaskPopover(taskId, vehicle, dateStr, prefilledTime){
+  const isEdit=!!taskId;
+  document.getElementById('task-popover-title').textContent=isEdit?'Edit Task':'New Task';
+  document.getElementById('task-popover-id').value=taskId||'';
+  document.getElementById('task-popover-date').value=dateStr||'';
+  document.getElementById('task-delete-btn').style.display=isEdit?'inline-block':'none';
+
+  // Populate vehicle dropdown with all vehicles + "All Vehicles"
+  const vSel=document.getElementById('task-popover-vehicle');
+  vSel.innerHTML='<option value="ALL">All Vehicles</option>'
+    +(RS_CONFIG.vehicles||[]).map(v=>`<option value="${v}">${v}</option>`).join('');
+  vSel.value=vehicle||'ALL';
+
+  // Populate time dropdown
+  const tSel=document.getElementById('task-popover-time');
+  tSel.innerHTML=timeOptions();
+  tSel.value=prefilledTime||'';
+
+  // Populate duration dropdown
+  const dSel=document.getElementById('task-popover-duration');
+  dSel.innerHTML=durationOptions();
+
+  if(isEdit){
+    // Edit mode — we need the task's current data. It's in dayTasks which
+    // is a local variable in renderRunsheet; pass data via inline onclick instead.
+    // Since we only have the id at this point, look it up from a module-level store.
+    const task=currentDayTasksById[taskId]||{};
+    document.getElementById('task-popover-title-input').value=task.title||'';
+    document.getElementById('task-popover-notes').value=task.notes||'';
+    tSel.value=task.start_time||'';
+    dSel.value=task.duration||'';
+    vSel.value=task.vehicle||'ALL';
+  } else {
+    document.getElementById('task-popover-title-input').value='';
+    document.getElementById('task-popover-notes').value='';
+    dSel.value='';
+  }
+
+  document.getElementById('task-popover-overlay').classList.add('open');
+  document.getElementById('task-popover').classList.add('open');
+  setTimeout(()=>document.getElementById('task-popover-title-input').focus(),80);
+}
+function closeTaskPopover(){
+  document.getElementById('task-popover-overlay').classList.remove('open');
+  document.getElementById('task-popover').classList.remove('open');
+}
+async function saveTask(){
+  const taskId=document.getElementById('task-popover-id').value||null;
+  const dateStr=document.getElementById('task-popover-date').value;
+  const title=document.getElementById('task-popover-title-input').value.trim();
+  const vehicle=document.getElementById('task-popover-vehicle').value;
+  const time=document.getElementById('task-popover-time').value||null;
+  const durVal=document.getElementById('task-popover-duration').value;
+  const duration=durVal?parseInt(durVal):null;
+  const notes=document.getElementById('task-popover-notes').value.trim()||null;
+
+  if(!title){ alert('Please enter a title for the task.'); return; }
+
+  if(taskId){
+    // Edit existing task
+    const res=await fetch(`/api/tasks/${taskId}`,{
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({title, vehicle, start_time:time, duration, notes})
+    });
+    const data=await res.json();
+    if(!data.success){ alert('Failed to update task: '+(data.error||'unknown error')); return; }
+  } else {
+    // Create new task
+    const res=await fetch('/api/tasks',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({vehicle, date:dateStr, title, notes, start_time:time, duration})
+    });
+    const data=await res.json();
+    if(!data.success){ alert('Failed to create task: '+(data.error||'unknown error')); return; }
+  }
+
+  closeTaskPopover();
+  renderRunsheet();
+}
+async function deleteTask(){
+  const taskId=document.getElementById('task-popover-id').value;
+  if(!taskId) return;
+  if(!confirm('Delete this task?')) return;
+  await fetch(`/api/tasks/${taskId}`,{method:'DELETE'});
+  closeTaskPopover();
+  renderRunsheet();
+}
+
+// Module-level task lookup — populated by renderRunsheet so the edit
+// popover can access task data without it being embedded in onclick strings
+let currentDayTasksById={};
 
 // ── Status change popover ──
 // Lists every status from STATUS_ORDER (the same list that drives the

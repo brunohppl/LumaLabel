@@ -115,9 +115,10 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .group-row-not-transferring .group-desc{color:var(--accent);}
 .not-transferring-row-tag{font-size:0.78rem;font-weight:600;color:var(--accent);margin-top:5px;letter-spacing:0.02em;}
 .group-note{font-size:0.82rem;color:var(--accent);margin-top:5px;font-style:italic;padding:4px 8px;background:rgba(184,147,90,0.08);border-radius:2px;}
-.photo-thumb-wrap{margin-top:6px;}
-.photo-thumb-btn{background:none;border:1px solid var(--border);border-radius:2px;padding:4px 10px;font-size:0.72rem;color:var(--muted);cursor:pointer;}
-.photo-thumb-btn:active{background:var(--warm);}
+.driver-photo-strip{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.driver-photo-thumb{width:60px;height:60px;object-fit:cover;border-radius:3px;border:1px solid var(--border);display:block;cursor:pointer;transition:border-color 0.15s;}
+.driver-photo-thumb:hover{border-color:var(--accent);}
+.driver-photo-strip-loading{font-size:0.72rem;color:var(--muted);margin-top:6px;}
 .photo-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;align-items:center;justify-content:center;}
 .photo-modal.open{display:flex;}
 .photo-modal img{max-width:95vw;max-height:90vh;border-radius:3px;}
@@ -203,6 +204,28 @@ function showPhoto(url){
 }
 function closePhoto(){
   document.getElementById('photo-modal').classList.remove('open');
+}
+
+async function renderDriverPhotoStrip(strip, itemId){
+  try{
+    const res=await fetch(`/api/items/${itemId}/photos`);
+    const photos=await res.json();
+    if(!photos.length){ strip.innerHTML=''; return; }
+    strip.innerHTML=photos.map(p=>
+      `<img class="driver-photo-thumb" src="${p.url}"
+        onclick="event.stopPropagation();showPhoto('${p.url}')"
+        title="Tap to view full size"/>`
+    ).join('');
+  }catch(e){
+    strip.innerHTML='';
+  }
+}
+
+async function loadDriverPhotoStrips(){
+  const strips=document.querySelectorAll('.driver-photo-strip[data-item-id]');
+  for(const strip of strips){
+    await renderDriverPhotoStrip(strip, strip.dataset.itemId);
+  }
 }
 
 const jobId=window.location.pathname.split('/').pop();
@@ -464,6 +487,7 @@ function renderRooms(){
     </div>`;
   }
   container.innerHTML=html;
+  loadDriverPhotoStrips();
 }
 
 function groupRowHTML(grp){
@@ -492,8 +516,13 @@ function groupRowHTML(grp){
   const location=grp.room?` <span class="group-location">(${grp.room})</span>`:'';
   const note=grp.notes?`<div class="group-note">${grp.notes}</div>`:'';
   const notTransferTag=grp.isNotTransferring?`<div class="not-transferring-row-tag">Staying behind — not part of the transfer</div>`:'';
-  const photoUrl=grp.photo_url||null;
-  const photoBtn=photoUrl?`<div class="photo-thumb-wrap"><button class="photo-thumb-btn" onclick="event.stopPropagation();showPhoto('${photoUrl}')">View Photo</button></div>`:'';
+  const firstItemId=grp.items[0].id;
+  // Photo strip — loaded lazily after the row is in the DOM.
+  // Only rendered when at least one item in the group has a photo.
+  const photoStripId=`driver-photo-strip-${grp.firstSerial}`;
+  const photoStrip=grp.photo_url
+    ? `<div class="driver-photo-strip" id="${photoStripId}" data-item-id="${firstItemId}"></div>`
+    : '';
   return `<div class="${cls}" id="grp-${grp.firstSerial}" onclick="toggleGroup('${ids}',this)">
     <button class="check-btn" onclick="toggleGroup('${ids}',this.closest('.group-row'));event.stopPropagation()">
       <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
@@ -503,7 +532,7 @@ function groupRowHTML(grp){
       <div class="group-desc">${desc}${location}</div>
       ${notTransferTag}
       ${note}
-      ${photoBtn}
+      ${photoStrip}
     </div>
   </div>`;
 }

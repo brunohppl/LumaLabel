@@ -36,6 +36,9 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .driver-notes-banner{background:rgba(184,147,90,0.08);border-bottom:1px solid rgba(184,147,90,0.3);padding:14px 20px;}
 .driver-notes-label{display:flex;align-items:center;gap:8px;font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:6px;}
 #driver-notes-text{font-size:0.92rem;color:var(--ink);line-height:1.5;}
+.accessory-tubs-banner{background:rgba(74,126,184,0.08);border-bottom:1px solid rgba(74,126,184,0.25);padding:13px 20px;display:flex;align-items:center;gap:10px;color:var(--blue);}
+.accessory-tubs-banner svg{flex-shrink:0;}
+#accessory-tubs-text{font-size:0.95rem;font-weight:700;color:var(--ink);}
 .transfer-banner{background:rgba(74,126,184,0.1);border-bottom:1px solid rgba(74,126,184,0.35);padding:12px 20px;font-size:0.88rem;color:var(--ink);line-height:1.4;}
 .transfer-banner b{color:var(--blue);}
 .transfer-banner-out{background:rgba(184,147,90,0.1);border-bottom:1px solid rgba(184,147,90,0.35);}
@@ -165,6 +168,11 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
   <div id="driver-notes-text"></div>
 </div>
 
+<div class="accessory-tubs-banner" id="accessory-tubs-banner" style="display:none;">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+  <span id="accessory-tubs-text"></span>
+</div>
+
 <div class="transfer-banner" id="transfer-banner" style="display:none;"></div>
 <div class="transfer-banner transfer-banner-out" id="transfer-out-banner" style="display:none;"></div>
 
@@ -250,6 +258,16 @@ async function loadJob(){
     notesBanner.style.display='block';
   } else {
     notesBanner.style.display='none';
+  }
+
+  const tubsBanner=document.getElementById('accessory-tubs-banner');
+  if(job.accessory_tubs){
+    const n=job.accessory_tubs;
+    document.getElementById('accessory-tubs-text').textContent=
+      `${n} accessory tub${n===1?'':'s'} needed`;
+    tubsBanner.style.display='flex';
+  } else {
+    tubsBanner.style.display='none';
   }
 
   const transferBanner=document.getElementById('transfer-banner');

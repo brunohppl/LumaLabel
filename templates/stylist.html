@@ -85,6 +85,11 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .room-card.done .room-card-name{color:var(--green);}
 .room-note{font-size:0.75rem;font-weight:500;font-style:italic;color:var(--accent);margin-top:3px;letter-spacing:0.01em;}
 .room-card-sub{font-size:0.72rem;color:var(--muted);margin-top:2px;}
+.room-delete-btn{background:none;border:none;cursor:pointer;padding:6px;color:var(--muted);border-radius:2px;transition:color 0.15s,background 0.15s;flex-shrink:0;display:flex;align-items:center;margin-left:auto;}
+.room-delete-btn:hover{color:var(--red);background:rgba(232,92,71,0.08);}
+.add-room-row{margin-bottom:14px;}
+.add-room-form{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;}
+.add-room-btn{font-size:0.75rem;padding:6px 12px;}
 
 .not-transferring-card{border:2px solid var(--accent);}
 .not-transferring-card .room-card-header{background:rgba(184,147,90,0.08);}
@@ -444,6 +449,8 @@ function roomCardHTML(room, roomItemList, isExtra=false){
   const roomNoteHtml=notesForRoom.length
     ? `<div class="room-note">${notesForRoom.map(n=>`<span>${n}</span>`).join(' · ')}</div>`
     : '';
+  const roomName=room||'Extras';
+  const itemIds=roomItemList.map(i=>`'${i.id}'`).join(',');
   return `<div class="room-card${done?' done':''}" id="stylist-room-${key}">
     <div class="room-card-header" onclick="toggleRoomCard(this)">
       <div class="ring-wrap">
@@ -455,9 +462,16 @@ function roomCardHTML(room, roomItemList, isExtra=false){
         <div class="ring-txt">${done?'<span class="ring-done-icon">✓</span>':`${picked}/${total}`}</div>
       </div>
       <div class="room-card-info">
-        <div class="room-card-name">${room||'Extras'}${roomNoteHtml}</div>
+        <div class="room-card-name">${roomName}${roomNoteHtml}</div>
         <div class="room-card-sub">${groups.length} line${groups.length!==1?'s':''} · ${total} item${total!==1?'s':''}</div>
       </div>
+      <button class="room-delete-btn" title="Remove entire room"
+        onclick="event.stopPropagation();deleteRoom('${roomName}',[${itemIds}])">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+        </svg>
+      </button>
       <span class="room-chevron">▼</span>
     </div>
     <div class="room-items">${groups.map(groupRow).join('')}</div>
@@ -500,13 +514,20 @@ function rerenderRoomProgress(){
 function renderItems(){
   const body=document.getElementById('items-container');
 
-  // "Not Transferring" items are pulled into their own card at the very
-  // top, separate from the normal room cards — same idea as the driver
-  // interface's top-level group, so a stylist sees exactly what the
-  // driver will see. Only shown when this job actually has any (i.e.
-  // currentJobIsTransferSource), and an item appears here OR under its
-  // room, never both.
   let html='';
+
+  // "Add Room" button — appears at top of the items area
+  html+=`<div class="add-room-row" id="add-room-row">
+    <button class="btn btn-outline add-room-btn" onclick="toggleAddRoomForm()" style="font-size:0.75rem;">+ Add Room</button>
+    <div class="add-room-form" id="add-room-form" style="display:none;">
+      <input type="text" id="new-room-name" class="add-input" placeholder="Room name e.g. MASTER, LIVING"
+        style="text-transform:uppercase;" onkeydown="if(event.key==='Enter')addRoom()"/>
+      <button class="btn btn-gold" onclick="addRoom()" style="font-size:0.78rem;">Add</button>
+      <button class="btn btn-outline" onclick="toggleAddRoomForm()" style="font-size:0.78rem;">Cancel</button>
+    </div>
+  </div>`;
+
+  // "Not Transferring" card at the top if this job is a transfer source
   if(currentJobIsTransferSource){
     const notTransferItems = allItems.filter(i=>i.not_transferring);
     if(notTransferItems.length){
@@ -524,7 +545,8 @@ function renderItems(){
     html+=roomCardHTML(room, roomItemList);
   }
 
-  const rooms_list=[...new Set(allItems.map(i=>i.room).filter(r=>r))];
+  // Build room list including any pending new rooms that have no items yet
+  const rooms_list=[...new Set([...allItems.map(i=>i.room).filter(r=>r), ...pendingRooms])];
   html+=`<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
     <div style="font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px;">Add Item</div>
     <div class="add-item-row">
@@ -729,6 +751,50 @@ async function deleteGroup(ids, label){
   renderItems();
 }
 
+// ── Room management ──
+// Rooms are derived from item.room — there's no separate room entity.
+// "Adding a room" means making its name available in the Add Item dropdown.
+// "Removing a room" means deleting all items in that room.
+let pendingRooms=[]; // room names added via "Add Room" that have no items yet
+
+function toggleAddRoomForm(){
+  const form=document.getElementById('add-room-form');
+  const btn=document.querySelector('.add-room-btn');
+  const visible=form.style.display!=='none';
+  form.style.display=visible?'none':'flex';
+  if(!visible) setTimeout(()=>document.getElementById('new-room-name').focus(),50);
+}
+
+function addRoom(){
+  const input=document.getElementById('new-room-name');
+  const name=(input.value||'').trim().toUpperCase();
+  if(!name){ alert('Please enter a room name.'); return; }
+  const existing=[...new Set(allItems.map(i=>i.room).filter(r=>r))];
+  if(existing.includes(name)||pendingRooms.includes(name)){
+    alert(`"${name}" already exists.`); return;
+  }
+  pendingRooms.push(name);
+  renderItems();
+  // Scroll to Add Item and pre-select the new room
+  setTimeout(()=>{
+    const sel=document.getElementById('new-room');
+    if(sel) sel.value=name;
+    document.getElementById('new-desc')?.focus();
+  },50);
+}
+
+async function deleteRoom(roomName, itemIds){
+  const count=itemIds.length;
+  const noun=count===1?'item':'items';
+  if(!confirm(`Remove the "${roomName}" room and all ${count} ${noun}? This can't be undone.`)) return;
+  // Delete all items in this room
+  await Promise.all(itemIds.map(id=>fetch(`/api/items/${id}`,{method:'DELETE'})));
+  allItems=allItems.filter(i=>!itemIds.includes(i.id));
+  // Also remove from pendingRooms if it was there
+  pendingRooms=pendingRooms.filter(r=>r!==roomName);
+  renderItems();
+}
+
 async function addItem(){
   const desc=document.getElementById('new-desc').value.trim(),room=document.getElementById('new-room').value;
   if(!desc)return;
@@ -736,9 +802,10 @@ async function addItem(){
   const newSerial=String(lastSerial+1).padStart(3,'0');
   const res=await fetch(`/api/jobs/${currentJob.id}/items`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serial:newSerial,room,description:desc,is_extra:false})});
   const newItem=await res.json();
+  // Once an item is added to a pending room, it's no longer "pending"
+  pendingRooms=pendingRooms.filter(r=>r!==room);
   allItems.push(newItem);document.getElementById('new-desc').value='';renderItems();
 }
-
 
 
 loadJob();

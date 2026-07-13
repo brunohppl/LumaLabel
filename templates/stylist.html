@@ -204,14 +204,16 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
   <!-- Accessory tubs — set by stylist, shown on driver interface as a one-liner -->
   <div id="accessory-tubs-section" style="margin-top:24px;padding:16px;background:var(--warm);border:1px solid var(--border);border-radius:3px;display:none;">
     <div style="font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px;">Accessory Tubs</div>
-    <div style="display:flex;align-items:center;gap:12px;">
+    <div style="display:flex;align-items:center;gap:10px;">
       <label style="font-size:0.88rem;color:var(--ink);">Number of accessory tubs needed</label>
       <input type="number" id="accessory-tubs-input" min="0" max="99" step="1"
         style="width:64px;padding:8px;border:1px solid var(--border);border-radius:2px;font-family:'Jost',sans-serif;font-size:1rem;text-align:center;outline:none;"
         placeholder="0"
-        oninput="saveAccessoryTubs(this.value)"
         onfocus="this.style.borderColor='var(--accent)'"
-        onblur="this.style.borderColor='var(--border)'"/>
+        onblur="this.style.borderColor='var(--border)'"
+        onkeydown="if(event.key==='Enter')saveAccessoryTubs()"/>
+      <button class="btn btn-gold" onclick="saveAccessoryTubs()" style="font-size:0.78rem;padding:8px 16px;">Save</button>
+      <span id="accessory-tubs-saved" style="font-size:0.75rem;color:var(--green);display:none;">✓ Saved</span>
     </div>
   </div>
 </div>
@@ -389,15 +391,16 @@ async function saveDriverNotes(value){
   await fetch(`/api/jobs/${currentJob.id}/notes`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({driver_notes:value})});
 }
 
-let tubsSaveTimer=null;
-function saveAccessoryTubs(value){
-  // Debounce — save 600ms after the user stops typing, not on every keystroke
-  clearTimeout(tubsSaveTimer);
-  tubsSaveTimer=setTimeout(async()=>{
-    const n=parseInt(value)||null;
-    currentJob.accessory_tubs=n;
-    await fetch(`/api/jobs/${currentJob.id}/notes`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessory_tubs:n})});
-  },600);
+async function saveAccessoryTubs(){
+  const input=document.getElementById('accessory-tubs-input');
+  const savedEl=document.getElementById('accessory-tubs-saved');
+  const n=parseInt(input.value)||null;
+  currentJob.accessory_tubs=n;
+  await fetch(`/api/jobs/${currentJob.id}/notes`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessory_tubs:n})});
+  if(savedEl){
+    savedEl.style.display='inline';
+    setTimeout(()=>{ savedEl.style.display='none'; },2000);
+  }
 }
 
 function renderStatus(){

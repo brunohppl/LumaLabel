@@ -200,6 +200,20 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
       onblur="saveDriverNotes(this.value)"></textarea>
   </div>
   <div id="items-container"><div class="loading"><div class="spinner"></div>Loading job…</div></div>
+
+  <!-- Accessory tubs — set by stylist, shown on driver interface as a one-liner -->
+  <div id="accessory-tubs-section" style="margin-top:24px;padding:16px;background:var(--warm);border:1px solid var(--border);border-radius:3px;display:none;">
+    <div style="font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px;">Accessory Tubs</div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <label style="font-size:0.88rem;color:var(--ink);">Number of accessory tubs needed</label>
+      <input type="number" id="accessory-tubs-input" min="0" max="99" step="1"
+        style="width:64px;padding:8px;border:1px solid var(--border);border-radius:2px;font-family:'Jost',sans-serif;font-size:1rem;text-align:center;outline:none;"
+        placeholder="0"
+        oninput="saveAccessoryTubs(this.value)"
+        onfocus="this.style.borderColor='var(--accent)'"
+        onblur="this.style.borderColor='var(--border)'"/>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -270,6 +284,12 @@ async function loadJob(){
   driverNotesEl.value = currentJob.driver_notes || '';
   driverNotesEl.style.height = 'auto';
   driverNotesEl.style.height = driverNotesEl.scrollHeight + 'px';
+
+  // Accessory tubs
+  const tubsInput = document.getElementById('accessory-tubs-input');
+  const tubsSection = document.getElementById('accessory-tubs-section');
+  if(tubsInput) tubsInput.value = currentJob.accessory_tubs || '';
+  if(tubsSection) tubsSection.style.display = 'block';
 
   renderStatus();
   renderItems();
@@ -367,6 +387,17 @@ async function saveDriverNotes(value){
   if(!currentJob) return;
   currentJob.driver_notes = value;
   await fetch(`/api/jobs/${currentJob.id}/notes`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({driver_notes:value})});
+}
+
+let tubsSaveTimer=null;
+function saveAccessoryTubs(value){
+  // Debounce — save 600ms after the user stops typing, not on every keystroke
+  clearTimeout(tubsSaveTimer);
+  tubsSaveTimer=setTimeout(async()=>{
+    const n=parseInt(value)||null;
+    currentJob.accessory_tubs=n;
+    await fetch(`/api/jobs/${currentJob.id}/notes`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessory_tubs:n})});
+  },600);
 }
 
 function renderStatus(){
@@ -600,7 +631,9 @@ function groupRow(grp){
   const picked  = grp.allPicked;
   const partial = grp.somePicked && !grp.allPicked;
   const serialTxt = grp.count>1 ? `#${grp.firstSerial}–#${grp.lastSerial}` : `#${grp.firstSerial}`;
-  const descTxt   = grp.count>1 ? `${grp.count}×  ${grp.description||'blank extra'}` : (grp.description||'<span style="color:var(--muted);font-style:italic">blank extra</span>');
+  // Accessories: don't prefix with "2×" — description is already clear from the packing slip
+  const isAccessories = /accessor/i.test(grp.description||'');
+  const descTxt   = grp.count>1 && !isAccessories ? `${grp.count}×  ${grp.description||'blank extra'}` : (grp.description||'<span style="color:var(--muted);font-style:italic">blank extra</span>');
   const isTransferItem = grp.allTransfer;
   const rowCls  = (isTransferItem?'item-row item-transfer-item':picked?'item-row item-picked':partial?'item-row item-partial':'item-row') + (grp.allNotTransferring?' item-not-transferring':'');
   const btnCls  = picked?'pick-btn picked':partial?'pick-btn partial':'pick-btn';

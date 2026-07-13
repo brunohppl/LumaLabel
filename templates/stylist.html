@@ -120,6 +120,8 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .photo-thumb:hover{border-color:var(--accent);}
 .photo-thumb-del{position:absolute;top:-5px;right:-5px;background:var(--red);color:white;border:none;border-radius:50%;width:16px;height:16px;font-size:9px;line-height:16px;text-align:center;cursor:pointer;padding:0;font-weight:700;}
 .photo-thumb-del:hover{background:#b00;}
+.photo-thumb-retake{position:absolute;bottom:-5px;right:-5px;background:var(--accent);color:white;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:16px;text-align:center;cursor:pointer;padding:0;font-weight:700;}
+.photo-thumb-retake:hover{background:#7a5010;}
 .photo-strip-loading{font-size:0.72rem;color:var(--muted);margin-left:48px;margin-top:6px;}
 
 .item-transfer-item{background:rgba(74,126,184,0.06);}
@@ -743,14 +745,40 @@ async function renderPhotoStrip(strip, itemId){
     const res=await fetch(`/api/items/${itemId}/photos`);
     const photos=await res.json();
     if(!photos.length){ strip.innerHTML=''; return; }
-    strip.innerHTML=photos.map(p=>`
+    strip.innerHTML=photos.map((p,i)=>`
       <div class="photo-thumb-wrap">
         <img class="photo-thumb" src="${p.url}" onclick="window.open('${p.url}','_blank')" title="View full size"/>
         <button class="photo-thumb-del" onclick="deleteItemPhoto('${p.id}','${itemId}','${strip.id}')" title="Delete photo">✕</button>
+        <input type="file" accept="image/*" capture="environment" id="retake-${p.id}" style="display:none;"
+          onchange="retakePhoto(this,'${p.id}','${itemId}','${strip.id}')"/>
+        <button class="photo-thumb-retake" onclick="document.getElementById('retake-${p.id}').click()" title="Retake / replace this photo">↺</button>
       </div>`).join('');
   }catch(e){
     strip.innerHTML='';
   }
+}
+
+async function retakePhoto(input, photoId, itemId, stripId){
+  const file=input.files[0];
+  if(!file) return;
+  const strip=document.getElementById(stripId);
+  if(strip) strip.innerHTML='<span class="photo-strip-loading">Replacing…</span>';
+  try{
+    // Delete the old photo record first, then upload and save the new one
+    await fetch(`/api/item-photos/${photoId}`,{method:'DELETE'});
+    const url=await uploadPhoto(file, itemId);
+    await fetch(`/api/items/${itemId}/photos`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url})
+    });
+    const item=allItems.find(i=>i.id===itemId);
+    if(item) item.photo_url=url;
+    if(strip) await renderPhotoStrip(strip, itemId);
+  }catch(e){
+    console.error('Retake failed:', e);
+    if(strip) await renderPhotoStrip(strip, itemId);
+  }
+  input.value='';
 }
 
 async function deleteItemPhoto(photoId, itemId, stripId){

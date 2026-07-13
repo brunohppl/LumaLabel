@@ -148,7 +148,7 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 /* ── GRID JOB TILES ── */
 /* Each grid job tile spans multiple rows based on its duration.
    Placed via grid-row on the cell wrapper and absolute within it. */
-.rs-job{border-radius:3px;overflow:hidden;
+.rs-job{border-radius:3px;
   border-left:4px solid transparent;
   box-shadow:0 2px 6px rgba(0,0,0,0.12);
   display:flex;flex-direction:column;
@@ -161,15 +161,20 @@ header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;j
 .rs-job-ref{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:700;color:var(--ink);line-height:1;}
 .rs-job-addr{font-size:0.8rem;color:#444;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
 .rs-job-type{font-size:0.68rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin-top:3px;color:#555;}
-.rs-job-notes{font-size:0.75rem;color:#555;margin-top:4px;font-style:italic;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}
+.rs-job-transfer{font-size:0.68rem;font-weight:600;margin-top:3px;padding:2px 5px;border-radius:2px;display:inline-block;}
+.rs-job-transfer-from{background:rgba(74,126,184,0.12);color:#1a5299;}
+.rs-job-transfer-to{background:rgba(184,147,90,0.15);color:#8a5c1a;}
+.rs-job-notes{font-size:0.75rem;color:#555;margin-top:4px;font-style:italic;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;cursor:pointer;}
+.rs-job-notes.expanded{display:block;overflow:visible;background:rgba(0,0,0,0.05);border-radius:3px;padding:5px 6px;margin-top:4px;}
 /* Task tiles — distinct from job tiles: neutral grey, dashed border */
-.rs-task{border-radius:3px;overflow:hidden;border-left:4px dashed #aaa;
+.rs-task{border-radius:3px;border-left:4px dashed #aaa;
   background:#f5f5f4;box-shadow:0 1px 4px rgba(0,0,0,0.08);
   display:flex;flex-direction:column;transition:box-shadow 0.15s;cursor:pointer;}
 .rs-task:hover{box-shadow:0 2px 8px rgba(0,0,0,0.14);}
 .rs-task-content{padding:6px 8px 4px;flex:1;}
 .rs-task-title{font-size:0.88rem;font-weight:700;color:var(--ink);line-height:1.2;}
-.rs-task-notes{font-size:0.75rem;color:#666;margin-top:3px;font-style:italic;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}
+.rs-task-notes{font-size:0.75rem;color:#666;margin-top:3px;font-style:italic;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;cursor:pointer;}
+.rs-task-notes.expanded{display:block;overflow:visible;background:rgba(0,0,0,0.05);border-radius:3px;padding:5px 6px;margin-top:3px;}
 /* Clickable empty cells — subtle hover hint */
 .rs-cell-clickable{cursor:pointer;}
 .rs-cell-clickable:hover{background:rgba(184,147,90,0.06);}
@@ -786,13 +791,27 @@ async function renderRunsheet(){
       const addr=street_only_js(job.address||'');
       const typeLabel=RUNSHEET_TYPE_LABELS[job.runsheet_type]||'';
       const notes=entry.notes||'';
+
+      // Transfer indicator — resolve both directions from the full job cache
+      let transferHtml='';
+      if(job.is_transfer && job.transfer_from_job_id){
+        const src=jobsById.get(job.transfer_from_job_id);
+        const srcRef=src?(src.job_ref||src.job_number):'?';
+        transferHtml=`<div class="rs-job-transfer rs-job-transfer-from">↓ Transfer from ${srcRef}</div>`;
+      } else if(transferringToMap.has(job.id)){
+        const dest=transferringToMap.get(job.id);
+        const destRef=dest.job_ref||dest.job_number;
+        transferHtml=`<div class="rs-job-transfer rs-job-transfer-to">↑ Transferring to ${destRef}</div>`;
+      }
+
       cells.push(`<div class="rs-job ${typeClass}"
         style="grid-column:${vi+2};grid-row:${rowStart}/${rowEnd};border-left-color:${colour};z-index:2;">
         <div class="rs-job-content">
           <div class="rs-job-ref">${ref}</div>
           <div class="rs-job-addr">${addr}</div>
           ${typeLabel?`<div class="rs-job-type">${typeLabel}</div>`:''}
-          ${notes?`<div class="rs-job-notes">${notes}</div>`:''}
+          ${transferHtml}
+          ${notes?`<div class="rs-job-notes" onclick="event.stopPropagation();this.classList.toggle('expanded')" title="Tap to expand">${notes}</div>`:''}
         </div>
         <div class="rs-job-actions">
           <button class="rs-job-btn-gear" onclick="openRunsheetPopover('${job.id}')" title="Edit schedule">${gearSVG}</button>
@@ -830,7 +849,7 @@ async function renderRunsheet(){
         onclick="openTaskPopover('${task.id}','${task.vehicle}','${task.date}',null)">
         <div class="rs-task-content">
           <div class="rs-task-title">${task.title}</div>
-          ${task.notes?`<div class="rs-task-notes">${task.notes}</div>`:''}
+          ${task.notes?`<div class="rs-task-notes" onclick="event.stopPropagation();this.classList.toggle('expanded')" title="Tap to expand">${task.notes}</div>`:''}
         </div>
       </div>`);
     });

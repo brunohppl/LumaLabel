@@ -1983,7 +1983,46 @@ def api_delete_item(item_id):
     result = sb_delete('items', f'id=eq.{item_id}')
     return jsonify({'success': result})
 
-@app.route('/api/jobs/<job_id>', methods=['DELETE'])
+@app.route('/api/items/<item_id>/photos', methods=['GET'])
+def api_item_photos_list(item_id):
+    """All photos for an item, oldest first."""
+    rows = sb_get('item_photos', f'item_id=eq.{item_id}&order=created_at.asc')
+    return jsonify(rows or [])
+
+@app.route('/api/items/<item_id>/photos', methods=['POST'])
+def api_item_photos_add(item_id):
+    """Record a new photo URL for an item. The actual file upload goes
+    direct from the browser to Supabase Storage — this just saves the URL.
+    Also updates items.photo_url to the new URL so the driver interface
+    always shows the most recently added photo."""
+    data = request.get_json()
+    url  = data.get('url', '').strip()
+    if not url:
+        return jsonify({'success': False, 'error': 'url required'}), 400
+    result = sb_post('item_photos', {'item_id': item_id, 'url': url})
+    # Keep items.photo_url in sync as the latest photo
+    sb_patch('items', f'id=eq.{item_id}', {'photo_url': url})
+    return jsonify({'success': bool(result), 'photo': result[0] if result else None})
+
+@app.route('/api/item-photos/<photo_id>', methods=['DELETE'])
+def api_item_photo_delete(photo_id):
+    """Delete a single photo record. If it was the primary photo (photo_url
+    on the item), update photo_url to the next most recent photo instead,
+    or null if no photos remain."""
+    # Find the photo to know which item it belongs to
+    photo = sb_get('item_photos', f'id=eq.{photo_id}')
+    if photo:
+        item_id = photo[0]['item_id']
+        sb_delete('item_photos', f'id=eq.{photo_id}')
+        # Re-derive photo_url from remaining photos (most recent)
+        remaining = sb_get('item_photos', f'item_id=eq.{item_id}&order=created_at.desc')
+        new_primary = remaining[0]['url'] if remaining else None
+        sb_patch('items', f'id=eq.{item_id}', {'photo_url': new_primary})
+    else:
+        sb_delete('item_photos', f'id=eq.{photo_id}')
+    return jsonify({'success': True})
+
+
 def api_delete_job(job_id):
     """Delete a job and all its associated data. Cascade order matters:
     items and room_notes must go before the job row itself (Supabase

@@ -719,6 +719,8 @@ def parse_packing_list(pdf_bytes):
     return meta, items
 
 def format_date(raw):
+    """Parse a date string and return a compact label like '7 JUL'.
+    Used for filenames and PDF checklist headers."""
     if not raw: return '—'
     for fmt in ('%d %B %Y', '%d %b %Y', '%B %d, %Y'):
         try:
@@ -731,12 +733,32 @@ def format_date(raw):
     return raw[:6].upper()
 
 
+def format_date_label(raw):
+    """Parse a date string and return a prominent label-friendly format
+    like 'WED 7TH JULY' for printing on the physical label itself.
+    Ordinal suffix (ST/ND/RD/TH) makes the day number unambiguous at a glance."""
+    if not raw: return '—'
+    dt = None
+    for fmt in ('%d %B %Y', '%d %b %Y', '%B %d, %Y', '%Y-%m-%d'):
+        try:
+            dt = datetime.strptime(raw.strip(), fmt)
+            break
+        except:
+            pass
+    if not dt:
+        # Fall back to the compact version if we can't parse it
+        return format_date(raw)
+    day = dt.day
+    suffix = 'TH' if 11 <= day <= 13 else {1:'ST', 2:'ND', 3:'RD'}.get(day % 10, 'TH')
+    return dt.strftime('%a').upper() + '-' + str(day) + suffix + ' ' + dt.strftime('%B').upper()
+
+
 # ════════════════════════════════════════════════
 # GENERATE LABELS PDF
 # ════════════════════════════════════════════════
 def generate_labels(meta, items, colour, label_format=18):
     colour_hex  = colour['hex']
-    date_txt    = format_date(meta['stage_date'])
+    date_txt    = format_date_label(meta['stage_date'])
 
     PAGE_W, PAGE_H = A4
 
@@ -806,33 +828,38 @@ def generate_labels(meta, items, colour, label_format=18):
         rxe = x + w - pad
         rw  = rxe - rx
 
-        # ── Layout (18pp): ITEM NUMBER (upper) → ROOM (bottom) → ADDRESS + DATE (very bottom) ──
-        ds  = 10    # date font
+        # ── Layout (18pp): ITEM NUMBER (upper) → ROOM (bottom) → DATE (prominent) → ADDRESS (very bottom) ──
         asz = 5.5   # address font
 
         # Divider — near top, below where date used to be
-        div_y = y + h - pad - ds * 1.2
+        div_y = y + h - pad - 10 * 1.2
         c.setStrokeColor(C_BORDER); c.setLineWidth(0.3)
         c.line(rx, div_y, rxe, div_y)
 
-        # Address + Date on same line at very bottom
+        # DATE — large, bold, auto-sized to fill the available width between
+        # divider and address line. "WED 7TH JULY" needs to be prominent
+        # enough to read at a glance when labels are stacked.
         addr = meta['address']
+        baseline_addr = y + pad
+        date_area_h = div_y - baseline_addr - asz * 1.6 - 3  # space between divider and address
+        # Auto-size: start large and shrink until it fits the panel width
+        date_sz = 14
+        while date_sz > 7 and c.stringWidth(date_txt, 'Helvetica-Bold', date_sz) > rw:
+            date_sz -= 0.5
+        date_y = baseline_addr + asz * 1.6 + 2  # sits just above the address line
+        c.setFillColor(C_INK)
+        c.setFont('Helvetica-Bold', date_sz)
+        c.drawString(rx, date_y, date_txt)
+
+        # Address — small, muted, at the very bottom
         c.setFillColor(C_MUTED); c.setFont('Helvetica', asz)
-        # Date right-aligned, address left-aligned on same baseline
-        date_sz = 8  # date font larger than address
-        dw = c.stringWidth(date_txt, 'Helvetica-Bold', date_sz)
-        # Truncate address if needed to leave room for date
-        addr_max_w = rw - dw - 6
+        addr_max_w = rw
         addr_display = addr
         while addr_display and c.stringWidth(addr_display, 'Helvetica', asz) > addr_max_w:
             addr_display = addr_display[:-1]
         if addr_display != addr:
             addr_display = addr_display[:-1] + '…'
-        baseline = y + pad
-        c.setFont('Helvetica', asz)
-        c.drawString(rx, baseline, addr_display)
-        c.setFillColor(C_INK); c.setFont('Helvetica-Bold', date_sz)
-        c.drawString(rxe - dw, baseline, date_txt)
+        c.drawString(rx, baseline_addr, addr_display)
 
         # ── Fixed label zones — all positions fixed in points from label edges ──
         ROOM_FONT  = 7          # fixed font — no auto-sizing

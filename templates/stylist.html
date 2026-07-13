@@ -114,6 +114,13 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .item-notes{width:100%;background:none;border:none;border-top:1px dashed var(--sand);padding:8px 0 4px;font-family:'Jost',sans-serif;font-size:0.9rem;color:var(--muted);outline:none;resize:none;margin-top:8px;margin-left:48px;}
 .item-notes:focus{color:var(--ink);border-top-color:var(--accent);}
 .item-notes::placeholder{color:var(--border);}
+.photo-strip{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;margin-left:48px;width:100%;}
+.photo-thumb-wrap{position:relative;flex-shrink:0;}
+.photo-thumb{width:56px;height:56px;object-fit:cover;border-radius:3px;border:1px solid var(--border);display:block;cursor:pointer;}
+.photo-thumb:hover{border-color:var(--accent);}
+.photo-thumb-del{position:absolute;top:-5px;right:-5px;background:var(--red);color:white;border:none;border-radius:50%;width:16px;height:16px;font-size:9px;line-height:16px;text-align:center;cursor:pointer;padding:0;font-weight:700;}
+.photo-thumb-del:hover{background:#b00;}
+.photo-strip-loading{font-size:0.72rem;color:var(--muted);margin-left:48px;margin-top:6px;}
 
 .item-transfer-item{background:rgba(74,126,184,0.06);}
 .item-transfer-item .item-desc{color:var(--blue);}
@@ -555,6 +562,9 @@ function renderItems(){
       <button class="btn btn-gold" onclick="addItem()">Add</button>
     </div></div>`;
   body.innerHTML=html;
+  // Load photo strips lazily after DOM is ready — only fetches for items
+  // that already have at least one photo (photo_url is set)
+  loadPhotoStrips();
 }
 
 function notTransferringCardHTML(notTransferItems){
@@ -594,12 +604,15 @@ function groupRow(grp){
   const btnCls  = picked?'pick-btn picked':partial?'pick-btn partial':'pick-btn';
   const ids     = grp.items.map(i=>i.id).join(',');
   const hasPhoto= grp.items.some(i=>i.photo_url);
-  const btnId   = `photo-btn-${grp.firstSerial}`;
   const inputId = `photo-input-${grp.firstSerial}`;
+  const stripId = `photo-strip-${grp.firstSerial}`;
+  // Photos are fetched lazily and rendered into the strip after the row
+  // is in the DOM — avoids a fetch-per-item on every renderItems() call.
   const camColour = hasPhoto ? 'var(--green)' : 'var(--border)';
-  const camTitle  = hasPhoto ? 'Photo taken — tap to replace' : 'Take photo';
+  const camTitle  = hasPhoto ? 'Photos taken — tap to add more' : 'Take photo';
   const camIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${camColour}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
   const trashIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
+  const firstItemId = grp.items[0].id;
 
   const transferCheckbox = (currentJob && currentJob.is_transfer) ? `
     <label class="transfer-checkbox-label" title="Mark as transferring from another job — driver won't need to load this">
@@ -622,8 +635,8 @@ function groupRow(grp){
       ${transferCheckbox}
       ${notTransferringCheckbox}
       <input type="file" accept="image/*" capture="environment" id="${inputId}" style="display:none;"
-        onchange="handlePhotoUpload(this,'${ids}','${btnId}')"/>
-      <button id="${btnId}" title="${camTitle}"
+        onchange="handlePhotoUpload(this,'${firstItemId}','${stripId}')"/>
+      <button title="${camTitle}"
         style="background:none;border:none;padding:2px;cursor:pointer;line-height:0;flex-shrink:0;"
         onclick="document.getElementById('${inputId}').click()">${camIcon}</button>
     </div>
@@ -632,6 +645,7 @@ function groupRow(grp){
       onblur="saveNote('${grp.items[0].id}',this.value)"
       oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
     >${grp.notes}</textarea>
+    <div class="photo-strip" id="${stripId}" data-item-id="${firstItemId}"></div>
   </div>`;
 }
 
@@ -662,13 +676,14 @@ async function toggleTransferItem(ids, checked, el){
 
 async function uploadPhoto(file, itemId){
   const compressed = await compressImage(file, 800, 0.6);
-  const path = `${itemId}.jpg`;
+  // Use a timestamp suffix so each photo gets a unique filename — previously
+  // all photos used itemId.jpg which meant re-uploading silently replaced the file
+  const path = `${itemId}_${Date.now()}.jpg`;
   const res = await fetch(`${SB_URL}/storage/v1/object/item-photos/${path}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${SB_KEY}`,
       'Content-Type': 'image/jpeg',
-      'x-upsert': 'true',
       'cache-control': '3600',
     },
     body: compressed,
@@ -699,23 +714,67 @@ function compressImage(file, maxWidth, quality){
   });
 }
 
-async function handlePhotoUpload(input, ids, btnId){
+async function handlePhotoUpload(input, itemId, stripId){
   const file=input.files[0];
   if(!file)return;
-  const btn=document.getElementById(btnId);
-  btn.textContent='Uploading…';btn.disabled=true;
+  const strip=document.getElementById(stripId);
+  if(strip) strip.innerHTML='<span class="photo-strip-loading">Uploading…</span>';
   try{
-    const idList=ids.split(',');
-    const url=await uploadPhoto(file,idList[0]);
-    await Promise.all(idList.map(id=>
-      fetch('/api/items/'+id+'/check',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo_url:url})})
-    ));
-    idList.forEach(id=>{const item=allItems.find(i=>i.id===id);if(item)item.photo_url=url;});
-    btn.textContent='Photo ✓';btn.classList.add('has-photo');
+    const url=await uploadPhoto(file, itemId);
+    // Save to item_photos table (backend also updates items.photo_url)
+    const res=await fetch(`/api/items/${itemId}/photos`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url})
+    });
+    const data=await res.json();
+    // Update local cache for the camera icon colour
+    const item=allItems.find(i=>i.id===itemId);
+    if(item) item.photo_url=url;
+    if(strip) await renderPhotoStrip(strip, itemId);
   }catch(e){
-    btn.textContent='Failed';
-  }finally{
-    btn.disabled=false;
+    console.error('Photo upload failed:', e);
+    if(strip) strip.innerHTML='<span class="photo-strip-loading" style="color:var(--red);">Upload failed</span>';
+  }
+  input.value=''; // reset so the same file can be selected again
+}
+
+async function renderPhotoStrip(strip, itemId){
+  try{
+    const res=await fetch(`/api/items/${itemId}/photos`);
+    const photos=await res.json();
+    if(!photos.length){ strip.innerHTML=''; return; }
+    strip.innerHTML=photos.map(p=>`
+      <div class="photo-thumb-wrap">
+        <img class="photo-thumb" src="${p.url}" onclick="window.open('${p.url}','_blank')" title="View full size"/>
+        <button class="photo-thumb-del" onclick="deleteItemPhoto('${p.id}','${itemId}','${strip.id}')" title="Delete photo">✕</button>
+      </div>`).join('');
+  }catch(e){
+    strip.innerHTML='';
+  }
+}
+
+async function deleteItemPhoto(photoId, itemId, stripId){
+  if(!confirm('Delete this photo?')) return;
+  await fetch(`/api/item-photos/${photoId}`,{method:'DELETE'});
+  // Update local cache
+  const remaining=await fetch(`/api/items/${itemId}/photos`).then(r=>r.json()).catch(()=>[]);
+  const item=allItems.find(i=>i.id===itemId);
+  if(item) item.photo_url=remaining.length?remaining[remaining.length-1].url:null;
+  const strip=document.getElementById(stripId);
+  if(strip) await renderPhotoStrip(strip, itemId);
+}
+
+// Lazy-load photo strips after renderItems() — called once the DOM is ready
+// so we don't fetch photos on every re-render, only when the strips are visible
+async function loadPhotoStrips(){
+  const strips=document.querySelectorAll('.photo-strip[data-item-id]');
+  for(const strip of strips){
+    const itemId=strip.dataset.itemId;
+    const item=allItems.find(i=>i.id===itemId);
+    // Only fetch if the item has at least one photo (avoids 404s for clean items)
+    if(item?.photo_url){
+      await renderPhotoStrip(strip, itemId);
+    }
   }
 }
 

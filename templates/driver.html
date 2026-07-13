@@ -36,9 +36,13 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .driver-notes-banner{background:rgba(184,147,90,0.08);border-bottom:1px solid rgba(184,147,90,0.3);padding:14px 20px;}
 .driver-notes-label{display:flex;align-items:center;gap:8px;font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:6px;}
 #driver-notes-text{font-size:0.92rem;color:var(--ink);line-height:1.5;}
-.accessory-tubs-banner{background:rgba(74,126,184,0.08);border-bottom:1px solid rgba(74,126,184,0.25);padding:13px 20px;display:flex;align-items:center;gap:10px;color:var(--blue);}
-.accessory-tubs-banner svg{flex-shrink:0;}
-#accessory-tubs-text{font-size:0.95rem;font-weight:700;color:var(--ink);}
+.accessory-tubs-row{display:flex;align-items:center;border-bottom:1px solid var(--border);background:rgba(74,126,184,0.04);transition:background 0.15s;cursor:pointer;}
+.accessory-tubs-row.checked{background:rgba(74,124,89,0.05);}
+.accessory-tubs-row.checked .check-circle{background:var(--green);border-color:var(--green);}
+.accessory-tubs-row.checked .check-tick{display:block;}
+.accessory-tubs-row.checked .check-empty{display:none;}
+#accessory-tubs-text{font-size:0.95rem;color:var(--ink);flex:1;}
+.accessory-tubs-row .group-desc{font-size:0.82rem;color:var(--muted);margin-top:2px;}
 .transfer-banner{background:rgba(74,126,184,0.1);border-bottom:1px solid rgba(74,126,184,0.35);padding:12px 20px;font-size:0.88rem;color:var(--ink);line-height:1.4;}
 .transfer-banner b{color:var(--blue);}
 .transfer-banner-out{background:rgba(184,147,90,0.1);border-bottom:1px solid rgba(184,147,90,0.35);}
@@ -132,6 +136,8 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .done-banner.show{display:block;}
 .done-title{font-size:1.5rem;font-weight:600;color:var(--green);}
 .done-sub{font-size:0.88rem;color:var(--muted);margin-top:5px;}
+.back-link{display:flex;align-items:center;gap:6px;color:rgba(250,248,244,0.55);text-decoration:none;font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;transition:color 0.15s;}
+.back-link:hover{color:var(--accent);}
 
 .loading{text-align:center;padding:60px 20px;color:var(--muted);}
 .spinner{width:22px;height:22px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px;}
@@ -142,7 +148,10 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 
 <div class="hdr">
   <div class="hdr-top">
-    <div class="hdr-logo">LUMA Warehouse</div>
+    <a href="/jobs" class="back-link">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      All Jobs
+    </a>
     <div id="status-badge" class="pill pill-readyload">Ready to Load</div>
   </div>
   <div class="hdr-ref" id="job-ref">—</div>
@@ -168,9 +177,14 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
   <div id="driver-notes-text"></div>
 </div>
 
-<div class="accessory-tubs-banner" id="accessory-tubs-banner" style="display:none;">
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-  <span id="accessory-tubs-text"></span>
+<div class="accessory-tubs-row" id="accessory-tubs-banner" style="display:none;" onclick="toggleTubsRow(this)">
+  <button class="check-btn" onclick="toggleTubsRow(document.getElementById('accessory-tubs-banner'));event.stopPropagation()">
+    <div class="check-circle" id="accessory-tubs-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
+  </button>
+  <div class="group-info">
+    <div id="accessory-tubs-text" style="font-size:0.95rem;font-weight:600;color:var(--ink);"></div>
+    <div class="group-desc">Accessory tubs — tap to mark collected</div>
+  </div>
 </div>
 
 <div class="transfer-banner" id="transfer-banner" style="display:none;"></div>
@@ -212,6 +226,10 @@ function showPhoto(url){
 }
 function closePhoto(){
   document.getElementById('photo-modal').classList.remove('open');
+}
+
+function toggleTubsRow(row){
+  row.classList.toggle('checked');
 }
 
 async function renderDriverPhotoStrip(strip, itemId){

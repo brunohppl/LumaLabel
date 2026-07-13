@@ -440,8 +440,8 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
 <script>
 let showArchived=false;
 const COLOUR_MAP={Red:'#D62828',Blue:'#1565C0',Green:'#2E7D32',Yellow:'#F9A825',Purple:'#6A0DAD',Orange:'#E65100',Teal:'#00838F',Magenta:'#AD1457',Brown:'#4E342E',Olive:'#558B2F',Indigo:'#283593',Cyan:'#00ACC1',Pink:'#F06292',Grey:'#757575'};
-const STATUS_LABELS={ready:'Ready to Pick',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',ready_to_collect:'Ready to Collect',archived:'Returned'};
-const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',ready_to_collect:'pill-readycollect',archived:'pill-returned'};
+const STATUS_LABELS={ready:'Ready to Pick',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',ready_to_collect:'Ready to Collect',returned:'Returned',archived:'Returned'};
+const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',ready_to_collect:'pill-readycollect',returned:'pill-returned',archived:'pill-returned'};
 
 function toggleArchived(){
   showArchived=!showArchived;
@@ -454,7 +454,11 @@ function toggleArchived(){
 
 // Status display order — strict order of execution, matching the
 // actual job lifecycle from start to finish.
-const STATUS_ORDER=['ready','picking','ready_to_load','loading','loaded','installed','ready_to_collect'];
+const STATUS_ORDER=['ready','picking','ready_to_load','loading','loaded','installed','ready_to_collect','returned'];
+// Note: "returned" is included here so admin can manually mark a job as returned
+// from the jobs page without needing the driver interface. The backend's
+// /api/jobs/<id>/status route silently converts "returned" to "archived" — the
+// same path used when a driver taps "Mark Returned" — so the end result is identical.
 const STATUS_SECTION_LABELS={
   ready:'Ready to Pick', picking:'Picking', ready_to_load:'Ready to Load',
   loading:'Loading', loaded:'Loaded', installed:'Installed', ready_to_collect:'Ready to Collect'
@@ -1178,12 +1182,10 @@ async function deleteTask(){
 let currentDayTasksById={};
 
 // ── Status change popover ──
-// Lists every status from STATUS_ORDER (the same list that drives the
-// Active Jobs section grouping) so this never falls out of sync with
-// what the rest of the app considers a valid, manually-settable status.
-// "archived" is deliberately excluded — it's reached automatically when
-// a driver marks a job Returned (see api_job_status in app.py, which
-// silently converts 'returned' to 'archived'), never picked directly.
+// Lists every status from STATUS_ORDER. "returned" is included so admin
+// can mark a job returned from the jobs page — the backend auto-converts
+// it to "archived" (same path as the driver interface), and the local
+// cache mirrors that conversion immediately so the tile moves correctly.
 let statusPopoverJobId=null;
 function openStatusPopover(jobId, btnEl){
   statusPopoverJobId=jobId;
@@ -1211,7 +1213,8 @@ async function changeJobStatus(newStatus){
     body:JSON.stringify({status:newStatus})
   });
   const job=jobsById.get(jobId);
-  if(job) job.status=newStatus;
+  // Mirror the backend's auto-conversion: 'returned' is stored as 'archived'
+  if(job) job.status=newStatus==='returned'?'archived':newStatus;
   closeStatusPopover();
   renderJobs();
   if(currentView==='runsheet') renderRunsheet();

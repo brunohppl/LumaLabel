@@ -139,10 +139,11 @@ def save_job_to_db(meta, items, colour_name, job_owner='', is_transfer=False,
             sb_post('room_notes', notes_data)
 
         # Seed the two-day schedule if an install date was provided.
+        # Pass items so bedroom count can drive smart vehicle assignment.
         # On re-upload with a new date, this replaces any existing schedule.
         # On re-upload without a date, existing schedule is left untouched.
         if install_date_iso:
-            seed_two_day_schedule(job_id, install_date_iso, 'install')
+            seed_two_day_schedule(job_id, install_date_iso, 'install', items=items)
 
     except Exception as e:
         pass  # Never let DB failure break label generation
@@ -1685,53 +1686,103 @@ def api_job_notes(job_id):
     result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})
 
-def seed_two_day_schedule(job_id, main_date_str, main_type):
+def count_bedrooms(items):
+    """Count distinct bedroom rooms from a job's item list.
+    Matches: Master Bedroom, Bedroom 2, 2nd Bedroom, Bedroom, etc.
+    Ignores: Living Room, Kitchen, Bathroom, Study, etc."""
+    bedroom_rooms = {
+        item['room'] for item in items
+        if item.get('room') and re.search(r'\b(bedroom|master)\b', item['room'], re.I)
+    }
+    return len(bedroom_rooms)
+
+
+def vehicles_for_job(items):
+    """Suggest vehicle(s) based on bedroom count.
+    Rules (guides only — always overridable by the team):
+      1–2 bedrooms  → Nemo   (smallest truck)
+      3 bedrooms    → Nigel  (mid-size)
+      4 bedrooms    → Bruce  (biggest single truck)
+      5+ bedrooms   → Nigel + Nemo  (two trucks share the load)
+    Returns a list of vehicle name strings."""
+    n = count_bedrooms(items)
+    if n == 0:
+        return []
+    elif n <= 2:
+        return ['Nemo']
+    elif n == 3:
+        return ['Nigel']
+    elif n == 4:
+        return ['Bruce']
+    else:  # 5+
+        return ['Nigel', 'Nemo']
+
+
+def seed_two_day_schedule(job_id, main_date_str, main_type, items=None):
     """Seed the standard two-day schedule for a job:
-    - Load day  (day before main_date): type=to_load, 13:30–15:30 (120 min)
-    - Main day  (main_date):            type=main_type, 07:30–10:00 (150 min)
+    - Load day  (day before main_date): to_load, 13:30–15:30 (120 min)
+    - Main day  (main_date):            main_type, 07:30–10:00 (150 min)
 
-    Called both from the label generator (on job creation/re-upload)
-    and from the runsheet PATCH route (when the user manually sets a date
-    via the calendar icon on a job tile).
+    If items are provided, smart vehicle assignment is applied:
+    bedroom count → Nemo (1-2 bed), Nigel (3 bed), Nigel+Nemo (4+ bed).
+    Vehicle is null (unscheduled strip) when bedroom count can't be determined.
 
-    Clears any existing job_schedule rows first so re-seeding on a
-    re-upload or date change never leaves stale entries behind.
-
-    For to_load type, only seeds the single to_load day (no second day).
-    """
-    from datetime import datetime, timedelta
+    For to_load type, only seeds the single load day.
+    Re-upload or date change: clears existing entries first."""
+    from datetime import datetime as _dt, timedelta
     sb_delete('job_schedule', f'job_id=eq.{job_id}')
 
     try:
-        main_dt   = datetime.strptime(main_date_str, '%Y-%m-%d')
+        main_dt   = _dt.strptime(main_date_str, '%Y-%m-%d')
         load_dt   = main_dt - timedelta(days=1)
         load_date = load_dt.strftime('%Y-%m-%d')
     except ValueError:
-        return  # malformed date — skip silently
+        return
 
-    # Load day entry (always — both install and pickup need loading the day before)
-    sb_post('job_schedule', {
-        'job_id':     job_id,
-        'date':       load_date,
-        'vehicle':    None,      # no vehicle assigned yet — shows in unscheduled strip
-        'start_time': '13:30',
-        'duration':   120,       # 1:30pm–3:30pm
-        'notes':      None,
-    })
+    vehicles = vehicles_for_job(items) if items else []
 
-    if main_type != 'to_load':
-        # Main day entry (install or pickup)
+    if vehicles:
+        # Create one load entry per vehicle
+        for v in vehicles:
+            sb_post('job_schedule', {
+                'job_id':     job_id,
+                'date':       load_date,
+                'vehicle':    v,
+                'start_time': '13:30',
+                'duration':   120,
+                'notes':      None,
+            })
+        if main_type != 'to_load':
+            for v in vehicles:
+                sb_post('job_schedule', {
+                    'job_id':     job_id,
+                    'date':       main_date_str,
+                    'vehicle':    v,
+                    'start_time': '07:30',
+                    'duration':   150,
+                    'notes':      None,
+                })
+    else:
+        # No bedroom data — create unassigned entries (show in unscheduled strip)
         sb_post('job_schedule', {
             'job_id':     job_id,
-            'date':       main_date_str,
+            'date':       load_date,
             'vehicle':    None,
-            'start_time': '07:30',
-            'duration':   150,   # 7:30am–10:00am
+            'start_time': '13:30',
+            'duration':   120,
             'notes':      None,
         })
+        if main_type != 'to_load':
+            sb_post('job_schedule', {
+                'job_id':     job_id,
+                'date':       main_date_str,
+                'vehicle':    None,
+                'start_time': '07:30',
+                'duration':   150,
+                'notes':      None,
+            })
 
-    # Keep jobs.runsheet_date pointing at the main date for backward
-    # compatibility with any code that still reads it
+    # Keep jobs.runsheet_date on the main date for backward compat
     sb_patch('jobs', f'id=eq.{job_id}', {
         'runsheet_date': main_date_str,
         'runsheet_type': main_type,
@@ -1756,7 +1807,9 @@ def api_job_runsheet(job_id):
                         'error': 'runsheet_type must be install, pickup, or to_load'}), 400
 
     if runsheet_date:
-        seed_two_day_schedule(job_id, runsheet_date, runsheet_type)
+        # Fetch items so bedroom count can drive smart vehicle assignment
+        items = sb_get('items', f'job_id=eq.{job_id}') or []
+        seed_two_day_schedule(job_id, runsheet_date, runsheet_type, items=items)
     else:
         sb_delete('job_schedule', f'job_id=eq.{job_id}')
         sb_patch('jobs', f'id=eq.{job_id}', {

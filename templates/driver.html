@@ -405,7 +405,7 @@ const ITEM_CATEGORIES = [
   { label: 'Rugs',              keywords: ['rug'] },
   { label: 'Floor Lamps',        keywords: ['floor lamp'] },
   { label: 'Artwork',           keywords: ['artwork'] },
-  { label: 'Soft Furnishings',  keywords: ['cushion','throw','linen','coverlet','pillow','towel'] },
+  { label: 'Linen and Cushions', keywords: ['linen','coverlet','towel','throw','cushion','pillow'] },
   { label: 'Outdoor',           keywords: ['outdoor'] },
   { label: 'Accessories',       keywords: ['accessor','centrepiece','mirror'] },
 ];
@@ -441,6 +441,15 @@ function isSmallLamp(desc){
   return d.includes('lamp') && !d.includes('floor lamp');
 }
 
+// Individual cushion/pillow/throw/linen items from the packing slip are
+// replaced on the driver side by a single "X× Cushion Bags" line set by
+// the stylist — so we filter out the raw items entirely.
+function isCushionItem(desc){
+  if(!desc) return false;
+  const d = desc.toLowerCase();
+  return /cushion|pillow|throw|coverlet/.test(d);
+}
+
 function getCategory(desc){
   if(!desc) return 'Other';
   const d = desc.toLowerCase();
@@ -471,7 +480,7 @@ function groupItems(list){
 
 function renderRooms(){
   const container=document.getElementById('items-container');
-  const allGrouped=groupItems(items.filter(i=>!i.is_extra && !isSmallLamp(i.description)));
+  const allGrouped=groupItems(items.filter(i=>!i.is_extra && !isSmallLamp(i.description) && !isCushionItem(i.description)));
 
   // "Not Transferring" items sit in their own group at the top, separate
   // from the item-type categories — these are real loadable items (going
@@ -489,6 +498,13 @@ function renderRooms(){
     catMap[grp.category].push(grp);
   }
 
+
+  // If stylist set cushion bags, ensure "Linen and Cushions" appears even
+  // when all individual cushion items were filtered out
+  const cushionBagCount = job && job.cushion_bags ? job.cushion_bags : 0;
+  if(cushionBagCount && !catMap['Linen and Cushions']){
+    catMap['Linen and Cushions'] = [];
+  }
 
   // Render in defined order, skip empty categories
   const orderedCats=ITEM_CATEGORIES.map(c=>c.label).filter(l=>catMap[l]);
@@ -525,7 +541,7 @@ function renderRooms(){
   }
 
   for(const cat of orderedCats){
-    const groups=catMap[cat];
+    const groups=catMap[cat]||[];
     const catItems=groups.flatMap(g=>g.items);
     const loadable=catItems.filter(i=>!i.is_transfer_item);
     const checked=loadable.filter(i=>i.checked).length;
@@ -533,6 +549,12 @@ function renderRooms(){
     const done=checked===total&&total>0;
     const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
     const key=cat.replace(/[^a-zA-Z0-9]/g,'_');
+
+    // Cushion bags row — injected at the top of the Linen and Cushions category
+    const cushionBagRow = (cat==='Linen and Cushions' && cushionBagCount)
+      ? cushionBagsRowHTML(cushionBagCount)
+      : '';
+
     html+=`<div class="room-card${done?' done':''}" id="room-${key}">
       <div class="room-card-header" onclick="toggleRoomCard(this)">
         <div class="ring-wrap">
@@ -550,12 +572,27 @@ function renderRooms(){
         <div class="room-chevron" id="chev-${key}">▼</div>
       </div>
       <div class="room-items" id="items-${key}">
+        ${cushionBagRow}
         ${groups.map(g=>groupRowHTML(g)).join('')}
       </div>
     </div>`;
   }
   container.innerHTML=html;
   loadDriverPhotoStrips();
+}
+
+function cushionBagsRowHTML(n){
+  const label=`${n}× Cushion Bag${n===1?'':'s'}`;
+  const id='cushion-bags-row';
+  return `<div class="group-row" id="${id}" onclick="this.classList.toggle('checked')">
+    <button class="check-btn" onclick="this.closest('.group-row').classList.toggle('checked');event.stopPropagation()">
+      <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
+    </button>
+    <div class="group-info">
+      <div class="group-desc" style="font-weight:600;">${label}</div>
+      <div class="group-desc" style="font-size:0.8rem;color:var(--muted);">Packed by stylist</div>
+    </div>
+  </div>`;
 }
 
 function groupRowHTML(grp){
@@ -633,7 +670,7 @@ async function toggleGroup(ids,el){
 }
 
 function rerenderRoomProgress(){
-  const allGrouped=groupItems(items.filter(i=>!i.is_extra && !isSmallLamp(i.description)));
+  const allGrouped=groupItems(items.filter(i=>!i.is_extra && !isSmallLamp(i.description) && !isCushionItem(i.description)));
   const notTransferGroups=allGrouped.filter(g=>g.isNotTransferring);
   const categoryGrouped=allGrouped.filter(g=>!g.isNotTransferring);
 

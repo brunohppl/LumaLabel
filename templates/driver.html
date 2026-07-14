@@ -403,7 +403,7 @@ const ITEM_CATEGORIES = [
   { label: 'Tables',            keywords: ['table','desk'] },
   { label: 'Storage & Consoles', keywords: ['console','buffet','dresser','entertainment unit','etu','shelv','bookshelf','wardrobe'] },
   { label: 'Rugs',              keywords: ['rug'] },
-  { label: 'Lamps & Lighting',  keywords: ['lamp','plant','floor lamp'] },
+  { label: 'Floor Lamps',        keywords: ['floor lamp'] },
   { label: 'Artwork',           keywords: ['artwork'] },
   { label: 'Soft Furnishings',  keywords: ['cushion','throw','linen','coverlet','pillow','towel'] },
   { label: 'Outdoor',           keywords: ['outdoor'] },
@@ -431,6 +431,14 @@ function formatDriverDesc(description){
       return `${size} Bed Frame`;
   }
   return description;
+}
+
+// Small lamps (table, desk, bedside, etc.) are packed in accessory tubs —
+// drivers don't need to see them. Only floor lamps are shown.
+function isSmallLamp(desc){
+  if(!desc) return false;
+  const d = desc.toLowerCase();
+  return d.includes('lamp') && !d.includes('floor lamp');
 }
 
 function getCategory(desc){
@@ -463,7 +471,7 @@ function groupItems(list){
 
 function renderRooms(){
   const container=document.getElementById('items-container');
-  const allGrouped=groupItems(items.filter(i=>!i.is_extra));
+  const allGrouped=groupItems(items.filter(i=>!i.is_extra && !isSmallLamp(i.description)));
 
   // "Not Transferring" items sit in their own group at the top, separate
   // from the item-type categories — these are real loadable items (going
@@ -625,7 +633,7 @@ async function toggleGroup(ids,el){
 }
 
 function rerenderRoomProgress(){
-  const allGrouped=groupItems(items.filter(i=>!i.is_extra));
+  const allGrouped=groupItems(items.filter(i=>!i.is_extra && !isSmallLamp(i.description)));
   const notTransferGroups=allGrouped.filter(g=>g.isNotTransferring);
   const categoryGrouped=allGrouped.filter(g=>!g.isNotTransferring);
 

@@ -71,8 +71,16 @@ def sb_delete(table, params):
     except Exception as e:
         return False
 
-def save_job_to_db(meta, items, colour_name, job_owner='', is_transfer=False, transfer_from_job_id=None):
-    """Save job and items to Supabase. Called after label generation."""
+def save_job_to_db(meta, items, colour_name, job_owner='', is_transfer=False,
+                   transfer_from_job_id=None, install_date_iso=None):
+    """Save job and items to Supabase. Called after label generation.
+
+    install_date_iso: the YYYY-MM-DD date entered by the user on the label
+    form. When provided, seeds the standard two-day schedule (load day +
+    install day). On re-upload, the old schedule is replaced if a date is
+    provided — old entries are wiped in seed_two_day_schedule via sb_delete.
+    If no install_date_iso is provided, the schedule is left as-is so
+    existing manual schedule adjustments survive a colour/owner re-print."""
     try:
         meta['job_owner'] = job_owner
         job_ref = re.sub(r'\D', '', meta['job_number'])[-3:] if meta['job_number'] else '000'
@@ -89,11 +97,11 @@ def save_job_to_db(meta, items, colour_name, job_owner='', is_transfer=False, tr
             'is_transfer': is_transfer,
             'transfer_from_job_id': transfer_from_job_id if is_transfer else None,
         }
-        # Delete existing job+items if re-generating
+        # Delete existing items if re-generating (keeps the job row itself)
         existing = sb_get('jobs', f'job_number=eq.{meta["job_number"]}')
         if existing:
             job_id = existing[0]['id']
-            sb_delete('items', f'job_id=eq.{job_id}')
+            sb_delete('items',      f'job_id=eq.{job_id}')
             sb_delete('room_notes', f'job_id=eq.{job_id}')
             sb_patch('jobs', f'id=eq.{job_id}', job_data)
         else:
@@ -129,6 +137,13 @@ def save_job_to_db(meta, items, colour_name, job_owner='', is_transfer=False, tr
         ]
         if notes_data:
             sb_post('room_notes', notes_data)
+
+        # Seed the two-day schedule if an install date was provided.
+        # On re-upload with a new date, this replaces any existing schedule.
+        # On re-upload without a date, existing schedule is left untouched.
+        if install_date_iso:
+            seed_two_day_schedule(job_id, install_date_iso, 'install')
+
     except Exception as e:
         pass  # Never let DB failure break label generation
 
@@ -1543,7 +1558,8 @@ def generate():
         label_filename = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
 
         # Save job to database (non-blocking)
-        save_job_to_db(meta, items, colour['name'], job_owner, is_transfer, transfer_from_job_id)
+        save_job_to_db(meta, items, colour['name'], job_owner, is_transfer,
+                       transfer_from_job_id, install_date_iso=install_date or None)
 
         # Send PDF directly to browser as a download — no third-party hosting needed
         job_ref = re.sub(r'\D', '', meta['job_number'])[-3:] if meta['job_number'] else '000'
@@ -1669,37 +1685,119 @@ def api_job_notes(job_id):
     result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})
 
+def seed_two_day_schedule(job_id, main_date_str, main_type):
+    """Seed the standard two-day schedule for a job:
+    - Load day  (day before main_date): type=to_load, 13:30–15:30 (120 min)
+    - Main day  (main_date):            type=main_type, 07:30–10:00 (150 min)
+
+    Called both from the label generator (on job creation/re-upload)
+    and from the runsheet PATCH route (when the user manually sets a date
+    via the calendar icon on a job tile).
+
+    Clears any existing job_schedule rows first so re-seeding on a
+    re-upload or date change never leaves stale entries behind.
+
+    For to_load type, only seeds the single to_load day (no second day).
+    """
+    from datetime import datetime, timedelta
+    sb_delete('job_schedule', f'job_id=eq.{job_id}')
+
+    try:
+        main_dt   = datetime.strptime(main_date_str, '%Y-%m-%d')
+        load_dt   = main_dt - timedelta(days=1)
+        load_date = load_dt.strftime('%Y-%m-%d')
+    except ValueError:
+        return  # malformed date — skip silently
+
+    # Load day entry (always — both install and pickup need loading the day before)
+    sb_post('job_schedule', {
+        'job_id':     job_id,
+        'date':       load_date,
+        'vehicle':    None,      # no vehicle assigned yet — shows in unscheduled strip
+        'start_time': '13:30',
+        'duration':   120,       # 1:30pm–3:30pm
+        'notes':      None,
+    })
+
+    if main_type != 'to_load':
+        # Main day entry (install or pickup)
+        sb_post('job_schedule', {
+            'job_id':     job_id,
+            'date':       main_date_str,
+            'vehicle':    None,
+            'start_time': '07:30',
+            'duration':   150,   # 7:30am–10:00am
+            'notes':      None,
+        })
+
+    # Keep jobs.runsheet_date pointing at the main date for backward
+    # compatibility with any code that still reads it
+    sb_patch('jobs', f'id=eq.{job_id}', {
+        'runsheet_date': main_date_str,
+        'runsheet_type': main_type,
+    })
+
+
 @app.route('/api/jobs/<job_id>/runsheet', methods=['PATCH'])
 def api_job_runsheet(job_id):
-    """Set or clear the job-level runsheet fields (date + type only).
-    Clearing also deletes all job_schedule rows for this job."""
+    """Set or clear the job's runsheet schedule.
+
+    When setting a date + type, auto-seeds the standard two-day schedule:
+    - Install/Pickup: load entry on the day before + main entry on the date
+    - To Load: just the single load entry on that date
+
+    Clearing (runsheet_date: null) deletes all job_schedule rows."""
     data = request.get_json()
     runsheet_date = data.get('runsheet_date')
     runsheet_type = data.get('runsheet_type')
+
     if runsheet_date is not None and runsheet_type not in ('install', 'pickup', 'to_load'):
-        return jsonify({'success': False, 'error': 'runsheet_type must be install, pickup, or to_load'}), 400
-    result = sb_patch('jobs', f'id=eq.{job_id}', {
-        'runsheet_date': runsheet_date,
-        'runsheet_type': runsheet_type if runsheet_date else None,
-    })
-    if not runsheet_date:
+        return jsonify({'success': False,
+                        'error': 'runsheet_type must be install, pickup, or to_load'}), 400
+
+    if runsheet_date:
+        seed_two_day_schedule(job_id, runsheet_date, runsheet_type)
+    else:
         sb_delete('job_schedule', f'job_id=eq.{job_id}')
-    return jsonify({'success': bool(result)})
+        sb_patch('jobs', f'id=eq.{job_id}', {
+            'runsheet_date': None,
+            'runsheet_type': None,
+        })
+
+    return jsonify({'success': True})
 
 
 @app.route('/api/runsheet/<date_str>', methods=['GET'])
 def api_runsheet_day(date_str):
-    """Jobs + schedule entries + crew + tasks for a specific date, in one request."""
-    jobs     = sb_get('jobs',            f'runsheet_date=eq.{date_str}')
-    crew     = sb_get('vehicle_day_crew', f'date=eq.{date_str}')
-    tasks    = sb_get('runsheet_tasks',   f'date=eq.{date_str}&order=start_time.asc')
-    schedule = []
-    if jobs:
-        ids_str  = ','.join(j['id'] for j in jobs)
-        schedule = sb_get('job_schedule',
-                          f'job_id=in.({ids_str})&order=start_time.asc,created_at.asc') or []
-    return jsonify({'jobs': jobs or [], 'schedule': schedule,
-                    'crew': crew or [], 'tasks': tasks or []})
+    """Jobs + schedule entries + crew + tasks for a specific date.
+
+    Schedule entries are now queried by job_schedule.date rather than
+    jobs.runsheet_date — this is what allows a single job to appear on
+    two different days (load day + install day). We collect all jobs
+    that have any schedule entry on this date, then return those jobs
+    and their entries together."""
+    # Find all schedule entries for this date
+    schedule = sb_get('job_schedule', f'date=eq.{date_str}&order=start_time.asc,created_at.asc') or []
+
+    # Derive the unique job IDs from those entries
+    job_ids = list({e['job_id'] for e in schedule if e.get('job_id')})
+
+    # Also include jobs whose legacy runsheet_date matches (backward compat
+    # for jobs scheduled before the date column was added to job_schedule)
+    legacy_jobs = sb_get('jobs', f'runsheet_date=eq.{date_str}') or []
+    legacy_ids  = [j['id'] for j in legacy_jobs]
+    all_ids     = list({*job_ids, *legacy_ids})
+
+    jobs = []
+    if all_ids:
+        ids_str = ','.join(all_ids)
+        jobs    = sb_get('jobs', f'id=in.({ids_str})') or []
+
+    crew  = sb_get('vehicle_day_crew', f'date=eq.{date_str}') or []
+    tasks = sb_get('runsheet_tasks',   f'date=eq.{date_str}&order=start_time.asc') or []
+
+    return jsonify({'jobs': jobs, 'schedule': schedule,
+                    'crew': crew, 'tasks': tasks})
 
 
 @app.route('/api/tasks', methods=['POST'])
@@ -1774,43 +1872,46 @@ def api_job_schedule_list(job_id):
 
 @app.route('/api/jobs/<job_id>/schedule', methods=['POST'])
 def api_job_schedule_add(job_id):
-    """Add a vehicle assignment. Body: {vehicle, start_time?, duration?, notes?}"""
+    """Add a vehicle assignment. Body: {vehicle?, date?, start_time?, duration?, notes?}
+    vehicle may be null for auto-seeded entries (shown in unscheduled strip)."""
     data       = request.get_json()
     vehicle    = data.get('vehicle')
+    date_str   = data.get('date')
     start_time = data.get('start_time')
     duration   = data.get('duration')
     notes      = data.get('notes') or None
-    if vehicle not in RUNSHEET_VEHICLES:
+    if vehicle is not None and vehicle not in RUNSHEET_VEHICLES:
         return jsonify({'success': False, 'error': f'Unknown vehicle: {vehicle}'}), 400
     if start_time is not None and start_time not in RUNSHEET_TIME_SLOTS:
         return jsonify({'success': False, 'error': 'Invalid start_time'}), 400
     if duration is not None and duration not in RUNSHEET_DURATIONS:
         return jsonify({'success': False, 'error': 'Invalid duration'}), 400
-    result = sb_post('job_schedule', {'job_id': job_id, 'vehicle': vehicle,
-                                      'start_time': start_time, 'duration': duration,
-                                      'notes': notes})
+    result = sb_post('job_schedule', {
+        'job_id': job_id, 'vehicle': vehicle, 'date': date_str,
+        'start_time': start_time, 'duration': duration, 'notes': notes,
+    })
     return jsonify({'success': bool(result), 'row': result[0] if result else None})
 
 
 @app.route('/api/schedule/<entry_id>', methods=['PATCH'])
 def api_schedule_update(entry_id):
-    """Edit a vehicle assignment. Body: any of {vehicle, start_time, duration, notes}"""
+    """Edit a vehicle assignment. Body: any of {vehicle, date, start_time, duration, notes}"""
     data    = request.get_json()
     payload = {}
     if 'vehicle' in data:
-        if data['vehicle'] not in RUNSHEET_VEHICLES:
+        if data['vehicle'] is not None and data['vehicle'] not in RUNSHEET_VEHICLES:
             return jsonify({'success': False, 'error': 'Unknown vehicle'}), 400
         payload['vehicle'] = data['vehicle']
+    if 'date'       in data: payload['date']       = data['date']
     if 'start_time' in data:
         if data['start_time'] is not None and data['start_time'] not in RUNSHEET_TIME_SLOTS:
             return jsonify({'success': False, 'error': 'Invalid start_time'}), 400
         payload['start_time'] = data['start_time']
-    if 'duration' in data:
+    if 'duration'   in data:
         if data['duration'] is not None and data['duration'] not in RUNSHEET_DURATIONS:
             return jsonify({'success': False, 'error': 'Invalid duration'}), 400
         payload['duration'] = data['duration']
-    if 'notes' in data:
-        payload['notes'] = data['notes'] or None
+    if 'notes'      in data: payload['notes'] = data['notes'] or None
     result = sb_patch('job_schedule', f'id=eq.{entry_id}', payload)
     return jsonify({'success': bool(result)})
 

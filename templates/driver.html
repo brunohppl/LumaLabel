@@ -36,13 +36,7 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .driver-notes-banner{background:rgba(184,147,90,0.08);border-bottom:1px solid rgba(184,147,90,0.3);padding:14px 20px;}
 .driver-notes-label{display:flex;align-items:center;gap:8px;font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:6px;}
 #driver-notes-text{font-size:0.92rem;color:var(--ink);line-height:1.5;}
-.accessory-tubs-row{display:flex;align-items:center;border-bottom:1px solid var(--border);background:rgba(74,126,184,0.04);transition:background 0.15s;cursor:pointer;}
-.accessory-tubs-row.checked{background:rgba(74,124,89,0.05);}
-.accessory-tubs-row.checked .check-circle{background:var(--green);border-color:var(--green);}
-.accessory-tubs-row.checked .check-tick{display:block;}
-.accessory-tubs-row.checked .check-empty{display:none;}
-#accessory-tubs-text{font-size:0.95rem;color:var(--ink);flex:1;}
-.accessory-tubs-row .group-desc{font-size:0.82rem;color:var(--muted);margin-top:2px;}
+
 .transfer-banner{background:rgba(74,126,184,0.1);border-bottom:1px solid rgba(74,126,184,0.35);padding:12px 20px;font-size:0.88rem;color:var(--ink);line-height:1.4;}
 .transfer-banner b{color:var(--blue);}
 .transfer-banner-out{background:rgba(184,147,90,0.1);border-bottom:1px solid rgba(184,147,90,0.35);}
@@ -177,15 +171,6 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
   <div id="driver-notes-text"></div>
 </div>
 
-<div class="accessory-tubs-row" id="accessory-tubs-banner" style="display:none;" onclick="toggleTubsRow(this)">
-  <button class="check-btn" onclick="toggleTubsRow(document.getElementById('accessory-tubs-banner'));event.stopPropagation()">
-    <div class="check-circle" id="accessory-tubs-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
-  </button>
-  <div class="group-info">
-    <div id="accessory-tubs-text" style="font-size:0.95rem;font-weight:600;color:var(--ink);"></div>
-    <div class="group-desc">Accessory tubs — tap to mark collected</div>
-  </div>
-</div>
 
 <div class="transfer-banner" id="transfer-banner" style="display:none;"></div>
 <div class="transfer-banner transfer-banner-out" id="transfer-out-banner" style="display:none;"></div>
@@ -226,10 +211,6 @@ function showPhoto(url){
 }
 function closePhoto(){
   document.getElementById('photo-modal').classList.remove('open');
-}
-
-function toggleTubsRow(row){
-  row.classList.toggle('checked');
 }
 
 async function renderDriverPhotoStrip(strip, itemId){
@@ -276,16 +257,6 @@ async function loadJob(){
     notesBanner.style.display='block';
   } else {
     notesBanner.style.display='none';
-  }
-
-  const tubsBanner=document.getElementById('accessory-tubs-banner');
-  if(job.accessory_tubs){
-    const n=job.accessory_tubs;
-    document.getElementById('accessory-tubs-text').textContent=
-      `${n} accessory tub${n===1?'':'s'} needed`;
-    tubsBanner.style.display='flex';
-  } else {
-    tubsBanner.style.display='none';
   }
 
   const transferBanner=document.getElementById('transfer-banner');
@@ -506,6 +477,12 @@ function renderRooms(){
     catMap['Linen and Cushions'] = [];
   }
 
+  // If stylist set accessory tubs, ensure "Accessories" category appears
+  const accessoryTubsCount = job && job.accessory_tubs ? job.accessory_tubs : 0;
+  if(accessoryTubsCount && !catMap['Accessories']){
+    catMap['Accessories'] = [];
+  }
+
   // Render in defined order, skip empty categories
   const orderedCats=ITEM_CATEGORIES.map(c=>c.label).filter(l=>catMap[l]);
   Object.keys(catMap).forEach(c=>{if(!orderedCats.includes(c))orderedCats.push(c);});
@@ -555,6 +532,11 @@ function renderRooms(){
       ? cushionBagsRowHTML(cushionBagCount)
       : '';
 
+    // Accessory tubs row — injected at the top of the Accessories category
+    const accessoryTubsRow = (cat==='Accessories' && accessoryTubsCount)
+      ? accessoryTubsRowHTML(accessoryTubsCount)
+      : '';
+
     html+=`<div class="room-card${done?' done':''}" id="room-${key}">
       <div class="room-card-header" onclick="toggleRoomCard(this)">
         <div class="ring-wrap">
@@ -573,6 +555,7 @@ function renderRooms(){
       </div>
       <div class="room-items" id="items-${key}">
         ${cushionBagRow}
+        ${accessoryTubsRow}
         ${groups.map(g=>groupRowHTML(g)).join('')}
       </div>
     </div>`;
@@ -583,14 +566,26 @@ function renderRooms(){
 
 function cushionBagsRowHTML(n){
   const label=`${n}× Cushion Bag${n===1?'':'s'}`;
-  const id='cushion-bags-row';
-  return `<div class="group-row" id="${id}" onclick="this.classList.toggle('checked')">
+  return `<div class="group-row" id="cushion-bags-row" onclick="this.classList.toggle('checked')">
     <button class="check-btn" onclick="this.closest('.group-row').classList.toggle('checked');event.stopPropagation()">
       <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
     </button>
     <div class="group-info">
       <div class="group-desc" style="font-weight:600;">${label}</div>
       <div class="group-desc" style="font-size:0.8rem;color:var(--muted);">Packed by stylist</div>
+    </div>
+  </div>`;
+}
+
+function accessoryTubsRowHTML(n){
+  const label=`${n} Accessory Tub${n===1?'':'s'}`;
+  return `<div class="group-row" id="accessory-tubs-row" onclick="this.classList.toggle('checked')">
+    <button class="check-btn" onclick="this.closest('.group-row').classList.toggle('checked');event.stopPropagation()">
+      <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
+    </button>
+    <div class="group-info">
+      <div class="group-desc" style="font-weight:600;">${label}</div>
+      <div class="group-desc" style="font-size:0.8rem;color:var(--muted);">Tap to mark collected</div>
     </div>
   </div>`;
 }

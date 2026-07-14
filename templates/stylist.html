@@ -672,7 +672,7 @@ function groupRow(grp){
       <span class="item-desc" style="margin-top:0;">${descTxt}</span>
       ${transferCheckbox}
       ${notTransferringCheckbox}
-      <input type="file" accept="image/*" capture="environment" id="${inputId}" style="display:none;"
+      <input type="file" accept="image/*" id="${inputId}" style="display:none;"
         onchange="handlePhotoUpload(this,'${firstItemId}','${stripId}')"/>
       <button title="${camTitle}"
         style="background:none;border:none;padding:2px;cursor:pointer;line-height:0;flex-shrink:0;"
@@ -785,7 +785,7 @@ async function renderPhotoStrip(strip, itemId){
       <div class="photo-thumb-wrap">
         <img class="photo-thumb" src="${p.url}" onclick="window.open('${p.url}','_blank')" title="View full size"/>
         <button class="photo-thumb-del" onclick="deleteItemPhoto('${p.id}','${itemId}','${strip.id}')" title="Delete photo">✕</button>
-        <input type="file" accept="image/*" capture="environment" id="retake-${p.id}" style="display:none;"
+        <input type="file" accept="image/*" id="retake-${p.id}" style="display:none;"
           onchange="retakePhoto(this,'${p.id}','${itemId}','${strip.id}')"/>
         <button class="photo-thumb-retake" onclick="document.getElementById('retake-${p.id}').click()" title="Retake / replace this photo">↺</button>
       </div>`).join('');

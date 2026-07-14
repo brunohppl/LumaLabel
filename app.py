@@ -1686,6 +1686,9 @@ def api_job_notes(job_id):
     if 'accessory_tubs' in data:
         v = data['accessory_tubs']
         payload['accessory_tubs'] = int(v) if v not in (None, '', 0) else None
+    if 'cushion_bags' in data:
+        v = data['cushion_bags']
+        payload['cushion_bags'] = int(v) if v not in (None, '', 0) else None
     result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})
 

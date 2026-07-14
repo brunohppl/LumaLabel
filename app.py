@@ -720,9 +720,12 @@ def parse_packing_list(pdf_bytes):
         if re.search(r'\blinen\b|cushion', description, re.I):
             description = description + ' (Bag)'
 
-        # Ensemble items always get exactly 3 labels: mattress + 2x bed frame
+        # Ensemble label counts: Single → 1 mattress + 1 bed frame
+        #                        Double/Queen/King → 1 mattress + 2 bed frames
         if re.search(r'\bensemble\b', description, re.I):
-            for suffix in ['(Mattress)', '(Bed Frame)', '(Bed Frame)']:
+            is_single = re.search(r'\bsingle\b', description, re.I)
+            suffixes = ['(Mattress)', '(Bed Frame)'] if is_single else ['(Mattress)', '(Bed Frame)', '(Bed Frame)']
+            for suffix in suffixes:
                 items.append({'serial': f'{serial:03d}', 'room': current_room, 'description': f'{description} {suffix}'})
                 serial += 1
             continue

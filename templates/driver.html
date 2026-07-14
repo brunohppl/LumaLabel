@@ -409,6 +409,29 @@ const ITEM_CATEGORIES = [
   { label: 'Accessories',     keywords: ['accessor','centrepiece','mirror'] },
 ];
 
+// Transform ensemble item descriptions into clean driver-friendly labels.
+// The packing slip produces e.g. "Double Ensemble (Mattress)" and
+// "Double Ensemble (Bed Frame)" — on the driver side we show these as
+// "Double Mattress" and "Double Bed Frame" (the count prefix e.g. "2×"
+// is added by groupRowHTML as normal, so "2× Double Bed Frame" appears).
+// Size words: Single, Double, Queen, King.
+const ENSEMBLE_SIZES = ['Single','Double','Queen','King'];
+
+function formatDriverDesc(description){
+  if(!description) return description;
+  for(const size of ENSEMBLE_SIZES){
+    // Match "[Size] Ensemble (Mattress)" → "[Size] Mattress"
+    const mattressRe = new RegExp(`^${size}\\s+Ensemble\\s*\\(Mattress\\)$`, 'i');
+    if(mattressRe.test(description.trim()))
+      return `${size} Mattress`;
+    // Match "[Size] Ensemble (Bed Frame)" → "[Size] Bed Frame"
+    const frameRe = new RegExp(`^${size}\\s+Ensemble\\s*\\(Bed Frame\\)$`, 'i');
+    if(frameRe.test(description.trim()))
+      return `${size} Bed Frame`;
+  }
+  return description;
+}
+
 function getCategory(desc){
   if(!desc) return 'Other';
   const d = desc.toLowerCase();
@@ -529,7 +552,8 @@ function renderRooms(){
 function groupRowHTML(grp){
   if(grp.isTransferItem){
     const serial=grp.count>1?`#${grp.firstSerial}–#${grp.lastSerial}`:`#${grp.firstSerial}`;
-    const desc=grp.count>1?`${grp.count}×  ${grp.description||'blank'}`:(grp.description||'<span style="opacity:0.5">blank extra</span>');
+    const rawDesc=formatDriverDesc(grp.description||'');
+    const desc=grp.count>1?`${grp.count}×  ${rawDesc||'blank'}`:(rawDesc||'<span style="opacity:0.5">blank extra</span>');
     const location=grp.room?` <span class="group-location">(${grp.room})</span>`:'';
     const note=grp.notes?`<div class="group-note">${grp.notes}</div>`:'';
     return `<div class="group-row group-row-transfer">
@@ -548,7 +572,8 @@ function groupRowHTML(grp){
   const cls=(grp.allChecked?'group-row checked':'group-row')+(grp.isNotTransferring?' group-row-not-transferring':'');
   const ids=grp.items.map(i=>i.id).join(',');
   const serial=grp.count>1?`#${grp.firstSerial}–#${grp.lastSerial}`:`#${grp.firstSerial}`;
-  const desc=grp.count>1?`${grp.count}×  ${grp.description||'blank'}`:(grp.description||'<span style="opacity:0.5">blank extra</span>');
+  const rawDesc=formatDriverDesc(grp.description||'');
+  const desc=grp.count>1?`${grp.count}×  ${rawDesc||'blank'}`:(rawDesc||'<span style="opacity:0.5">blank extra</span>');
   const location=grp.room?` <span class="group-location">(${grp.room})</span>`:'';
   const note=grp.notes?`<div class="group-note">${grp.notes}</div>`:'';
   const notTransferTag=grp.isNotTransferring?`<div class="not-transferring-row-tag">Staying behind — not part of the transfer</div>`:'';

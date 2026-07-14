@@ -997,12 +997,18 @@ async function saveRunsheetEntry(){
   // Collect per-vehicle time/duration/notes from dynamically-rendered inputs
   const vehicleData=schedVehicleSelected.map(v=>({
     vehicle:v,
+    // For install/pickup: load day is date-1, main day is date.
+    // The popover only has one date field — we assign the main date for
+    // all entries here and let the user adjust via the grid if needed.
+    date:date,
     start_time:document.getElementById(`sched-time-${v}`)?.value||null,
     duration:parseInt(document.getElementById(`sched-dur-${v}`)?.value)||null,
     notes:document.getElementById(`sched-notes-${v}`)?.value.trim()||null,
   }));
 
-  // Save date + type on the job
+  // PATCH the runsheet — this auto-seeds the two-day schedule on the backend.
+  // If the user also selected specific vehicles below, those will override
+  // the seeded entries in the next step.
   const r1=await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
     method:'PATCH', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({runsheet_date:date, runsheet_type:type})
@@ -1012,16 +1018,19 @@ async function saveRunsheetEntry(){
   const job=jobsById.get(runsheetPopoverJobId);
   if(job){ job.runsheet_date=date; job.runsheet_type=type; }
 
-  // Replace schedule entries — delete all, re-add one per vehicle with its own time
-  const existingRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
-  const existing=await existingRes.json();
-  await Promise.all(existing.map(e=>fetch(`/api/schedule/${e.id}`,{method:'DELETE'})));
-  await Promise.all(vehicleData.map(vd=>
-    fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`,{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(vd)
-    })
-  ));
+  // If the user selected specific vehicles in the popover, replace the
+  // auto-seeded entries with their explicit assignments
+  if(vehicleData.length){
+    const existingRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
+    const existing=await existingRes.json();
+    await Promise.all(existing.map(e=>fetch(`/api/schedule/${e.id}`,{method:'DELETE'})));
+    await Promise.all(vehicleData.map(vd=>
+      fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`,{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(vd)
+      })
+    ));
+  }
 
   closeRunsheetPopover();
   renderJobs();

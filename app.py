@@ -1594,6 +1594,11 @@ def jobs_page():
     with open('templates/jobs.html', 'r') as f:
         return f.read()
 
+@app.route('/catalogue', methods=['GET'])
+def catalogue_page():
+    with open('templates/catalogue.html', 'r') as f:
+        return f.read()
+
 @app.route('/stylist/<job_id>', methods=['GET'])
 def stylist_page(job_id):
     with open('templates/stylist.html', 'r') as f:
@@ -2153,20 +2158,143 @@ def api_item_photos_list(item_id):
     rows = sb_get('item_photos', f'item_id=eq.{item_id}&order=created_at.asc')
     return jsonify(rows or [])
 
+
+# ── Furniture catalogue helpers ──
+# Category mapping mirrors the driver interface's ITEM_CATEGORIES.
+# Descriptions that don't match any category are not catalogued (accessories,
+# extras, ensembles components, etc. are excluded).
+_CATALOGUE_CATEGORIES = [
+    ('Storage & Consoles',  ['console','buffet','dresser','entertainment unit','etu','shelv','bookshelf','wardrobe']),
+    ('Bedside Tables',      ['bedside']),
+    ('Chairs',              ['chair','barstool','stool','bench seat']),
+    ('Sofas',               ['sofa','settee','lounge']),
+    ('Rugs',                ['rug']),
+    ('Linen and Cushions',  ['linen','coverlet','towel','throw','cushion','pillow']),
+    ('Beds & Mattresses',   ['ensemble','mattress','bed frame','headboard','bedhead']),
+    ('Tables',              ['table','desk']),
+    ('Artwork',             ['artwork']),
+    ('Floor Lamps',         ['floor lamp']),
+    ('Outdoor',             ['outdoor']),
+    ('Accessories',         ['accessor','centrepiece','mirror']),
+]
+
+def catalogue_type_for(description):
+    """Return the catalogue type label for a description, or None if it
+    shouldn't be catalogued (e.g. blank extras, unrecognised items)."""
+    if not description:
+        return None
+    d = description.lower()
+    for label, keywords in _CATALOGUE_CATEGORIES:
+        if any(k in d for k in keywords):
+            return label
+    return None
+
+
 @app.route('/api/items/<item_id>/photos', methods=['POST'])
 def api_item_photos_add(item_id):
     """Record a new photo URL for an item. The actual file upload goes
     direct from the browser to Supabase Storage — this just saves the URL.
     Also updates items.photo_url to the new URL so the driver interface
-    always shows the most recently added photo."""
+    always shows the most recently added photo.
+
+    Auto-catalogues the FIRST photo of an item into furniture_catalogue
+    if the item description maps to a known furniture category. Subsequent
+    photos for the same item are not re-catalogued (one entry per item per job)."""
     data = request.get_json()
     url  = data.get('url', '').strip()
     if not url:
         return jsonify({'success': False, 'error': 'url required'}), 400
+
+    # Check if this is the first photo for this item
+    existing_photos = sb_get('item_photos', f'item_id=eq.{item_id}')
+    is_first_photo  = not existing_photos
+
     result = sb_post('item_photos', {'item_id': item_id, 'url': url})
-    # Keep items.photo_url in sync as the latest photo
     sb_patch('items', f'id=eq.{item_id}', {'photo_url': url})
+
+    # Auto-catalogue: only on first photo, only for catalogueable item types
+    if is_first_photo:
+        item = sb_get('items', f'id=eq.{item_id}')
+        if item:
+            item      = item[0]
+            desc      = item.get('description', '')
+            room      = item.get('room', '')
+            job_id    = item.get('job_id')
+            cat_type  = catalogue_type_for(desc)
+            if cat_type:
+                sb_post('furniture_catalogue', {
+                    'type':         cat_type,
+                    'room_context': room or None,
+                    'description':  desc,
+                    'photo_url':    url,
+                    'item_id':      item_id,
+                    'job_id':       job_id,
+                })
+
     return jsonify({'success': bool(result), 'photo': result[0] if result else None})
+
+
+@app.route('/api/catalogue', methods=['GET'])
+def api_catalogue_list():
+    """All catalogue entries, newest first. Optionally filter by type and/or
+    room_context via query params: /api/catalogue?type=Sofas&room=Living+Room"""
+    filters = 'order=created_at.desc'
+    t = request.args.get('type')
+    r = request.args.get('room')
+    if t: filters += f'&type=eq.{t}'
+    if r: filters += f'&room_context=eq.{r}'
+    rows = sb_get('furniture_catalogue', filters)
+    return jsonify(rows or [])
+
+
+@app.route('/api/catalogue', methods=['POST'])
+def api_catalogue_add():
+    """Manually add a catalogue entry. Body: {type, room_context?, description?, photo_url}"""
+    data = request.get_json()
+    url  = (data.get('photo_url') or '').strip()
+    cat_type = (data.get('type') or '').strip()
+    if not url or not cat_type:
+        return jsonify({'success': False, 'error': 'type and photo_url required'}), 400
+    result = sb_post('furniture_catalogue', {
+        'type':         cat_type,
+        'room_context': data.get('room_context') or None,
+        'description':  data.get('description') or None,
+        'photo_url':    url,
+        'item_id':      None,
+        'job_id':       None,
+    })
+    return jsonify({'success': bool(result), 'entry': result[0] if result else None})
+
+
+@app.route('/api/catalogue/<entry_id>', methods=['PATCH'])
+def api_catalogue_update(entry_id):
+    """Edit a catalogue entry. Body: any of {type, room_context, description, photo_url}"""
+    data    = request.get_json()
+    payload = {}
+    if 'type'         in data: payload['type']         = data['type']
+    if 'room_context' in data: payload['room_context'] = data['room_context'] or None
+    if 'description'  in data: payload['description']  = data['description'] or None
+    if 'photo_url'    in data: payload['photo_url']    = data['photo_url']
+    result = sb_patch('furniture_catalogue', f'id=eq.{entry_id}', payload)
+    return jsonify({'success': bool(result)})
+
+
+@app.route('/api/catalogue/<entry_id>', methods=['DELETE'])
+def api_catalogue_delete(entry_id):
+    result = sb_delete('furniture_catalogue', f'id=eq.{entry_id}')
+    return jsonify({'success': bool(result)})
+
+
+@app.route('/api/catalogue/types', methods=['GET'])
+def api_catalogue_types():
+    """All distinct types + room_contexts in the catalogue, for building
+    the filter UI without a full table scan."""
+    rows = sb_get('furniture_catalogue', 'select=type,room_context')
+    types = sorted({r['type'] for r in (rows or []) if r.get('type')})
+    rooms = sorted({r['room_context'] for r in (rows or []) if r.get('room_context')})
+    # Also include the full defined list so empty categories still appear
+    all_types = [t for t,_ in _CATALOGUE_CATEGORIES]
+    return jsonify({'types': types, 'rooms': rooms, 'all_types': all_types})
 
 @app.route('/api/item-photos/<photo_id>', methods=['DELETE'])
 def api_item_photo_delete(photo_id):

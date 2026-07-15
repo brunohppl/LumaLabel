@@ -140,9 +140,22 @@ nav{background:var(--ink);padding:0 24px;display:flex;align-items:center;justify
   <input class="field-input" type="text" id="modal-desc" placeholder="e.g. White boucle, Natural oak…"/>
 
   <label class="field-label">Photo</label>
-  <input class="field-input" type="url" id="modal-url" placeholder="https://…" oninput="previewModalPhoto(this.value)"/>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+    <input type="file" accept="image/*" id="modal-file-input" style="display:none;"
+      onchange="handleCatalogueFileSelect(this)"/>
+    <button type="button" onclick="document.getElementById('modal-file-input').click()"
+      style="flex:1;padding:10px;border:1px dashed var(--border);border-radius:2px;background:var(--sand);font-family:'Jost',sans-serif;font-size:0.82rem;color:var(--muted);cursor:pointer;text-align:center;transition:border-color 0.15s;"
+      id="modal-upload-btn">📷 Take photo or choose from library</button>
+    <span id="modal-upload-status" style="font-size:0.75rem;color:var(--green);display:none;">✓</span>
+  </div>
   <img class="photo-preview" id="modal-preview" src="" alt="preview"/>
-  <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">Or upload direct to Supabase Storage and paste the public URL.</div>
+  <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
+    <div style="flex:1;height:1px;background:var(--border);"></div>
+    <span style="font-size:0.72rem;color:var(--muted);">or paste URL</span>
+    <div style="flex:1;height:1px;background:var(--border);"></div>
+  </div>
+  <input class="field-input" type="url" id="modal-url" placeholder="https://…"
+    style="margin-top:8px;" oninput="previewModalPhoto(this.value)"/>
 
   <div class="modal-actions">
     <button class="btn-outline" onclick="closeModal()">Cancel</button>
@@ -178,6 +191,9 @@ nav{background:var(--ink);padding:0 24px;display:flex;align-items:center;justify
 </div>
 
 <script>
+const SB_URL='https://aqgxojawmohhogkhcxdb.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxZ3hvamF3bW9oaG9na2hjeGRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NDc5ODYsImV4cCI6MjA5NDMyMzk4Nn0.-2UOdGY52jDEmCmBBtQA2XEy6dVT8ZPA_AIPcM7RFX4';
+
 let allEntries = [];
 let activeType = '';
 let activeRoom = '';
@@ -186,6 +202,64 @@ const ALL_TYPES = [
   'Linen and Cushions','Beds & Mattresses','Tables','Artwork',
   'Floor Lamps','Outdoor','Accessories'
 ];
+
+// ── Photo upload helpers ──
+function compressCatalogueImage(file, maxWidth=1200, quality=0.7){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const scale=Math.min(1,maxWidth/img.width);
+      const canvas=document.createElement('canvas');
+      canvas.width=img.width*scale;
+      canvas.height=img.height*scale;
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      canvas.toBlob(blob=>resolve(blob),'image/jpeg',quality);
+      URL.revokeObjectURL(url);
+    };
+    img.onerror=reject;
+    img.src=url;
+  });
+}
+
+async function uploadCataloguePhoto(file){
+  const compressed=await compressCatalogueImage(file);
+  const path=`catalogue_${Date.now()}.jpg`;
+  const res=await fetch(`${SB_URL}/storage/v1/object/item-photos/${path}`,{
+    method:'POST',
+    headers:{
+      'Authorization':`Bearer ${SB_KEY}`,
+      'Content-Type':'image/jpeg',
+      'cache-control':'3600',
+    },
+    body:compressed,
+  });
+  if(!res.ok) throw new Error(`Upload failed: ${res.status}`);
+  return `${SB_URL}/storage/v1/object/public/item-photos/${path}`;
+}
+
+async function handleCatalogueFileSelect(input){
+  const file=input.files[0];
+  if(!file) return;
+  const btn=document.getElementById('modal-upload-btn');
+  const status=document.getElementById('modal-upload-status');
+  btn.textContent='Uploading…';
+  btn.disabled=true;
+  status.style.display='none';
+  try{
+    const url=await uploadCataloguePhoto(file);
+    document.getElementById('modal-url').value=url;
+    previewModalPhoto(url);
+    btn.textContent='📷 Change photo';
+    status.style.display='inline';
+  }catch(e){
+    btn.textContent='Upload failed — try again';
+    console.error(e);
+  }finally{
+    btn.disabled=false;
+    input.value='';
+  }
+}
 
 async function loadCatalogue(){
   try{
@@ -279,6 +353,8 @@ function openAddModal(){
   document.getElementById('modal-desc').value = '';
   document.getElementById('modal-url').value = '';
   document.getElementById('modal-preview').style.display = 'none';
+  document.getElementById('modal-upload-btn').textContent = '📷 Take photo or choose from library';
+  document.getElementById('modal-upload-status').style.display = 'none';
   document.getElementById('modal-overlay').classList.add('open');
   document.getElementById('add-modal').classList.add('open');
 }
@@ -290,6 +366,8 @@ function openEditModal(id, type, room, desc, url){
   document.getElementById('modal-room').value = room;
   document.getElementById('modal-desc').value = desc;
   document.getElementById('modal-url').value = url;
+  document.getElementById('modal-upload-btn').textContent = '📷 Replace photo';
+  document.getElementById('modal-upload-status').style.display = 'none';
   previewModalPhoto(url);
   document.getElementById('modal-overlay').classList.add('open');
   document.getElementById('add-modal').classList.add('open');

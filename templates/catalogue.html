@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Catalogue · LUMA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --ink:#1a1714;--accent:#b8935a;--green:#4a7c59;--red:#e85c47;
+  --muted:#9a8f80;--border:#e0d8ce;--sand:#f0ebe4;--warm:#faf8f4;
+}
+body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-height:100vh;}
+
+/* ── NAV ── */
+nav{background:var(--ink);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100;}
+.nav-logo{font-family:'Cormorant Garamond',serif;font-size:1.15rem;color:var(--warm);letter-spacing:0.06em;}
+.nav-logo em{color:var(--accent);font-style:italic;}
+.nav-links{display:flex;gap:24px;}
+.nav-links a{color:rgba(250,248,244,0.55);text-decoration:none;font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;transition:color 0.15s;}
+.nav-links a:hover,.nav-links a.active{color:var(--accent);}
+
+/* ── PAGE ── */
+.page{max-width:1100px;margin:0 auto;padding:28px 20px 60px;}
+.page-title{font-family:'Cormorant Garamond',serif;font-size:2.2rem;font-weight:400;margin-bottom:4px;}
+.page-sub{font-size:0.82rem;color:var(--muted);margin-bottom:24px;}
+
+/* ── TOOLBAR ── */
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;}
+.filter-chips{display:flex;gap:6px;flex-wrap:wrap;flex:1;}
+.chip{padding:6px 14px;border:1px solid var(--border);border-radius:20px;background:white;font-family:'Jost',sans-serif;font-size:0.78rem;color:var(--muted);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.chip:hover{border-color:var(--accent);color:var(--accent);}
+.chip.active{border-color:var(--accent);background:rgba(184,147,90,0.1);color:var(--accent);font-weight:600;}
+.room-select{padding:7px 12px;border:1px solid var(--border);border-radius:20px;background:white;font-family:'Jost',sans-serif;font-size:0.78rem;color:var(--muted);outline:none;cursor:pointer;}
+.room-select:focus{border-color:var(--accent);}
+.btn-add{padding:7px 16px;background:var(--accent);color:white;border:none;border-radius:2px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;white-space:nowrap;transition:opacity 0.15s;}
+.btn-add:hover{opacity:0.85;}
+
+/* ── GRID ── */
+.cat-count{font-size:0.78rem;color:var(--muted);margin-bottom:14px;}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;}
+.photo-card{background:white;border:1px solid var(--border);border-radius:3px;overflow:hidden;transition:box-shadow 0.15s;cursor:pointer;position:relative;}
+.photo-card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.12);}
+.photo-card img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:var(--sand);}
+.photo-card-body{padding:9px 10px 10px;}
+.photo-card-type{font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);}
+.photo-card-room{font-size:0.78rem;color:var(--muted);margin-top:2px;}
+.photo-card-desc{font-size:0.8rem;color:var(--ink);margin-top:3px;line-height:1.3;}
+.photo-card-del{position:absolute;top:7px;right:7px;background:rgba(26,23,20,0.55);color:white;border:none;border-radius:50%;width:22px;height:22px;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center;line-height:1;}
+.photo-card:hover .photo-card-del{display:flex;}
+.photo-card-del:hover{background:var(--red);}
+
+/* ── EMPTY STATE ── */
+.empty{padding:60px 20px;text-align:center;color:var(--muted);}
+.empty-title{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--ink);margin-bottom:8px;}
+.empty-sub{font-size:0.85rem;line-height:1.6;}
+
+/* ── LOADING ── */
+.loading{text-align:center;padding:60px 20px;color:var(--muted);font-size:0.88rem;}
+.spinner{width:20px;height:20px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── LIGHTBOX ── */
+.lightbox{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.88);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:24px;}
+.lightbox.open{display:flex;}
+.lightbox img{max-width:min(90vw,700px);max-height:75vh;object-fit:contain;border-radius:3px;}
+.lightbox-meta{text-align:center;color:rgba(250,248,244,0.8);}
+.lightbox-type{font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);}
+.lightbox-desc{font-size:0.9rem;margin-top:4px;}
+.lightbox-close{position:absolute;top:18px;right:22px;background:none;border:none;color:rgba(250,248,244,0.6);font-size:1.6rem;cursor:pointer;line-height:1;}
+.lightbox-close:hover{color:white;}
+
+/* ── ADD MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.4);z-index:300;}
+.modal-overlay.open{display:block;}
+.modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:4px;box-shadow:0 12px 40px rgba(0,0,0,0.2);padding:24px;width:360px;max-height:90vh;overflow-y:auto;z-index:301;}
+.modal.open{display:block;}
+.modal-title{font-family:'Cormorant Garamond',serif;font-size:1.3rem;margin-bottom:16px;}
+.field-label{display:block;font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px;margin-top:12px;}
+.field-input{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:2px;font-family:'Jost',sans-serif;font-size:0.92rem;color:var(--ink);outline:none;}
+.field-input:focus{border-color:var(--accent);}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
+.btn-outline{padding:9px 18px;border:1px solid var(--border);border-radius:2px;background:white;font-family:'Jost',sans-serif;font-size:0.82rem;cursor:pointer;color:var(--muted);}
+.btn-outline:hover{border-color:var(--ink);color:var(--ink);}
+.btn-gold{padding:9px 18px;background:var(--accent);color:white;border:none;border-radius:2px;font-family:'Jost',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;}
+.btn-gold:hover{opacity:0.88;}
+.photo-preview{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:2px;margin-top:8px;display:none;border:1px solid var(--border);}
+
+/* ── EDIT OVERLAY ON CARD ── */
+.photo-card-edit{position:absolute;top:7px;left:7px;background:rgba(26,23,20,0.55);color:white;border:none;border-radius:50%;width:22px;height:22px;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center;}
+.photo-card:hover .photo-card-edit{display:flex;}
+.photo-card-edit:hover{background:var(--accent);}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">LUMA <em>Design</em> Co</div>
+  <div class="nav-links">
+    <a href="/">Labels</a>
+    <a href="/jobs">Jobs</a>
+    <a href="/catalogue" class="active">Catalogue</a>
+  </div>
+</nav>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">×</button>
+  <img id="lightbox-img" src="" alt=""/>
+  <div class="lightbox-meta">
+    <div class="lightbox-type" id="lightbox-type"></div>
+    <div class="lightbox-desc" id="lightbox-desc"></div>
+  </div>
+</div>
+
+<!-- Add / Edit Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal()"></div>
+<div class="modal" id="add-modal">
+  <div class="modal-title" id="modal-title">Add to Catalogue</div>
+  <input type="hidden" id="modal-entry-id"/>
+
+  <label class="field-label">Type</label>
+  <select class="field-input" id="modal-type"></select>
+
+  <label class="field-label">Room context <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+  <select class="field-input" id="modal-room">
+    <option value="">Not specified</option>
+    <option>Living Room</option>
+    <option>Dining Room</option>
+    <option>Master Bedroom</option>
+    <option>Bedroom</option>
+    <option>Study</option>
+    <option>Hallway</option>
+    <option>Outdoor</option>
+  </select>
+
+  <label class="field-label">Description <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+  <input class="field-input" type="text" id="modal-desc" placeholder="e.g. White boucle, Natural oak…"/>
+
+  <label class="field-label">Photo</label>
+  <input class="field-input" type="url" id="modal-url" placeholder="https://…" oninput="previewModalPhoto(this.value)"/>
+  <img class="photo-preview" id="modal-preview" src="" alt="preview"/>
+  <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">Or upload direct to Supabase Storage and paste the public URL.</div>
+
+  <div class="modal-actions">
+    <button class="btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn-gold" onclick="saveEntry()">Save</button>
+  </div>
+</div>
+
+<div class="page">
+  <h1 class="page-title">Catalogue</h1>
+  <p class="page-sub">Furniture reference — built from job photos. Browse by type, filter by room.</p>
+
+  <div class="toolbar">
+    <div class="filter-chips" id="type-chips">
+      <button class="chip active" data-type="" onclick="selectType(this,'')">All</button>
+    </div>
+    <select class="room-select" id="room-filter" onchange="applyFilters()">
+      <option value="">All rooms</option>
+      <option>Living Room</option>
+      <option>Dining Room</option>
+      <option>Master Bedroom</option>
+      <option>Bedroom</option>
+      <option>Study</option>
+      <option>Hallway</option>
+      <option>Outdoor</option>
+    </select>
+    <button class="btn-add" onclick="openAddModal()">+ Add Entry</button>
+  </div>
+
+  <div class="cat-count" id="cat-count"></div>
+  <div id="catalogue-grid" class="photo-grid">
+    <div class="loading"><div class="spinner"></div>Loading catalogue…</div>
+  </div>
+</div>
+
+<script>
+let allEntries = [];
+let activeType = '';
+let activeRoom = '';
+const ALL_TYPES = [
+  'Storage & Consoles','Bedside Tables','Chairs','Sofas','Rugs',
+  'Linen and Cushions','Beds & Mattresses','Tables','Artwork',
+  'Floor Lamps','Outdoor','Accessories'
+];
+
+async function loadCatalogue(){
+  try{
+    const res = await fetch('/api/catalogue');
+    allEntries = await res.json();
+    buildTypeChips();
+    renderGrid();
+  }catch(e){
+    document.getElementById('catalogue-grid').innerHTML=
+      '<div class="empty"><div class="empty-title">Couldn\'t load catalogue</div></div>';
+  }
+}
+
+function buildTypeChips(){
+  const usedTypes = [...new Set(allEntries.map(e=>e.type))].sort();
+  const container = document.getElementById('type-chips');
+  container.innerHTML = `<button class="chip${activeType===''?' active':''}" data-type="" onclick="selectType(this,'')">All</button>`
+    + ALL_TYPES.filter(t=>usedTypes.includes(t)).map(t=>
+      `<button class="chip${activeType===t?' active':''}" data-type="${t}" onclick="selectType(this,'${t}')">${t}</button>`
+    ).join('');
+}
+
+function selectType(btn, type){
+  activeType = type;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  btn.classList.add('active');
+  renderGrid();
+}
+
+function applyFilters(){
+  activeRoom = document.getElementById('room-filter').value;
+  renderGrid();
+}
+
+function renderGrid(){
+  let filtered = allEntries;
+  if(activeType) filtered = filtered.filter(e=>e.type===activeType);
+  if(activeRoom) filtered = filtered.filter(e=>e.room_context===activeRoom);
+
+  const count = document.getElementById('cat-count');
+  count.textContent = filtered.length
+    ? `${filtered.length} item${filtered.length!==1?'s':''}`
+    : '';
+
+  const grid = document.getElementById('catalogue-grid');
+  if(!filtered.length){
+    grid.innerHTML = `<div class="empty">
+      <div class="empty-title">${allEntries.length ? 'No items match this filter' : 'Catalogue is empty'}</div>
+      <div class="empty-sub">${allEntries.length
+        ? 'Try a different type or room.'
+        : 'Photos taken during jobs appear here automatically.<br>You can also add entries manually using the button above.'}</div>
+    </div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(e=>`
+    <div class="photo-card" onclick="openLightbox('${e.photo_url}','${(e.type||'').replace(/'/g,"\\'")}','${(e.description||'').replace(/'/g,"\\'")}','${(e.room_context||'').replace(/'/g,"\\'")}')">
+      <img src="${e.photo_url}" alt="${e.description||e.type}" loading="lazy"
+        onerror="this.style.background='var(--sand)';this.style.height='180px'"/>
+      <div class="photo-card-body">
+        <div class="photo-card-type">${e.type}</div>
+        ${e.room_context?`<div class="photo-card-room">${e.room_context}</div>`:''}
+        ${e.description?`<div class="photo-card-desc">${e.description}</div>`:''}
+      </div>
+      <button class="photo-card-edit" onclick="event.stopPropagation();openEditModal('${e.id}','${(e.type||'').replace(/'/g,"\\'")}','${(e.room_context||'').replace(/'/g,"\\'")}','${(e.description||'').replace(/'/g,"\\'")}','${e.photo_url}')" title="Edit">✎</button>
+      <button class="photo-card-del" onclick="event.stopPropagation();deleteEntry('${e.id}')" title="Delete">✕</button>
+    </div>`).join('');
+}
+
+// ── Lightbox ──
+function openLightbox(url, type, desc, room){
+  document.getElementById('lightbox-img').src = url;
+  document.getElementById('lightbox-type').textContent = [type, room].filter(Boolean).join(' · ');
+  document.getElementById('lightbox-desc').textContent = desc || '';
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox(){ document.getElementById('lightbox').classList.remove('open'); }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeLightbox(); closeModal(); }});
+
+// ── Add / Edit modal ──
+function populateTypeSelect(){
+  const sel = document.getElementById('modal-type');
+  sel.innerHTML = ALL_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('');
+}
+
+function openAddModal(){
+  document.getElementById('modal-title').textContent = 'Add to Catalogue';
+  document.getElementById('modal-entry-id').value = '';
+  document.getElementById('modal-type').value = ALL_TYPES[0];
+  document.getElementById('modal-room').value = '';
+  document.getElementById('modal-desc').value = '';
+  document.getElementById('modal-url').value = '';
+  document.getElementById('modal-preview').style.display = 'none';
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('add-modal').classList.add('open');
+}
+
+function openEditModal(id, type, room, desc, url){
+  document.getElementById('modal-title').textContent = 'Edit Entry';
+  document.getElementById('modal-entry-id').value = id;
+  document.getElementById('modal-type').value = type;
+  document.getElementById('modal-room').value = room;
+  document.getElementById('modal-desc').value = desc;
+  document.getElementById('modal-url').value = url;
+  previewModalPhoto(url);
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('add-modal').classList.add('open');
+}
+
+function closeModal(){
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.getElementById('add-modal').classList.remove('open');
+}
+
+function previewModalPhoto(url){
+  const img = document.getElementById('modal-preview');
+  if(url && url.startsWith('http')){
+    img.src = url;
+    img.style.display = 'block';
+  } else {
+    img.style.display = 'none';
+  }
+}
+
+async function saveEntry(){
+  const id    = document.getElementById('modal-entry-id').value;
+  const type  = document.getElementById('modal-type').value;
+  const room  = document.getElementById('modal-room').value || null;
+  const desc  = document.getElementById('modal-desc').value.trim() || null;
+  const url   = document.getElementById('modal-url').value.trim();
+
+  if(!url){ alert('A photo URL is required.'); return; }
+  if(!type){ alert('Please select a type.'); return; }
+
+  if(id){
+    await fetch(`/api/catalogue/${id}`,{
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type, room_context:room, description:desc, photo_url:url})
+    });
+    const idx = allEntries.findIndex(e=>e.id===id);
+    if(idx!==-1) allEntries[idx]={...allEntries[idx], type, room_context:room, description:desc, photo_url:url};
+  } else {
+    const res = await fetch('/api/catalogue',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type, room_context:room, description:desc, photo_url:url})
+    });
+    const data = await res.json();
+    if(data.entry) allEntries.unshift(data.entry);
+  }
+
+  closeModal();
+  buildTypeChips();
+  renderGrid();
+}
+
+async function deleteEntry(id){
+  if(!confirm('Remove this entry from the catalogue?')) return;
+  await fetch(`/api/catalogue/${id}`,{method:'DELETE'});
+  allEntries = allEntries.filter(e=>e.id!==id);
+  buildTypeChips();
+  renderGrid();
+}
+
+populateTypeSelect();
+loadCatalogue();
+</script>
+</body>
+</html>

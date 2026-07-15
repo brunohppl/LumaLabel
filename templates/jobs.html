@@ -790,11 +790,14 @@ async function renderRunsheet(){
       const spanSlots=Math.max(1,Math.round(dur/30));
       const rowStart=HEADER_ROWS+si+1;
       const rowEnd=rowStart+spanSlots;
-      const typeClass=`rs-job-${job.runsheet_type||'install'}`;
+      // Use the entry's own type if set (load day = to_load, install day = install)
+      // Fall back to job.runsheet_type for manually-created entries without a type
+      const entryType=entry.type||job.runsheet_type||'install';
+      const typeClass=`rs-job-${entryType}`;
       const colour=COLOUR_MAP[job.colour]||'#888';
       const ref=job.job_ref||job.job_number||'';
       const addr=street_only_js(job.address||'');
-      const typeLabel=RUNSHEET_TYPE_LABELS[job.runsheet_type]||'';
+      const typeLabel=RUNSHEET_TYPE_LABELS[entryType]||'';
       const notes=entry.notes||'';
 
       // Transfer indicator — resolve both directions from the full job cache

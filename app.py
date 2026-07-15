@@ -1759,6 +1759,7 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None):
                 'job_id':     job_id,
                 'date':       load_date,
                 'vehicle':    v,
+                'type':       'to_load',
                 'start_time': '13:30',
                 'duration':   120,
                 'notes':      None,
@@ -1769,6 +1770,7 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None):
                     'job_id':     job_id,
                     'date':       main_date_str,
                     'vehicle':    v,
+                    'type':       main_type,
                     'start_time': '07:30',
                     'duration':   150,
                     'notes':      None,
@@ -1779,6 +1781,7 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None):
             'job_id':     job_id,
             'date':       load_date,
             'vehicle':    None,
+            'type':       'to_load',
             'start_time': '13:30',
             'duration':   120,
             'notes':      None,
@@ -1788,6 +1791,7 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None):
                 'job_id':     job_id,
                 'date':       main_date_str,
                 'vehicle':    None,
+                'type':       main_type,
                 'start_time': '07:30',
                 'duration':   150,
                 'notes':      None,
@@ -1936,11 +1940,11 @@ def api_job_schedule_list(job_id):
 
 @app.route('/api/jobs/<job_id>/schedule', methods=['POST'])
 def api_job_schedule_add(job_id):
-    """Add a vehicle assignment. Body: {vehicle?, date?, start_time?, duration?, notes?}
-    vehicle may be null for auto-seeded entries (shown in unscheduled strip)."""
+    """Add a vehicle assignment. Body: {vehicle?, date?, type?, start_time?, duration?, notes?}"""
     data       = request.get_json()
     vehicle    = data.get('vehicle')
     date_str   = data.get('date')
+    entry_type = data.get('type')
     start_time = data.get('start_time')
     duration   = data.get('duration')
     notes      = data.get('notes') or None
@@ -1952,7 +1956,8 @@ def api_job_schedule_add(job_id):
         return jsonify({'success': False, 'error': 'Invalid duration'}), 400
     result = sb_post('job_schedule', {
         'job_id': job_id, 'vehicle': vehicle, 'date': date_str,
-        'start_time': start_time, 'duration': duration, 'notes': notes,
+        'type': entry_type, 'start_time': start_time,
+        'duration': duration, 'notes': notes,
     })
     return jsonify({'success': bool(result), 'row': result[0] if result else None})
 
@@ -1966,6 +1971,7 @@ def api_schedule_update(entry_id):
         if data['vehicle'] is not None and data['vehicle'] not in RUNSHEET_VEHICLES:
             return jsonify({'success': False, 'error': 'Unknown vehicle'}), 400
         payload['vehicle'] = data['vehicle']
+    if 'type'       in data: payload['type']       = data['type']
     if 'date'       in data: payload['date']       = data['date']
     if 'start_time' in data:
         if data['start_time'] is not None and data['start_time'] not in RUNSHEET_TIME_SLOTS:

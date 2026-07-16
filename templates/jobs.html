@@ -293,33 +293,31 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
   </div>
 </div>
 
-<!-- Schedule popover: pick vehicle(s), then time+duration per vehicle -->
+<!-- Schedule popover: install date + type + vehicles → backend seeds both tiles automatically -->
 <div class="runsheet-popover-overlay" id="runsheet-popover-overlay" onclick="closeRunsheetPopover()"></div>
-<div class="runsheet-popover" id="runsheet-popover" style="width:360px;max-height:90vh;overflow-y:auto;">
+<div class="runsheet-popover" id="runsheet-popover" style="width:340px;">
   <div class="runsheet-popover-title">Schedule Job</div>
   <div id="sched-popover-ref" style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;line-height:1.4;"></div>
 
   <div class="sched-two-col">
     <div>
-      <label class="runsheet-popover-label">Date</label>
+      <label class="runsheet-popover-label">Install date</label>
       <input type="date" id="runsheet-popover-date" class="runsheet-popover-input"/>
     </div>
     <div>
       <label class="runsheet-popover-label">Type</label>
       <select id="runsheet-popover-type" class="runsheet-popover-input">
-        <option value="">Select…</option>
         <option value="install">Install</option>
         <option value="pickup">Pickup</option>
-        <option value="to_load">To Load</option>
       </select>
     </div>
   </div>
 
-  <label class="runsheet-popover-label">Vehicle(s) needed</label>
+  <label class="runsheet-popover-label" style="margin-top:12px;">Vehicle(s)</label>
   <div class="sched-chip-row" id="sched-vehicle-chips"></div>
-
-  <!-- Per-vehicle time/duration inputs — updated dynamically when vehicles are toggled -->
-  <div id="sched-vehicle-times" style="margin-top:12px;"></div>
+  <div style="font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;">
+    Two tiles will be created automatically — <strong>To Load</strong> on the day before and <strong>${'Install/Pickup'}</strong> on the date above. Times can be adjusted by tapping the tiles on the grid.
+  </div>
 
   <div class="runsheet-popover-actions" style="margin-top:18px;">
     <button class="btn btn-outline" onclick="removeFromRunsheet()" id="runsheet-remove-btn" style="font-size:0.72rem;display:none;">Remove</button>
@@ -895,7 +893,6 @@ function street_only_js(addr){
 // ── Schedule popover: vehicle(s) + per-vehicle time + duration ──
 let runsheetPopoverJobId=null;
 let schedVehicleSelected=[];
-let schedVehicleTimes={};
 
 function timeOptions(){
   return '<option value="">No time yet</option>'
@@ -920,68 +917,35 @@ function populateSchedPopoverDropdowns(){
       .map(w=>w.startsWith('──')?`<option disabled>${w}</option>`:`<option value="${w}">${w}</option>`).join('');
 }
 
-function renderVehicleTimeInputs(){
-  const container=document.getElementById('sched-vehicle-times');
-  if(!container) return;
-  if(!schedVehicleSelected.length){ container.innerHTML=''; return; }
-  container.innerHTML=schedVehicleSelected.map(v=>`
-    <div style="margin-bottom:14px;">
-      <div style="font-size:0.73rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink);margin-bottom:6px;">${v}</div>
-      <div class="sched-two-col" style="margin-bottom:6px;">
-        <select id="sched-time-${v}" class="runsheet-popover-input">${timeOptions()}</select>
-        <select id="sched-dur-${v}" class="runsheet-popover-input">${durationOptions()}</select>
-      </div>
-      <textarea id="sched-notes-${v}" class="runsheet-popover-input"
-        placeholder="Notes — e.g. keys from Ray White, access via side gate…"
-        style="height:52px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
-    </div>`).join('');
-  schedVehicleSelected.forEach(v=>{
-    const t=schedVehicleTimes[v]||{};
-    const ts=document.getElementById(`sched-time-${v}`);
-    const ds=document.getElementById(`sched-dur-${v}`);
-    const ns=document.getElementById(`sched-notes-${v}`);
-    if(ts) ts.value=t.start_time||'';
-    if(ds) ds.value=t.duration||'';
-    if(ns) ns.value=t.notes||'';
-  });
-}
-
 function toggleSchedVehicle(btn, v){
   btn.classList.toggle('selected');
   if(btn.classList.contains('selected')) schedVehicleSelected.push(v);
   else schedVehicleSelected=schedVehicleSelected.filter(x=>x!==v);
-  renderVehicleTimeInputs();
 }
 
 async function openRunsheetPopover(jobId){
   runsheetPopoverJobId=jobId;
   schedVehicleSelected=[];
-  schedVehicleTimes={};
   const job=jobsById.get(jobId)||lastFetchedJobs.find(j=>j.id===jobId);
 
   document.getElementById('sched-popover-ref').textContent=
     [job?.job_ref||job?.job_number, job?.address?street_only_js(job.address):null]
       .filter(Boolean).join(' — ');
   document.getElementById('runsheet-popover-date').value=job?.runsheet_date||'';
-  document.getElementById('runsheet-popover-type').value=job?.runsheet_type||'';
+  document.getElementById('runsheet-popover-type').value=job?.runsheet_type||'install';
   document.getElementById('runsheet-remove-btn').style.display=
     job?.runsheet_date?'inline-block':'none';
 
-  // Pre-fill from existing schedule entries
-  let existingEntries=[];
+  // Pre-fill vehicle chips from existing schedule entries
   try{
     const res=await fetch(`/api/jobs/${jobId}/schedule`);
-    existingEntries=await res.json();
+    const entries=await res.json();
+    schedVehicleSelected=[...new Set(entries.map(e=>e.vehicle).filter(Boolean))];
   }catch(e){}
 
-  schedVehicleSelected=[...new Set(existingEntries.map(e=>e.vehicle))];
-  existingEntries.forEach(e=>{
-    schedVehicleTimes[e.vehicle]={start_time:e.start_time||'', duration:e.duration||'', notes:e.notes||''};
-  });
   document.querySelectorAll('[data-sv]').forEach(el=>{
     el.classList.toggle('selected', schedVehicleSelected.includes(el.dataset.sv));
   });
-  renderVehicleTimeInputs();
 
   document.getElementById('runsheet-popover-overlay').classList.add('open');
   document.getElementById('runsheet-popover').classList.add('open');
@@ -994,47 +958,25 @@ function closeRunsheetPopover(){
 
 async function saveRunsheetEntry(){
   const date=document.getElementById('runsheet-popover-date').value;
-  const type=document.getElementById('runsheet-popover-type').value;
-  if(!date){ alert('Pick a date first.'); return; }
-  if(!type){ alert('Choose a type — Install, Pickup, or To Load.'); return; }
+  const type=document.getElementById('runsheet-popover-type').value||'install';
+  if(!date){ alert('Pick an install date first.'); return; }
 
-  // Collect per-vehicle time/duration/notes from dynamically-rendered inputs
-  const vehicleData=schedVehicleSelected.map(v=>({
-    vehicle:v,
-    // For install/pickup: load day is date-1, main day is date.
-    // The popover only has one date field — we assign the main date for
-    // all entries here and let the user adjust via the grid if needed.
-    date:date,
-    start_time:document.getElementById(`sched-time-${v}`)?.value||null,
-    duration:parseInt(document.getElementById(`sched-dur-${v}`)?.value)||null,
-    notes:document.getElementById(`sched-notes-${v}`)?.value.trim()||null,
-  }));
-
-  // PATCH the runsheet — this auto-seeds the two-day schedule on the backend.
-  // If the user also selected specific vehicles below, those will override
-  // the seeded entries in the next step.
+  // The backend PATCH route calls seed_two_day_schedule which creates
+  // both the To Load tile (day before) and the Install/Pickup tile (date).
+  // We pass the selected vehicles so smart assignment is applied.
   const r1=await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
     method:'PATCH', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({runsheet_date:date, runsheet_type:type})
+    body:JSON.stringify({
+      runsheet_date:date,
+      runsheet_type:type,
+      vehicles:schedVehicleSelected.length ? schedVehicleSelected : null,
+    })
   });
   const d1=await r1.json();
   if(!d1.success){ alert('Failed to save: '+(d1.error||'unknown error')); return; }
+
   const job=jobsById.get(runsheetPopoverJobId);
   if(job){ job.runsheet_date=date; job.runsheet_type=type; }
-
-  // If the user selected specific vehicles in the popover, replace the
-  // auto-seeded entries with their explicit assignments
-  if(vehicleData.length){
-    const existingRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
-    const existing=await existingRes.json();
-    await Promise.all(existing.map(e=>fetch(`/api/schedule/${e.id}`,{method:'DELETE'})));
-    await Promise.all(vehicleData.map(vd=>
-      fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`,{
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(vd)
-      })
-    ));
-  }
 
   closeRunsheetPopover();
   renderJobs();

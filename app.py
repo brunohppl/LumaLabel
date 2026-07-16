@@ -733,6 +733,11 @@ def parse_packing_list(pdf_bytes):
         for _ in range(qty):
             items.append({'serial': f'{serial:03d}', 'room': current_room, 'description': description})
             serial += 1
+            # Dining tables always ship with separate legs — add a Table Legs
+            # item in the same room so it appears in the same driver group
+            if re.search(r'\bdining table\b', description, re.I):
+                items.append({'serial': f'{serial:03d}', 'room': current_room, 'description': 'Table Legs'})
+                serial += 1
 
     meta['room_notes'] = room_notes
     return meta, items
@@ -2334,10 +2339,4 @@ def api_delete_job(job_id):
     """Delete a job and all its associated data. Cascade order matters:
     items and room_notes must go before the job row itself (Supabase
     won't cascade these automatically since they have no FK deletion
-    rule — only transfer_from_job_id does, which is handled by the DB's
-    own ON DELETE SET NULL constraint and needs no code here).
-    This is a permanent, irreversible action — the confirmation prompt
-    is on the frontend, not the backend. If building per-user permissions
-    later, this route is the natural place to add a "admin only" check.
-    """
-    sb_delete('items',      f'job_id=eq.{jo
+    rule — only transfer_from_job_id does, whic

@@ -1729,16 +1729,16 @@ def vehicles_for_job(items):
         return ['Nigel', 'Nemo']
 
 
-def seed_two_day_schedule(job_id, main_date_str, main_type, items=None):
+def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_vehicles=None):
     """Seed the standard two-day schedule for a job:
     - Load day  (day before main_date): to_load, 13:30–15:30 (120 min)
     - Main day  (main_date):            main_type, 07:30–10:00 (150 min)
 
-    If items are provided, smart vehicle assignment is applied:
-    bedroom count → Nemo (1-2 bed), Nigel (3 bed), Nigel+Nemo (4+ bed).
-    Vehicle is null (unscheduled strip) when bedroom count can't be determined.
+    Vehicle assignment priority:
+    1. forced_vehicles — explicit list from the scheduling popover
+    2. bedroom-count from items — smart auto-assignment
+    3. None — shows in unscheduled strip until manually assigned
 
-    For to_load type, only seeds the single load day.
     Re-upload or date change: clears existing entries first."""
     from datetime import datetime as _dt, timedelta
     sb_delete('job_schedule', f'job_id=eq.{job_id}')
@@ -1750,7 +1750,8 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None):
     except ValueError:
         return
 
-    vehicles = vehicles_for_job(items) if items else []
+    vehicles = forced_vehicles if forced_vehicles is not None else \
+               (vehicles_for_job(items) if items else [])
 
     if vehicles:
         # Create one load entry per vehicle
@@ -1806,25 +1807,33 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None):
 
 @app.route('/api/jobs/<job_id>/runsheet', methods=['PATCH'])
 def api_job_runsheet(job_id):
-    """Set or clear the job's runsheet schedule.
+    """Set or clear the job two-day runsheet schedule.
 
-    When setting a date + type, auto-seeds the standard two-day schedule:
-    - Install/Pickup: load entry on the day before + main entry on the date
-    - To Load: just the single load entry on that date
+    Always seeds both tiles:
+    - To Load: day before the date, 13:30-15:30
+    - Install/Pickup: on the date, 07:30-10:00
 
-    Clearing (runsheet_date: null) deletes all job_schedule rows."""
-    data = request.get_json()
+    Optional 'vehicles' from the popover overrides bedroom-count auto-assignment.
+    Clearing (runsheet_date: null) removes all schedule entries."""
+    data          = request.get_json()
     runsheet_date = data.get('runsheet_date')
     runsheet_type = data.get('runsheet_type')
+    vehicles      = data.get('vehicles')
 
     if runsheet_date is not None and runsheet_type not in ('install', 'pickup', 'to_load'):
         return jsonify({'success': False,
                         'error': 'runsheet_type must be install, pickup, or to_load'}), 400
 
     if runsheet_date:
-        # Fetch items so bedroom count can drive smart vehicle assignment
-        items = sb_get('items', f'job_id=eq.{job_id}') or []
-        seed_two_day_schedule(job_id, runsheet_date, runsheet_type, items=items)
+        if vehicles:
+            bad = [v for v in vehicles if v not in RUNSHEET_VEHICLES]
+            if bad:
+                return jsonify({'success': False, 'error': f'Unknown vehicles: {bad}'}), 400
+            seed_two_day_schedule(job_id, runsheet_date, runsheet_type,
+                                  forced_vehicles=vehicles)
+        else:
+            items = sb_get('items', f'job_id=eq.{job_id}') or []
+            seed_two_day_schedule(job_id, runsheet_date, runsheet_type, items=items)
     else:
         sb_delete('job_schedule', f'job_id=eq.{job_id}')
         sb_patch('jobs', f'id=eq.{job_id}', {
@@ -2331,11 +2340,4 @@ def api_delete_job(job_id):
     is on the frontend, not the backend. If building per-user permissions
     later, this route is the natural place to add a "admin only" check.
     """
-    sb_delete('items',      f'job_id=eq.{job_id}')
-    sb_delete('room_notes', f'job_id=eq.{job_id}')
-    result = sb_delete('jobs', f'id=eq.{job_id}')
-    return jsonify({'success': bool(result)})
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    sb_delete('items',      f'job_id=eq.{jo

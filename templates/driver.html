@@ -204,6 +204,15 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
   <img id="photo-modal-img" src="" alt="Item photo"/>
 </div>
 
+<div id="table-legs-overlay" style="display:none;position:fixed;inset:0;background:rgba(26,23,20,0.55);z-index:400;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:white;border-radius:4px;padding:28px 24px;max-width:320px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.25);">
+    <div style="font-size:2rem;margin-bottom:10px;">🦵</div>
+    <div style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:600;color:var(--ink);margin-bottom:8px;">Don't forget the table legs!</div>
+    <div style="font-size:0.88rem;color:var(--muted);line-height:1.5;margin-bottom:20px;">The dining table legs are packed separately — make sure they're loaded too.</div>
+    <button onclick="closeTableLegsReminder()" style="width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:2px;font-family:'Jost',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;letter-spacing:0.04em;">Got it</button>
+  </div>
+</div>
+
 <script>
 function showPhoto(url){
   document.getElementById('photo-modal-img').src=url;
@@ -211,6 +220,14 @@ function showPhoto(url){
 }
 function closePhoto(){
   document.getElementById('photo-modal').classList.remove('open');
+}
+
+function showTableLegsReminder(){
+  const el=document.getElementById('table-legs-overlay');
+  el.style.display='flex';
+}
+function closeTableLegsReminder(){
+  document.getElementById('table-legs-overlay').style.display='none';
 }
 
 async function renderDriverPhotoStrip(strip, itemId){
@@ -625,8 +642,9 @@ function groupRowHTML(grp){
   const photoStrip=grp.photo_url
     ? `<div class="driver-photo-strip" id="${photoStripId}" data-item-id="${firstItemId}"></div>`
     : '';
-  return `<div class="${cls}" id="grp-${grp.firstSerial}" onclick="toggleGroup('${ids}',this)">
-    <button class="check-btn" onclick="toggleGroup('${ids}',this.closest('.group-row'));event.stopPropagation()">
+  const isDiningTable=/dining table/i.test(grp.description||'');
+  return `<div class="${cls}" id="grp-${grp.firstSerial}" onclick="toggleGroup('${ids}',this,${isDiningTable})">
+    <button class="check-btn" onclick="toggleGroup('${ids}',this.closest('.group-row'),${isDiningTable});event.stopPropagation()">
       <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
     </button>
     <div class="group-info">
@@ -649,7 +667,7 @@ function toggleRoomCard(header){
   chev.classList.toggle('open',!isOpen);
 }
 
-async function toggleGroup(ids,el){
+async function toggleGroup(ids,el,isDiningTable=false){
   if(job.status==='installed'||job.status==='returned'||job.status==='archived')return;
   const idList=ids.split(',');
   const first=items.find(i=>i.id===idList[0]);
@@ -662,6 +680,10 @@ async function toggleGroup(ids,el){
   await Promise.all(idList.map(id=>
     fetch(`/api/items/${id}/check`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({checked:newChecked})})
   ));
+  // Remind the driver about table legs when ticking a dining table as loaded
+  if(isDiningTable && newChecked){
+    showTableLegsReminder();
+  }
 }
 
 function rerenderRoomProgress(){

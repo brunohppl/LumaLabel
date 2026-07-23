@@ -46,8 +46,6 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .rs-time{padding:0 8px;font-size:0.72rem;font-weight:600;color:var(--muted);text-align:right;border-right:1px solid var(--border);border-bottom:1px solid var(--sand);display:flex;align-items:flex-start;justify-content:flex-end;padding-top:6px;}
 .rs-cell{border-right:1px solid var(--sand);border-bottom:1px solid var(--sand);position:relative;min-height:46px;padding:4px;}
 .rs-cell:last-child{border-right:none;}
-.rs-lunch-time,.rs-lunch-cell{background:rgba(184,147,90,0.07)!important;}
-.rs-lunch-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);opacity:0.6;}
 .rs-cell-clickable{cursor:pointer;}
 .rs-cell-clickable:hover{background:rgba(184,147,90,0.06);}
 .rs-cell-clickable:hover::after{content:'+';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.1rem;color:rgba(184,147,90,0.4);pointer-events:none;}
@@ -316,7 +314,6 @@ async function renderRunsheet(){
   currentDayCrew=crewByVehicle;
 
   const HEADER_ROWS=2;
-  const LUNCH_SLOT='12:30';
   let cells=[];
 
   // Header
@@ -341,14 +338,9 @@ async function renderRunsheet(){
   // Time slots + empty cells
   slots.forEach((slot,si)=>{
     const gridRow=HEADER_ROWS+si+1;
-    const isLunch=slot===LUNCH_SLOT;
-    cells.push(`<div class="rs-time${isLunch?' rs-lunch-time':''}" style="grid-column:1;grid-row:${gridRow};">${formatSlotLabel(slot)}</div>`);
+    cells.push(`<div class="rs-time" style="grid-column:1;grid-row:${gridRow};">${formatSlotLabel(slot)}</div>`);
     vehicles.forEach((v,vi)=>{
-      if(isLunch){
-        cells.push(`<div class="rs-cell rs-lunch-cell" style="grid-column:${vi+2};grid-row:${gridRow};"><span class="rs-lunch-label">Lunch</span></div>`);
-      }else{
-        cells.push(`<div class="rs-cell rs-cell-clickable" style="grid-column:${vi+2};grid-row:${gridRow};" onclick="openTaskPopover(null,'${v}','${todayStr}','${slot}')"></div>`);
-      }
+      cells.push(`<div class="rs-cell rs-cell-clickable" style="grid-column:${vi+2};grid-row:${gridRow};" onclick="openTaskPopover(null,'${v}','${todayStr}','${slot}')"></div>`);
     });
   });
 

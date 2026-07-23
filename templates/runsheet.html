@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Runsheet · LUMA Design Co</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--cream:#FAF8F4;--warm:#F2EDE4;--sand:#E5DDD0;--border:#D8CFBF;--muted:#9A8F80;--ink:#1A1714;--accent:#B8935A;--green:#4A7C59;--red:#A63D2F;--blue:#4A7EB8;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font-weight:400;font-size:18px;min-height:100vh;}
+
+header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;justify-content:space-between;}
+.logo{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:300;letter-spacing:0.12em;color:#FAF8F4;}
+.logo em{font-style:italic;color:var(--accent);}
+.nav-links{display:flex;gap:24px;}
+.nav-link{color:rgba(250,248,244,0.45);text-decoration:none;font-size:0.8rem;letter-spacing:0.14em;text-transform:uppercase;transition:color 0.2s;}
+.nav-link:hover,.nav-link.active{color:var(--accent);}
+
+.main{max-width:1200px;margin:0 auto;padding:36px 24px;}
+.page-title{font-family:'Cormorant Garamond',serif;font-size:2.6rem;font-weight:300;margin-bottom:4px;}
+.page-sub{font-size:0.9rem;color:var(--muted);margin-bottom:24px;}
+
+/* ── DATE NAV ── */
+.runsheet-date-row{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+.runsheet-nav-btn{background:white;border:1px solid var(--border);border-radius:2px;width:34px;height:34px;font-size:1.1rem;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color 0.15s;}
+.runsheet-nav-btn:hover{border-color:var(--accent);color:var(--accent);}
+.runsheet-date-label{font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--ink);min-width:240px;}
+.btn-today{padding:7px 16px;background:white;border:1px solid var(--border);border-radius:2px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;color:var(--muted);transition:all 0.15s;}
+.btn-today:hover{border-color:var(--accent);color:var(--accent);}
+.runsheet-empty{padding:60px 20px;text-align:center;color:var(--muted);font-size:0.9rem;background:white;border:1px dashed var(--border);border-radius:3px;}
+
+/* ── RUNSHEET GRID ── */
+.rs-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.rs-grid{display:grid;min-width:700px;border:1px solid var(--border);border-radius:3px;background:white;overflow:hidden;}
+.rs-header-cell{padding:8px 10px;background:var(--ink);color:rgba(250,248,244,0.85);font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;text-align:center;border-right:1px solid rgba(255,255,255,0.1);}
+.rs-header-cell:first-child{text-align:right;background:rgba(26,23,20,0.95);}
+.rs-header-cell:last-child{border-right:none;}
+.rs-team-cell{padding:5px 8px;background:rgba(26,23,20,0.85);color:rgba(250,248,244,0.55);font-size:0.68rem;text-align:center;border-right:1px solid rgba(255,255,255,0.08);border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s;}
+.rs-team-cell:hover{background:rgba(184,147,90,0.25);color:var(--accent);}
+.rs-team-cell.has-crew{color:rgba(250,248,244,0.8);}
+.rs-team-cell:first-child{cursor:default;}
+.rs-team-cell:first-child:hover{background:rgba(26,23,20,0.85);}
+.rs-time{padding:0 8px;font-size:0.72rem;font-weight:600;color:var(--muted);text-align:right;border-right:1px solid var(--border);border-bottom:1px solid var(--sand);display:flex;align-items:flex-start;justify-content:flex-end;padding-top:6px;}
+.rs-cell{border-right:1px solid var(--sand);border-bottom:1px solid var(--sand);position:relative;min-height:46px;padding:4px;}
+.rs-cell:last-child{border-right:none;}
+.rs-lunch-time,.rs-lunch-cell{background:rgba(184,147,90,0.07)!important;}
+.rs-lunch-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);opacity:0.6;}
+.rs-cell-clickable{cursor:pointer;}
+.rs-cell-clickable:hover{background:rgba(184,147,90,0.06);}
+.rs-cell-clickable:hover::after{content:'+';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.1rem;color:rgba(184,147,90,0.4);pointer-events:none;}
+
+/* ── JOB TILES ── */
+.rs-job{border-radius:3px;border-left:4px solid transparent;box-shadow:0 2px 6px rgba(0,0,0,0.12);display:flex;flex-direction:column;transition:box-shadow 0.15s;}
+.rs-job:hover{box-shadow:0 3px 12px rgba(0,0,0,0.2);}
+.rs-job-install{background:#e8f3ea;border-left-color:var(--green);}
+.rs-job-pickup{background:#e8eef8;border-left-color:var(--blue);}
+.rs-job-to_load{background:#f5f0e8;border-left-color:var(--accent);}
+.rs-job-content{padding:6px 8px 4px;flex:1;min-height:0;}
+.rs-job-ref{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:700;color:var(--ink);line-height:1;}
+.rs-job-addr{font-size:0.8rem;color:#444;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
+.rs-job-type{font-size:0.68rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin-top:3px;color:#555;}
+.rs-job-transfer{font-size:0.68rem;font-weight:600;margin-top:3px;padding:2px 5px;border-radius:2px;display:inline-block;}
+.rs-job-transfer-from{background:rgba(74,126,184,0.12);color:#1a5299;}
+.rs-job-transfer-to{background:rgba(184,147,90,0.15);color:#8a5c1a;}
+.rs-job-notes{font-size:0.75rem;color:#555;margin-top:4px;font-style:italic;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;cursor:pointer;}
+.rs-job-notes.expanded{display:block;overflow:visible;background:rgba(0,0,0,0.05);border-radius:3px;padding:5px 6px;}
+.rs-job-actions{display:flex;border-top:1px solid rgba(0,0,0,0.08);margin-top:auto;}
+.rs-job-btn-gear{width:32px;flex-shrink:0;padding:5px 4px;background:none;border:none;border-right:1px solid rgba(0,0,0,0.08);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#888;transition:background 0.12s;}
+.rs-job-btn-gear:hover{background:rgba(0,0,0,0.06);}
+.rs-job-btn-stack{display:flex;flex-direction:column;flex:1;}
+.rs-job-btn{flex:1;padding:4px 6px;background:none;border:none;cursor:pointer;font-size:0.65rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:4px;transition:background 0.12s;}
+.rs-job-btn:hover{background:rgba(0,0,0,0.06);}
+.rs-job-btn-stylist{color:#8a6f2e;border-bottom:1px solid rgba(0,0,0,0.08);}
+.rs-job-btn-driver{color:#2e5a8a;}
+
+/* ── TASK TILES ── */
+.rs-task{border-radius:3px;border-left:4px dashed #aaa;background:#f5f5f4;box-shadow:0 1px 4px rgba(0,0,0,0.08);display:flex;flex-direction:column;transition:box-shadow 0.15s;cursor:pointer;}
+.rs-task:hover{box-shadow:0 2px 8px rgba(0,0,0,0.14);}
+.rs-task-content{padding:6px 8px 4px;flex:1;}
+.rs-task-title{font-size:0.88rem;font-weight:700;color:var(--ink);line-height:1.2;}
+.rs-task-notes{font-size:0.75rem;color:#666;margin-top:3px;font-style:italic;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;cursor:pointer;}
+.rs-task-notes.expanded{display:block;overflow:visible;background:rgba(0,0,0,0.05);border-radius:3px;padding:5px 6px;}
+
+/* ── UNSCHEDULED STRIP ── */
+.rs-unscheduled{margin-top:18px;}
+.rs-unscheduled-title{font-size:0.72rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+.rs-unscheduled-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.rs-unscheduled-chip{background:white;border:1px solid var(--border);border-radius:2px;padding:7px 11px;cursor:pointer;font-size:0.82rem;color:var(--ink);display:flex;align-items:center;gap:7px;transition:border-color 0.15s;}
+.rs-unscheduled-chip:hover{border-color:var(--accent);}
+.rs-chip-ref{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--accent);}
+
+/* ── POPOVERS ── */
+.runsheet-popover-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.35);z-index:200;}
+.runsheet-popover-overlay.open{display:block;}
+.runsheet-popover{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:4px;box-shadow:0 12px 40px rgba(0,0,0,0.2);padding:22px;z-index:201;max-height:90vh;overflow-y:auto;}
+.runsheet-popover.open{display:block;}
+.runsheet-popover-title{font-family:'Cormorant Garamond',serif;font-size:1.3rem;margin-bottom:14px;color:var(--ink);}
+.runsheet-popover-label{display:block;font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px;margin-top:12px;}
+.runsheet-popover-input{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:2px;font-family:'Jost',sans-serif;font-size:0.92rem;color:var(--ink);outline:none;box-sizing:border-box;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239A8F80' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:14px;padding-right:30px;}
+.runsheet-popover-input:focus{border-color:var(--accent);}
+.sched-two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.sched-chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
+.sched-chip{padding:5px 11px;border:1px solid var(--border);border-radius:12px;background:white;font-family:'Jost',sans-serif;font-size:0.78rem;color:var(--muted);cursor:pointer;transition:all 0.15s;}
+.sched-chip:hover{border-color:var(--accent);}
+.sched-chip.selected{border-color:var(--accent);background:rgba(184,147,90,0.1);color:var(--accent);font-weight:600;}
+.runsheet-popover-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.btn{padding:9px 18px;border-radius:2px;font-family:'Jost',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:opacity 0.15s;}
+.btn-gold{background:var(--accent);color:white;border-color:var(--accent);}
+.btn-gold:hover{opacity:0.88;}
+.btn-outline{background:white;color:var(--muted);border-color:var(--border);}
+.btn-outline:hover{border-color:var(--ink);color:var(--ink);}
+.loading{text-align:center;padding:40px 20px;color:var(--muted);font-size:0.88rem;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">LUMA <em>Design</em> Co</div>
+  <div class="nav-links">
+    <a href="/" class="nav-link">Labels</a>
+    <a href="/jobs" class="nav-link">Jobs</a>
+    <a href="/runsheet" class="nav-link active">Runsheet</a>
+    <a href="/catalogue" class="nav-link">Catalogue</a>
+  </div>
+</header>
+
+<!-- Schedule popover -->
+<div class="runsheet-popover-overlay" id="runsheet-popover-overlay" onclick="closeRunsheetPopover()"></div>
+<div class="runsheet-popover" id="runsheet-popover" style="width:340px;">
+  <div class="runsheet-popover-title">Schedule Job</div>
+  <div id="sched-popover-ref" style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;line-height:1.4;"></div>
+  <div class="sched-two-col">
+    <div>
+      <label class="runsheet-popover-label">Install date</label>
+      <input type="date" id="runsheet-popover-date" class="runsheet-popover-input"/>
+    </div>
+    <div>
+      <label class="runsheet-popover-label">Type</label>
+      <select id="runsheet-popover-type" class="runsheet-popover-input">
+        <option value="install">Install</option>
+        <option value="pickup">Pickup</option>
+      </select>
+    </div>
+  </div>
+  <label class="runsheet-popover-label" style="margin-top:12px;">Vehicle(s)</label>
+  <div class="sched-chip-row" id="sched-vehicle-chips"></div>
+  <div style="font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;">Two tiles will be created — <strong>To Load</strong> the day before and <strong>Install/Pickup</strong> on the date above.</div>
+  <div class="runsheet-popover-actions" style="margin-top:18px;">
+    <button class="btn btn-outline" onclick="removeFromRunsheet()" id="runsheet-remove-btn" style="font-size:0.72rem;display:none;">Remove</button>
+    <button class="btn btn-gold" onclick="saveRunsheetEntry()">Save</button>
+  </div>
+</div>
+
+<!-- Crew popover -->
+<div class="runsheet-popover-overlay" id="crew-popover-overlay" onclick="closeCrewPopover()"></div>
+<div class="runsheet-popover" id="crew-popover" style="width:320px;">
+  <div class="runsheet-popover-title" id="crew-popover-title">Set Crew</div>
+  <input type="hidden" id="crew-popover-vehicle"/>
+  <input type="hidden" id="crew-popover-date"/>
+  <label class="runsheet-popover-label">Lead</label>
+  <select id="crew-popover-lead" class="runsheet-popover-input"><option value="">No lead</option></select>
+  <label class="runsheet-popover-label">Offsiders</label>
+  <div class="sched-chip-row" id="crew-popover-offsiders"></div>
+  <div class="runsheet-popover-actions" style="margin-top:16px;">
+    <button class="btn btn-outline" onclick="closeCrewPopover()" style="font-size:0.75rem;">Cancel</button>
+    <button class="btn btn-gold" onclick="saveCrewEntry()">Save</button>
+  </div>
+</div>
+
+<!-- Task popover -->
+<div class="runsheet-popover-overlay" id="task-popover-overlay" onclick="closeTaskPopover()"></div>
+<div class="runsheet-popover" id="task-popover" style="width:340px;">
+  <div class="runsheet-popover-title" id="task-popover-title">New Task</div>
+  <input type="hidden" id="task-popover-id"/>
+  <input type="hidden" id="task-popover-date"/>
+  <label class="runsheet-popover-label">Title</label>
+  <input type="text" id="task-popover-title-input" class="runsheet-popover-input" placeholder="e.g. Unload truck, Team briefing…"/>
+  <label class="runsheet-popover-label">Vehicle</label>
+  <select id="task-popover-vehicle" class="runsheet-popover-input"><option value="ALL">All Vehicles</option></select>
+  <div class="sched-two-col" style="margin-top:12px;">
+    <div>
+      <label class="runsheet-popover-label">Start time</label>
+      <select id="task-popover-time" class="runsheet-popover-input"><option value="">No time yet</option></select>
+    </div>
+    <div>
+      <label class="runsheet-popover-label">Duration</label>
+      <select id="task-popover-duration" class="runsheet-popover-input"><option value="">1 hr (default)</option></select>
+    </div>
+  </div>
+  <label class="runsheet-popover-label">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+  <textarea id="task-popover-notes" class="runsheet-popover-input" placeholder="Any extra details…" style="height:60px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
+  <div class="runsheet-popover-actions" style="margin-top:16px;">
+    <button class="btn btn-outline" onclick="deleteTask()" id="task-delete-btn" style="font-size:0.72rem;display:none;color:var(--red);border-color:var(--red);">Delete</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-outline" onclick="closeTaskPopover()" style="font-size:0.75rem;">Cancel</button>
+      <button class="btn btn-gold" onclick="saveTask()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <h1 class="page-title">Runsheet</h1>
+  <p class="page-sub">Daily transport schedule — installs, pickups, and loads.</p>
+
+  <div class="runsheet-date-row">
+    <button class="runsheet-nav-btn" onclick="shiftRunsheetDate(-1)">‹</button>
+    <div class="runsheet-date-label" id="runsheet-date-label"></div>
+    <button class="runsheet-nav-btn" onclick="shiftRunsheetDate(1)">›</button>
+    <button class="btn-today" onclick="goToToday()">Today</button>
+  </div>
+
+  <div id="runsheet-content"><div class="loading">Loading runsheet…</div></div>
+</div>
+
+<script>
+const COLOUR_MAP={Red:'#D62828',Blue:'#1565C0',Green:'#2E7D32',Yellow:'#F9A825',Purple:'#6A0DAD',Orange:'#E65100',Teal:'#00838F',Magenta:'#AD1457',Brown:'#4E342E',Olive:'#558B2F',Indigo:'#283593',Cyan:'#00ACC1',Pink:'#F06292',Grey:'#757575'};
+const RUNSHEET_TYPE_LABELS={install:'Install',pickup:'Pickup',to_load:'To Load'};
+
+// Job cache — populated from the runsheet day fetch
+// The runsheet page doesn't load ALL jobs, only those scheduled for the day.
+// jobsById and transferringToMap are built fresh on each renderRunsheet() call.
+let jobsById=new Map();
+let transferringToMap=new Map();
+
+function localDateStr(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+let runsheetViewDate=new Date();
+function shiftRunsheetDate(delta){
+  runsheetViewDate=new Date(runsheetViewDate);
+  runsheetViewDate.setDate(runsheetViewDate.getDate()+delta);
+  renderRunsheet();
+}
+function goToToday(){
+  runsheetViewDate=new Date();
+  renderRunsheet();
+}
+
+// ── Runsheet config ──
+let RS_CONFIG={
+  vehicles:['Marlin','Bruce','Nigel','Nemo','VUG'],
+  stylists:['Addy','Montie','Delphine','India','Hayley'],
+  drivers:['Jo','Savio','Nick','Stefano','Yuri','Ayoub','Bruno','Phil'],
+  workers:[],time_slots:[],durations:[30,60,90,120,150,180,210,240],
+};
+async function loadRunsheetConfig(){
+  try{const res=await fetch('/api/runsheet-config');RS_CONFIG=await res.json();}catch(e){}
+  populateSchedPopoverDropdowns();
+}
+
+const SLOT_H=46;
+const TOTAL_SLOTS=17;
+function slotIndex(t){const[h,m]=t.split(':').map(Number);return(h-7)*2+(m===30?1:0)-1;}
+function formatSlotLabel(t){const[h,m]=t.split(':').map(Number);const p=h<12?'am':'pm',h12=h%12===0?12:h%12;return`${h12}:${String(m).padStart(2,'0')}${p}`;}
+function street_only_js(addr){if(!addr)return addr;return addr.split(',')[0].trim();}
+function timeOptions(){return'<option value="">No time yet</option>'+(RS_CONFIG.time_slots||[]).map(t=>`<option value="${t}">${formatSlotLabel(t)}</option>`).join('');}
+function durationOptions(){return'<option value="">1 hr (default)</option>'+(RS_CONFIG.durations||[]).map(d=>{const h=Math.floor(d/60),m=d%60;return`<option value="${d}">${h&&m?`${h}h ${m}m`:h?`${h} hr`:`${m} min`}</option>`;}).join('');}
+
+let currentDaySchedule=[];
+let currentDayCrew={};
+let currentDayTasksById={};
+
+async function renderRunsheet(){
+  const todayStr=localDateStr(runsheetViewDate);
+  const label=document.getElementById('runsheet-date-label');
+  const isToday=localDateStr(new Date())===todayStr;
+  label.textContent=runsheetViewDate.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})+(isToday?' (Today)':'');
+
+  const content=document.getElementById('runsheet-content');
+  content.innerHTML='<div class="loading">Loading…</div>';
+
+  let dayJobs=[],daySchedule=[],dayCrew=[],dayTasks=[];
+  try{
+    const res=await fetch(`/api/runsheet/${todayStr}`);
+    const data=await res.json();
+    dayJobs=data.jobs||[];daySchedule=data.schedule||[];
+    dayCrew=data.crew||[];dayTasks=data.tasks||[];
+  }catch(e){content.innerHTML='<div class="runsheet-empty">Failed to load runsheet.</div>';return;}
+
+  currentDaySchedule=daySchedule;
+  currentDayTasksById=Object.fromEntries(dayTasks.map(t=>[t.id,t]));
+
+  // Build job caches for this day
+  jobsById=new Map(dayJobs.map(j=>[j.id,j]));
+  transferringToMap=new Map(
+    dayJobs.filter(j=>j.is_transfer&&j.transfer_from_job_id).map(j=>[j.transfer_from_job_id,j])
+  );
+
+  if(!dayJobs.length&&!dayTasks.length){
+    content.innerHTML=`<div class="runsheet-empty">Nothing scheduled for this day yet.<br>Go to a job tile in <a href="/jobs" style="color:var(--accent);">Jobs</a> and use the calendar icon to schedule it.</div>`;
+    return;
+  }
+
+  const vehicles=RS_CONFIG.vehicles;
+  const slots=RS_CONFIG.time_slots;
+  const nCols=vehicles.length;
+
+  const schedByVehicle={};
+  vehicles.forEach(v=>{schedByVehicle[v]=[];});
+  const jobById=Object.fromEntries(dayJobs.map(j=>[j.id,j]));
+  for(const entry of daySchedule){
+    const job=jobById[entry.job_id];
+    if(!job)continue;
+    if(schedByVehicle[entry.vehicle])schedByVehicle[entry.vehicle].push({...entry,_job:job});
+  }
+
+  const scheduledJobIds=new Set(daySchedule.map(e=>e.job_id));
+  const unscheduled=dayJobs.filter(j=>!scheduledJobIds.has(j.id));
+
+  const crewByVehicle={};
+  dayCrew.forEach(c=>{crewByVehicle[c.vehicle]=c;});
+  currentDayCrew=crewByVehicle;
+
+  const HEADER_ROWS=2;
+  const LUNCH_SLOT='12:30';
+  let cells=[];
+
+  // Header
+  cells.push(`<div class="rs-header-cell" style="grid-column:1;grid-row:1;">Time</div>`);
+  vehicles.forEach((v,i)=>{cells.push(`<div class="rs-header-cell" style="grid-column:${i+2};grid-row:1;">${v}</div>`);});
+
+  // Team row
+  cells.push(`<div class="rs-team-cell" style="grid-column:1;grid-row:2;cursor:default;"></div>`);
+  vehicles.forEach((v,i)=>{
+    const crew=crewByVehicle[v];
+    const hasCrew=!!(crew?.lead||(crew?.offsiders||[]).length);
+    let crewText='+ Set crew';
+    if(hasCrew){
+      const leadLine=crew.lead?`<span style="opacity:0.55;font-weight:600;">Lead:</span> ${crew.lead}`:'';
+      const offsiderNames=(crew.offsiders||[]).filter(Boolean).join(', ');
+      const offLine=offsiderNames?`<span style="opacity:0.55;font-weight:600;">Offsider(s):</span> ${offsiderNames}`:'';
+      crewText=[leadLine,offLine].filter(Boolean).join('<br>');
+    }
+    cells.push(`<div class="rs-team-cell${hasCrew?' has-crew':''}" style="grid-column:${i+2};grid-row:2;line-height:1.5;padding:6px 8px;" onclick="openCrewPopover('${v}','${todayStr}')" title="Set ${v} crew">${crewText}</div>`);
+  });
+
+  // Time slots + empty cells
+  slots.forEach((slot,si)=>{
+    const gridRow=HEADER_ROWS+si+1;
+    const isLunch=slot===LUNCH_SLOT;
+    cells.push(`<div class="rs-time${isLunch?' rs-lunch-time':''}" style="grid-column:1;grid-row:${gridRow};">${formatSlotLabel(slot)}</div>`);
+    vehicles.forEach((v,vi)=>{
+      if(isLunch){
+        cells.push(`<div class="rs-cell rs-lunch-cell" style="grid-column:${vi+2};grid-row:${gridRow};"><span class="rs-lunch-label">Lunch</span></div>`);
+      }else{
+        cells.push(`<div class="rs-cell rs-cell-clickable" style="grid-column:${vi+2};grid-row:${gridRow};" onclick="openTaskPopover(null,'${v}','${todayStr}','${slot}')"></div>`);
+      }
+    });
+  });
+
+  // Job tiles
+  const gearSVG=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+  const stylistSVG=`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.71 4.04c.39-.39.39-1.05 0-1.44l-2.31-2.31a.996.996 0 0 0-1.41 0L15.13 2.16l3.71 3.71M3 17.25V21h3.75L20.81 6.94l-3.75-3.75z"/></svg>`;
+  const driverSVG=`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>`;
+
+  vehicles.forEach((v,vi)=>{
+    (schedByVehicle[v]||[]).forEach(entry=>{
+      const job=entry._job;
+      if(!entry.start_time)return;
+      const si=slotIndex(entry.start_time);
+      const dur=entry.duration||60;
+      const spanSlots=Math.max(1,Math.round(dur/30));
+      const rowStart=HEADER_ROWS+si+1;
+      const rowEnd=rowStart+spanSlots;
+      const entryType=entry.type||job.runsheet_type||'install';
+      const typeClass=`rs-job-${entryType}`;
+      const colour=COLOUR_MAP[job.colour]||'#888';
+      const ref=job.job_ref||job.job_number||'';
+      const addr=street_only_js(job.address||'');
+      const typeLabel=RUNSHEET_TYPE_LABELS[entryType]||'';
+      const notes=entry.notes||'';
+
+      let transferHtml='';
+      if(job.is_transfer&&job.transfer_from_job_id){
+        const src=jobsById.get(job.transfer_from_job_id);
+        const srcRef=src?(src.job_ref||src.job_number):'?';
+        transferHtml=`<div class="rs-job-transfer rs-job-transfer-from">↓ Transfer from ${srcRef}</div>`;
+      }else if(transferringToMap.has(job.id)){
+        const dest=transferringToMap.get(job.id);
+        transferHtml=`<div class="rs-job-transfer rs-job-transfer-to">↑ Transferring to ${dest.job_ref||dest.job_number}</div>`;
+      }
+
+      cells.push(`<div class="rs-job ${typeClass}" style="grid-column:${vi+2};grid-row:${rowStart}/${rowEnd};border-left-color:${colour};z-index:2;">
+        <div class="rs-job-content">
+          <div class="rs-job-ref">${ref}</div>
+          <div class="rs-job-addr">${addr}</div>
+          ${typeLabel?`<div class="rs-job-type">${typeLabel}</div>`:''}
+          ${transferHtml}
+          ${notes?`<div class="rs-job-notes" onclick="event.stopPropagation();this.classList.toggle('expanded')">${notes}</div>`:''}
+        </div>
+        <div class="rs-job-actions">
+          <button class="rs-job-btn-gear" onclick="openRunsheetPopover('${job.id}')" title="Edit schedule">${gearSVG}</button>
+          <div class="rs-job-btn-stack">
+            <button class="rs-job-btn rs-job-btn-stylist" onclick="window.open('/stylist/${job.id}','_blank')">${stylistSVG} Stylist</button>
+            <button class="rs-job-btn rs-job-btn-driver" onclick="window.open('/driver/${job.id}','_blank')">${driverSVG} Driver</button>
+          </div>
+        </div>
+      </div>`);
+    });
+    (schedByVehicle[v]||[]).filter(e=>!e.start_time).forEach(entry=>{
+      const job=entry._job;
+      if(!unscheduled.find(u=>u.id===job.id))unscheduled.push(job);
+    });
+  });
+
+  // Task tiles
+  dayTasks.forEach(task=>{
+    if(!task.start_time)return;
+    const si=slotIndex(task.start_time);
+    if(si<0||si>=TOTAL_SLOTS)return;
+    const dur=task.duration||60;
+    const spanSlots=Math.max(1,Math.round(dur/30));
+    const rowStart=HEADER_ROWS+si+1;
+    const rowEnd=rowStart+spanSlots;
+    const targetCols=task.vehicle==='ALL'?vehicles.map((_,vi)=>vi+2):[vehicles.indexOf(task.vehicle)+2].filter(c=>c>=2);
+    targetCols.forEach(col=>{
+      cells.push(`<div class="rs-task" style="grid-column:${col};grid-row:${rowStart}/${rowEnd};z-index:2;" onclick="openTaskPopover('${task.id}','${task.vehicle}','${task.date}',null)">
+        <div class="rs-task-content">
+          <div class="rs-task-title">${task.title}</div>
+          ${task.notes?`<div class="rs-task-notes" onclick="event.stopPropagation();this.classList.toggle('expanded')">${task.notes}</div>`:''}
+        </div>
+      </div>`);
+    });
+  });
+
+  let html=`<div class="rs-scroll"><div class="rs-grid" style="grid-template-columns:60px repeat(${nCols},1fr);grid-template-rows:auto auto repeat(${TOTAL_SLOTS},${SLOT_H}px);">${cells.join('')}</div></div>`;
+
+  if(unscheduled.length){
+    html+=`<div class="rs-unscheduled">
+      <div class="rs-unscheduled-title">Not yet placed <span style="background:var(--sand);border-radius:10px;padding:1px 8px;font-size:0.7rem;font-weight:400;">${unscheduled.length}</span></div>
+      <div class="rs-unscheduled-chips">${unscheduled.map(j=>`<div class="rs-unscheduled-chip" onclick="openRunsheetPopover('${j.id}')"><div class="rs-chip-ref">${j.job_ref||j.job_number}</div><div style="font-size:0.76rem;color:var(--muted);">${street_only_js(j.address||'')}</div></div>`).join('')}</div>
+    </div>`;
+  }
+
+  content.innerHTML=html;
+}
+
+// ── Schedule popover ──
+let runsheetPopoverJobId=null;
+let schedVehicleSelected=[];
+
+function populateSchedPopoverDropdowns(){
+  const vRow=document.getElementById('sched-vehicle-chips');
+  if(vRow)vRow.innerHTML=(RS_CONFIG.vehicles||[]).map(v=>`<button class="sched-chip" data-sv="${v}" onclick="toggleSchedVehicle(this,'${v}')">${v}</button>`).join('');
+  const lSel=document.getElementById('crew-popover-lead');
+  if(lSel)lSel.innerHTML='<option value="">No lead</option>'+['── Stylists ──',...(RS_CONFIG.stylists||[]),'── Drivers ──',...(RS_CONFIG.drivers||[])].map(w=>w.startsWith('──')?`<option disabled>${w}</option>`:`<option value="${w}">${w}</option>`).join('');
+}
+
+function toggleSchedVehicle(btn,v){
+  btn.classList.toggle('selected');
+  if(btn.classList.contains('selected'))schedVehicleSelected.push(v);
+  else schedVehicleSelected=schedVehicleSelected.filter(x=>x!==v);
+}
+
+async function openRunsheetPopover(jobId){
+  runsheetPopoverJobId=jobId;
+  schedVehicleSelected=[];
+  const job=jobsById.get(jobId);
+  document.getElementById('sched-popover-ref').textContent=[job?.job_ref||job?.job_number,job?.address?street_only_js(job.address):null].filter(Boolean).join(' — ');
+  document.getElementById('runsheet-popover-date').value=job?.runsheet_date||'';
+  document.getElementById('runsheet-popover-type').value=job?.runsheet_type||'install';
+  document.getElementById('runsheet-remove-btn').style.display=job?.runsheet_date?'inline-block':'none';
+  try{const res=await fetch(`/api/jobs/${jobId}/schedule`);const entries=await res.json();schedVehicleSelected=[...new Set(entries.map(e=>e.vehicle).filter(Boolean))];}catch(e){}
+  document.querySelectorAll('[data-sv]').forEach(el=>{el.classList.toggle('selected',schedVehicleSelected.includes(el.dataset.sv));});
+  document.getElementById('runsheet-popover-overlay').classList.add('open');
+  document.getElementById('runsheet-popover').classList.add('open');
+}
+function closeRunsheetPopover(){
+  document.getElementById('runsheet-popover-overlay').classList.remove('open');
+  document.getElementById('runsheet-popover').classList.remove('open');
+  runsheetPopoverJobId=null;
+}
+async function saveRunsheetEntry(){
+  const date=document.getElementById('runsheet-popover-date').value;
+  const type=document.getElementById('runsheet-popover-type').value||'install';
+  if(!date){alert('Pick an install date first.');return;}
+  const r1=await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({runsheet_date:date,runsheet_type:type,vehicles:schedVehicleSelected.length?schedVehicleSelected:null})});
+  const d1=await r1.json();
+  if(!d1.success){alert('Failed to save: '+(d1.error||'unknown error'));return;}
+  const job=jobsById.get(runsheetPopoverJobId);
+  if(job){job.runsheet_date=date;job.runsheet_type=type;}
+  closeRunsheetPopover();
+  renderRunsheet();
+}
+async function removeFromRunsheet(){
+  if(!confirm('Remove this job from the runsheet and clear all vehicle assignments?'))return;
+  await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({runsheet_date:null,runsheet_type:null})});
+  closeRunsheetPopover();
+  renderRunsheet();
+}
+
+// ── Crew popover ──
+function openCrewPopover(vehicle,dateStr){
+  document.getElementById('crew-popover-vehicle').value=vehicle;
+  document.getElementById('crew-popover-date').value=dateStr;
+  document.getElementById('crew-popover-title').textContent=`${vehicle} — Crew`;
+  const crew=currentDayCrew[vehicle];
+  document.getElementById('crew-popover-lead').value=crew?.lead||'';
+  const selected=crew?.offsiders||[];
+  document.getElementById('crew-popover-offsiders').innerHTML=[...(RS_CONFIG.stylists||[]),...(RS_CONFIG.drivers||[])].map(w=>`<button class="sched-chip${selected.includes(w)?' selected':''}" onclick="this.classList.toggle('selected')">${w}</button>`).join('');
+  document.getElementById('crew-popover-overlay').classList.add('open');
+  document.getElementById('crew-popover').classList.add('open');
+}
+function closeCrewPopover(){document.getElementById('crew-popover-overlay').classList.remove('open');document.getElementById('crew-popover').classList.remove('open');}
+async function saveCrewEntry(){
+  const vehicle=document.getElementById('crew-popover-vehicle').value;
+  const dateStr=document.getElementById('crew-popover-date').value;
+  const lead=document.getElementById('crew-popover-lead').value||null;
+  const offsiders=Array.from(document.querySelectorAll('#crew-popover-offsiders .sched-chip.selected')).map(el=>el.textContent);
+  const res=await fetch(`/api/crew/${dateStr}/${vehicle}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({lead,offsiders})});
+  const data=await res.json();
+  if(!data.success){alert('Failed to save crew: '+(data.error||'unknown error'));return;}
+  closeCrewPopover();
+  renderRunsheet();
+}
+
+// ── Task popover ──
+function openTaskPopover(taskId,vehicle,dateStr,prefilledTime){
+  const isEdit=!!taskId;
+  document.getElementById('task-popover-title').textContent=isEdit?'Edit Task':'New Task';
+  document.getElementById('task-popover-id').value=taskId||'';
+  document.getElementById('task-popover-date').value=dateStr||'';
+  document.getElementById('task-delete-btn').style.display=isEdit?'inline-block':'none';
+  const vSel=document.getElementById('task-popover-vehicle');
+  vSel.innerHTML='<option value="ALL">All Vehicles</option>'+(RS_CONFIG.vehicles||[]).map(v=>`<option value="${v}">${v}</option>`).join('');
+  vSel.value=vehicle||'ALL';
+  const tSel=document.getElementById('task-popover-time');
+  tSel.innerHTML=timeOptions();tSel.value=prefilledTime||'';
+  document.getElementById('task-popover-duration').innerHTML=durationOptions();
+  if(isEdit){const task=currentDayTasksById[taskId]||{};document.getElementById('task-popover-title-input').value=task.title||'';document.getElementById('task-popover-notes').value=task.notes||'';tSel.value=task.start_time||'';document.getElementById('task-popover-duration').value=task.duration||'';vSel.value=task.vehicle||'ALL';}
+  else{document.getElementById('task-popover-title-input').value='';document.getElementById('task-popover-notes').value='';document.getElementById('task-popover-duration').value='';}
+  document.getElementById('task-popover-overlay').classList.add('open');
+  document.getElementById('task-popover').classList.add('open');
+  setTimeout(()=>document.getElementById('task-popover-title-input').focus(),80);
+}
+function closeTaskPopover(){document.getElementById('task-popover-overlay').classList.remove('open');document.getElementById('task-popover').classList.remove('open');}
+async function saveTask(){
+  const taskId=document.getElementById('task-popover-id').value||null;
+  const dateStr=document.getElementById('task-popover-date').value;
+  const title=document.getElementById('task-popover-title-input').value.trim();
+  const vehicle=document.getElementById('task-popover-vehicle').value;
+  const time=document.getElementById('task-popover-time').value||null;
+  const durVal=document.getElementById('task-popover-duration').value;
+  const duration=durVal?parseInt(durVal):null;
+  const notes=document.getElementById('task-popover-notes').value.trim()||null;
+  if(!title){alert('Please enter a title for the task.');return;}
+  if(taskId){const res=await fetch(`/api/tasks/${taskId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,vehicle,start_time:time,duration,notes})});const data=await res.json();if(!data.success){alert('Failed to update task: '+(data.error||'unknown error'));return;}}
+  else{const res=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({vehicle,date:dateStr,title,notes,start_time:time,duration})});const data=await res.json();if(!data.success){alert('Failed to create task: '+(data.error||'unknown error'));return;}}
+  closeTaskPopover();renderRunsheet();
+}
+async function deleteTask(){
+  const taskId=document.getElementById('task-popover-id').value;
+  if(!taskId)return;
+  if(!confirm('Delete this task?'))return;
+  await fetch(`/api/tasks/${taskId}`,{method:'DELETE'});
+  closeTaskPopover();renderRunsheet();
+}
+
+loadRunsheetConfig();
+renderRunsheet();
+</script>
+</body>
+</html>

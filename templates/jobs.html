@@ -269,11 +269,6 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
     <button class="btn btn-outline" id="archived-toggle" onclick="toggleArchived()" style="font-size:0.75rem;">Show Completed Jobs</button>
   </div>
 
-  <div class="view-tabs">
-    <button class="view-tab active" id="tab-active" onclick="switchView('active')">Active Jobs</button>
-    <button class="view-tab" id="tab-runsheet" onclick="switchView('runsheet')">Runsheet</button>
-  </div>
-
   <div id="active-view">
     <div class="search-bar">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
@@ -281,16 +276,6 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
       <button id="search-clear" onclick="clearSearch()" style="display:none;">✕</button>
     </div>
     <div class="jobs-grid" id="jobs-grid"><div class="loading">Loading jobs…</div></div>
-  </div>
-
-  <div id="runsheet-view" style="display:none;">
-    <div class="runsheet-date-row">
-      <button class="runsheet-nav-btn" onclick="shiftRunsheetDate(-1)">‹</button>
-      <div class="runsheet-date-label" id="runsheet-date-label"></div>
-      <button class="runsheet-nav-btn" onclick="shiftRunsheetDate(1)">›</button>
-      <button class="btn btn-outline" onclick="goToToday()" style="font-size:0.72rem;margin-left:10px;">Today</button>
-    </div>
-    <div id="runsheet-content"><div class="loading">Loading runsheet…</div></div>
   </div>
 </div>
 
@@ -585,33 +570,9 @@ async function loadJobs(){
     lastFetchedJobs.filter(j=>j.is_transfer&&j.transfer_from_job_id).map(j=>[j.transfer_from_job_id,j])
   );
   renderJobs();
-  if(currentView==='runsheet') renderRunsheet();
 }
 
-// ── View switching ──
-let currentView='active';
-function switchView(view){
-  currentView=view;
-  document.getElementById('tab-active').classList.toggle('active', view==='active');
-  document.getElementById('tab-runsheet').classList.toggle('active', view==='runsheet');
-  document.getElementById('active-view').style.display = view==='active' ? 'block' : 'none';
-  document.getElementById('runsheet-view').style.display = view==='runsheet' ? 'block' : 'none';
-  document.getElementById('archived-toggle').style.display = view==='active' ? 'inline-block' : 'none';
-  const title=document.getElementById('page-title'), sub=document.getElementById('page-sub');
-  if(view==='runsheet'){
-    title.textContent='Runsheet';
-    sub.textContent='Jobs scheduled for transport — installs and pickups with a truck assigned';
-    renderRunsheet();
-  } else {
-    title.textContent='Active Jobs';
-    sub.textContent='Click a job to manage items and update status';
-  }
-}
-
-// ── Runsheet date navigation ──
-// Local calendar date as YYYY-MM-DD, not UTC — "today" must match the
-// date the person is actually looking at the screen on, not whatever
-// day it happens to be in UTC at that moment.
+// ── Runsheet date navigation (kept for the calendar icon popover save) ──
 function localDateStr(d){
   const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
@@ -1173,7 +1134,6 @@ async function changeJobStatus(newStatus){
   if(job) job.status=newStatus==='returned'?'archived':newStatus;
   closeStatusPopover();
   renderJobs();
-  if(currentView==='runsheet') renderRunsheet();
 }
 
 // ── Transfer setup popover ──
@@ -1346,7 +1306,6 @@ async function confirmDeleteJob(){
   transferringToMap.forEach((v,k)=>{ if(v.id===jobId) transferringToMap.delete(k); });
   closeDeletePopover();
   renderJobs();
-  if(currentView==='runsheet') renderRunsheet();
 }
 
 function renderJobs(){

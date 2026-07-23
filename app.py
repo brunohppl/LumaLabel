@@ -263,11 +263,14 @@ def get_truck_eta(lat, lng, destination_address):
         print('[ETA] GOOGLE_MAPS_API_KEY is not set')
         return None
     try:
+        import time as _time
         params = urllib.parse.urlencode({
-            'origins':      f'{lat},{lng}',
-            'destinations': destination_address,
-            'units':        'metric',
-            'key':          api_key,
+            'origins':          f'{lat},{lng}',
+            'destinations':     destination_address,
+            'units':            'metric',
+            'departure_time':   'now',          # enables traffic-aware duration
+            'traffic_model':    'best_guess',   # realistic estimate vs optimistic/pessimistic
+            'key':              api_key,
         })
         url = f'https://maps.googleapis.com/maps/api/distancematrix/json?{params}'
         req = urllib.request.Request(url)
@@ -282,7 +285,13 @@ def get_truck_eta(lat, lng, destination_address):
             print(f'[ETA] Element status not OK: {element.get("status")}')
             return None
 
-        duration_seconds = element['duration']['value']
+        # Prefer duration_in_traffic (live traffic) — falls back to duration
+        # if traffic data isn't available for this route
+        dur = element.get('duration_in_traffic') or element.get('duration')
+        if not dur:
+            print('[ETA] No duration in response')
+            return None
+        duration_seconds = dur['value']
         from zoneinfo import ZoneInfo
         from datetime import timedelta, timezone as _tz
         now_utc      = datetime.now(_tz.utc)

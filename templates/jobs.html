@@ -426,8 +426,8 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
 <script>
 let showArchived=false;
 const COLOUR_MAP={Red:'#D62828',Blue:'#1565C0',Green:'#2E7D32',Yellow:'#F9A825',Purple:'#6A0DAD',Orange:'#E65100',Teal:'#00838F',Magenta:'#AD1457',Brown:'#4E342E',Olive:'#558B2F',Indigo:'#283593',Cyan:'#00ACC1',Pink:'#F06292',Grey:'#757575'};
-const STATUS_LABELS={ready:'Ready to Pick',picking:'Picking',ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',ready_to_collect:'Ready to Collect',returned:'Returned',archived:'Returned'};
-const STATUS_PILLS={ready:'pill-ready',picking:'pill-picking',ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',ready_to_collect:'pill-readycollect',returned:'pill-returned',archived:'pill-returned'};
+const STATUS_LABELS={ready:'Ready to Pick',ready_to_load:'Ready to Load',loaded:'Loaded',installed:'Installed',ready_to_collect:'Ready to Collect',returned:'Completed',archived:'Completed'};
+const STATUS_PILLS={ready:'pill-ready',ready_to_load:'pill-readyload',loaded:'pill-loaded',installed:'pill-installed',ready_to_collect:'pill-readycollect',returned:'pill-returned',archived:'pill-returned'};
 
 function toggleArchived(){
   showArchived=!showArchived;
@@ -440,14 +440,13 @@ function toggleArchived(){
 
 // Status display order — strict order of execution, matching the
 // actual job lifecycle from start to finish.
-const STATUS_ORDER=['ready','picking','ready_to_load','loading','loaded','installed','ready_to_collect','returned'];
-// Note: "returned" is included here so admin can manually mark a job as returned
-// from the jobs page without needing the driver interface. The backend's
-// /api/jobs/<id>/status route silently converts "returned" to "archived" — the
-// same path used when a driver taps "Mark Returned" — so the end result is identical.
+const STATUS_ORDER=['ready','ready_to_load','loaded','installed','ready_to_collect','returned'];
+// Note: "returned" is included so admin can manually mark a job completed
+// from the jobs page. The backend auto-converts it to "archived".
 const STATUS_SECTION_LABELS={
-  ready:'Ready to Pick', picking:'Picking', ready_to_load:'Ready to Load',
-  loading:'Loading', loaded:'Loaded', installed:'Installed', ready_to_collect:'Ready to Collect'
+  ready:'Ready to Pick', ready_to_load:'Ready to Load',
+  loaded:'Loaded', installed:'Installed', ready_to_collect:'Ready to Collect',
+  returned:'Completed', archived:'Completed'
 };
 
 const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};

@@ -127,7 +127,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 
 <!-- Schedule popover -->
 <div class="runsheet-popover-overlay" id="runsheet-popover-overlay" onclick="closeRunsheetPopover()"></div>
-<div class="runsheet-popover" id="runsheet-popover" style="width:340px;">
+<div class="runsheet-popover" id="runsheet-popover" style="width:360px;">
   <div class="runsheet-popover-title">Schedule Job</div>
   <div id="sched-popover-ref" style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;line-height:1.4;"></div>
   <div class="sched-two-col">
@@ -146,6 +146,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   <label class="runsheet-popover-label" style="margin-top:12px;">Vehicle(s)</label>
   <div class="sched-chip-row" id="sched-vehicle-chips"></div>
   <div style="font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;">Two tiles will be created — <strong>To Load</strong> the day before and <strong>Install/Pickup</strong> on the date above.</div>
+
+  <!-- Per-vehicle time overrides — shown after vehicles are selected -->
+  <div id="sched-vehicle-times" style="margin-top:12px;"></div>
+
   <div class="runsheet-popover-actions" style="margin-top:18px;">
     <button class="btn btn-outline" onclick="removeFromRunsheet()" id="runsheet-remove-btn" style="font-size:0.72rem;display:none;">Remove</button>
     <button class="btn btn-gold" onclick="saveRunsheetEntry()">Save</button>
@@ -434,30 +438,77 @@ async function renderRunsheet(){
 // ── Schedule popover ──
 let runsheetPopoverJobId=null;
 let schedVehicleSelected=[];
+let schedVehicleTimes={};
+
+function workerOptions(selected=''){
+  return '<option value="">No lead</option>'
+    +['── Stylists ──',...(RS_CONFIG.stylists||[]),'── Drivers ──',...(RS_CONFIG.drivers||[])]
+      .map(w=>w.startsWith('──')
+        ?`<option disabled>${w}</option>`
+        :`<option value="${w}"${w===selected?' selected':''}>${w}</option>`
+      ).join('');
+}
 
 function populateSchedPopoverDropdowns(){
   const vRow=document.getElementById('sched-vehicle-chips');
-  if(vRow)vRow.innerHTML=(RS_CONFIG.vehicles||[]).map(v=>`<button class="sched-chip" data-sv="${v}" onclick="toggleSchedVehicle(this,'${v}')">${v}</button>`).join('');
-  const lSel=document.getElementById('crew-popover-lead');
-  if(lSel)lSel.innerHTML='<option value="">No lead</option>'+['── Stylists ──',...(RS_CONFIG.stylists||[]),'── Drivers ──',...(RS_CONFIG.drivers||[])].map(w=>w.startsWith('──')?`<option disabled>${w}</option>`:`<option value="${w}">${w}</option>`).join('');
+  if(vRow) vRow.innerHTML=(RS_CONFIG.vehicles||[]).map(v=>
+    `<button class="sched-chip" data-sv="${v}" onclick="toggleSchedVehicle(this,'${v}')">${v}</button>`
+  ).join('');
+  // Lead select is populated fresh in openCrewPopover — no need to pre-fill here
+}
+
+function renderVehicleTimeInputs(){
+  const container=document.getElementById('sched-vehicle-times');
+  if(!container) return;
+  if(!schedVehicleSelected.length){ container.innerHTML=''; return; }
+  container.innerHTML=`<div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px;margin-top:4px;">Time overrides (optional)</div>`
+    + schedVehicleSelected.map(v=>`
+    <div style="margin-bottom:10px;">
+      <div style="font-size:0.73rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink);margin-bottom:5px;">${v}</div>
+      <div class="sched-two-col">
+        <select id="sched-time-${v}" class="runsheet-popover-input">${timeOptions()}</select>
+        <select id="sched-dur-${v}" class="runsheet-popover-input">${durationOptions()}</select>
+      </div>
+    </div>`).join('');
+  // Restore saved values
+  schedVehicleSelected.forEach(v=>{
+    const t=schedVehicleTimes[v]||{};
+    const ts=document.getElementById(`sched-time-${v}`);
+    const ds=document.getElementById(`sched-dur-${v}`);
+    if(ts&&t.start_time) ts.value=t.start_time;
+    if(ds&&t.duration) ds.value=t.duration;
+  });
 }
 
 function toggleSchedVehicle(btn,v){
   btn.classList.toggle('selected');
   if(btn.classList.contains('selected'))schedVehicleSelected.push(v);
   else schedVehicleSelected=schedVehicleSelected.filter(x=>x!==v);
+  renderVehicleTimeInputs();
 }
 
 async function openRunsheetPopover(jobId){
   runsheetPopoverJobId=jobId;
   schedVehicleSelected=[];
+  schedVehicleTimes={};
   const job=jobsById.get(jobId);
   document.getElementById('sched-popover-ref').textContent=[job?.job_ref||job?.job_number,job?.address?street_only_js(job.address):null].filter(Boolean).join(' — ');
   document.getElementById('runsheet-popover-date').value=job?.runsheet_date||'';
   document.getElementById('runsheet-popover-type').value=job?.runsheet_type||'install';
   document.getElementById('runsheet-remove-btn').style.display=job?.runsheet_date?'inline-block':'none';
-  try{const res=await fetch(`/api/jobs/${jobId}/schedule`);const entries=await res.json();schedVehicleSelected=[...new Set(entries.map(e=>e.vehicle).filter(Boolean))];}catch(e){}
+  try{
+    const res=await fetch(`/api/jobs/${jobId}/schedule`);
+    const entries=await res.json();
+    schedVehicleSelected=[...new Set(entries.map(e=>e.vehicle).filter(Boolean))];
+    // Restore per-vehicle times from existing entries
+    entries.forEach(e=>{
+      if(e.vehicle&&(e.start_time||e.duration)){
+        schedVehicleTimes[e.vehicle]={start_time:e.start_time||'',duration:e.duration||''};
+      }
+    });
+  }catch(e){}
   document.querySelectorAll('[data-sv]').forEach(el=>{el.classList.toggle('selected',schedVehicleSelected.includes(el.dataset.sv));});
+  renderVehicleTimeInputs();
   document.getElementById('runsheet-popover-overlay').classList.add('open');
   document.getElementById('runsheet-popover').classList.add('open');
 }
@@ -470,9 +521,35 @@ async function saveRunsheetEntry(){
   const date=document.getElementById('runsheet-popover-date').value;
   const type=document.getElementById('runsheet-popover-type').value||'install';
   if(!date){alert('Pick an install date first.');return;}
-  const r1=await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({runsheet_date:date,runsheet_type:type,vehicles:schedVehicleSelected.length?schedVehicleSelected:null})});
+
+  // Collect any time overrides per vehicle
+  const vehicleOverrides=schedVehicleSelected.map(v=>({
+    vehicle:v,
+    start_time:document.getElementById(`sched-time-${v}`)?.value||null,
+    duration:parseInt(document.getElementById(`sched-dur-${v}`)?.value)||null,
+  }));
+
+  const r1=await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({runsheet_date:date,runsheet_type:type,vehicles:schedVehicleSelected.length?schedVehicleSelected:null})});
   const d1=await r1.json();
   if(!d1.success){alert('Failed to save: '+(d1.error||'unknown error'));return;}
+
+  // Apply time overrides to the seeded entries if any were set
+  if(vehicleOverrides.some(o=>o.start_time||o.duration)){
+    const schedRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
+    const entries=await schedRes.json();
+    await Promise.all(entries.map(async entry=>{
+      const override=vehicleOverrides.find(o=>o.vehicle===entry.vehicle);
+      if(!override) return;
+      const patch={};
+      if(override.start_time) patch.start_time=override.start_time;
+      if(override.duration) patch.duration=override.duration;
+      if(Object.keys(patch).length){
+        await fetch(`/api/schedule/${entry.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
+      }
+    }));
+  }
+
   const job=jobsById.get(runsheetPopoverJobId);
   if(job){job.runsheet_date=date;job.runsheet_type=type;}
   closeRunsheetPopover();
@@ -491,7 +568,10 @@ function openCrewPopover(vehicle,dateStr){
   document.getElementById('crew-popover-date').value=dateStr;
   document.getElementById('crew-popover-title').textContent=`${vehicle} — Crew`;
   const crew=currentDayCrew[vehicle];
-  document.getElementById('crew-popover-lead').value=crew?.lead||'';
+  // Populate lead select fresh each time — guarantees options are present
+  // regardless of when loadRunsheetConfig() completed
+  const lSel=document.getElementById('crew-popover-lead');
+  lSel.innerHTML=workerOptions(crew?.lead||'');
   const selected=crew?.offsiders||[];
   document.getElementById('crew-popover-offsiders').innerHTML=[...(RS_CONFIG.stylists||[]),...(RS_CONFIG.drivers||[])].map(w=>`<button class="sched-chip${selected.includes(w)?' selected':''}" onclick="this.classList.toggle('selected')">${w}</button>`).join('');
   document.getElementById('crew-popover-overlay').classList.add('open');

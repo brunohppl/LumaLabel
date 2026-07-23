@@ -1678,13 +1678,23 @@ def api_job_summary_pdf(job_id):
 def api_job_status(job_id):
     data    = request.get_json()
     status  = data['status']
-    # "Returned" is a terminal action — once the truck is back at the warehouse,
-    # the job is done. Auto-archive it immediately rather than requiring a
-    # separate manual archive step.
     if status == 'returned':
         status = 'archived'
     payload = {'status': status}
-    if 'truck' in data: payload['truck'] = data['truck']
+    if 'truck' in data:
+        new_truck = data['truck']
+        payload['truck'] = new_truck
+        # Sync the runsheet: update any job_schedule entries for this job
+        # to use the newly selected vehicle, so the runsheet tile moves to
+        # the correct column automatically when the driver picks a truck.
+        # Only update entries that already have a vehicle assigned — unassigned
+        # entries (vehicle=null) are left alone.
+        if new_truck and new_truck in RUNSHEET_VEHICLES:
+            existing_entries = sb_get('job_schedule', f'job_id=eq.{job_id}')
+            for entry in (existing_entries or []):
+                if entry.get('vehicle'):  # only update assigned entries
+                    sb_patch('job_schedule', f'id=eq.{entry["id"]}',
+                             {'vehicle': new_truck})
     result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})
 
@@ -1755,7 +1765,18 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_v
 
     try:
         main_dt   = _dt.strptime(main_date_str, '%Y-%m-%d')
-        load_dt   = main_dt - timedelta(days=1)
+        # Skip weekends when calculating the load day:
+        # Monday (weekday=0) → Friday (subtract 3 days)
+        # Sunday  (weekday=6) → Friday (subtract 2 days)
+        # All other days      → previous calendar day
+        weekday = main_dt.weekday()  # 0=Mon … 6=Sun
+        if weekday == 0:    # Monday install → Friday load
+            delta = 3
+        elif weekday == 6:  # Sunday install (unusual) → Friday load
+            delta = 2
+        else:
+            delta = 1
+        load_dt   = main_dt - timedelta(days=delta)
         load_date = load_dt.strftime('%Y-%m-%d')
     except ValueError:
         return

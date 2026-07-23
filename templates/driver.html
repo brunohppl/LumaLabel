@@ -93,18 +93,20 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .group-row{display:flex;align-items:center;padding:0;border-bottom:1px solid var(--warm);transition:background 0.15s;}
 .group-row:last-child{border-bottom:none;}
 .group-row.checked{background:var(--green-light);}
+.group-row.on-bay{background:rgba(249,168,37,0.08);}
 .check-btn{width:64px;min-height:64px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .check-btn:active{background:var(--warm);}
 .check-circle{width:32px;height:32px;border-radius:50%;border:2.5px solid var(--border);display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
 .group-row.checked .check-circle{background:var(--green);border-color:var(--green);}
+.group-row.on-bay .check-circle{background:#F9A825;border-color:#F9A825;}
 .check-tick{display:none;color:white;font-size:1rem;font-weight:700;}
-.group-row.checked .check-tick{display:block;}
+.group-row.checked .check-tick,.group-row.on-bay .check-tick{display:block;}
 .check-empty{display:block;width:8px;height:8px;}
-.group-row.checked .check-empty{display:none;}
+.group-row.checked .check-empty,.group-row.on-bay .check-empty{display:none;}
 .group-info{flex:1;padding:14px 14px 14px 0;}
 .group-serial{font-size:0.75rem;font-weight:700;color:var(--accent);letter-spacing:0.08em;}
 .group-desc{font-size:1rem;color:var(--ink);margin-top:3px;line-height:1.4;font-weight:500;}
-.group-row.checked .group-desc{color:var(--muted);}
+.group-row.checked .group-desc,.group-row.on-bay .group-desc{color:var(--muted);}
 .group-location{font-size:0.85rem;font-weight:400;color:var(--muted);}
 
 .group-row-transfer{display:flex;align-items:center;padding:0;border-bottom:1px solid var(--warm);background:rgba(74,126,184,0.08);}
@@ -456,7 +458,11 @@ function groupItems(list){
     let j=i+1;
     while(j<list.length&&(list[j].description||'')===desc&&(list[j].room||'')===room&&!!list[j].not_transferring===notTransferring)j++;
     groups.push({count:j-i,description:desc,room:room,firstSerial:list[i].serial,lastSerial:list[j-1].serial,
-      items:list.slice(i,j),allChecked:list.slice(i,j).every(x=>x.checked),notes:list[i].notes||'',
+      items:list.slice(i,j),
+      allChecked:list.slice(i,j).every(x=>x.checked),
+      allOnTruck:list.slice(i,j).every(x=>x.on_truck),
+      anyChecked:list.slice(i,j).some(x=>x.checked||x.on_truck),
+      notes:list[i].notes||'',
       photo_url:list.slice(i,j).find(x=>x.photo_url)?.photo_url||null,
       isTransferItem:list.slice(i,j).every(x=>x.is_transfer_item),
       isNotTransferring:notTransferring,
@@ -508,7 +514,7 @@ function renderRooms(){
 
   if(notTransferGroups.length){
     const ntItems=notTransferGroups.flatMap(g=>g.items);
-    const checked=ntItems.filter(i=>i.checked).length;
+    const checked=ntItems.filter(i=>i.on_truck).length;
     const total=ntItems.length;
     const done=checked===total&&total>0;
     const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
@@ -538,7 +544,7 @@ function renderRooms(){
     const groups=catMap[cat]||[];
     const catItems=groups.flatMap(g=>g.items);
     const loadable=catItems.filter(i=>!i.is_transfer_item);
-    const checked=loadable.filter(i=>i.checked).length;
+    const checked=loadable.filter(i=>i.on_truck).length;
     const total=loadable.length;
     const done=checked===total&&total>0;
     const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
@@ -627,7 +633,9 @@ function groupRowHTML(grp){
     </div>`;
   }
 
-  const cls=(grp.allChecked?'group-row checked':'group-row')+(grp.isNotTransferring?' group-row-not-transferring':'');
+  // Three states: green (all on truck) > yellow (some/all on bay) > unchecked
+  const stateClass = grp.allOnTruck ? 'checked' : grp.anyChecked ? 'on-bay' : '';
+  const cls=('group-row'+(stateClass?' '+stateClass:''))+(grp.isNotTransferring?' group-row-not-transferring':'');
   const ids=grp.items.map(i=>i.id).join(',');
   const serial=grp.count>1?`#${grp.firstSerial}–#${grp.lastSerial}`:`#${grp.firstSerial}`;
   const rawDesc=formatDriverDesc(grp.description||'');
@@ -672,16 +680,43 @@ async function toggleGroup(ids,el,isDiningTable=false){
   const idList=ids.split(',');
   const first=items.find(i=>i.id===idList[0]);
   if(!first)return;
-  const newChecked=!first.checked;
-  for(const id of idList){const item=items.find(i=>i.id===id);if(item)item.checked=newChecked;}
-  if(newChecked)el.classList.add('checked');else el.classList.remove('checked');
+
+  // Three-state cycle: unchecked → on bay (yellow) → on truck (green) → unchecked
+  // State is determined by the first item in the group
+  const wasChecked=!!first.checked;
+  const wasOnTruck=!!first.on_truck;
+
+  let newChecked, newOnTruck;
+  if(!wasChecked && !wasOnTruck){
+    // unchecked → on bay
+    newChecked=true; newOnTruck=false;
+  } else if(wasChecked && !wasOnTruck){
+    // on bay → on truck
+    newChecked=true; newOnTruck=true;
+  } else {
+    // on truck (or any other state) → unchecked
+    newChecked=false; newOnTruck=false;
+  }
+
+  for(const id of idList){
+    const item=items.find(i=>i.id===id);
+    if(item){item.checked=newChecked;item.on_truck=newOnTruck;}
+  }
+
+  // Update row class immediately for instant feedback
+  el.classList.remove('checked','on-bay');
+  if(newOnTruck) el.classList.add('checked');
+  else if(newChecked) el.classList.add('on-bay');
+
   updateProgress();
   rerenderRoomProgress();
+
   await Promise.all(idList.map(id=>
-    fetch(`/api/items/${id}/check`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({checked:newChecked})})
+    fetch(`/api/items/${id}/check`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({checked:newChecked,on_truck:newOnTruck})})
   ));
-  // Remind the driver about table legs when ticking a dining table as loaded
-  if(isDiningTable && newChecked){
+
+  if(isDiningTable && newChecked && !newOnTruck){
     showTableLegsReminder();
   }
 }
@@ -695,7 +730,7 @@ function rerenderRoomProgress(){
     const card=document.getElementById('room-not_transferring');
     if(card){
       const ntItems=notTransferGroups.flatMap(g=>g.items);
-      const checked=ntItems.filter(i=>i.checked).length,total=ntItems.length,done=checked===total&&total>0;
+      const checked=ntItems.filter(i=>i.on_truck).length,total=ntItems.length,done=checked===total&&total>0;
       const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
       const rf=card.querySelector('.ring-fill'),rt=card.querySelector('.ring-txt');
       if(rf)rf.setAttribute('stroke-dashoffset',offset.toFixed(1));
@@ -712,7 +747,7 @@ function rerenderRoomProgress(){
     const card=document.getElementById('room-'+key);if(!card)continue;
     const catItems=groups.flatMap(g=>g.items);
     const loadable=catItems.filter(i=>!i.is_transfer_item);
-    const checked=loadable.filter(i=>i.checked).length,total=loadable.length,done=checked===total&&total>0;
+    const checked=loadable.filter(i=>i.on_truck).length,total=loadable.length,done=checked===total&&total>0;
     const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
     const rf=card.querySelector('.ring-fill'),rt=card.querySelector('.ring-txt');
     if(rf)rf.setAttribute('stroke-dashoffset',offset.toFixed(1));
@@ -723,7 +758,7 @@ function rerenderRoomProgress(){
 
 function updateProgress(){
   const loadable=items.filter(i=>!i.is_transfer_item);
-  const total=loadable.length,checked=loadable.filter(i=>i.checked).length,pct=total?Math.round(checked/total*100):0;
+  const total=loadable.length,checked=loadable.filter(i=>i.on_truck).length,pct=total?Math.round(checked/total*100):0;
   document.getElementById('prog-fill').style.width=pct+'%';
   document.getElementById('prog-txt').textContent=`${checked} / ${total}`;
   const allDone=total>0&&checked===total;
@@ -747,7 +782,7 @@ async function saveTruck(){
 
 async function finishLoading(){
   const loadable=items.filter(i=>!i.is_transfer_item);
-  const checked=loadable.filter(i=>i.checked).length,total=loadable.length;
+  const checked=loadable.filter(i=>i.on_truck).length,total=loadable.length;
   if(checked<total){if(!confirm(`${total-checked} items not checked off. Mark as loaded anyway?`))return;}
   await setStatus('loaded');
 }

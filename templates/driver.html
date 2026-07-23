@@ -256,8 +256,8 @@ async function loadDriverPhotoStrips(){
 
 const jobId=window.location.pathname.split('/').pop();
 let job=null,items=[];
-const STATUS_PILLS={ready_to_load:'pill-readyload',loading:'pill-loading',loaded:'pill-loaded',installed:'pill-installed',ready_to_collect:'pill-readycollect',returned:'pill-returned',archived:'pill-returned'};
-const STATUS_LABELS={ready_to_load:'Ready to Load',loading:'Loading',loaded:'Loaded',installed:'Installed',ready_to_collect:'Ready to Collect',returned:'Returned',archived:'Returned'};
+const STATUS_PILLS={ready_to_load:'pill-readyload',loaded:'pill-loaded',installed:'pill-installed',ready_to_collect:'pill-readycollect',returned:'pill-returned',archived:'pill-returned'};
+const STATUS_LABELS={ready_to_load:'Ready to Load',loaded:'Loaded',installed:'Installed',ready_to_collect:'Ready to Collect',returned:'Completed',archived:'Completed'};
 
 async function loadJob(){
   const res=await fetch(`/api/jobs/${jobId}`);
@@ -375,13 +375,12 @@ function renderStatusBar(){
   badge.className='pill '+(STATUS_PILLS[s]||'pill-readyload');
   badge.textContent=STATUS_LABELS[s]||s;
   const bar=document.getElementById('action-bar');
-  if(s==='ready_to_load') bar.innerHTML=`<button class="action-btn btn-start" onclick="setStatus('loading')">Start Loading</button>`;
-  else if(s==='loading')  bar.innerHTML=`<button class="action-btn btn-finish" onclick="finishLoading()">Loading Finished</button>`;
-  else if(s==='loaded')   bar.innerHTML=`<button class="action-btn btn-installed" onclick="setStatus('installed')">Installed</button>`;
+  if(s==='ready_to_load') bar.innerHTML=`<button class="action-btn btn-start" onclick="finishLoading()">Mark Loaded</button>`;
+  else if(s==='loaded')   bar.innerHTML=`<button class="action-btn btn-installed" onclick="setStatus('installed')">Mark Installed</button>`;
   else if(s==='installed') bar.innerHTML=`<div class="action-status-msg">Waiting for job to be marked Ready to Collect…</div>`;
-  else if(s==='ready_to_collect') bar.innerHTML=`<button class="action-btn btn-returned" onclick="setStatus('returned')">Mark Returned</button>`;
-  else if(s==='returned'||s==='archived') bar.innerHTML=`<div class="action-status-msg">Truck returned to warehouse — job complete</div>`;
-  else bar.innerHTML=`<div class="action-status-msg">Waiting for stylist to complete picking…</div>`;
+  else if(s==='ready_to_collect') bar.innerHTML=`<button class="action-btn btn-returned" onclick="setStatus('returned')">Mark Completed</button>`;
+  else if(s==='returned'||s==='archived') bar.innerHTML=`<div class="action-status-msg">Job complete — truck returned to warehouse</div>`;
+  else bar.innerHTML=`<div class="action-status-msg">Waiting for stylist to mark Ready to Load…</div>`;
 }
 
 // ── Item type categories ──
@@ -762,7 +761,7 @@ function updateProgress(){
   document.getElementById('prog-fill').style.width=pct+'%';
   document.getElementById('prog-txt').textContent=`${checked} / ${total}`;
   const allDone=total>0&&checked===total;
-  document.getElementById('done-banner').classList.toggle('show',allDone&&job.status==='loading');
+  document.getElementById('done-banner').classList.toggle('show',allDone&&job.status==='ready_to_load');
 }
 
 async function setStatus(newStatus){

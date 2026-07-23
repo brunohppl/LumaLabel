@@ -1604,6 +1604,11 @@ def catalogue_page():
     with open('templates/catalogue.html', 'r') as f:
         return f.read()
 
+@app.route('/runsheet', methods=['GET'])
+def runsheet_page():
+    with open('templates/runsheet.html', 'r') as f:
+        return f.read()
+
 @app.route('/stylist/<job_id>', methods=['GET'])
 def stylist_page(job_id):
     with open('templates/stylist.html', 'r') as f:

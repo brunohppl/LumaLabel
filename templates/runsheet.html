@@ -11,12 +11,13 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font-weight:400;font-size:18px;min-height:100vh;}
 
-header{background:var(--ink);padding:22px 32px;display:flex;align-items:center;justify-content:space-between;}
-.logo{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:300;letter-spacing:0.12em;color:#FAF8F4;}
+header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.logo{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;letter-spacing:0.1em;color:#FAF8F4;white-space:nowrap;}
 .logo em{font-style:italic;color:var(--accent);}
-.nav-links{display:flex;gap:24px;}
-.nav-link{color:rgba(250,248,244,0.45);text-decoration:none;font-size:0.8rem;letter-spacing:0.14em;text-transform:uppercase;transition:color 0.2s;}
+.nav-links{display:flex;gap:16px;flex-wrap:wrap;}
+.nav-link{color:rgba(250,248,244,0.45);text-decoration:none;font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;transition:color 0.2s;white-space:nowrap;}
 .nav-link:hover,.nav-link.active{color:var(--accent);}
+@media(max-width:480px){header{padding:12px 16px;}.logo{font-size:1.2rem;}.nav-link{font-size:0.68rem;letter-spacing:0.06em;}.nav-links{gap:12px;}}
 
 .main{max-width:1200px;margin:0 auto;padding:36px 24px;}
 .page-title{font-family:'Cormorant Garamond',serif;font-size:2.6rem;font-weight:300;margin-bottom:4px;}

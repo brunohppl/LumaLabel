@@ -72,7 +72,8 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .rs-job-btn{flex:1;padding:4px 6px;background:none;border:none;cursor:pointer;font-size:0.65rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:4px;transition:background 0.12s;}
 .rs-job-btn:hover{background:rgba(0,0,0,0.06);}
 .rs-job-btn-stylist{color:#8a6f2e;border-bottom:1px solid rgba(0,0,0,0.08);}
-.rs-job-btn-driver{color:#2e5a8a;}
+.rs-job-btn-driver{color:#2e5a8a;border-bottom:1px solid rgba(0,0,0,0.08);}
+.rs-job-btn-navigate{color:#2e7a4a;}
 
 /* ── TASK TILES ── */
 .rs-task{border-radius:3px;border-left:4px dashed #aaa;background:#f5f5f4;box-shadow:0 1px 4px rgba(0,0,0,0.08);display:flex;flex-direction:column;transition:box-shadow 0.15s;cursor:pointer;}
@@ -217,7 +218,48 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   <div id="runsheet-content"><div class="loading">Loading runsheet…</div></div>
 </div>
 
+<!-- Slack / Navigate confirmation popup -->
+<div id="slack-confirm-overlay" style="display:none;position:fixed;inset:0;background:rgba(26,23,20,0.55);z-index:400;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:white;border-radius:4px;padding:28px 24px;max-width:320px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.25);">
+    <div style="font-size:1.8rem;margin-bottom:10px;">📍</div>
+    <div style="font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:600;color:var(--ink);margin-bottom:8px;">Notify Slack?</div>
+    <div style="font-size:0.88rem;color:var(--muted);line-height:1.5;margin-bottom:22px;">Send an ETA notification to Slack before opening Maps?</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button onclick="rsSlackChoice('yes')" style="width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:2px;font-family:'Jost',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;letter-spacing:0.04em;">Yes — notify Slack</button>
+      <button onclick="rsSlackChoice('no')" style="width:100%;padding:12px;background:white;color:var(--ink);border:1px solid var(--border);border-radius:2px;font-family:'Jost',sans-serif;font-size:0.9rem;cursor:pointer;">No — just open Maps</button>
+      <button onclick="rsSlackChoice('cancel')" style="width:100%;padding:10px;background:none;color:var(--muted);border:none;font-family:'Jost',sans-serif;font-size:0.85rem;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
+let _rsNavJobId=null, _rsNavAddress=null;
+
+function openRunsheetNavigate(jobId, address){
+  _rsNavJobId=jobId;
+  _rsNavAddress=address;
+  document.getElementById('slack-confirm-overlay').style.display='flex';
+}
+
+function rsSlackChoice(choice){
+  document.getElementById('slack-confirm-overlay').style.display='none';
+  const jobId=_rsNavJobId, address=_rsNavAddress;
+  _rsNavJobId=null; _rsNavAddress=null;
+  if(choice==='cancel') return;
+  const mapsUrl=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address||'')}`;
+  if(choice==='no'){ window.open(mapsUrl,'_blank'); return; }
+  // yes — ETA + Slack + Maps
+  if(!navigator.geolocation){ window.open(mapsUrl,'_blank'); return; }
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      fetch(`/api/jobs/${jobId}/eta`,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,role:'runsheet'})
+      }).then(()=>window.open(mapsUrl,'_blank')).catch(()=>window.open(mapsUrl,'_blank'));
+    },
+    ()=>window.open(mapsUrl,'_blank'),
+    {timeout:8000}
+  );
+}
 const COLOUR_MAP={Red:'#D62828',Blue:'#1565C0',Green:'#2E7D32',Yellow:'#F9A825',Purple:'#6A0DAD',Orange:'#E65100',Teal:'#00838F',Magenta:'#AD1457',Brown:'#4E342E',Olive:'#558B2F',Indigo:'#283593',Cyan:'#00ACC1',Pink:'#F06292',Grey:'#757575'};
 const RUNSHEET_TYPE_LABELS={install:'Install',pickup:'Pickup',to_load:'To Load'};
 
@@ -352,6 +394,7 @@ async function renderRunsheet(){
   const gearSVG=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
   const stylistSVG=`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.71 4.04c.39-.39.39-1.05 0-1.44l-2.31-2.31a.996.996 0 0 0-1.41 0L15.13 2.16l3.71 3.71M3 17.25V21h3.75L20.81 6.94l-3.75-3.75z"/></svg>`;
   const driverSVG=`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>`;
+  const navSVG=`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>`;
 
   vehicles.forEach((v,vi)=>{
     (schedByVehicle[v]||[]).forEach(entry=>{
@@ -393,6 +436,7 @@ async function renderRunsheet(){
           <div class="rs-job-btn-stack">
             <button class="rs-job-btn rs-job-btn-stylist" onclick="window.open('/stylist/${job.id}','_blank')">${stylistSVG} Stylist</button>
             <button class="rs-job-btn rs-job-btn-driver" onclick="window.open('/driver/${job.id}','_blank')">${driverSVG} Driver</button>
+            <button class="rs-job-btn rs-job-btn-navigate" onclick="openRunsheetNavigate('${job.id}','${(job.address||'').replace(/'/g,"\\'")}')">${navSVG} Navigate</button>
           </div>
         </div>
       </div>`);

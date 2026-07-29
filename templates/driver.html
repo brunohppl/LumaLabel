@@ -478,6 +478,7 @@ function groupItems(list){
       allChecked:list.slice(i,j).every(x=>x.checked),
       allOnTruck:list.slice(i,j).every(x=>x.on_truck),
       anyChecked:list.slice(i,j).some(x=>x.checked||x.on_truck),
+      bayLocation:list[i].bay_location||null,
       notes:list[i].notes||'',
       photo_url:list.slice(i,j).find(x=>x.photo_url)?.photo_url||null,
       isTransferItem:list.slice(i,j).every(x=>x.is_transfer_item),
@@ -656,6 +657,7 @@ function groupRowHTML(grp){
   const serial=grp.count>1?`#${grp.firstSerial}–#${grp.lastSerial}`:`#${grp.firstSerial}`;
   const rawDesc=formatDriverDesc(grp.description||'');
   const desc=grp.count>1?`${grp.count}×  ${rawDesc||'blank'}`:(rawDesc||'<span style="opacity:0.5">blank extra</span>');
+  const bayTag=grp.bayLocation?`<span style="font-size:0.72rem;font-weight:700;background:rgba(74,124,89,0.12);color:var(--green);padding:2px 6px;border-radius:2px;letter-spacing:0.06em;margin-left:6px;">${grp.bayLocation}</span>`:'';
   const location=grp.room?` <span class="group-location">(${grp.room})</span>`:'';
   const note=grp.notes?`<div class="group-note">${grp.notes}</div>`:'';
   const notTransferTag=grp.isNotTransferring?`<div class="not-transferring-row-tag">Staying behind — not part of the transfer</div>`:'';
@@ -673,7 +675,7 @@ function groupRowHTML(grp){
     </button>
     <div class="group-info">
       <div class="group-serial">${serial}</div>
-      <div class="group-desc">${desc}${location}</div>
+      <div class="group-desc">${desc}${bayTag}${location}</div>
       ${notTransferTag}
       ${note}
       ${photoStrip}

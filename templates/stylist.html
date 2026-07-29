@@ -1000,7 +1000,7 @@ loadJob();
 <div id="qr-overlay" style="display:none;position:fixed;inset:0;background:rgba(26,23,20,0.92);z-index:500;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
   <div style="color:rgba(250,248,244,0.6);font-size:0.82rem;letter-spacing:0.1em;text-transform:uppercase;">Scan Bay QR Code</div>
   <div style="position:relative;width:260px;height:260px;">
-    <video id="qr-video" style="width:260px;height:260px;object-fit:cover;border-radius:4px;" playsinline autoplay muted></video>
+    <video id="qr-video" style="width:260px;height:260px;object-fit:cover;border-radius:4px;" playsinline webkit-playsinline autoplay muted></video>
     <canvas id="qr-canvas" style="display:none;"></canvas>
     <!-- Viewfinder corners -->
     <div style="position:absolute;inset:0;pointer-events:none;">
@@ -1036,21 +1036,24 @@ function openQrScanner(ids, firstItemId){
 async function startQrCamera(){
   try{
     _qrStream = await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode:'environment', width:{ideal:640}, height:{ideal:640} }
+      video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720} }
     });
     const video = document.getElementById('qr-video');
     video.srcObject = _qrStream;
-    video.play();
-    video.addEventListener('loadedmetadata', scanFrame);
+    await video.play();
+    document.getElementById('qr-status').textContent = 'Camera ready — scanning…';
+    // Small delay to let the first frames render before scanning
+    setTimeout(()=>{ _qrAnimFrame = requestAnimationFrame(scanFrame); }, 300);
   }catch(e){
-    document.getElementById('qr-status').textContent = 'Camera not available — ' + e.message;
+    document.getElementById('qr-status').textContent = 'Camera error: ' + e.message;
   }
 }
 
 function scanFrame(){
   const video = document.getElementById('qr-video');
   const canvas = document.getElementById('qr-canvas');
-  if(video.readyState !== video.HAVE_ENOUGH_DATA){
+  if(!video.srcObject){ return; } // scanner was closed
+  if(video.readyState < 2 || video.videoWidth === 0){
     _qrAnimFrame = requestAnimationFrame(scanFrame);
     return;
   }
@@ -1059,16 +1062,18 @@ function scanFrame(){
   const ctx = canvas.getContext('2d');
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const code = jsQR(imageData.data, imageData.width, imageData.height, {inversionAttempts:'dontInvert'});
+  const code = jsQR(imageData.data, imageData.width, imageData.height, {
+    inversionAttempts: 'attemptBoth'  // works for both dark-on-light and light-on-dark QR codes
+  });
   if(code){
     const val = code.data.trim().toUpperCase();
+    document.getElementById('qr-status').textContent = 'Read: ' + val;
     if(BAY_RE.test(val)){
       document.getElementById('qr-status').textContent = '✓ Bay ' + val + ' — saving…';
       saveBayLocation(val);
       return; // stop scanning
-    } else {
-      document.getElementById('qr-status').textContent = 'Not a valid bay code: ' + code.data;
     }
+    // Invalid code — keep scanning
   }
   _qrAnimFrame = requestAnimationFrame(scanFrame);
 }

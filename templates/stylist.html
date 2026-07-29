@@ -697,6 +697,12 @@ function groupRow(grp){
   const trashIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
   const firstItemId = grp.items[0].id;
 
+  // Bay location — from the first item in the group
+  const bayLoc = grp.items[0].bay_location || null;
+  const bayColour = bayLoc ? 'var(--green)' : 'var(--border)';
+  const qrIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${bayColour}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="5" y="5" width="3" height="3"/><rect x="16" y="5" width="3" height="3"/><rect x="5" y="16" width="3" height="3"/><line x1="14" y1="14" x2="14" y2="14"/><line x1="17" y1="14" x2="17" y2="14"/><line x1="20" y1="14" x2="20" y2="14"/><line x1="14" y1="17" x2="14" y2="17"/><line x1="17" y1="17" x2="20" y2="17"/><line x1="20" y1="20" x2="20" y2="20"/><line x1="14" y1="20" x2="17" y2="20"/></svg>`;
+  const bayTag = bayLoc ? `<span style="font-size:0.72rem;font-weight:700;background:rgba(74,124,89,0.12);color:var(--green);padding:2px 6px;border-radius:2px;letter-spacing:0.06em;">${bayLoc}</span>` : '';
+
   const transferCheckbox = (currentJob && currentJob.is_transfer) ? `
     <label class="transfer-checkbox-label" title="Mark as transferring from another job — driver won't need to load this">
       <input type="checkbox" class="transfer-checkbox" ${isTransferItem?'checked':''} onchange="toggleTransferItem('${ids}', this.checked, this)" />
@@ -715,6 +721,7 @@ function groupRow(grp){
     <div class="item-serial" style="margin-top:0;">${serialTxt}</div>
     <div style="flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
       <span class="item-desc" style="margin-top:0;">${descTxt}</span>
+      ${bayTag}
       ${transferCheckbox}
       ${notTransferringCheckbox}
       <!-- Two separate inputs: capture forces camera, gallery opens file picker -->
@@ -726,6 +733,8 @@ function groupRow(grp){
         onclick="document.getElementById('${inputId}-cam').click()">${camIcon}</button>
       <button title="Upload from gallery" style="background:none;border:none;padding:2px;cursor:pointer;line-height:0;flex-shrink:0;opacity:0.6;"
         onclick="document.getElementById('${inputId}-lib').click()">${galleryIcon}</button>
+      <button title="${bayLoc?'Bay: '+bayLoc+' — tap to re-scan':'Scan bay QR code'}" style="background:none;border:none;padding:2px;cursor:pointer;line-height:0;flex-shrink:0;"
+        onclick="openQrScanner('${ids}','${firstItemId}')">${qrIcon}</button>
     </div>
     <button class="item-del" title="Delete item" onclick="deleteGroup('${ids}','${grp.count>1?`${grp.count} items (${serialTxt})`:serialTxt}')" style="margin-top:0;">${trashIcon}</button>
     <textarea class="item-notes" rows="1" placeholder="Add note for driver…"
@@ -986,6 +995,110 @@ async function addItem(){
 
 
 loadJob();
+</script>
+<!-- QR Scanner Modal -->
+<div id="qr-overlay" style="display:none;position:fixed;inset:0;background:rgba(26,23,20,0.92);z-index:500;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+  <div style="color:rgba(250,248,244,0.6);font-size:0.82rem;letter-spacing:0.1em;text-transform:uppercase;">Scan Bay QR Code</div>
+  <div style="position:relative;width:260px;height:260px;">
+    <video id="qr-video" style="width:260px;height:260px;object-fit:cover;border-radius:4px;" playsinline autoplay muted></video>
+    <canvas id="qr-canvas" style="display:none;"></canvas>
+    <!-- Viewfinder corners -->
+    <div style="position:absolute;inset:0;pointer-events:none;">
+      <div style="position:absolute;top:10px;left:10px;width:28px;height:28px;border-top:3px solid var(--accent);border-left:3px solid var(--accent);border-radius:2px 0 0 0;"></div>
+      <div style="position:absolute;top:10px;right:10px;width:28px;height:28px;border-top:3px solid var(--accent);border-right:3px solid var(--accent);border-radius:0 2px 0 0;"></div>
+      <div style="position:absolute;bottom:10px;left:10px;width:28px;height:28px;border-bottom:3px solid var(--accent);border-left:3px solid var(--accent);border-radius:0 0 0 2px;"></div>
+      <div style="position:absolute;bottom:10px;right:10px;width:28px;height:28px;border-bottom:3px solid var(--accent);border-right:3px solid var(--accent);border-radius:0 0 2px 0;"></div>
+    </div>
+  </div>
+  <div id="qr-status" style="color:rgba(250,248,244,0.5);font-size:0.82rem;min-height:1.2em;"></div>
+  <button onclick="closeQrScanner()" style="padding:10px 28px;background:rgba(250,248,244,0.12);color:rgba(250,248,244,0.7);border:1px solid rgba(250,248,244,0.2);border-radius:2px;font-family:'Jost',sans-serif;font-size:0.85rem;cursor:pointer;">Cancel</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script>
+// Valid bay codes: A-F + 1-6
+const BAY_RE = /^[A-Fa-f][1-6]$/;
+
+let _qrItemIds = null;
+let _qrFirstItemId = null;
+let _qrStream = null;
+let _qrAnimFrame = null;
+
+function openQrScanner(ids, firstItemId){
+  _qrItemIds = ids;
+  _qrFirstItemId = firstItemId;
+  const overlay = document.getElementById('qr-overlay');
+  overlay.style.display = 'flex';
+  document.getElementById('qr-status').textContent = 'Point camera at a bay QR code…';
+  startQrCamera();
+}
+
+async function startQrCamera(){
+  try{
+    _qrStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:'environment', width:{ideal:640}, height:{ideal:640} }
+    });
+    const video = document.getElementById('qr-video');
+    video.srcObject = _qrStream;
+    video.play();
+    video.addEventListener('loadedmetadata', scanFrame);
+  }catch(e){
+    document.getElementById('qr-status').textContent = 'Camera not available — ' + e.message;
+  }
+}
+
+function scanFrame(){
+  const video = document.getElementById('qr-video');
+  const canvas = document.getElementById('qr-canvas');
+  if(video.readyState !== video.HAVE_ENOUGH_DATA){
+    _qrAnimFrame = requestAnimationFrame(scanFrame);
+    return;
+  }
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const code = jsQR(imageData.data, imageData.width, imageData.height, {inversionAttempts:'dontInvert'});
+  if(code){
+    const val = code.data.trim().toUpperCase();
+    if(BAY_RE.test(val)){
+      document.getElementById('qr-status').textContent = '✓ Bay ' + val + ' — saving…';
+      saveBayLocation(val);
+      return; // stop scanning
+    } else {
+      document.getElementById('qr-status').textContent = 'Not a valid bay code: ' + code.data;
+    }
+  }
+  _qrAnimFrame = requestAnimationFrame(scanFrame);
+}
+
+async function saveBayLocation(bay){
+  const ids = _qrItemIds.split(',');
+  // Update all items in the group
+  await Promise.all(ids.map(id =>
+    fetch(`/api/items/${id}/check`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({bay_location: bay})
+    })
+  ));
+  // Update local cache
+  ids.forEach(id => {
+    const item = allItems.find(i => i.id === id);
+    if(item) item.bay_location = bay;
+  });
+  closeQrScanner();
+  renderItems();
+}
+
+function closeQrScanner(){
+  if(_qrAnimFrame){ cancelAnimationFrame(_qrAnimFrame); _qrAnimFrame = null; }
+  if(_qrStream){ _qrStream.getTracks().forEach(t => t.stop()); _qrStream = null; }
+  const video = document.getElementById('qr-video');
+  video.srcObject = null;
+  document.getElementById('qr-overlay').style.display = 'none';
+  _qrItemIds = null; _qrFirstItemId = null;
+}
 </script>
 </body>
 </html>

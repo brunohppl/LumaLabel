@@ -1016,20 +1016,16 @@ loadJob();
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <script>
-// Valid bay codes: A-F + 1-6
-const BAY_RE = /^[A-Fa-f][1-6]$/;
-
 let _qrItemIds = null;
 let _qrFirstItemId = null;
 let _qrStream = null;
-let _qrAnimFrame = null;
+let _qrInterval = null;
 
 function openQrScanner(ids, firstItemId){
   _qrItemIds = ids;
   _qrFirstItemId = firstItemId;
-  const overlay = document.getElementById('qr-overlay');
-  overlay.style.display = 'flex';
-  document.getElementById('qr-status').textContent = 'Point camera at a bay QR code…';
+  document.getElementById('qr-overlay').style.display = 'flex';
+  document.getElementById('qr-status').textContent = 'Starting camera…';
   startQrCamera();
 }
 
@@ -1040,10 +1036,10 @@ async function startQrCamera(){
     });
     const video = document.getElementById('qr-video');
     video.srcObject = _qrStream;
+    video.setAttribute('playsinline','true');
     await video.play();
-    document.getElementById('qr-status').textContent = 'Camera ready — scanning…';
-    // Small delay to let the first frames render before scanning
-    setTimeout(()=>{ _qrAnimFrame = requestAnimationFrame(scanFrame); }, 300);
+    document.getElementById('qr-status').textContent = 'Scanning…';
+    _qrInterval = setInterval(scanFrame, 200);
   }catch(e){
     document.getElementById('qr-status').textContent = 'Camera error: ' + e.message;
   }
@@ -1052,57 +1048,46 @@ async function startQrCamera(){
 function scanFrame(){
   const video = document.getElementById('qr-video');
   const canvas = document.getElementById('qr-canvas');
-  if(!video.srcObject){ return; } // scanner was closed
-  if(video.readyState < 2 || video.videoWidth === 0){
-    _qrAnimFrame = requestAnimationFrame(scanFrame);
-    return;
-  }
+  if(!video.srcObject || video.readyState < 2 || video.videoWidth === 0) return;
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const code = jsQR(imageData.data, imageData.width, imageData.height, {
-    inversionAttempts: 'attemptBoth'  // works for both dark-on-light and light-on-dark QR codes
+    inversionAttempts:'attemptBoth'
   });
   if(code){
-    const val = code.data.trim().toUpperCase();
-    document.getElementById('qr-status').textContent = 'Read: ' + val;
-    if(BAY_RE.test(val)){
-      document.getElementById('qr-status').textContent = '✓ Bay ' + val + ' — saving…';
-      saveBayLocation(val);
-      return; // stop scanning
-    }
-    // Invalid code — keep scanning
+    const val = code.data.trim();
+    document.getElementById('qr-status').textContent = '✓ ' + val + ' — saving…';
+    clearInterval(_qrInterval); _qrInterval = null;
+    saveBayLocation(val);
   }
-  _qrAnimFrame = requestAnimationFrame(scanFrame);
 }
 
 async function saveBayLocation(bay){
   const ids = _qrItemIds.split(',');
-  // Update all items in the group
   await Promise.all(ids.map(id =>
-    fetch(`/api/items/${id}/check`, {
+    fetch(`/api/items/${id}/check`,{
       method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({bay_location: bay})
+      body:JSON.stringify({bay_location:bay})
     })
   ));
-  // Update local cache
-  ids.forEach(id => {
-    const item = allItems.find(i => i.id === id);
-    if(item) item.bay_location = bay;
+  ids.forEach(id=>{
+    const item=allItems.find(i=>i.id===id);
+    if(item) item.bay_location=bay;
   });
   closeQrScanner();
   renderItems();
 }
 
 function closeQrScanner(){
-  if(_qrAnimFrame){ cancelAnimationFrame(_qrAnimFrame); _qrAnimFrame = null; }
-  if(_qrStream){ _qrStream.getTracks().forEach(t => t.stop()); _qrStream = null; }
-  const video = document.getElementById('qr-video');
-  video.srcObject = null;
-  document.getElementById('qr-overlay').style.display = 'none';
-  _qrItemIds = null; _qrFirstItemId = null;
+  clearInterval(_qrInterval); _qrInterval=null;
+  if(_qrStream){ _qrStream.getTracks().forEach(t=>t.stop()); _qrStream=null; }
+  const video=document.getElementById('qr-video');
+  video.srcObject=null;
+  document.getElementById('qr-overlay').style.display='none';
+  _qrItemIds=null; _qrFirstItemId=null;
 }
 </script>
 </body>

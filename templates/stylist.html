@@ -90,6 +90,11 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .add-room-row{margin-bottom:14px;}
 .add-room-form{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;}
 .add-room-btn{font-size:0.75rem;padding:6px 12px;}
+.room-add-item-row{display:flex;align-items:center;gap:6px;padding:8px 12px;border-top:1px dashed var(--border);}
+.room-add-input{flex:1;border:none;background:none;font-family:'Jost',sans-serif;font-size:0.85rem;color:var(--muted);outline:none;padding:4px 0;}
+.room-add-input:focus{color:var(--ink);}
+.room-add-input::placeholder{color:var(--border);}
+.room-add-btn{font-size:0.72rem;padding:5px 12px;}
 
 .not-transferring-card{border:2px solid var(--accent);}
 .not-transferring-card .room-card-header{background:rgba(184,147,90,0.08);}
@@ -563,7 +568,15 @@ function roomCardHTML(room, roomItemList, isExtra=false){
       </button>
       <span class="room-chevron">▼</span>
     </div>
-    <div class="room-items">${groups.map(groupRow).join('')}</div>
+    <div class="room-items">${groups.map(groupRow).join('')}
+      <div class="room-add-item-row">
+        <input class="room-add-input" placeholder="+ Add item to ${roomName}…"
+          onkeydown="if(event.key==='Enter'&&this.value.trim())addItemToRoom('${roomName}',this)"
+          onfocus="this.placeholder='Item description'"
+          onblur="this.placeholder='+ Add item to ${roomName}…'"/>
+        <button class="btn btn-gold room-add-btn" onclick="addItemToRoom('${roomName}',this.previousElementSibling)" style="display:none;">Add</button>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1001,9 +1014,36 @@ async function addItem(){
   const newSerial=String(lastSerial+1).padStart(3,'0');
   const res=await fetch(`/api/jobs/${currentJob.id}/items`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serial:newSerial,room,description:desc,is_extra:false})});
   const newItem=await res.json();
-  // Once an item is added to a pending room, it's no longer "pending"
   pendingRooms=pendingRooms.filter(r=>r!==room);
   allItems.push(newItem);document.getElementById('new-desc').value='';renderItems();
+}
+
+async function addItemToRoom(room, input){
+  const desc=input.value.trim();
+  if(!desc) return;
+  const lastSerial=allItems.length?Math.max(...allItems.map(i=>parseInt(i.serial)||0)):0;
+  const newSerial=String(lastSerial+1).padStart(3,'0');
+  const res=await fetch(`/api/jobs/${currentJob.id}/items`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serial:newSerial,room,description:desc,is_extra:false})});
+  const newItem=await res.json();
+  allItems.push(newItem);
+  input.value='';
+  // Insert the new item row directly into the room card without a full re-render
+  const key=(room||'extra').replace(/[^a-zA-Z0-9]/g,'_');
+  const roomItemsDiv=document.querySelector(`#stylist-room-${key} .room-items`);
+  const addRow=roomItemsDiv?.querySelector('.room-add-item-row');
+  if(roomItemsDiv && addRow){
+    const roomItems=allItems.filter(i=>i.room===room);
+    const groups=groupItems(roomItems);
+    const lastGrp=groups[groups.length-1];
+    if(lastGrp){
+      const div=document.createElement('div');
+      div.innerHTML=groupRow(lastGrp);
+      roomItemsDiv.insertBefore(div.firstChild, addRow);
+    }
+    input.focus();
+  } else {
+    renderItems();
+  }
 }
 
 

@@ -11174,12 +11174,35 @@ async function saveBayLocation(bay){
       body:JSON.stringify({bay_location:bay})
     })
   ));
+  // Update local cache
   ids.forEach(id=>{
     const item=allItems.find(i=>i.id===id);
     if(item) item.bay_location=bay;
   });
   closeQrScanner();
-  renderItems();
+  // Update the bay tag in-place — no full re-render so the user stays in position
+  const firstItem=allItems.find(i=>i.id===ids[0]);
+  if(firstItem){
+    // Find the group row by serial and update/insert the bay tag
+    const grp=allItems.filter(i=>ids.includes(i.id));
+    const serial=grp[0]?.serial;
+    const row=document.getElementById(`group-${serial}`);
+    if(row){
+      // Update existing tag or insert one after the description span
+      let tag=row.querySelector('.bay-tag-inline');
+      if(!tag){
+        tag=document.createElement('span');
+        tag.className='bay-tag-inline';
+        tag.style.cssText='font-size:0.72rem;font-weight:700;background:rgba(74,124,89,0.12);color:var(--green);padding:2px 6px;border-radius:2px;letter-spacing:0.06em;';
+        const descSpan=row.querySelector('.item-desc');
+        if(descSpan) descSpan.insertAdjacentElement('afterend',tag);
+      }
+      tag.textContent=bay;
+      // Also update the QR icon colour to green
+      const qrBtn=row.querySelectorAll('button[title^="Scan"], button[title^="Bay"]');
+      qrBtn.forEach(btn=>{ btn.title=`Bay: ${bay} — tap to re-scan`; });
+    }
+  }
 }
 
 function closeQrScanner(){

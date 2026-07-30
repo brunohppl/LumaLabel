@@ -701,7 +701,20 @@ function groupRow(grp){
   const bayLoc = grp.items[0].bay_location || null;
   const bayColour = bayLoc ? 'var(--green)' : 'var(--border)';
   const qrIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${bayColour}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="5" y="5" width="3" height="3"/><rect x="16" y="5" width="3" height="3"/><rect x="5" y="16" width="3" height="3"/><line x1="14" y1="14" x2="14" y2="14"/><line x1="17" y1="14" x2="17" y2="14"/><line x1="20" y1="14" x2="20" y2="14"/><line x1="14" y1="17" x2="14" y2="17"/><line x1="17" y1="17" x2="20" y2="17"/><line x1="20" y1="20" x2="20" y2="20"/><line x1="14" y1="20" x2="17" y2="20"/></svg>`;
-  const bayTag = bayLoc ? `<span style="font-size:0.72rem;font-weight:700;background:rgba(74,124,89,0.12);color:var(--green);padding:2px 6px;border-radius:2px;letter-spacing:0.06em;">${bayLoc}</span>` : '';
+
+  // Parse existing bay location into aisle + number
+  const bayAisle = bayLoc ? bayLoc[0] : '';
+  const bayNum   = bayLoc ? bayLoc.slice(1) : '';
+
+  const ddStyle = `padding:3px 4px;border:1px solid ${bayLoc?'var(--green)':'var(--border)'};border-radius:2px;font-family:'Jost',sans-serif;font-size:0.75rem;color:${bayLoc?'var(--green)':'var(--muted)'};background:white;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;`;
+  const aisleDD = `<select id="bay-aisle-${grp.firstSerial}" style="${ddStyle}width:38px;text-align:center;" onchange="onBayDropdownChange('${ids}','${grp.firstSerial}')">
+    <option value="">–</option>
+    ${['A','B','C','D','E','F'].map(a=>`<option value="${a}"${a===bayAisle?' selected':''}>${a}</option>`).join('')}
+  </select>`;
+  const numDD = `<select id="bay-num-${grp.firstSerial}" style="${ddStyle}width:38px;text-align:center;" onchange="onBayDropdownChange('${ids}','${grp.firstSerial}')">
+    <option value="">–</option>
+    ${['1','2','3','4'].map(n=>`<option value="${n}"${n===bayNum?' selected':''}>${n}</option>`).join('')}
+  </select>`;
 
   const transferCheckbox = (currentJob && currentJob.is_transfer) ? `
     <label class="transfer-checkbox-label" title="Mark as transferring from another job — driver won't need to load this">
@@ -721,7 +734,7 @@ function groupRow(grp){
     <div class="item-serial" style="margin-top:0;">${serialTxt}</div>
     <div style="flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
       <span class="item-desc" style="margin-top:0;">${descTxt}</span>
-      ${bayTag}
+      ${aisleDD}${numDD}
       ${transferCheckbox}
       ${notTransferringCheckbox}
       <!-- Two separate inputs: capture forces camera, gallery opens file picker -->
@@ -11166,43 +11179,45 @@ function scanFrame(){
   }
 }
 
-async function saveBayLocation(bay){
-  const ids = _qrItemIds.split(',');
-  await Promise.all(ids.map(id =>
+async function onBayDropdownChange(ids, serial){
+  const aisle = document.getElementById(`bay-aisle-${serial}`)?.value;
+  const num   = document.getElementById(`bay-num-${serial}`)?.value;
+  if(!aisle || !num) return; // wait until both are selected
+  const bay = aisle + num;
+  await saveBayLocation(bay, ids, serial);
+}
+
+async function saveBayLocation(bay, ids, serial){
+  const itemIds = ids || _qrItemIds;
+  if(!itemIds) return;
+  const idList = itemIds.split(',');
+  await Promise.all(idList.map(id =>
     fetch(`/api/items/${id}/check`,{
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({bay_location:bay})
     })
   ));
-  // Update local cache
-  ids.forEach(id=>{
+  idList.forEach(id=>{
     const item=allItems.find(i=>i.id===id);
     if(item) item.bay_location=bay;
   });
-  closeQrScanner();
-  // Update the bay tag in-place — no full re-render so the user stays in position
-  const firstItem=allItems.find(i=>i.id===ids[0]);
-  if(firstItem){
-    // Find the group row by serial and update/insert the bay tag
-    const grp=allItems.filter(i=>ids.includes(i.id));
-    const serial=grp[0]?.serial;
-    const row=document.getElementById(`group-${serial}`);
-    if(row){
-      // Update existing tag or insert one after the description span
-      let tag=row.querySelector('.bay-tag-inline');
-      if(!tag){
-        tag=document.createElement('span');
-        tag.className='bay-tag-inline';
-        tag.style.cssText='font-size:0.72rem;font-weight:700;background:rgba(74,124,89,0.12);color:var(--green);padding:2px 6px;border-radius:2px;letter-spacing:0.06em;';
-        const descSpan=row.querySelector('.item-desc');
-        if(descSpan) descSpan.insertAdjacentElement('afterend',tag);
-      }
-      tag.textContent=bay;
-      // Also update the QR icon colour to green
-      const qrBtn=row.querySelectorAll('button[title^="Scan"], button[title^="Bay"]');
-      qrBtn.forEach(btn=>{ btn.title=`Bay: ${bay} — tap to re-scan`; });
-    }
+  if(!ids){
+    // QR path — close scanner and update dropdowns
+    const firstItem=allItems.find(i=>i.id===idList[0]);
+    const grpSerial=firstItem?.serial;
+    closeQrScanner();
+    if(grpSerial) updateBayDropdowns(grpSerial, bay);
+  } else {
+    // Dropdown path — just update colours
+    updateBayDropdowns(serial, bay);
   }
+}
+
+function updateBayDropdowns(serial, bay){
+  const aisleEl=document.getElementById(`bay-aisle-${serial}`);
+  const numEl=document.getElementById(`bay-num-${serial}`);
+  if(aisleEl){ aisleEl.style.borderColor='var(--green)'; aisleEl.style.color='var(--green)'; aisleEl.value=bay[0]||''; }
+  if(numEl){   numEl.style.borderColor='var(--green)';   numEl.style.color='var(--green)';   numEl.value=bay.slice(1)||''; }
 }
 
 function closeQrScanner(){

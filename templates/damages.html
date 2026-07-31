@@ -149,6 +149,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
         <button class="wizard-opt" onclick="choose(2,'furniture','chair')"><span class="opt-icon">💺</span>Chair</button>
         <button class="wizard-opt" onclick="choose(2,'furniture','rug')"><span class="opt-icon">⬜</span>Rug</button>
         <button class="wizard-opt" onclick="choose(2,'furniture','storage_unit')"><span class="opt-icon">🗄️</span>Storage unit</button>
+        <button class="wizard-opt" onclick="choose(2,'furniture','bedhead')"><span class="opt-icon">🛏️</span>Bedhead</button>
       </div>
       <button class="wizard-back" onclick="goBack(2)">← Back</button>
     </div>
@@ -193,7 +194,7 @@ const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 const LABELS = {
   location:   {pickup:'Pickup',install:'Install',transport:'Transport',warehouse:'Warehouse'},
   damage_type:{scratch:'Scratch',dent:'Dent',broken_leg:'Broken leg',broken_top:'Broken top',tear:'Tear'},
-  furniture:  {sofa:'Sofa',table:'Table',chair:'Chair',rug:'Rug',storage_unit:'Storage unit'},
+  furniture:  {sofa:'Sofa',table:'Table',chair:'Chair',rug:'Rug',storage_unit:'Storage unit',bedhead:'Bedhead'},
 };
 
 let reports = [];

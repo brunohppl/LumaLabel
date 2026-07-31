@@ -649,13 +649,6 @@ function renderItems(){
 
   // Build room list including any pending new rooms that have no items yet
   const rooms_list=[...new Set([...allItems.map(i=>i.room).filter(r=>r), ...pendingRooms])];
-  html+=`<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
-    <div style="font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px;">Add Item</div>
-    <div class="add-item-row">
-      <select class="room-select" id="new-room">${rooms_list.map(r=>`<option>${r}</option>`).join('')}</select>
-      <input class="add-input" id="new-desc" placeholder="Item description" onkeydown="if(event.key==='Enter')addItem()"/>
-      <button class="btn btn-gold" onclick="addItem()">Add</button>
-    </div></div>`;
   body.innerHTML=html;
   // Load photo strips lazily after DOM is ready — only fetches for items
   // that already have at least one photo (photo_url is set)

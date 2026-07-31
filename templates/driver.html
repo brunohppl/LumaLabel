@@ -456,6 +456,15 @@ function isCushionItem(desc){
   return /cushion|pillow|throw|coverlet/.test(d);
 }
 
+// Individual accessor items from the packing slip are replaced by a single
+// synthetic row — either the tub count set by the stylist, or a prompt
+// to check with them. Filter them all out here.
+function isAccessoryItem(desc){
+  if(!desc) return false;
+  const d = desc.toLowerCase();
+  return /accessor|centrepiece/.test(d);
+}
+
 function getCategory(desc){
   if(!desc) return 'Other';
   const d = desc.toLowerCase();
@@ -491,7 +500,7 @@ function groupItems(list){
 
 function renderRooms(){
   const container=document.getElementById('items-container');
-  const allGrouped=groupItems(items.filter(i=>!i.is_extra && !isSmallLamp(i.description) && !isCushionItem(i.description)));
+  const allGrouped=groupItems(items.filter(i=>!i.is_extra && !isSmallLamp(i.description) && !isCushionItem(i.description) && !isAccessoryItem(i.description)));
 
   // "Not Transferring" items sit in their own group at the top, separate
   // from the item-type categories — these are real loadable items (going
@@ -517,11 +526,10 @@ function renderRooms(){
     catMap['Linen and Cushions'] = [];
   }
 
-  // If stylist set accessory tubs, ensure "Accessories" category appears
+  // Accessories category always shows — raw accessor items are filtered out
+  // and replaced by the synthetic accessoryTubsRow (with count or check-with-stylist message)
   const accessoryTubsCount = job && job.accessory_tubs ? job.accessory_tubs : 0;
-  if(accessoryTubsCount && !catMap['Accessories']){
-    catMap['Accessories'] = [];
-  }
+  if(!catMap['Accessories']) catMap['Accessories'] = [];
 
   // Render in defined order, skip empty categories
   const orderedCats=ITEM_CATEGORIES.map(c=>c.label).filter(l=>catMap[l]);
@@ -572,8 +580,8 @@ function renderRooms(){
       ? cushionBagsRowHTML(cushionBagCount)
       : '';
 
-    // Accessory tubs row — injected at the top of the Accessories category
-    const accessoryTubsRow = (cat==='Accessories' && accessoryTubsCount)
+    // Accessory tubs row — always shown in Accessories category
+    const accessoryTubsRow = (cat==='Accessories')
       ? accessoryTubsRowHTML(accessoryTubsCount)
       : '';
 
@@ -618,14 +626,19 @@ function cushionBagsRowHTML(n){
 }
 
 function accessoryTubsRowHTML(n){
-  const label=`${n} Accessory Tub${n===1?'':'s'}`;
+  const label = n
+    ? `${n} Accessory Box${n===1?'':'es'}`
+    : 'Accessories — please check with the Stylist';
+  const sub = n
+    ? 'Tap to mark collected'
+    : 'Number of boxes not set';
   return `<div class="group-row" id="accessory-tubs-row" onclick="this.classList.toggle('checked')">
     <button class="check-btn" onclick="this.closest('.group-row').classList.toggle('checked');event.stopPropagation()">
       <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
     </button>
     <div class="group-info">
       <div class="group-desc" style="font-weight:600;">${label}</div>
-      <div class="group-desc" style="font-size:0.8rem;color:var(--muted);">Tap to mark collected</div>
+      <div class="group-desc" style="font-size:0.8rem;color:var(--muted);">${sub}</div>
     </div>
   </div>`;
 }
@@ -740,7 +753,7 @@ async function toggleGroup(ids,el,isDiningTable=false){
 }
 
 function rerenderRoomProgress(){
-  const allGrouped=groupItems(items.filter(i=>!i.is_extra && !isSmallLamp(i.description) && !isCushionItem(i.description)));
+  const allGrouped=groupItems(items.filter(i=>!i.is_extra && !isSmallLamp(i.description) && !isCushionItem(i.description) && !isAccessoryItem(i.description)));
   const notTransferGroups=allGrouped.filter(g=>g.isNotTransferring);
   const categoryGrouped=allGrouped.filter(g=>!g.isNotTransferring);
 

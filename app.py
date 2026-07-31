@@ -1475,6 +1475,11 @@ def generate_job_summary(job, items, room_notes=None):
 # API ROUTES
 # ════════════════════════════════════════════════
 @app.route('/', methods=['GET'])
+def home():
+    with open('templates/home.html', 'r') as f:
+        return f.read()
+
+@app.route('/labels', methods=['GET'])
 def index():
     with open('templates/index.html', 'r') as f:
         return f.read()

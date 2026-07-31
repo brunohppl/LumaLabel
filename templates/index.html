@@ -34,18 +34,21 @@
   /* ── HEADER ── */
   header {
     background: var(--ink);
-    padding: 28px 48px;
+    padding: 16px 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
   }
 
   .logo {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     font-weight: 300;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.1em;
     color: var(--cream);
+    white-space: nowrap;
   }
 
   .logo em {
@@ -53,13 +56,10 @@
     color: var(--accent);
   }
 
-  .logo-sub {
-    font-size: 0.55rem;
-    letter-spacing: 0.35em;
-    text-transform: uppercase;
-    color: rgba(250,248,244,0.3);
-    margin-top: 3px;
-  }
+  .nav-links { display:flex; gap:16px; flex-wrap:wrap; }
+  .nav-link { color:rgba(250,248,244,0.45); text-decoration:none; font-size:0.72rem; letter-spacing:0.1em; text-transform:uppercase; transition:color 0.2s; white-space:nowrap; }
+  .nav-link:hover, .nav-link.active { color:var(--accent); }
+  @media(max-width:480px){ header{padding:12px 16px;} .logo{font-size:1.2rem;} .nav-link{font-size:0.68rem;letter-spacing:0.06em;} .nav-links{gap:12px;} }
 
   .header-tag {
     font-size: 0.6rem;
@@ -531,17 +531,14 @@
 <body>
 
 <header>
-  <div>
-    <div class="logo">LUMA <em>Design</em> Co</div>
-    <div class="logo-sub">Brisbane Property Styling</div>
-  </div>
-  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
-    <a href="/" style="display:inline-flex;align-items:center;padding:8px 14px;background:rgba(255,255,255,0.18);color:var(--cream);text-decoration:none;font-family:'Jost',sans-serif;font-size:0.72rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;border-radius:1px;border:1px solid rgba(255,255,255,0.25);transition:background 0.2s;white-space:nowrap;">Home</a>
-    <a href="/labels" style="display:inline-flex;align-items:center;padding:8px 14px;background:rgba(255,255,255,0.18);color:var(--cream);text-decoration:none;font-family:'Jost',sans-serif;font-size:0.72rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;border-radius:1px;border:1px solid rgba(255,255,255,0.25);transition:background 0.2s;white-space:nowrap;">Labels</a>
-    <a href="/jobs" style="display:inline-flex;align-items:center;padding:8px 14px;background:var(--accent);color:white;text-decoration:none;font-family:'Jost',sans-serif;font-size:0.72rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;border-radius:1px;border:1px solid transparent;transition:background 0.2s;white-space:nowrap;">Jobs</a>
-    <a href="/runsheet" style="display:inline-flex;align-items:center;padding:8px 14px;background:rgba(255,255,255,0.18);color:var(--cream);text-decoration:none;font-family:'Jost',sans-serif;font-size:0.72rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;border-radius:1px;border:1px solid rgba(255,255,255,0.25);transition:background 0.2s;white-space:nowrap;">Runsheet</a>
-    <a href="/damages" style="display:inline-flex;align-items:center;padding:8px 14px;background:rgba(255,255,255,0.18);color:var(--cream);text-decoration:none;font-family:'Jost',sans-serif;font-size:0.72rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;border-radius:1px;border:1px solid rgba(255,255,255,0.25);transition:background 0.2s;white-space:nowrap;">Damages</a>
-    <a href="/catalogue" style="display:inline-flex;align-items:center;padding:8px 14px;background:rgba(255,255,255,0.18);color:var(--cream);text-decoration:none;font-family:'Jost',sans-serif;font-size:0.72rem;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;border-radius:1px;border:1px solid rgba(255,255,255,0.25);transition:background 0.2s;white-space:nowrap;">Catalogue</a>
+  <div class="logo">LUMA <em>Design</em> Co</div>
+  <div class="nav-links">
+    <a href="/" class="nav-link">Home</a>
+    <a href="/labels" class="nav-link active">Labels</a>
+    <a href="/jobs" class="nav-link">Jobs</a>
+    <a href="/runsheet" class="nav-link">Runsheet</a>
+    <a href="/catalogue" class="nav-link">Catalogue</a>
+    <a href="/damages" class="nav-link">Damages</a>
   </div>
 </header>
 

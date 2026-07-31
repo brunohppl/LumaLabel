@@ -1619,6 +1619,33 @@ def runsheet_page():
     with open('templates/runsheet.html', 'r') as f:
         return f.read()
 
+@app.route('/damages', methods=['GET'])
+def damages_page():
+    with open('templates/damages.html', 'r') as f:
+        return f.read()
+
+@app.route('/api/damages', methods=['GET'])
+def api_damages_list():
+    rows = sb_get('damage_reports', 'order=created_at.desc')
+    return jsonify(rows or [])
+
+@app.route('/api/damages', methods=['POST'])
+def api_damages_create():
+    data = request.get_json()
+    result = sb_post('damage_reports', {
+        'location':    data.get('location'),
+        'damage_type': data.get('damage_type'),
+        'furniture':   data.get('furniture'),
+        'photo_url':   data.get('photo_url') or None,
+        'notes':       data.get('notes') or None,
+    })
+    return jsonify({'success': bool(result), 'report': result[0] if result else None})
+
+@app.route('/api/damages/<report_id>', methods=['DELETE'])
+def api_damages_delete(report_id):
+    result = sb_delete('damage_reports', f'id=eq.{report_id}')
+    return jsonify({'success': bool(result)})
+
 @app.route('/stylist/<job_id>', methods=['GET'])
 def stylist_page(job_id):
     with open('templates/stylist.html', 'r') as f:

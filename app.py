@@ -2004,21 +2004,10 @@ def api_job_runsheet(job_id):
 
 @app.route('/api/runsheet/<date_str>', methods=['GET'])
 def api_runsheet_day(date_str):
-    """Jobs + schedule entries + crew + tasks for a specific date.
-
-    Schedule entries are now queried by job_schedule.date rather than
-    jobs.runsheet_date — this is what allows a single job to appear on
-    two different days (load day + install day). We collect all jobs
-    that have any schedule entry on this date, then return those jobs
-    and their entries together."""
-    # Find all schedule entries for this date
+    """Jobs + schedule entries (transport, styling, warehouse_pick) + crew + tasks for a date."""
     schedule = sb_get('job_schedule', f'date=eq.{date_str}&order=start_time.asc,created_at.asc') or []
 
-    # Derive the unique job IDs from those entries
-    job_ids = list({e['job_id'] for e in schedule if e.get('job_id')})
-
-    # Also include jobs whose legacy runsheet_date matches (backward compat
-    # for jobs scheduled before the date column was added to job_schedule)
+    job_ids     = list({e['job_id'] for e in schedule if e.get('job_id')})
     legacy_jobs = sb_get('jobs', f'runsheet_date=eq.{date_str}') or []
     legacy_ids  = [j['id'] for j in legacy_jobs]
     all_ids     = list({*job_ids, *legacy_ids})
@@ -2031,8 +2020,73 @@ def api_runsheet_day(date_str):
     crew  = sb_get('vehicle_day_crew', f'date=eq.{date_str}') or []
     tasks = sb_get('runsheet_tasks',   f'date=eq.{date_str}&order=start_time.asc') or []
 
-    return jsonify({'jobs': jobs, 'schedule': schedule,
-                    'crew': crew, 'tasks': tasks})
+    # Split schedule by category for the three tabs
+    transport  = [e for e in schedule if (e.get('category') or 'transport') == 'transport']
+    styling    = [e for e in schedule if e.get('category') == 'styling']
+    wh_picks   = [e for e in schedule if e.get('category') == 'warehouse_pick']
+    wh_tasks   = [t for t in tasks if (t.get('category') or 'warehouse') == 'warehouse']
+
+    return jsonify({
+        'jobs':      jobs,
+        'schedule':  transport,       # backward compat — transport entries
+        'styling':   styling,
+        'wh_picks':  wh_picks,
+        'tasks':     wh_tasks,
+        'crew':      crew,
+    })
+
+
+# ── Styling schedule routes ──────────────────────────────────────────────────
+
+@app.route('/api/jobs/<job_id>/styling', methods=['GET'])
+def api_job_styling_list(job_id):
+    """List styling entries for a job (across all dates)."""
+    entries = sb_get('job_schedule', f'job_id=eq.{job_id}&category=eq.styling&order=date.asc,start_time.asc') or []
+    return jsonify(entries)
+
+@app.route('/api/jobs/<job_id>/styling', methods=['POST'])
+def api_job_styling_add(job_id):
+    """Add a styling entry for a job.
+    Body: {date, person, start_time, duration, notes}"""
+    data = request.get_json()
+    result = sb_post('job_schedule', {
+        'job_id':     job_id,
+        'date':       data.get('date'),
+        'person':     data.get('person'),
+        'vehicle':    None,
+        'type':       'styling',
+        'category':   'styling',
+        'start_time': data.get('start_time') or None,
+        'duration':   data.get('duration') or None,
+        'notes':      data.get('notes') or None,
+    })
+    return jsonify({'success': bool(result), 'entry': result[0] if result else None})
+
+
+# ── Warehouse pick routes ────────────────────────────────────────────────────
+
+@app.route('/api/jobs/<job_id>/warehouse-pick', methods=['GET'])
+def api_job_wh_pick_list(job_id):
+    entries = sb_get('job_schedule', f'job_id=eq.{job_id}&category=eq.warehouse_pick&order=date.asc,start_time.asc') or []
+    return jsonify(entries)
+
+@app.route('/api/jobs/<job_id>/warehouse-pick', methods=['POST'])
+def api_job_wh_pick_add(job_id):
+    """Add a warehouse pick entry for a job.
+    Body: {date, person, start_time, duration, notes}"""
+    data = request.get_json()
+    result = sb_post('job_schedule', {
+        'job_id':     job_id,
+        'date':       data.get('date'),
+        'person':     data.get('person'),
+        'vehicle':    None,
+        'type':       'warehouse_pick',
+        'category':   'warehouse_pick',
+        'start_time': data.get('start_time') or None,
+        'duration':   data.get('duration') or None,
+        'notes':      data.get('notes') or None,
+    })
+    return jsonify({'success': bool(result), 'entry': result[0] if result else None})
 
 
 @app.route('/api/tasks', methods=['POST'])
@@ -2131,24 +2185,26 @@ def api_job_schedule_add(job_id):
 
 @app.route('/api/schedule/<entry_id>', methods=['PATCH'])
 def api_schedule_update(entry_id):
-    """Edit a vehicle assignment. Body: any of {vehicle, date, start_time, duration, notes}"""
+    """Edit a schedule entry. Body: any of {vehicle, person, category, date, type, start_time, duration, notes}"""
     data    = request.get_json()
     payload = {}
     if 'vehicle' in data:
         if data['vehicle'] is not None and data['vehicle'] not in RUNSHEET_VEHICLES:
             return jsonify({'success': False, 'error': 'Unknown vehicle'}), 400
         payload['vehicle'] = data['vehicle']
-    if 'type'       in data: payload['type']       = data['type']
-    if 'date'       in data: payload['date']       = data['date']
+    if 'person'   in data: payload['person']   = data['person'] or None
+    if 'category' in data: payload['category'] = data['category'] or 'transport'
+    if 'type'     in data: payload['type']     = data['type']
+    if 'date'     in data: payload['date']     = data['date']
     if 'start_time' in data:
         if data['start_time'] is not None and data['start_time'] not in RUNSHEET_TIME_SLOTS:
             return jsonify({'success': False, 'error': 'Invalid start_time'}), 400
         payload['start_time'] = data['start_time']
-    if 'duration'   in data:
+    if 'duration' in data:
         if data['duration'] is not None and data['duration'] not in RUNSHEET_DURATIONS:
             return jsonify({'success': False, 'error': 'Invalid duration'}), 400
         payload['duration'] = data['duration']
-    if 'notes'      in data: payload['notes'] = data['notes'] or None
+    if 'notes'    in data: payload['notes'] = data['notes'] or None
     result = sb_patch('job_schedule', f'id=eq.{entry_id}', payload)
     return jsonify({'success': bool(result)})
 

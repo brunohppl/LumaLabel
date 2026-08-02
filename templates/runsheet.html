@@ -84,6 +84,35 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .rs-task-notes.expanded{display:block;overflow:visible;background:rgba(0,0,0,0.05);border-radius:3px;padding:5px 6px;}
 
 /* ── UNSCHEDULED STRIP ── */
+.rs-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px;}
+.rs-tab{background:none;border:none;padding:10px 20px;font-family:'Jost',sans-serif;font-size:0.82rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color 0.15s,border-color 0.15s;}
+.rs-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.rs-tab:hover{color:var(--ink);}
+.myday-who-row{display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+.myday-who-label{font-size:0.82rem;font-weight:600;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;white-space:nowrap;}
+.myday-select{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--border);border-radius:4px;font-family:'Jost',sans-serif;font-size:0.85rem;background:white;color:var(--ink);}
+.myday-card{background:white;border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:14px;display:flex;gap:16px;align-items:flex-start;}
+.myday-card-time{text-align:center;min-width:52px;flex-shrink:0;}
+.myday-card-time-main{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;color:var(--ink);line-height:1;}
+.myday-card-time-ampm{font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-top:2px;}
+.myday-card-body{flex:1;}
+.myday-card-type{font-size:0.68rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:4px;}
+.myday-card-type.install{color:var(--green);}
+.myday-card-type.to_load{color:var(--accent);}
+.myday-card-type.pickup{color:#2e5a8a;}
+.myday-card-ref{font-size:1rem;font-weight:600;color:var(--ink);margin-bottom:2px;}
+.myday-card-addr{font-size:0.85rem;color:var(--muted);line-height:1.4;margin-bottom:8px;}
+.myday-card-notes{font-size:0.8rem;color:var(--muted);font-style:italic;margin-bottom:8px;}
+.myday-card-crew{font-size:0.78rem;color:var(--muted);margin-bottom:10px;}
+.myday-card-btns{display:flex;gap:8px;flex-wrap:wrap;}
+.myday-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:6px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;cursor:pointer;text-decoration:none;border:none;transition:opacity 0.15s;}
+.myday-btn:hover{opacity:0.85;}
+.myday-btn-nav{background:var(--accent);color:white;cursor:pointer;}
+.myday-btn-stylist{background:rgba(74,124,89,0.12);color:var(--green);}
+.myday-btn-driver{background:rgba(46,90,138,0.12);color:#2e5a8a;}
+.myday-empty{text-align:center;padding:48px 20px;color:var(--muted);}
+.myday-empty-title{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--ink);margin-bottom:6px;}
+@media(max-width:480px){.myday-card{padding:14px;gap:12px;}.myday-card-time-main{font-size:1.2rem;}}
 .rs-unscheduled{margin-top:18px;}
 .rs-unscheduled-title{font-size:0.72rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
 .rs-unscheduled-chips{display:flex;flex-wrap:wrap;gap:8px;}
@@ -290,9 +319,17 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 </div>
 
 <div class="main">
-  <h1 class="page-title">Runsheet</h1>
-  <p class="page-sub">Daily transport schedule — installs, pickups, and loads.</p>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+    <h1 class="page-title">Runsheet</h1>
+  </div>
 
+  <!-- Tabs -->
+  <div class="rs-tabs">
+    <button class="rs-tab active" id="tab-grid" onclick="switchTab('grid')">Grid</button>
+    <button class="rs-tab" id="tab-myday" onclick="switchTab('myday')">My Day</button>
+  </div>
+
+  <!-- Date nav — shared between both tabs -->
   <div class="runsheet-date-row">
     <button class="runsheet-nav-btn" onclick="shiftRunsheetDate(-1)">‹</button>
     <div class="runsheet-date-label" id="runsheet-date-label"></div>
@@ -300,7 +337,24 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     <button class="btn-today" onclick="goToToday()">Today</button>
   </div>
 
-  <div id="runsheet-content"><div class="loading">Loading runsheet…</div></div>
+  <!-- Grid view -->
+  <div id="view-grid">
+    <div id="runsheet-content"><div class="loading">Loading runsheet…</div></div>
+  </div>
+
+  <!-- My Day view -->
+  <div id="view-myday" style="display:none;">
+    <div class="myday-who-row">
+      <span class="myday-who-label">I am</span>
+      <select id="myday-person" class="myday-select" onchange="saveMydayPerson();renderMyDay()">
+        <option value="">— select your name —</option>
+      </select>
+      <select id="myday-vehicle" class="myday-select" onchange="saveMydayVehicle();renderMyDay()">
+        <option value="">— my truck —</option>
+      </select>
+    </div>
+    <div id="myday-content"><div class="loading">Select your name above to see your day.</div></div>
+  </div>
 </div>
 
 <!-- Slack / Navigate confirmation popup -->
@@ -373,12 +427,15 @@ function goToToday(){
 let RS_CONFIG={
   vehicles:['Marlin','Bruce','Nigel','Nemo','VUG'],
   stylists:['Addy','Montie','Delphine','India','Hayley'],
-  drivers:['Jo','Savio','Nick','Stefano','Yuri','Ayoub','Bruno','Phil'],
+  drivers:['Jo','Savio','Nick','Ayoub','Bruno','Phil','Tiago'],
   workers:[],time_slots:[],durations:[30,60,90,120,150,180,210,240],
 };
+let lastFetchedData={jobs:[],schedule:[],tasks:[],crew:{}};
+
 async function loadRunsheetConfig(){
   try{const res=await fetch('/api/runsheet-config');RS_CONFIG=await res.json();}catch(e){}
   populateSchedPopoverDropdowns();
+  initTabs();
 }
 
 const SLOT_H=46;
@@ -412,6 +469,9 @@ async function renderRunsheet(){
 
   currentDaySchedule=daySchedule;
   currentDayTasksById=Object.fromEntries(dayTasks.map(t=>[t.id,t]));
+
+  // Store for My Day tab
+  lastFetchedData={jobs:dayJobs,schedule:daySchedule,tasks:dayTasks,crew:dayCrew};
 
   // Build job caches for this day
   jobsById=new Map(dayJobs.map(j=>[j.id,j]));
@@ -562,9 +622,149 @@ async function renderRunsheet(){
   }
 
   content.innerHTML=html;
+  // If My Day tab is active, refresh it with the new data too
+  if(currentTab==='myday') renderMyDay();
 }
 
-// ── Schedule popover ──
+// ── Tabs ──
+let currentTab = localStorage.getItem('rs-tab') || 'grid';
+
+function switchTab(tab){
+  currentTab = tab;
+  localStorage.setItem('rs-tab', tab);
+  document.getElementById('tab-grid').classList.toggle('active', tab==='grid');
+  document.getElementById('tab-myday').classList.toggle('active', tab==='myday');
+  document.getElementById('view-grid').style.display = tab==='grid' ? '' : 'none';
+  document.getElementById('view-myday').style.display = tab==='myday' ? '' : 'none';
+  if(tab==='myday') renderMyDay();
+}
+
+function initTabs(){
+  populateMydaySelects();
+  switchTab(currentTab);
+}
+
+function populateMydaySelects(){
+  const personSel = document.getElementById('myday-person');
+  const vehSel    = document.getElementById('myday-vehicle');
+  const allWorkers = [...(RS_CONFIG.stylists||[]), ...(RS_CONFIG.drivers||[])];
+  personSel.innerHTML = '<option value="">— select your name —</option>'
+    + allWorkers.map(w=>`<option value="${w}">${w}</option>`).join('');
+  vehSel.innerHTML = '<option value="">— my truck —</option>'
+    + (RS_CONFIG.vehicles||[]).map(v=>`<option value="${v}">${v}</option>`).join('');
+  // Restore saved values
+  const savedPerson = localStorage.getItem('myday-person') || '';
+  const savedVehicle = localStorage.getItem('myday-vehicle') || '';
+  personSel.value = savedPerson;
+  vehSel.value = savedVehicle;
+}
+
+function saveMydayPerson(){
+  localStorage.setItem('myday-person', document.getElementById('myday-person').value);
+}
+function saveMydayVehicle(){
+  localStorage.setItem('myday-vehicle', document.getElementById('myday-vehicle').value);
+}
+
+function renderMyDay(){
+  const vehicle = document.getElementById('myday-vehicle').value;
+  const person  = document.getElementById('myday-person').value;
+  const content = document.getElementById('myday-content');
+
+  if(!vehicle && !person){
+    content.innerHTML = '<div class="myday-empty"><div class="myday-empty-title">Select your name and truck above</div></div>';
+    return;
+  }
+
+  // Filter schedule entries for this vehicle on the current date
+  const dayJobs = lastFetchedData?.jobs || [];
+  const daySchedule = lastFetchedData?.schedule || [];
+  const dayTasks = lastFetchedData?.tasks || [];
+  const dayCrew  = lastFetchedData?.crew || {};
+
+  // Get entries for this vehicle
+  const myEntries = daySchedule.filter(e => e.vehicle === vehicle);
+
+  // Also include tasks assigned to this vehicle or ALL
+  const myTasks = dayTasks.filter(t => t.vehicle === vehicle || t.vehicle === 'ALL');
+
+  // Build combined list sorted by start_time
+  const combined = [];
+
+  myEntries.forEach(e => {
+    const job = dayJobs.find(j => j.id === e.job_id);
+    if(job) combined.push({...e, job, isTask:false});
+  });
+
+  myTasks.forEach(t => combined.push({...t, isTask:true}));
+
+  combined.sort((a,b) => {
+    const ta = a.start_time||'99:99', tb = b.start_time||'99:99';
+    return ta.localeCompare(tb);
+  });
+
+  if(!combined.length){
+    content.innerHTML = `<div class="myday-empty">
+      <div class="myday-empty-title">Nothing scheduled${vehicle?' for '+vehicle:''}</div>
+      <p style="font-size:0.85rem;margin-top:6px;">Check back once the runsheet is filled in.</p>
+    </div>`;
+    return;
+  }
+
+  const typeLabel = {install:'Install',to_load:'To Load',pickup:'Pickup'};
+
+  content.innerHTML = combined.map(item => {
+    if(item.isTask){
+      const t = formatSlotLabel(item.start_time||'');
+      const [time, ampm] = t ? t.split(' ') : ['—',''];
+      return `<div class="myday-card" style="border-left:4px solid var(--border);">
+        <div class="myday-card-time">
+          <div class="myday-card-time-main">${time}</div>
+          <div class="myday-card-time-ampm">${ampm}</div>
+        </div>
+        <div class="myday-card-body">
+          <div class="myday-card-type" style="color:var(--muted);">Task</div>
+          <div class="myday-card-ref">${item.title||'Untitled task'}</div>
+          ${item.notes?`<div class="myday-card-notes">${item.notes}</div>`:''}
+        </div>
+      </div>`;
+    }
+
+    const job = item.job;
+    const type = item.type || 'install';
+    const tLabel = formatSlotLabel(item.start_time||'');
+    const [time, ampm] = tLabel ? tLabel.split(' ') : ['—',''];
+    const ref = job.job_ref || job.job_number || '';
+    const addr = job.address || '';
+    const streetOnly = addr.split(',')[0];
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
+    const crewEntry = dayCrew[vehicle] || {};
+    const crewStr = [crewEntry.lead, ...(crewEntry.offsiders||[])].filter(Boolean).join(', ');
+
+    const borderColor = type==='install'?'var(--green)':type==='to_load'?'var(--accent)':'#2e5a8a';
+
+    return `<div class="myday-card" style="border-left:4px solid ${borderColor};">
+      <div class="myday-card-time">
+        <div class="myday-card-time-main">${time}</div>
+        <div class="myday-card-time-ampm">${ampm}</div>
+      </div>
+      <div class="myday-card-body">
+        <div class="myday-card-type ${type}">${typeLabel[type]||type}</div>
+        <div class="myday-card-ref">${ref}</div>
+        <div class="myday-card-addr">${streetOnly}</div>
+        ${item.notes?`<div class="myday-card-notes">📝 ${item.notes}</div>`:''}
+        ${crewStr?`<div class="myday-card-crew">👥 ${crewStr}</div>`:''}
+        <div class="myday-card-btns">
+          <button class="myday-btn myday-btn-nav" onclick="openRunsheetNavigate('${job.id}','${(addr).replace(/'/g,"\\'")}')">📍 Navigate</button>
+          ${type!=='to_load'?`<a href="/stylist/${job.id}" target="_blank" class="myday-btn myday-btn-stylist">✎ Stylist</a>`:''}
+          <a href="/driver/${job.id}" target="_blank" class="myday-btn myday-btn-driver">🚛 Driver</a>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+
 let runsheetPopoverJobId=null;
 let schedVehicleSelected=[];
 let schedVehicleTimes={};

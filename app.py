@@ -2251,6 +2251,7 @@ def api_item_check(item_id):
     if 'checked'          in data: payload['checked']          = data['checked']
     if 'on_truck'         in data: payload['on_truck']         = data['on_truck']
     if 'bay_location'     in data: payload['bay_location']     = data['bay_location'] or None
+    if 'room'             in data: payload['room']             = data['room'] or None
     if 'notes'            in data: payload['notes']            = data['notes']
     if 'picked'           in data: payload['picked']           = data['picked']
     if 'photo_url'        in data: payload['photo_url']        = data['photo_url']

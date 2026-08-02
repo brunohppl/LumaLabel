@@ -109,6 +109,21 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .myday-empty{text-align:center;padding:48px 20px;color:var(--muted);}
 .myday-empty-title{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--ink);margin-bottom:6px;}
 @media(max-width:480px){.myday-card{padding:14px;gap:12px;}.myday-card-time-main{font-size:1.2rem;}}
+.rs-list-card{background:white;border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start;}
+.rs-list-card-time{text-align:center;min-width:44px;flex-shrink:0;}
+.rs-list-card-time-main{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:600;line-height:1;color:var(--ink);}
+.rs-list-card-time-ampm{font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
+.rs-list-card-body{flex:1;}
+.rs-list-card-label{font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:3px;}
+.rs-list-card-ref{font-size:0.95rem;font-weight:600;color:var(--ink);}
+.rs-list-card-sub{font-size:0.8rem;color:var(--muted);margin-top:2px;}
+.rs-list-card-note{font-size:0.78rem;color:var(--muted);font-style:italic;margin-top:4px;}
+.rs-list-card-edit{background:none;border:none;cursor:pointer;color:var(--border);padding:4px;border-radius:3px;transition:color 0.15s;flex-shrink:0;}
+.rs-list-card-edit:hover{color:var(--accent);}
+.rs-list-section{margin-bottom:22px;}
+.rs-list-section-title{font-size:0.68rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--sand);}
+.rs-list-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:0.88rem;}
+.wh-type-selected{border-color:var(--accent)!important;background:rgba(184,147,90,0.08)!important;}
 .rs-unscheduled{margin-top:18px;}
 .rs-unscheduled-title{font-size:0.72rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
 .rs-unscheduled-chips{display:flex;flex-wrap:wrap;gap:8px;}
@@ -192,6 +207,95 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   <div class="runsheet-popover-actions" style="margin-top:18px;">
     <button class="btn btn-outline" onclick="removeFromRunsheet()" id="runsheet-remove-btn" style="font-size:0.72rem;display:none;">Remove</button>
     <button class="btn btn-gold" onclick="saveRunsheetEntry()">Save</button>
+  </div>
+</div>
+
+<!-- Styling popover -->
+<div class="runsheet-popover-overlay" id="styling-popover-overlay" onclick="closeStylingPopover()"></div>
+<div class="runsheet-popover" id="styling-popover" style="width:360px;max-height:90vh;overflow-y:auto;">
+  <div class="runsheet-popover-title" id="styling-popover-title">Add Styling Entry</div>
+  <input type="hidden" id="styling-entry-id"/>
+  <label class="runsheet-popover-label">Job</label>
+  <input type="text" id="styling-job-search" class="runsheet-popover-input" placeholder="Job number or address…" oninput="searchJobsForPopover(this.value,'styling-job-results','styling-job-selected','styling-job-id')"/>
+  <div id="styling-job-results" style="margin-top:4px;max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:2px;display:none;"></div>
+  <div id="styling-job-selected" style="display:none;margin-top:8px;padding:7px 10px;background:var(--sand);border-radius:3px;font-size:0.85rem;"></div>
+  <input type="hidden" id="styling-job-id"/>
+  <div class="sched-two-col" style="margin-top:12px;">
+    <div>
+      <label class="runsheet-popover-label">Date</label>
+      <input type="date" id="styling-date" class="runsheet-popover-input"/>
+    </div>
+    <div>
+      <label class="runsheet-popover-label">Stylist</label>
+      <select id="styling-person" class="runsheet-popover-input"><option value="">— select —</option></select>
+    </div>
+  </div>
+  <div class="sched-two-col" style="margin-top:10px;">
+    <div>
+      <label class="runsheet-popover-label">Arrival time</label>
+      <select id="styling-time" class="runsheet-popover-input"><option value="">No time set</option></select>
+    </div>
+    <div>
+      <label class="runsheet-popover-label">Duration</label>
+      <select id="styling-duration" class="runsheet-popover-input"><option value="">—</option></select>
+    </div>
+  </div>
+  <label class="runsheet-popover-label" style="margin-top:10px;">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+  <textarea id="styling-notes" class="runsheet-popover-input" placeholder="Access info, arrival instructions…" style="height:52px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
+  <div class="runsheet-popover-actions" style="margin-top:14px;">
+    <button class="btn btn-outline" id="styling-delete-btn" style="font-size:0.72rem;display:none;color:var(--red);border-color:var(--red);" onclick="deleteStylingEntry()">Delete</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-outline" onclick="closeStylingPopover()" style="font-size:0.75rem;">Cancel</button>
+      <button class="btn btn-gold" onclick="saveStylingEntry()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Warehouse popover -->
+<div class="runsheet-popover-overlay" id="warehouse-popover-overlay" onclick="closeWarehousePopover()"></div>
+<div class="runsheet-popover" id="warehouse-popover" style="width:360px;max-height:90vh;overflow-y:auto;">
+  <div class="runsheet-popover-title" id="warehouse-popover-title">Add Warehouse Task</div>
+  <input type="hidden" id="warehouse-entry-id"/>
+  <input type="hidden" id="warehouse-entry-type"/>
+  <div style="display:flex;gap:8px;margin-bottom:14px;">
+    <button class="sched-mode-btn" id="wh-type-pick" onclick="setWarehouseType('pick')" style="flex:1;">
+      <div style="font-size:1.2rem;margin-bottom:4px;">📦</div>
+      <div style="font-size:0.78rem;font-weight:600;">Pick Job</div>
+    </button>
+    <button class="sched-mode-btn" id="wh-type-task" onclick="setWarehouseType('task')" style="flex:1;">
+      <div style="font-size:1.2rem;margin-bottom:4px;">🏭</div>
+      <div style="font-size:0.78rem;font-weight:600;">General Task</div>
+    </button>
+  </div>
+  <div id="wh-job-row" style="display:none;">
+    <label class="runsheet-popover-label">Job to pick</label>
+    <input type="text" id="warehouse-job-search" class="runsheet-popover-input" placeholder="Job number or address…" oninput="searchJobsForPopover(this.value,'warehouse-job-results','warehouse-job-selected','warehouse-job-id')"/>
+    <div id="warehouse-job-results" style="margin-top:4px;max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:2px;display:none;"></div>
+    <div id="warehouse-job-selected" style="display:none;margin-top:8px;padding:7px 10px;background:var(--sand);border-radius:3px;font-size:0.85rem;"></div>
+    <input type="hidden" id="warehouse-job-id"/>
+  </div>
+  <div id="wh-title-row" style="display:none;">
+    <label class="runsheet-popover-label">Task description</label>
+    <input type="text" id="warehouse-title" class="runsheet-popover-input" placeholder="e.g. Stage sofa at bay A3, clean truck…"/>
+  </div>
+  <div class="sched-two-col" style="margin-top:12px;">
+    <div>
+      <label class="runsheet-popover-label">Person</label>
+      <select id="warehouse-person" class="runsheet-popover-input"><option value="ALL">All team</option></select>
+    </div>
+    <div>
+      <label class="runsheet-popover-label">Time</label>
+      <select id="warehouse-time" class="runsheet-popover-input"><option value="">No time set</option></select>
+    </div>
+  </div>
+  <label class="runsheet-popover-label" style="margin-top:10px;">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+  <textarea id="warehouse-notes" class="runsheet-popover-input" placeholder="Bay location, special instructions…" style="height:52px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
+  <div class="runsheet-popover-actions" style="margin-top:14px;">
+    <button class="btn btn-outline" id="warehouse-delete-btn" style="font-size:0.72rem;display:none;color:var(--red);border-color:var(--red);" onclick="deleteWarehouseEntry()">Delete</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-outline" onclick="closeWarehousePopover()" style="font-size:0.75rem;">Cancel</button>
+      <button class="btn btn-gold" onclick="saveWarehouseEntry()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -321,8 +425,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 
   <!-- Tabs -->
   <div class="rs-tabs">
-    <button class="rs-tab active" id="tab-grid" onclick="switchTab('grid')">Grid</button>
-    <button class="rs-tab" id="tab-myday" onclick="switchTab('myday')">My Day</button>
+    <button class="rs-tab active" id="tab-grid"      onclick="switchTab('grid')">🚛 Transport</button>
+    <button class="rs-tab"        id="tab-styling"   onclick="switchTab('styling')">🎨 Styling</button>
+    <button class="rs-tab"        id="tab-warehouse" onclick="switchTab('warehouse')">🏭 Warehouse</button>
+    <button class="rs-tab"        id="tab-myday"     onclick="switchTab('myday')">My Day</button>
   </div>
 
   <!-- Date nav — shared between both tabs -->
@@ -333,9 +439,25 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     <button class="btn-today" onclick="goToToday()">Today</button>
   </div>
 
-  <!-- Grid view -->
+  <!-- Grid view (Transport) -->
   <div id="view-grid">
     <div id="runsheet-content"><div class="loading">Loading runsheet…</div></div>
+  </div>
+
+  <!-- Styling view -->
+  <div id="view-styling" style="display:none;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="btn-add" onclick="openStylingPopover(null)" title="Add styling entry" style="width:36px;height:36px;font-size:1.2rem;">+</button>
+    </div>
+    <div id="styling-content"><div class="loading">Loading…</div></div>
+  </div>
+
+  <!-- Warehouse view -->
+  <div id="view-warehouse" style="display:none;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="btn-add" onclick="openWarehousePopover(null)" title="Add warehouse task" style="width:36px;height:36px;font-size:1.2rem;">+</button>
+    </div>
+    <div id="warehouse-content"><div class="loading">Loading…</div></div>
   </div>
 
   <!-- My Day view -->
@@ -423,7 +545,7 @@ let RS_CONFIG={
   drivers:['Jo','Savio','Nick','Ayoub','Bruno','Phil','Tiago'],
   workers:[],time_slots:[],durations:[30,60,90,120,150,180,210,240],
 };
-let lastFetchedData={jobs:[],schedule:[],tasks:[],crew:{}};
+let lastFetchedData={jobs:[],schedule:[],styling:[],wh_picks:[],tasks:[],crew:{}};
 
 async function loadRunsheetConfig(){
   try{const res=await fetch('/api/runsheet-config');RS_CONFIG=await res.json();}catch(e){}
@@ -466,8 +588,20 @@ async function renderRunsheet(){
   // Convert crew array to dict keyed by vehicle for easy lookup
   const _crewDict = Object.fromEntries((dayCrew||[]).map(c=>[c.vehicle, c]));
 
-  // Store for My Day tab
-  lastFetchedData={jobs:dayJobs, schedule:daySchedule, tasks:dayTasks, crew:_crewDict};
+  // Store for all tabs
+  lastFetchedData={
+    jobs:     dayJobs,
+    schedule: daySchedule,
+    styling:  data.styling  || [],
+    wh_picks: data.wh_picks || [],
+    tasks:    dayTasks,
+    crew:     _crewDict,
+  };
+
+  // Refresh non-grid tabs if active
+  if(currentTab==='myday')     renderMyDay();
+  if(currentTab==='styling')   renderStyling();
+  if(currentTab==='warehouse') renderWarehouse();
 
   // Build job caches for this day
   jobsById=new Map(dayJobs.map(j=>[j.id,j]));
@@ -623,16 +757,308 @@ let currentTab = localStorage.getItem('rs-tab') || 'grid';
 function switchTab(tab){
   currentTab = tab;
   localStorage.setItem('rs-tab', tab);
-  document.getElementById('tab-grid').classList.toggle('active', tab==='grid');
-  document.getElementById('tab-myday').classList.toggle('active', tab==='myday');
-  document.getElementById('view-grid').style.display = tab==='grid' ? '' : 'none';
-  document.getElementById('view-myday').style.display = tab==='myday' ? '' : 'none';
-  if(tab==='myday') renderMyDay();
+  ['grid','styling','warehouse','myday'].forEach(t=>{
+    document.getElementById(`tab-${t}`)?.classList.toggle('active', t===tab);
+    document.getElementById(`view-${t}`)?.style && (document.getElementById(`view-${t}`).style.display = t===tab ? '' : 'none');
+  });
+  if(tab==='styling')   renderStyling();
+  if(tab==='warehouse') renderWarehouse();
+  if(tab==='myday')     renderMyDay();
 }
 
 function initTabs(){
   populateMydaySelects();
   switchTab(currentTab);
+}
+
+// ── Shared job search for popovers ─────────────────────────────────────────
+let _jobSearchTimers={};
+async function searchJobsForPopover(q, resultsId, selectedId, hiddenId){
+  clearTimeout(_jobSearchTimers[resultsId]);
+  const results=document.getElementById(resultsId);
+  if(!results) return;
+  if(!q.trim()){ results.style.display='none'; return; }
+  _jobSearchTimers[resultsId]=setTimeout(async()=>{
+    const res=await fetch('/api/jobs');
+    const jobs=await res.json();
+    const ql=q.toLowerCase();
+    const matches=jobs.filter(j=>
+      (j.job_ref||'').toLowerCase().includes(ql)||
+      (j.job_number||'').toLowerCase().includes(ql)||
+      (j.address||'').toLowerCase().includes(ql)
+    ).slice(0,8);
+    results.innerHTML=matches.length
+      ? matches.map(j=>`<div class="job-search-result" onclick="selectJobForPopover('${j.id}','${(j.job_ref||j.job_number||'').replace(/'/g,"\\'")}','${(j.address||'').replace(/'/g,"\\'")}','${resultsId}','${selectedId}','${hiddenId}')">
+          <span class="job-search-ref">${j.job_ref||j.job_number}</span>
+          <span class="job-search-addr">${j.address||''}</span>
+        </div>`).join('')
+      : '<div class="job-search-result" style="color:var(--muted)">No jobs found</div>';
+    results.style.display='block';
+  },300);
+}
+function selectJobForPopover(jobId, ref, addr, resultsId, selectedId, hiddenId){
+  document.getElementById(resultsId).style.display='none';
+  document.getElementById(selectedId).textContent=`${ref} — ${addr}`;
+  document.getElementById(selectedId).style.display='block';
+  document.getElementById(hiddenId).value=jobId;
+}
+
+// ── Styling tab ─────────────────────────────────────────────────────────────
+function renderStyling(){
+  const content=document.getElementById('styling-content');
+  const styling=lastFetchedData?.styling||[];
+  const jobs=lastFetchedData?.jobs||[];
+  if(!styling.length){
+    content.innerHTML='<div class="rs-list-empty">No styling entries for this day.<br>Tap + to add one.</div>';
+    return;
+  }
+  // Group by job
+  const byJob={};
+  styling.forEach(e=>{
+    const job=jobs.find(j=>j.id===e.job_id)||{};
+    const key=e.job_id||'unlinked';
+    if(!byJob[key]) byJob[key]={job, entries:[]};
+    byJob[key].entries.push(e);
+  });
+  content.innerHTML=Object.values(byJob).map(({job,entries})=>{
+    const ref=job.job_ref||job.job_number||'Unknown Job';
+    const addr=job.address?job.address.split(',')[0]:'';
+    return `<div class="rs-list-section">
+      <div class="rs-list-section-title">${ref}${addr?' · '+addr:''}</div>
+      ${entries.map(e=>{
+        const {time,ampm}=fmtTimeParts(e.start_time);
+        const dur=e.duration?` · ${e.duration} min`:'';
+        return `<div class="rs-list-card" style="border-left:4px solid #8a4fbf;">
+          <div class="rs-list-card-time">
+            <div class="rs-list-card-time-main">${time}</div>
+            <div class="rs-list-card-time-ampm">${ampm}</div>
+          </div>
+          <div class="rs-list-card-body">
+            <div class="rs-list-card-label" style="color:#8a4fbf;">Styling${dur}</div>
+            <div class="rs-list-card-ref">${e.person||'Unassigned'}</div>
+            ${e.notes?`<div class="rs-list-card-note">📝 ${e.notes}</div>`:''}
+          </div>
+          <button class="rs-list-card-edit" onclick="openStylingPopover('${e.id}')">⚙</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+let _stylingEntryId=null;
+function openStylingPopover(entryId){
+  _stylingEntryId=entryId;
+  const todayStr=localDateStr(runsheetViewDate);
+  document.getElementById('styling-popover-title').textContent=entryId?'Edit Styling Entry':'Add Styling Entry';
+  document.getElementById('styling-entry-id').value=entryId||'';
+  document.getElementById('styling-delete-btn').style.display=entryId?'inline-block':'none';
+  document.getElementById('styling-job-search').value='';
+  document.getElementById('styling-job-results').style.display='none';
+  document.getElementById('styling-job-selected').style.display='none';
+  document.getElementById('styling-job-id').value='';
+  document.getElementById('styling-date').value=todayStr;
+  document.getElementById('styling-notes').value='';
+  // Populate person select with stylists
+  const sel=document.getElementById('styling-person');
+  sel.innerHTML='<option value="">— select stylist —</option>'+(RS_CONFIG.stylists||[]).map(s=>`<option value="${s}">${s}</option>`).join('');
+  document.getElementById('styling-time').innerHTML=timeOptions();
+  document.getElementById('styling-duration').innerHTML=durationOptions();
+  // Pre-fill if editing
+  if(entryId){
+    const entry=(lastFetchedData?.styling||[]).find(e=>e.id===entryId);
+    if(entry){
+      sel.value=entry.person||'';
+      document.getElementById('styling-date').value=entry.date||todayStr;
+      document.getElementById('styling-time').value=entry.start_time||'';
+      document.getElementById('styling-duration').value=entry.duration||'';
+      document.getElementById('styling-notes').value=entry.notes||'';
+      const job=(lastFetchedData?.jobs||[]).find(j=>j.id===entry.job_id);
+      if(job){
+        document.getElementById('styling-job-selected').textContent=`${job.job_ref||job.job_number} — ${job.address||''}`;
+        document.getElementById('styling-job-selected').style.display='block';
+        document.getElementById('styling-job-id').value=entry.job_id;
+      }
+    }
+  }
+  document.getElementById('styling-popover-overlay').classList.add('open');
+  document.getElementById('styling-popover').classList.add('open');
+}
+function closeStylingPopover(){
+  document.getElementById('styling-popover-overlay').classList.remove('open');
+  document.getElementById('styling-popover').classList.remove('open');
+  _stylingEntryId=null;
+}
+async function saveStylingEntry(){
+  const jobId=document.getElementById('styling-job-id').value;
+  const person=document.getElementById('styling-person').value;
+  const date=document.getElementById('styling-date').value;
+  if(!jobId||!person||!date){alert('Please select a job, stylist and date.');return;}
+  const payload={
+    date, person,
+    start_time:document.getElementById('styling-time').value||null,
+    duration:parseInt(document.getElementById('styling-duration').value)||null,
+    notes:document.getElementById('styling-notes').value.trim()||null,
+  };
+  if(_stylingEntryId){
+    await fetch(`/api/schedule/${_stylingEntryId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,person,category:'styling'})});
+  } else {
+    await fetch(`/api/jobs/${jobId}/styling`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  }
+  closeStylingPopover();
+  renderRunsheet();
+}
+async function deleteStylingEntry(){
+  if(!confirm('Delete this styling entry?')) return;
+  await fetch(`/api/schedule/${_stylingEntryId}`,{method:'DELETE'});
+  closeStylingPopover();
+  renderRunsheet();
+}
+
+// ── Warehouse tab ────────────────────────────────────────────────────────────
+let _whType='pick';
+function setWarehouseType(type){
+  _whType=type;
+  document.getElementById('wh-type-pick').classList.toggle('wh-type-selected', type==='pick');
+  document.getElementById('wh-type-task').classList.toggle('wh-type-selected', type==='task');
+  document.getElementById('wh-job-row').style.display=type==='pick'?'block':'none';
+  document.getElementById('wh-title-row').style.display=type==='task'?'block':'none';
+}
+
+function renderWarehouse(){
+  const content=document.getElementById('warehouse-content');
+  const picks=lastFetchedData?.wh_picks||[];
+  const tasks=lastFetchedData?.tasks||[];
+  const jobs=lastFetchedData?.jobs||[];
+  if(!picks.length&&!tasks.length){
+    content.innerHTML='<div class="rs-list-empty">No warehouse tasks for this day.<br>Tap + to add one.</div>';
+    return;
+  }
+  let html='';
+  if(picks.length){
+    html+=`<div class="rs-list-section">
+      <div class="rs-list-section-title">📦 Picking</div>
+      ${picks.map(e=>{
+        const job=jobs.find(j=>j.id===e.job_id)||{};
+        const ref=job.job_ref||job.job_number||'Job';
+        const addr=job.address?job.address.split(',')[0]:'';
+        const {time,ampm}=fmtTimeParts(e.start_time);
+        return `<div class="rs-list-card" style="border-left:4px solid var(--accent);">
+          <div class="rs-list-card-time">
+            <div class="rs-list-card-time-main">${time}</div>
+            <div class="rs-list-card-time-ampm">${ampm}</div>
+          </div>
+          <div class="rs-list-card-body">
+            <div class="rs-list-card-label" style="color:var(--accent);">Pick · ${e.person||'Unassigned'}</div>
+            <div class="rs-list-card-ref">${ref}</div>
+            <div class="rs-list-card-sub">${addr}</div>
+            ${e.notes?`<div class="rs-list-card-note">📝 ${e.notes}</div>`:''}
+          </div>
+          <button class="rs-list-card-edit" onclick="openWarehousePopover('${e.id}','pick')">⚙</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+  if(tasks.length){
+    html+=`<div class="rs-list-section">
+      <div class="rs-list-section-title">🏭 General Tasks</div>
+      ${tasks.map(t=>{
+        const {time,ampm}=fmtTimeParts(t.start_time);
+        return `<div class="rs-list-card" style="border-left:4px solid var(--muted);">
+          <div class="rs-list-card-time">
+            <div class="rs-list-card-time-main">${time}</div>
+            <div class="rs-list-card-time-ampm">${ampm}</div>
+          </div>
+          <div class="rs-list-card-body">
+            <div class="rs-list-card-label" style="color:var(--muted);">Task · ${t.vehicle==='ALL'?'All team':t.vehicle||'Unassigned'}</div>
+            <div class="rs-list-card-ref">${t.title||'Untitled'}</div>
+            ${t.notes?`<div class="rs-list-card-note">📝 ${t.notes}</div>`:''}
+          </div>
+          <button class="rs-list-card-edit" onclick="openWarehousePopover('${t.id}','task')">⚙</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+  content.innerHTML=html;
+}
+
+let _whEntryId=null;
+function openWarehousePopover(entryId, type='pick'){
+  _whEntryId=entryId;
+  const todayStr=localDateStr(runsheetViewDate);
+  document.getElementById('warehouse-popover-title').textContent=entryId?'Edit Warehouse Entry':'Add Warehouse Task';
+  document.getElementById('warehouse-entry-id').value=entryId||'';
+  document.getElementById('warehouse-delete-btn').style.display=entryId?'inline-block':'none';
+  document.getElementById('warehouse-job-search').value='';
+  document.getElementById('warehouse-job-results').style.display='none';
+  document.getElementById('warehouse-job-selected').style.display='none';
+  document.getElementById('warehouse-job-id').value='';
+  document.getElementById('warehouse-title').value='';
+  document.getElementById('warehouse-notes').value='';
+  // Populate person select
+  const sel=document.getElementById('warehouse-person');
+  const allWorkers=[...(RS_CONFIG.stylists||[]),...(RS_CONFIG.drivers||[])];
+  sel.innerHTML='<option value="ALL">All team</option>'+allWorkers.map(w=>`<option value="${w}">${w}</option>`).join('');
+  document.getElementById('warehouse-time').innerHTML=timeOptions();
+  setWarehouseType(type);
+  // Pre-fill if editing
+  if(entryId){
+    if(type==='task'){
+      const task=(lastFetchedData?.tasks||[]).find(t=>t.id===entryId);
+      if(task){ document.getElementById('warehouse-title').value=task.title||''; document.getElementById('warehouse-notes').value=task.notes||''; document.getElementById('warehouse-time').value=task.start_time||''; sel.value=task.vehicle||'ALL'; }
+    } else {
+      const pick=(lastFetchedData?.wh_picks||[]).find(e=>e.id===entryId);
+      if(pick){ sel.value=pick.person||'ALL'; document.getElementById('warehouse-time').value=pick.start_time||''; document.getElementById('warehouse-notes').value=pick.notes||'';
+        const job=(lastFetchedData?.jobs||[]).find(j=>j.id===pick.job_id);
+        if(job){ document.getElementById('warehouse-job-selected').textContent=`${job.job_ref||job.job_number} — ${job.address||''}`; document.getElementById('warehouse-job-selected').style.display='block'; document.getElementById('warehouse-job-id').value=pick.job_id; }
+      }
+    }
+  }
+  document.getElementById('warehouse-popover-overlay').classList.add('open');
+  document.getElementById('warehouse-popover').classList.add('open');
+}
+function closeWarehousePopover(){
+  document.getElementById('warehouse-popover-overlay').classList.remove('open');
+  document.getElementById('warehouse-popover').classList.remove('open');
+  _whEntryId=null;
+}
+async function saveWarehouseEntry(){
+  const todayStr=localDateStr(runsheetViewDate);
+  const person=document.getElementById('warehouse-person').value;
+  const time=document.getElementById('warehouse-time').value||null;
+  const notes=document.getElementById('warehouse-notes').value.trim()||null;
+  if(_whType==='pick'){
+    const jobId=document.getElementById('warehouse-job-id').value;
+    if(!jobId){alert('Please select a job.');return;}
+    if(_whEntryId){
+      await fetch(`/api/schedule/${_whEntryId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({person,start_time:time,notes,category:'warehouse_pick'})});
+    } else {
+      await fetch(`/api/jobs/${jobId}/warehouse-pick`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:todayStr,person,start_time:time,notes})});
+    }
+  } else {
+    const title=document.getElementById('warehouse-title').value.trim();
+    if(!title){alert('Please enter a task description.');return;}
+    if(_whEntryId){
+      await fetch(`/api/tasks/${_whEntryId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,vehicle:person,start_time:time,notes,category:'warehouse'})});
+    } else {
+      await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,vehicle:person,date:todayStr,start_time:time,notes,category:'warehouse'})});
+    }
+  }
+  closeWarehousePopover();
+  renderRunsheet();
+}
+async function deleteWarehouseEntry(){
+  if(!confirm('Delete this entry?')) return;
+  if(_whType==='task') await fetch(`/api/tasks/${_whEntryId}`,{method:'DELETE'});
+  else await fetch(`/api/schedule/${_whEntryId}`,{method:'DELETE'});
+  closeWarehousePopover();
+  renderRunsheet();
+}
+
+// Shared time formatter for list views
+function fmtTimeParts(t){
+  if(!t) return {time:'—',ampm:''};
+  const[h,m]=t.split(':').map(Number);
+  return {time:`${h%12===0?12:h%12}:${String(m).padStart(2,'0')}`,ampm:h<12?'am':'pm'};
 }
 
 function populateMydaySelects(){

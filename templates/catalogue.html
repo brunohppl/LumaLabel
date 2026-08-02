@@ -143,6 +143,18 @@ nav{background:var(--ink);padding:12px 20px;display:flex;align-items:center;just
   <label class="field-label">Description <span style="font-weight:400;text-transform:none;">(optional)</span></label>
   <input class="field-input" type="text" id="modal-desc" placeholder="e.g. White boucle, Natural oak…"/>
 
+  <label class="field-label">Warehouse location <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+  <div style="display:flex;gap:8px;">
+    <select class="field-input" id="modal-wh-aisle" style="width:80px;">
+      <option value="">Aisle</option>
+      ${['A','B','C','D','E','F'].map(a=>`<option value="${a}">${a}</option>`).join('')}
+    </select>
+    <select class="field-input" id="modal-wh-bay" style="width:80px;">
+      <option value="">Bay</option>
+      ${['1','2','3','4'].map(n=>`<option value="${n}">${n}</option>`).join('')}
+    </select>
+  </div>
+
   <label class="field-label">Photo</label>
   <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
     <input type="file" accept="image/*" id="modal-file-input" style="display:none;"
@@ -327,8 +339,9 @@ function renderGrid(){
         <div class="photo-card-type">${e.type}</div>
         ${e.room_context?`<div class="photo-card-room">${e.room_context}</div>`:''}
         ${e.description?`<div class="photo-card-desc">${e.description}</div>`:''}
+        ${e.warehouse_location?`<div style="font-size:0.7rem;font-weight:700;color:var(--green);margin-top:3px;letter-spacing:0.06em;">📍 ${e.warehouse_location}</div>`:''}
       </div>
-      <button class="photo-card-edit" onclick="event.stopPropagation();openEditModal('${e.id}','${(e.type||'').replace(/'/g,"\\'")}','${(e.room_context||'').replace(/'/g,"\\'")}','${(e.description||'').replace(/'/g,"\\'")}','${e.photo_url}')" title="Edit">✎</button>
+      <button class="photo-card-edit" onclick="event.stopPropagation();openEditModal('${e.id}','${(e.type||'').replace(/'/g,"\\'")}','${(e.room_context||'').replace(/'/g,"\\'")}','${(e.description||'').replace(/'/g,"\\'")}','${e.photo_url}','${(e.warehouse_location||'').replace(/'/g,"\\'")}')" title="Edit">✎</button>
       <button class="photo-card-del" onclick="event.stopPropagation();deleteEntry('${e.id}')" title="Delete">✕</button>
     </div>`).join('');
 }
@@ -355,6 +368,8 @@ function openAddModal(){
   document.getElementById('modal-type').value = ALL_TYPES[0];
   document.getElementById('modal-room').value = '';
   document.getElementById('modal-desc').value = '';
+  document.getElementById('modal-wh-aisle').value = '';
+  document.getElementById('modal-wh-bay').value = '';
   document.getElementById('modal-url').value = '';
   document.getElementById('modal-preview').style.display = 'none';
   document.getElementById('modal-upload-btn').textContent = '📷 Take photo or choose from library';
@@ -363,12 +378,15 @@ function openAddModal(){
   document.getElementById('add-modal').classList.add('open');
 }
 
-function openEditModal(id, type, room, desc, url){
+function openEditModal(id, type, room, desc, url, warehouseLoc){
   document.getElementById('modal-title').textContent = 'Edit Entry';
   document.getElementById('modal-entry-id').value = id;
   document.getElementById('modal-type').value = type;
   document.getElementById('modal-room').value = room;
   document.getElementById('modal-desc').value = desc;
+  const wh = warehouseLoc || '';
+  document.getElementById('modal-wh-aisle').value = wh[0] || '';
+  document.getElementById('modal-wh-bay').value = wh.slice(1) || '';
   document.getElementById('modal-url').value = url;
   document.getElementById('modal-upload-btn').textContent = '📷 Replace photo';
   document.getElementById('modal-upload-status').style.display = 'none';
@@ -397,6 +415,9 @@ async function saveEntry(){
   const type  = document.getElementById('modal-type').value;
   const room  = document.getElementById('modal-room').value || null;
   const desc  = document.getElementById('modal-desc').value.trim() || null;
+  const aisle = document.getElementById('modal-wh-aisle').value;
+  const bay   = document.getElementById('modal-wh-bay').value;
+  const wh    = (aisle && bay) ? aisle + bay : null;
   const url   = document.getElementById('modal-url').value.trim();
 
   if(!url){ alert('A photo URL is required.'); return; }
@@ -405,14 +426,14 @@ async function saveEntry(){
   if(id){
     await fetch(`/api/catalogue/${id}`,{
       method:'PATCH', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({type, room_context:room, description:desc, photo_url:url})
+      body:JSON.stringify({type, room_context:room, description:desc, warehouse_location:wh, photo_url:url})
     });
     const idx = allEntries.findIndex(e=>e.id===id);
-    if(idx!==-1) allEntries[idx]={...allEntries[idx], type, room_context:room, description:desc, photo_url:url};
+    if(idx!==-1) allEntries[idx]={...allEntries[idx], type, room_context:room, description:desc, warehouse_location:wh, photo_url:url};
   } else {
     const res = await fetch('/api/catalogue',{
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({type, room_context:room, description:desc, photo_url:url})
+      body:JSON.stringify({type, room_context:room, description:desc, warehouse_location:wh, photo_url:url})
     });
     const data = await res.json();
     if(data.entry) allEntries.unshift(data.entry);

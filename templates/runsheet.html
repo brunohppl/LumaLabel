@@ -142,12 +142,12 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   <div id="sched-popover-ref" style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;line-height:1.4;"></div>
   <div class="sched-two-col">
     <div>
-      <label class="runsheet-popover-label">Install date</label>
+      <label class="runsheet-popover-label" id="sched-date-label">Date</label>
       <input type="date" id="runsheet-popover-date" class="runsheet-popover-input"/>
     </div>
     <div>
       <label class="runsheet-popover-label">Type</label>
-      <select id="runsheet-popover-type" class="runsheet-popover-input">
+      <select id="runsheet-popover-type" class="runsheet-popover-input" onchange="updateSchedHint()">
         <option value="install">Install</option>
         <option value="pickup">Pickup</option>
         <option value="to_load">To Load</option>
@@ -156,7 +156,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   </div>
   <label class="runsheet-popover-label" style="margin-top:12px;">Vehicle(s)</label>
   <div class="sched-chip-row" id="sched-vehicle-chips"></div>
-  <div style="font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;">Two tiles will be created — <strong>To Load</strong> the day before and <strong>Install/Pickup</strong> on the date above.</div>
+  <div id="sched-hint" style="font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;"></div>
 
   <!-- Per-vehicle time overrides — shown after vehicles are selected -->
   <div id="sched-vehicle-times" style="margin-top:12px;"></div>
@@ -258,7 +258,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
         </div>
         <div>
           <label class="runsheet-popover-label">Type</label>
-          <select id="job-sched-type" class="runsheet-popover-input">
+          <select id="job-sched-type" class="runsheet-popover-input" onchange="updateJobSchedHint()">
             <option value="install">Install</option>
             <option value="pickup">Pickup</option>
             <option value="to_load">To Load</option>
@@ -267,7 +267,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       </div>
       <label class="runsheet-popover-label" style="margin-top:12px;">Vehicle(s)</label>
       <div class="sched-chip-row" id="job-sched-vehicle-chips"></div>
-      <div style="font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;">Two tiles will be created — <strong>To Load</strong> the day before and <strong>Install/Pickup</strong> on the date above.</div>
+      <div id="job-sched-hint" style="font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;">Two tiles will be created — <strong>To Load</strong> the day before and <strong>Install</strong> on the date above.</div>
       <div class="sched-two-col" style="margin-top:12px;">
         <div>
           <label class="runsheet-popover-label">Load time</label>
@@ -616,6 +616,35 @@ function toggleSchedVehicle(btn,v){
   renderVehicleTimeInputs();
 }
 
+function updateSchedHint(){
+  const type=document.getElementById('runsheet-popover-type')?.value||'install';
+  const label=document.getElementById('sched-date-label');
+  const hint=document.getElementById('sched-hint');
+  if(type==='pickup'){
+    if(label) label.textContent='Pickup date';
+    if(hint) hint.innerHTML='One tile only — <strong>Pickup</strong> on this date. No load tile created.';
+  } else if(type==='install'){
+    if(label) label.textContent='Install date';
+    if(hint) hint.innerHTML='Two tiles — <strong>To Load</strong> the day before (weekend-aware) and <strong>Install</strong> on this date.';
+  } else if(type==='to_load'){
+    if(label) label.textContent='Load date';
+    if(hint) hint.innerHTML='Two tiles — <strong>To Load</strong> on this date and <strong>Install</strong> the next business day.';
+  }
+}
+
+function updateJobSchedHint(){
+  const type=document.getElementById('job-sched-type')?.value||'install';
+  const hint=document.getElementById('job-sched-hint');
+  if(!hint) return;
+  if(type==='pickup'){
+    hint.innerHTML='One tile only — <strong>Pickup</strong> on this date. No load tile created.';
+  } else if(type==='install'){
+    hint.innerHTML='Two tiles — <strong>To Load</strong> the day before and <strong>Install</strong> on this date.';
+  } else if(type==='to_load'){
+    hint.innerHTML='Two tiles — <strong>To Load</strong> on this date and <strong>Install</strong> the next business day.';
+  }
+}
+
 async function openRunsheetPopover(jobId){
   runsheetPopoverJobId=jobId;
   schedVehicleSelected=[];
@@ -624,6 +653,7 @@ async function openRunsheetPopover(jobId){
   document.getElementById('sched-popover-ref').textContent=[job?.job_ref||job?.job_number,job?.address?street_only_js(job.address):null].filter(Boolean).join(' — ');
   document.getElementById('runsheet-popover-date').value=job?.runsheet_date||'';
   document.getElementById('runsheet-popover-type').value=job?.runsheet_type||'install';
+  updateSchedHint();
   document.getElementById('runsheet-remove-btn').style.display=job?.runsheet_date?'inline-block':'none';
   try{
     const res=await fetch(`/api/jobs/${jobId}/schedule`);
@@ -848,6 +878,7 @@ function selectJobForSched(jobId, ref, addr, existingDate, existingType){
   document.getElementById('job-sched-save-btn').style.opacity='1';
   if(existingDate) document.getElementById('job-sched-install-date').value=existingDate;
   document.getElementById('job-sched-type').value=existingType||'install';
+  updateJobSchedHint();
 }
 
 function clearJobSchedSelection(){

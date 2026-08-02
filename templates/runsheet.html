@@ -349,9 +349,6 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       <select id="myday-person" class="myday-select" onchange="saveMydayPerson();renderMyDay()">
         <option value="">— select your name —</option>
       </select>
-      <select id="myday-vehicle" class="myday-select" onchange="saveMydayVehicle();renderMyDay()">
-        <option value="">— my truck —</option>
-      </select>
     </div>
     <div id="myday-content"><div class="loading">Select your name above to see your day.</div></div>
   </div>
@@ -646,17 +643,10 @@ function initTabs(){
 
 function populateMydaySelects(){
   const personSel = document.getElementById('myday-person');
-  const vehSel    = document.getElementById('myday-vehicle');
   const allWorkers = [...(RS_CONFIG.stylists||[]), ...(RS_CONFIG.drivers||[])];
   personSel.innerHTML = '<option value="">— select your name —</option>'
     + allWorkers.map(w=>`<option value="${w}">${w}</option>`).join('');
-  vehSel.innerHTML = '<option value="">— my truck —</option>'
-    + (RS_CONFIG.vehicles||[]).map(v=>`<option value="${v}">${v}</option>`).join('');
-  // Restore saved values
-  const savedPerson = localStorage.getItem('myday-person') || '';
-  const savedVehicle = localStorage.getItem('myday-vehicle') || '';
-  personSel.value = savedPerson;
-  vehSel.value = savedVehicle;
+  personSel.value = localStorage.getItem('myday-person') || '';
 }
 
 function saveMydayPerson(){
@@ -667,80 +657,89 @@ function saveMydayVehicle(){
 }
 
 function renderMyDay(){
-  const vehicle = document.getElementById('myday-vehicle').value;
   const person  = document.getElementById('myday-person').value;
   const content = document.getElementById('myday-content');
 
-  if(!vehicle && !person){
-    content.innerHTML = '<div class="myday-empty"><div class="myday-empty-title">Select your name and truck above</div></div>';
+  if(!person){
+    content.innerHTML = '<div class="myday-empty"><div class="myday-empty-title">Select your name above</div></div>';
     return;
   }
 
-  // Filter schedule entries for this vehicle on the current date
-  const dayJobs = lastFetchedData?.jobs || [];
-  const daySchedule = lastFetchedData?.schedule || [];
-  const dayTasks = lastFetchedData?.tasks || [];
-  const dayCrew  = lastFetchedData?.crew || {};
+  const dayJobs    = lastFetchedData?.jobs || [];
+  const daySchedule= lastFetchedData?.schedule || [];
+  const dayTasks   = lastFetchedData?.tasks || [];
+  const dayCrew    = lastFetchedData?.crew || {};
 
-  // Get entries for this vehicle
-  const myEntries = daySchedule.filter(e => e.vehicle === vehicle);
+  // Find which vehicles this person is on today
+  const myVehicles = Object.entries(dayCrew)
+    .filter(([v, crew]) => crew.lead === person || (crew.offsiders||[]).includes(person))
+    .map(([v]) => v);
 
-  // Also include tasks assigned to this vehicle or ALL
-  const myTasks = dayTasks.filter(t => t.vehicle === vehicle || t.vehicle === 'ALL');
+  // Get schedule entries for those vehicles
+  const myEntries = daySchedule.filter(e => myVehicles.includes(e.vehicle));
 
-  // Build combined list sorted by start_time
+  // Tasks assigned to any of their vehicles or ALL
+  const myTasks = dayTasks.filter(t => myVehicles.includes(t.vehicle) || t.vehicle === 'ALL');
+
   const combined = [];
-
   myEntries.forEach(e => {
     const job = dayJobs.find(j => j.id === e.job_id);
     if(job) combined.push({...e, job, isTask:false});
   });
-
   myTasks.forEach(t => combined.push({...t, isTask:true}));
+  combined.sort((a,b) => (a.start_time||'99:99').localeCompare(b.start_time||'99:99'));
 
-  combined.sort((a,b) => {
-    const ta = a.start_time||'99:99', tb = b.start_time||'99:99';
-    return ta.localeCompare(tb);
-  });
+  if(!myVehicles.length){
+    content.innerHTML = `<div class="myday-empty">
+      <div class="myday-empty-title">Not assigned to a truck today</div>
+      <p style="font-size:0.85rem;margin-top:6px;">Ask your manager to add you to a crew on the runsheet.</p>
+    </div>`;
+    return;
+  }
 
   if(!combined.length){
     content.innerHTML = `<div class="myday-empty">
-      <div class="myday-empty-title">Nothing scheduled${vehicle?' for '+vehicle:''}</div>
-      <p style="font-size:0.85rem;margin-top:6px;">Check back once the runsheet is filled in.</p>
+      <div class="myday-empty-title">Nothing scheduled yet</div>
+      <p style="font-size:0.85rem;margin-top:6px;">You're on ${myVehicles.join(' & ')} — check back once the runsheet is filled in.</p>
     </div>`;
     return;
   }
 
   const typeLabel = {install:'Install',to_load:'To Load',pickup:'Pickup'};
 
+  function fmtTime(t){
+    // Returns {time:'7:30', ampm:'am'}
+    if(!t) return {time:'—', ampm:''};
+    const[h,m]=t.split(':').map(Number);
+    const ampm=h<12?'am':'pm';
+    const h12=h%12===0?12:h%12;
+    return {time:`${h12}:${String(m).padStart(2,'0')}`, ampm};
+  }
+
   content.innerHTML = combined.map(item => {
     if(item.isTask){
-      const t = formatSlotLabel(item.start_time||'');
-      const [time, ampm] = t ? t.split(' ') : ['—',''];
+      const {time, ampm} = fmtTime(item.start_time);
       return `<div class="myday-card" style="border-left:4px solid var(--border);">
         <div class="myday-card-time">
           <div class="myday-card-time-main">${time}</div>
           <div class="myday-card-time-ampm">${ampm}</div>
         </div>
         <div class="myday-card-body">
-          <div class="myday-card-type" style="color:var(--muted);">Task</div>
+          <div class="myday-card-type" style="color:var(--muted);">Task · ${item.vehicle||'All'}</div>
           <div class="myday-card-ref">${item.title||'Untitled task'}</div>
-          ${item.notes?`<div class="myday-card-notes">${item.notes}</div>`:''}
+          ${item.notes?`<div class="myday-card-notes">📝 ${item.notes}</div>`:''}
         </div>
       </div>`;
     }
 
     const job = item.job;
     const type = item.type || 'install';
-    const tLabel = formatSlotLabel(item.start_time||'');
-    const [time, ampm] = tLabel ? tLabel.split(' ') : ['—',''];
+    const {time, ampm} = fmtTime(item.start_time);
     const ref = job.job_ref || job.job_number || '';
     const addr = job.address || '';
     const streetOnly = addr.split(',')[0];
-    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
-    const crewEntry = dayCrew[vehicle] || {};
-    const crewStr = [crewEntry.lead, ...(crewEntry.offsiders||[])].filter(Boolean).join(', ');
-
+    const crew = dayCrew[item.vehicle] || {};
+    const crewStr = [crew.lead, ...(crew.offsiders||[])].filter(Boolean).join(', ');
     const borderColor = type==='install'?'var(--green)':type==='to_load'?'var(--accent)':'#2e5a8a';
 
     return `<div class="myday-card" style="border-left:4px solid ${borderColor};">
@@ -749,13 +748,13 @@ function renderMyDay(){
         <div class="myday-card-time-ampm">${ampm}</div>
       </div>
       <div class="myday-card-body">
-        <div class="myday-card-type ${type}">${typeLabel[type]||type}</div>
+        <div class="myday-card-type ${type}">${typeLabel[type]||type} · ${item.vehicle||''}</div>
         <div class="myday-card-ref">${ref}</div>
         <div class="myday-card-addr">${streetOnly}</div>
         ${item.notes?`<div class="myday-card-notes">📝 ${item.notes}</div>`:''}
         ${crewStr?`<div class="myday-card-crew">👥 ${crewStr}</div>`:''}
         <div class="myday-card-btns">
-          <button class="myday-btn myday-btn-nav" onclick="openRunsheetNavigate('${job.id}','${(addr).replace(/'/g,"\\'")}')">📍 Navigate</button>
+          <button class="myday-btn myday-btn-nav" onclick="openRunsheetNavigate('${job.id}','${addr.replace(/'/g,"\\'")}')">📍 Navigate</button>
           ${type!=='to_load'?`<a href="/stylist/${job.id}" target="_blank" class="myday-btn myday-btn-stylist">✎ Stylist</a>`:''}
           <a href="/driver/${job.id}" target="_blank" class="myday-btn myday-btn-driver">🚛 Driver</a>
         </div>

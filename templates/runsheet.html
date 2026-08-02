@@ -783,15 +783,17 @@ function renderVehicleTimeInputs(){
   const container=document.getElementById('sched-vehicle-times');
   if(!container) return;
   if(!schedVehicleSelected.length){ container.innerHTML=''; return; }
-  container.innerHTML=`<div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px;margin-top:4px;">Time overrides (optional)</div>`
-    + schedVehicleSelected.map(v=>`
-    <div style="margin-bottom:10px;">
-      <div style="font-size:0.73rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink);margin-bottom:5px;">${v}</div>
-      <div class="sched-two-col">
-        <select id="sched-time-${v}" class="runsheet-popover-input">${timeOptions()}</select>
-        <select id="sched-dur-${v}" class="runsheet-popover-input">${durationOptions()}</select>
-      </div>
-    </div>`).join('');
+  container.innerHTML=`<div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px;margin-top:4px;">Time per vehicle</div>`
+    + schedVehicleSelected.map(v=>{
+      const t=schedVehicleTimes[v]||{};
+      return `<div style="margin-bottom:10px;">
+        <div style="font-size:0.73rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink);margin-bottom:5px;">${v}</div>
+        <div class="sched-two-col">
+          <select id="sched-time-${v}" class="runsheet-popover-input">${timeOptions()}</select>
+          <select id="sched-dur-${v}" class="runsheet-popover-input">${durationOptions()}</select>
+        </div>
+      </div>`;
+    }).join('');
   // Restore saved values
   schedVehicleSelected.forEach(v=>{
     const t=schedVehicleTimes[v]||{};
@@ -876,36 +878,61 @@ function closeRunsheetPopover(){
 async function saveRunsheetEntry(){
   const date=document.getElementById('runsheet-popover-date').value;
   const type=document.getElementById('runsheet-popover-type').value||'install';
+  const notes=document.getElementById('runsheet-popover-notes')?.value.trim()||null;
   if(!date){alert('Pick an install date first.');return;}
 
-  // Collect any time overrides per vehicle
+  // Collect per-vehicle time overrides
   const vehicleOverrides=schedVehicleSelected.map(v=>({
     vehicle:v,
     start_time:document.getElementById(`sched-time-${v}`)?.value||null,
     duration:parseInt(document.getElementById(`sched-dur-${v}`)?.value)||null,
   }));
 
-  const notes=document.getElementById('runsheet-popover-notes')?.value.trim()||null;
+  // Check if this job already has schedule entries
+  const existingRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
+  const existingEntries=await existingRes.json();
 
-  const r1=await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{method:'PATCH',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({runsheet_date:date,runsheet_type:type,vehicles:schedVehicleSelected.length?schedVehicleSelected:null})});
-  const d1=await r1.json();
-  if(!d1.success){alert('Failed to save: '+(d1.error||'unknown error'));return;}
-
-  // Apply time overrides and notes to the seeded entries
-  if(vehicleOverrides.some(o=>o.start_time||o.duration)||notes){
-    const schedRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
-    const entries=await schedRes.json();
-    await Promise.all(entries.map(async entry=>{
+  if(existingEntries.length){
+    // Job already has entries — patch them directly, no re-seeding
+    // This preserves independently set times per vehicle
+    await Promise.all(existingEntries.map(async entry=>{
       const override=vehicleOverrides.find(o=>o.vehicle===entry.vehicle);
-      const patch={};
+      const patch={type, notes:notes||entry.notes||null};
       if(override?.start_time) patch.start_time=override.start_time;
-      if(override?.duration) patch.duration=override.duration;
-      if(notes) patch.notes=notes;
-      if(Object.keys(patch).length){
-        await fetch(`/api/schedule/${entry.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
-      }
+      if(override?.duration)   patch.duration=override.duration;
+      await fetch(`/api/schedule/${entry.id}`,{
+        method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)
+      });
     }));
+    // Update the job's runsheet_date/type
+    await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({runsheet_date:date,runsheet_type:type,vehicles:schedVehicleSelected.length?schedVehicleSelected:null,_skip_seed:true})
+    });
+  } else {
+    // No existing entries — seed fresh with the selected vehicles
+    const r1=await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({runsheet_date:date,runsheet_type:type,vehicles:schedVehicleSelected.length?schedVehicleSelected:null})
+    });
+    const d1=await r1.json();
+    if(!d1.success){alert('Failed to save: '+(d1.error||'unknown error'));return;}
+
+    // Apply time overrides and notes to the freshly seeded entries
+    if(vehicleOverrides.some(o=>o.start_time||o.duration)||notes){
+      const schedRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
+      const entries=await schedRes.json();
+      await Promise.all(entries.map(async entry=>{
+        const override=vehicleOverrides.find(o=>o.vehicle===entry.vehicle);
+        const patch={};
+        if(override?.start_time) patch.start_time=override.start_time;
+        if(override?.duration)   patch.duration=override.duration;
+        if(notes) patch.notes=notes;
+        if(Object.keys(patch).length){
+          await fetch(`/api/schedule/${entry.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
+        }
+      }));
+    }
   }
 
   const job=jobsById.get(runsheetPopoverJobId);

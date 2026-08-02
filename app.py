@@ -315,7 +315,7 @@ def get_truck_eta(lat, lng, destination_address):
 RUNSHEET_VEHICLES = ['Marlin', 'Bruce', 'Nigel', 'Nemo', 'VUG']
 
 RUNSHEET_STYLISTS = ['Addy', 'Montie', 'Delphine', 'India', 'Hayley']
-RUNSHEET_DRIVERS  = ['Jo', 'Savio', 'Nick', 'Stefano', 'Yuri', 'Ayoub', 'Bruno', 'Phil']
+RUNSHEET_DRIVERS  = ['Jo', 'Savio', 'Nick', 'Ayoub', 'Bruno', 'Phil', 'Tiago']
 RUNSHEET_WORKERS  = RUNSHEET_STYLISTS + RUNSHEET_DRIVERS
 
 # Time slots: 07:30 to 15:30 in 30-minute increments — matches the

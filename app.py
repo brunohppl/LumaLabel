@@ -2381,12 +2381,13 @@ def api_catalogue_add():
     if not url or not cat_type:
         return jsonify({'success': False, 'error': 'type and photo_url required'}), 400
     result = sb_post('furniture_catalogue', {
-        'type':         cat_type,
-        'room_context': data.get('room_context') or None,
-        'description':  data.get('description') or None,
-        'photo_url':    url,
-        'item_id':      None,
-        'job_id':       None,
+        'type':               cat_type,
+        'room_context':       data.get('room_context') or None,
+        'description':        data.get('description') or None,
+        'warehouse_location': data.get('warehouse_location') or None,
+        'photo_url':          url,
+        'item_id':            None,
+        'job_id':             None,
     })
     return jsonify({'success': bool(result), 'entry': result[0] if result else None})
 
@@ -2396,10 +2397,11 @@ def api_catalogue_update(entry_id):
     """Edit a catalogue entry. Body: any of {type, room_context, description, photo_url}"""
     data    = request.get_json()
     payload = {}
-    if 'type'         in data: payload['type']         = data['type']
-    if 'room_context' in data: payload['room_context'] = data['room_context'] or None
-    if 'description'  in data: payload['description']  = data['description'] or None
-    if 'photo_url'    in data: payload['photo_url']    = data['photo_url']
+    if 'type'               in data: payload['type']               = data['type']
+    if 'room_context'       in data: payload['room_context']       = data['room_context'] or None
+    if 'description'        in data: payload['description']        = data['description'] or None
+    if 'warehouse_location' in data: payload['warehouse_location'] = data['warehouse_location'] or None
+    if 'photo_url'          in data: payload['photo_url']          = data['photo_url']
     result = sb_patch('furniture_catalogue', f'id=eq.{entry_id}', payload)
     return jsonify({'success': bool(result)})
 

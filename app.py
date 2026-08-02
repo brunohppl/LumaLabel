@@ -718,7 +718,7 @@ def parse_packing_list(pdf_bytes):
         if re.search(r'\baccessories\b', description, re.I):
             for _ in range(2):
                 items.append({'serial': f'{serial:03d}', 'room': current_room,
-                              'description': f'{description} (Box)'})
+                              'description': description})
                 serial += 1
             continue
 

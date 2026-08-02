@@ -44,8 +44,12 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 
 .jobs-grid{display:flex;flex-direction:column;gap:28px;}
 .status-section{}
-.status-section-header{font-size:0.75rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.status-section-header{font-size:0.75rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;padding:6px 0;}
+.status-section-header:hover{color:var(--ink);}
 .status-section-count{background:var(--sand);color:var(--ink);border-radius:10px;padding:1px 9px;font-size:0.7rem;font-weight:600;}
+.status-section-chevron{margin-left:auto;font-size:0.7rem;color:var(--border);transition:transform 0.2s;}
+.status-section.collapsed .status-section-chevron{transform:rotate(-90deg);}
+.status-section.collapsed .jobs-grid-inner{display:none;}
 .jobs-grid-inner{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:18px;}
 .job-card{background:white;border:1px solid var(--border);border-radius:2px;overflow:hidden;transition:border-color 0.2s,box-shadow 0.2s;}
 .job-card:hover{border-color:var(--accent);box-shadow:0 4px 24px rgba(0,0,0,0.07);}
@@ -1350,12 +1354,25 @@ function renderJobs(){
   let html='';
   for(const status of orderedStatuses){
     const label=STATUS_SECTION_LABELS[status]||status;
-    html+=`<div class="status-section">
-      <div class="status-section-header">${label} <span class="status-section-count">${groups[status].length}</span></div>
+    const count=groups[status].length;
+    const collapsed=sessionStorage.getItem(`section-collapsed-${status}`)==='1';
+    html+=`<div class="status-section${collapsed?' collapsed':''}" id="section-${status}">
+      <div class="status-section-header" onclick="toggleSection('${status}')">
+        ${label}
+        <span class="status-section-count">${count}</span>
+        <span class="status-section-chevron">▼</span>
+      </div>
       <div class="jobs-grid-inner">${groups[status].map(jobCardHTML).join('')}</div>
     </div>`;
   }
   grid.innerHTML=html;
+}
+
+function toggleSection(status){
+  const section=document.getElementById(`section-${status}`);
+  if(!section) return;
+  const collapsed=section.classList.toggle('collapsed');
+  sessionStorage.setItem(`section-collapsed-${status}`, collapsed?'1':'0');
 }
 
 function handleSearchInput(value){

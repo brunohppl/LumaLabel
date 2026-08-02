@@ -105,6 +105,13 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .sched-chip{padding:5px 11px;border:1px solid var(--border);border-radius:12px;background:white;font-family:'Jost',sans-serif;font-size:0.78rem;color:var(--muted);cursor:pointer;transition:all 0.15s;}
 .sched-chip:hover{border-color:var(--accent);}
 .sched-chip.selected{border-color:var(--accent);background:rgba(184,147,90,0.1);color:var(--accent);font-weight:600;}
+.sched-mode-btn{padding:16px 10px;border:1.5px solid var(--border);border-radius:8px;background:white;cursor:pointer;text-align:center;transition:all 0.15s;font-family:'Jost',sans-serif;}
+.sched-mode-btn:hover{border-color:var(--accent);background:rgba(184,147,90,0.06);}
+.job-search-result{padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--sand);font-size:0.85rem;}
+.job-search-result:last-child{border-bottom:none;}
+.job-search-result:hover{background:var(--sand);}
+.job-search-ref{font-weight:700;color:var(--accent);margin-right:8px;}
+.job-search-addr{color:var(--muted);font-size:0.78rem;}
 .runsheet-popover-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;}
 .btn{padding:9px 18px;border-radius:2px;font-family:'Jost',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:opacity 0.15s;}
 .btn-gold{background:var(--accent);color:white;border-color:var(--accent);}
@@ -143,6 +150,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       <select id="runsheet-popover-type" class="runsheet-popover-input">
         <option value="install">Install</option>
         <option value="pickup">Pickup</option>
+        <option value="to_load">To Load</option>
       </select>
     </div>
   </div>
@@ -152,6 +160,9 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 
   <!-- Per-vehicle time overrides — shown after vehicles are selected -->
   <div id="sched-vehicle-times" style="margin-top:12px;"></div>
+
+  <label class="runsheet-popover-label" style="margin-top:12px;">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+  <textarea id="runsheet-popover-notes" class="runsheet-popover-input" placeholder="Access info, special instructions…" style="height:56px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
 
   <div class="runsheet-popover-actions" style="margin-top:18px;">
     <button class="btn btn-outline" onclick="removeFromRunsheet()" id="runsheet-remove-btn" style="font-size:0.72rem;display:none;">Remove</button>
@@ -177,33 +188,105 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 
 <!-- Task popover -->
 <div class="runsheet-popover-overlay" id="task-popover-overlay" onclick="closeTaskPopover()"></div>
-<div class="runsheet-popover" id="task-popover" style="width:340px;">
-  <div class="runsheet-popover-title" id="task-popover-title">New Task</div>
-  <input type="hidden" id="task-popover-id"/>
-  <input type="hidden" id="task-popover-date"/>
-  <label class="runsheet-popover-label">Title</label>
-  <input type="text" id="task-popover-title-input" class="runsheet-popover-input" placeholder="e.g. Unload truck, Team briefing…"/>
-  <label class="runsheet-popover-label">Vehicle</label>
-  <select id="task-popover-vehicle" class="runsheet-popover-input"><option value="ALL">All Vehicles</option></select>
-  <div class="sched-two-col" style="margin-top:12px;">
-    <div>
-      <label class="runsheet-popover-label">Start time</label>
-      <select id="task-popover-time" class="runsheet-popover-input"><option value="">No time yet</option></select>
+<div class="runsheet-popover" id="task-popover" style="width:360px;max-height:90vh;overflow-y:auto;">
+
+  <!-- Mode selector — shown when opening a new entry from an empty cell -->
+  <div id="task-mode-select" style="display:none;">
+    <div class="runsheet-popover-title">Add to Runsheet</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;">
+      <button class="sched-mode-btn" onclick="setTaskMode('task')">
+        <div style="font-size:1.4rem;margin-bottom:6px;">📝</div>
+        <div style="font-size:0.82rem;font-weight:600;">Task</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">Briefing, delivery, etc.</div>
+      </button>
+      <button class="sched-mode-btn" onclick="setTaskMode('job')">
+        <div style="font-size:1.4rem;margin-bottom:6px;">🏠</div>
+        <div style="font-size:0.82rem;font-weight:600;">Job</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">Schedule a job</div>
+      </button>
     </div>
-    <div>
-      <label class="runsheet-popover-label">Duration</label>
-      <select id="task-popover-duration" class="runsheet-popover-input"><option value="">1 hr (default)</option></select>
+    <button class="btn btn-outline" onclick="closeTaskPopover()" style="width:100%;margin-top:14px;font-size:0.75rem;">Cancel</button>
+  </div>
+
+  <!-- Task form -->
+  <div id="task-form" style="display:none;">
+    <div class="runsheet-popover-title" id="task-popover-title">New Task</div>
+    <input type="hidden" id="task-popover-id"/>
+    <input type="hidden" id="task-popover-date"/>
+    <label class="runsheet-popover-label">Title</label>
+    <input type="text" id="task-popover-title-input" class="runsheet-popover-input" placeholder="e.g. Unload truck, Team briefing…"/>
+    <label class="runsheet-popover-label">Vehicle</label>
+    <select id="task-popover-vehicle" class="runsheet-popover-input"><option value="ALL">All Vehicles</option></select>
+    <div class="sched-two-col" style="margin-top:12px;">
+      <div>
+        <label class="runsheet-popover-label">Start time</label>
+        <select id="task-popover-time" class="runsheet-popover-input"><option value="">No time yet</option></select>
+      </div>
+      <div>
+        <label class="runsheet-popover-label">Duration</label>
+        <select id="task-popover-duration" class="runsheet-popover-input"><option value="">1 hr (default)</option></select>
+      </div>
+    </div>
+    <label class="runsheet-popover-label">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+    <textarea id="task-popover-notes" class="runsheet-popover-input" placeholder="Any extra details…" style="height:60px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
+    <div class="runsheet-popover-actions" style="margin-top:16px;">
+      <button class="btn btn-outline" onclick="deleteTask()" id="task-delete-btn" style="font-size:0.72rem;display:none;color:var(--red);border-color:var(--red);">Delete</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" onclick="closeTaskPopover()" style="font-size:0.75rem;">Cancel</button>
+        <button class="btn btn-gold" onclick="saveTask()">Save</button>
+      </div>
     </div>
   </div>
-  <label class="runsheet-popover-label">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
-  <textarea id="task-popover-notes" class="runsheet-popover-input" placeholder="Any extra details…" style="height:60px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
-  <div class="runsheet-popover-actions" style="margin-top:16px;">
-    <button class="btn btn-outline" onclick="deleteTask()" id="task-delete-btn" style="font-size:0.72rem;display:none;color:var(--red);border-color:var(--red);">Delete</button>
-    <div style="display:flex;gap:8px;">
+
+  <!-- Job scheduling form -->
+  <div id="job-sched-form" style="display:none;">
+    <div class="runsheet-popover-title">Schedule a Job</div>
+    <input type="hidden" id="job-sched-date"/>
+    <label class="runsheet-popover-label">Search job</label>
+    <input type="text" id="job-search-input" class="runsheet-popover-input" placeholder="Job number or address…"
+      oninput="searchJobsForSched(this.value)"/>
+    <div id="job-search-results" style="margin-top:6px;max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:2px;display:none;"></div>
+    <div id="job-sched-selected" style="display:none;margin-top:10px;padding:8px 10px;background:var(--sand);border-radius:3px;font-size:0.85rem;">
+      <span id="job-sched-selected-label"></span>
+      <button onclick="clearJobSchedSelection()" style="float:right;background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.8rem;">✕</button>
+    </div>
+    <div id="job-sched-details" style="display:none;">
+      <div class="sched-two-col" style="margin-top:12px;">
+        <div>
+          <label class="runsheet-popover-label">Install date</label>
+          <input type="date" id="job-sched-install-date" class="runsheet-popover-input"/>
+        </div>
+        <div>
+          <label class="runsheet-popover-label">Type</label>
+          <select id="job-sched-type" class="runsheet-popover-input">
+            <option value="install">Install</option>
+            <option value="pickup">Pickup</option>
+            <option value="to_load">To Load</option>
+          </select>
+        </div>
+      </div>
+      <label class="runsheet-popover-label" style="margin-top:12px;">Vehicle(s)</label>
+      <div class="sched-chip-row" id="job-sched-vehicle-chips"></div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;">Two tiles will be created — <strong>To Load</strong> the day before and <strong>Install/Pickup</strong> on the date above.</div>
+      <div class="sched-two-col" style="margin-top:12px;">
+        <div>
+          <label class="runsheet-popover-label">Load time</label>
+          <select id="job-sched-load-time" class="runsheet-popover-input"><option value="">Default (1:30pm)</option></select>
+        </div>
+        <div>
+          <label class="runsheet-popover-label">Install time</label>
+          <select id="job-sched-install-time" class="runsheet-popover-input"><option value="">Default (7:30am)</option></select>
+        </div>
+      </div>
+      <label class="runsheet-popover-label" style="margin-top:12px;">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+      <textarea id="job-sched-notes" class="runsheet-popover-input" placeholder="Access info, special instructions…" style="height:56px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
+    </div>
+    <div class="runsheet-popover-actions" style="margin-top:16px;">
       <button class="btn btn-outline" onclick="closeTaskPopover()" style="font-size:0.75rem;">Cancel</button>
-      <button class="btn btn-gold" onclick="saveTask()">Save</button>
+      <button class="btn btn-gold" onclick="saveJobSched()" id="job-sched-save-btn" disabled style="opacity:0.5;">Schedule</button>
     </div>
   </div>
+
 </div>
 
 <div class="main">
@@ -546,12 +629,16 @@ async function openRunsheetPopover(jobId){
     const res=await fetch(`/api/jobs/${jobId}/schedule`);
     const entries=await res.json();
     schedVehicleSelected=[...new Set(entries.map(e=>e.vehicle).filter(Boolean))];
-    // Restore per-vehicle times from existing entries
+    // Restore per-vehicle times and notes
     entries.forEach(e=>{
       if(e.vehicle&&(e.start_time||e.duration)){
         schedVehicleTimes[e.vehicle]={start_time:e.start_time||'',duration:e.duration||''};
       }
     });
+    // Pre-fill notes from first entry that has them
+    const noteEntry=entries.find(e=>e.notes);
+    const notesEl=document.getElementById('runsheet-popover-notes');
+    if(notesEl) notesEl.value=noteEntry?.notes||'';
   }catch(e){}
   document.querySelectorAll('[data-sv]').forEach(el=>{el.classList.toggle('selected',schedVehicleSelected.includes(el.dataset.sv));});
   renderVehicleTimeInputs();
@@ -575,21 +662,23 @@ async function saveRunsheetEntry(){
     duration:parseInt(document.getElementById(`sched-dur-${v}`)?.value)||null,
   }));
 
+  const notes=document.getElementById('runsheet-popover-notes')?.value.trim()||null;
+
   const r1=await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{method:'PATCH',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({runsheet_date:date,runsheet_type:type,vehicles:schedVehicleSelected.length?schedVehicleSelected:null})});
   const d1=await r1.json();
   if(!d1.success){alert('Failed to save: '+(d1.error||'unknown error'));return;}
 
-  // Apply time overrides to the seeded entries if any were set
-  if(vehicleOverrides.some(o=>o.start_time||o.duration)){
+  // Apply time overrides and notes to the seeded entries
+  if(vehicleOverrides.some(o=>o.start_time||o.duration)||notes){
     const schedRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
     const entries=await schedRes.json();
     await Promise.all(entries.map(async entry=>{
       const override=vehicleOverrides.find(o=>o.vehicle===entry.vehicle);
-      if(!override) return;
       const patch={};
-      if(override.start_time) patch.start_time=override.start_time;
-      if(override.duration) patch.duration=override.duration;
+      if(override?.start_time) patch.start_time=override.start_time;
+      if(override?.duration) patch.duration=override.duration;
+      if(notes) patch.notes=notes;
       if(Object.keys(patch).length){
         await fetch(`/api/schedule/${entry.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
       }
@@ -637,23 +726,186 @@ async function saveCrewEntry(){
 }
 
 // ── Task popover ──
-function openTaskPopover(taskId,vehicle,dateStr,prefilledTime){
+function openTaskPopover(taskId, vehicle, dateStr, prefilledTime){
   const isEdit=!!taskId;
-  document.getElementById('task-popover-title').textContent=isEdit?'Edit Task':'New Task';
-  document.getElementById('task-popover-id').value=taskId||'';
-  document.getElementById('task-popover-date').value=dateStr||'';
-  document.getElementById('task-delete-btn').style.display=isEdit?'inline-block':'none';
+
+  // Show mode selector for new entries (clicking empty cell)
+  // Show task form directly for editing existing tasks
+  document.getElementById('task-mode-select').style.display = isEdit ? 'none' : 'block';
+  document.getElementById('task-form').style.display = isEdit ? 'block' : 'none';
+  document.getElementById('job-sched-form').style.display = 'none';
+
+  // Store context for whichever mode is chosen
+  _taskContext = {taskId, vehicle, dateStr, prefilledTime};
+
+  if(isEdit){
+    populateTaskForm(taskId, vehicle, dateStr, prefilledTime);
+  }
+
+  document.getElementById('task-popover-overlay').classList.add('open');
+  document.getElementById('task-popover').classList.add('open');
+}
+
+let _taskContext = {};
+let _jobSchedSelected = null;
+let _jobSchedVehicles = [];
+
+function setTaskMode(mode){
+  document.getElementById('task-mode-select').style.display='none';
+  if(mode==='task'){
+    document.getElementById('task-form').style.display='block';
+    populateTaskForm(null, _taskContext.vehicle, _taskContext.dateStr, _taskContext.prefilledTime);
+  } else {
+    document.getElementById('job-sched-form').style.display='block';
+    populateJobSchedForm(_taskContext.dateStr);
+  }
+}
+
+function populateTaskForm(taskId, vehicle, dateStr, prefilledTime){
+  document.getElementById('task-popover-title').textContent = taskId ? 'Edit Task' : 'New Task';
+  document.getElementById('task-popover-id').value = taskId||'';
+  document.getElementById('task-popover-date').value = dateStr||'';
+  document.getElementById('task-delete-btn').style.display = taskId ? 'inline-block' : 'none';
   const vSel=document.getElementById('task-popover-vehicle');
   vSel.innerHTML='<option value="ALL">All Vehicles</option>'+(RS_CONFIG.vehicles||[]).map(v=>`<option value="${v}">${v}</option>`).join('');
   vSel.value=vehicle||'ALL';
   const tSel=document.getElementById('task-popover-time');
-  tSel.innerHTML=timeOptions();tSel.value=prefilledTime||'';
+  tSel.innerHTML=timeOptions(); tSel.value=prefilledTime||'';
   document.getElementById('task-popover-duration').innerHTML=durationOptions();
-  if(isEdit){const task=currentDayTasksById[taskId]||{};document.getElementById('task-popover-title-input').value=task.title||'';document.getElementById('task-popover-notes').value=task.notes||'';tSel.value=task.start_time||'';document.getElementById('task-popover-duration').value=task.duration||'';vSel.value=task.vehicle||'ALL';}
-  else{document.getElementById('task-popover-title-input').value='';document.getElementById('task-popover-notes').value='';document.getElementById('task-popover-duration').value='';}
-  document.getElementById('task-popover-overlay').classList.add('open');
-  document.getElementById('task-popover').classList.add('open');
+  if(taskId){
+    const task=currentDayTasksById[taskId]||{};
+    document.getElementById('task-popover-title-input').value=task.title||'';
+    document.getElementById('task-popover-notes').value=task.notes||'';
+    tSel.value=task.start_time||'';
+    document.getElementById('task-popover-duration').value=task.duration||'';
+    vSel.value=task.vehicle||'ALL';
+  } else {
+    document.getElementById('task-popover-title-input').value='';
+    document.getElementById('task-popover-notes').value='';
+    document.getElementById('task-popover-duration').value='';
+  }
   setTimeout(()=>document.getElementById('task-popover-title-input').focus(),80);
+}
+
+function populateJobSchedForm(dateStr){
+  _jobSchedSelected=null;
+  _jobSchedVehicles=[];
+  document.getElementById('job-sched-date').value=dateStr||'';
+  document.getElementById('job-sched-install-date').value=dateStr||'';
+  document.getElementById('job-search-input').value='';
+  document.getElementById('job-search-results').style.display='none';
+  document.getElementById('job-sched-selected').style.display='none';
+  document.getElementById('job-sched-details').style.display='none';
+  document.getElementById('job-sched-save-btn').disabled=true;
+  document.getElementById('job-sched-save-btn').style.opacity='0.5';
+  document.getElementById('job-sched-notes').value='';
+  const chipsDiv=document.getElementById('job-sched-vehicle-chips');
+  chipsDiv.innerHTML=(RS_CONFIG.vehicles||[]).map(v=>
+    `<button class="sched-chip" data-jsv="${v}" onclick="toggleJobSchedVehicle(this,'${v}')">${v}</button>`
+  ).join('');
+
+  // Populate time dropdowns
+  const loadTimeSel=document.getElementById('job-sched-load-time');
+  const installTimeSel=document.getElementById('job-sched-install-time');
+  loadTimeSel.innerHTML='<option value="">Default (1:30pm)</option>'+(RS_CONFIG.time_slots||[]).map(t=>`<option value="${t}">${formatSlotLabel(t)}</option>`).join('');
+  installTimeSel.innerHTML='<option value="">Default (7:30am)</option>'+(RS_CONFIG.time_slots||[]).map(t=>`<option value="${t}">${formatSlotLabel(t)}</option>`).join('');
+}
+
+let _jobSearchTimer=null;
+async function searchJobsForSched(q){
+  clearTimeout(_jobSearchTimer);
+  const results=document.getElementById('job-search-results');
+  if(!q.trim()){ results.style.display='none'; return; }
+  _jobSearchTimer=setTimeout(async()=>{
+    try{
+      const res=await fetch('/api/jobs');
+      const jobs=await res.json();
+      const ql=q.toLowerCase();
+      const matches=jobs.filter(j=>
+        (j.job_ref||'').toLowerCase().includes(ql)||
+        (j.job_number||'').toLowerCase().includes(ql)||
+        (j.address||'').toLowerCase().includes(ql)
+      ).slice(0,8);
+      if(!matches.length){ results.innerHTML='<div class="job-search-result" style="color:var(--muted);">No jobs found</div>'; results.style.display='block'; return; }
+      results.innerHTML=matches.map(j=>`
+        <div class="job-search-result" onclick="selectJobForSched('${j.id}','${(j.job_ref||j.job_number||'').replace(/'/g,"\\'")}','${(j.address||'').replace(/'/g,"\\'")}','${j.runsheet_date||''}','${j.runsheet_type||'install'}')">
+          <span class="job-search-ref">${j.job_ref||j.job_number}</span>
+          <span class="job-search-addr">${j.address||''}</span>
+        </div>`).join('');
+      results.style.display='block';
+    }catch(e){}
+  },300);
+}
+
+function selectJobForSched(jobId, ref, addr, existingDate, existingType){
+  _jobSchedSelected=jobId;
+  document.getElementById('job-search-results').style.display='none';
+  document.getElementById('job-search-input').value='';
+  document.getElementById('job-sched-selected-label').textContent=`${ref} — ${addr}`;
+  document.getElementById('job-sched-selected').style.display='block';
+  document.getElementById('job-sched-details').style.display='block';
+  document.getElementById('job-sched-save-btn').disabled=false;
+  document.getElementById('job-sched-save-btn').style.opacity='1';
+  if(existingDate) document.getElementById('job-sched-install-date').value=existingDate;
+  document.getElementById('job-sched-type').value=existingType||'install';
+}
+
+function clearJobSchedSelection(){
+  _jobSchedSelected=null;
+  document.getElementById('job-sched-selected').style.display='none';
+  document.getElementById('job-sched-details').style.display='none';
+  document.getElementById('job-sched-save-btn').disabled=true;
+  document.getElementById('job-sched-save-btn').style.opacity='0.5';
+}
+
+function toggleJobSchedVehicle(btn,v){
+  btn.classList.toggle('selected');
+  if(btn.classList.contains('selected')) _jobSchedVehicles.push(v);
+  else _jobSchedVehicles=_jobSchedVehicles.filter(x=>x!==v);
+}
+
+async function saveJobSched(){
+  if(!_jobSchedSelected) return;
+  const date=document.getElementById('job-sched-install-date').value;
+  const type=document.getElementById('job-sched-type').value||'install';
+  if(!date){ alert('Please pick an install date.'); return; }
+
+  const btn=document.getElementById('job-sched-save-btn');
+  btn.textContent='Saving…'; btn.disabled=true;
+
+  try{
+    const r=await fetch(`/api/jobs/${_jobSchedSelected}/runsheet`,{
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({runsheet_date:date, runsheet_type:type,
+        vehicles:_jobSchedVehicles.length?_jobSchedVehicles:null})
+    });
+    const d=await r.json();
+    if(!d.success){ alert('Failed to schedule job.'); return; }
+
+    // Apply time overrides and notes if set
+    const loadTime=document.getElementById('job-sched-load-time').value;
+    const installTime=document.getElementById('job-sched-install-time').value;
+    const notes=document.getElementById('job-sched-notes').value.trim()||null;
+    if(loadTime||installTime||notes){
+      const schedRes=await fetch(`/api/jobs/${_jobSchedSelected}/schedule`);
+      const entries=await schedRes.json();
+      await Promise.all(entries.map(async e=>{
+        const patch={};
+        if(e.type==='to_load' && loadTime) patch.start_time=loadTime;
+        if(e.type!=='to_load' && installTime) patch.start_time=installTime;
+        if(notes) patch.notes=notes;
+        if(Object.keys(patch).length)
+          await fetch(`/api/schedule/${e.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
+      }));
+    }
+
+    closeTaskPopover();
+    renderRunsheet();
+  } catch(e){
+    alert('Error saving schedule.');
+  } finally{
+    btn.textContent='Schedule'; btn.disabled=false;
+  }
 }
 function closeTaskPopover(){document.getElementById('task-popover-overlay').classList.remove('open');document.getElementById('task-popover').classList.remove('open');}
 async function saveTask(){

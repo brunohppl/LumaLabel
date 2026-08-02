@@ -67,6 +67,8 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .job-action-driver:hover{background:rgba(74,126,184,0.08);}
 .job-action-delete{flex:0 0 48px;color:var(--red);}
 .job-action-delete:hover{background:rgba(232,92,71,0.08);}
+.job-action-labels{flex:0 0 48px;color:var(--muted);}
+.job-action-labels:hover{background:rgba(74,124,89,0.08);color:var(--green);}
 .colour-swatch{width:10px;align-self:stretch;border-radius:1px;min-height:70px;flex-shrink:0;}
 .job-info{flex:1;min-width:0;}
 .job-ref-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
@@ -548,11 +550,24 @@ function jobCardHTML(job){
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>
         Driver
       </button>
+      <button class="job-action-btn job-action-labels" onclick="downloadLabels('${job.id}','${(job.job_ref||job.job_number||'').replace(/'/g,'')}')" title="Download labels PDF">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
       <button class="job-action-btn job-action-delete" onclick="deleteJob('${job.id}','${(job.job_ref||job.job_number||'').replace(/'/g,'')}','${(job.address||'').replace(/'/g,'')}')" title="Delete job">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
       </button>
     </div>
   </div>`;
+}
+
+async function downloadLabels(jobId, jobRef){
+  if(!confirm(`Download labels PDF for job ${jobRef}?`)) return;
+  const a=document.createElement('a');
+  a.href=`/api/jobs/${jobId}/labels-pdf`;
+  a.download='';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 function openAsStylist(jobId){

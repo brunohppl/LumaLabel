@@ -1966,25 +1966,24 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_v
 
 @app.route('/api/jobs/<job_id>/runsheet', methods=['PATCH'])
 def api_job_runsheet(job_id):
-    """Set or clear the job two-day runsheet schedule.
-
-    Always seeds both tiles:
-    - To Load: day before the date, 13:30-15:30
-    - Install/Pickup: on the date, 07:30-10:00
-
-    Optional 'vehicles' from the popover overrides bedroom-count auto-assignment.
-    Clearing (runsheet_date: null) removes all schedule entries."""
     data          = request.get_json()
     runsheet_date = data.get('runsheet_date')
     runsheet_type = data.get('runsheet_type')
     vehicles      = data.get('vehicles')
+    skip_seed     = data.get('_skip_seed', False)
 
     if runsheet_date is not None and runsheet_type not in ('install', 'pickup', 'to_load'):
         return jsonify({'success': False,
                         'error': 'runsheet_type must be install, pickup, or to_load'}), 400
 
     if runsheet_date:
-        if vehicles:
+        if skip_seed:
+            # Just update the job metadata — don't touch existing schedule entries
+            sb_patch('jobs', f'id=eq.{job_id}', {
+                'runsheet_date': runsheet_date,
+                'runsheet_type': runsheet_type,
+            })
+        elif vehicles:
             bad = [v for v in vehicles if v not in RUNSHEET_VEHICLES]
             if bad:
                 return jsonify({'success': False, 'error': f'Unknown vehicles: {bad}'}), 400

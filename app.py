@@ -1629,6 +1629,11 @@ def damages_page():
     with open('templates/damages.html', 'r') as f:
         return f.read()
 
+@app.route('/damages/guide', methods=['GET'])
+def damages_guide():
+    with open('templates/damages_guide.html', 'r') as f:
+        return f.read()
+
 @app.route('/api/damages', methods=['GET'])
 def api_damages_list():
     rows = sb_get('damage_reports', 'order=created_at.desc')
@@ -1689,6 +1694,36 @@ def api_job_room_notes(job_id):
     for n in notes:
         by_room.setdefault(n['room'], []).append(n['note'])
     return jsonify(by_room)
+
+@app.route('/api/jobs/<job_id>/labels-pdf', methods=['GET'])
+def api_job_labels_pdf(job_id):
+    """Re-generate the Avery labels PDF from stored job data.
+    Uses the job's current colour, stage_date, and items from the database."""
+    job_rows = sb_get('jobs', f'id=eq.{job_id}')
+    if not job_rows:
+        return jsonify({'error': 'Job not found'}), 404
+    job   = job_rows[0]
+    items = sb_get('items', f'job_id=eq.{job_id}&order=serial.asc') or []
+
+    meta = {
+        'job_number':  job.get('job_number', ''),
+        'job_ref':     job.get('job_ref', ''),
+        'address':     job.get('address', ''),
+        'stage_date':  job.get('stage_date', ''),
+        'job_owner':   job.get('job_owner', ''),
+    }
+
+    colour_name = job.get('colour', 'Teal')
+    colour      = next((c for c in COLOURS if c['name']==colour_name), COLOURS[0])
+
+    pdf_bytes = generate_labels(meta, items, colour)
+    filename  = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
+    return Response(
+        pdf_bytes,
+        mimetype='application/pdf',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
+
 
 @app.route('/api/jobs/<job_id>/summary-pdf', methods=['GET'])
 def api_job_summary_pdf(job_id):

@@ -27,7 +27,27 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .btn-add{width:44px;height:44px;border-radius:50%;background:var(--accent);color:white;border:none;font-size:1.5rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(184,147,90,0.4);transition:opacity 0.15s;flex-shrink:0;}
 .btn-add:hover{opacity:0.88;}
 
-/* TABLE */
+/* GUIDE */
+.guide-card{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:24px;}
+.guide-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;user-select:none;}
+.guide-hdr:hover{background:var(--sand);}
+.guide-hdr-left{display:flex;align-items:center;gap:10px;}
+.guide-hdr-icon{font-size:1.1rem;}
+.guide-hdr-title{font-size:0.78rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink);}
+.guide-chevron{font-size:0.75rem;color:var(--muted);transition:transform 0.2s;}
+.guide-chevron.open{transform:rotate(180deg);}
+.guide-body{display:none;padding:18px;border-top:1px solid var(--sand);}
+.guide-body.open{display:block;}
+.guide-steps{display:flex;flex-direction:column;gap:14px;}
+.guide-step{display:flex;gap:14px;align-items:flex-start;}
+.guide-step-num{width:28px;height:28px;border-radius:50%;background:var(--accent);color:white;font-size:0.78rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.guide-step-content{}
+.guide-step-title{font-size:0.88rem;font-weight:600;color:var(--ink);margin-bottom:3px;}
+.guide-step-desc{font-size:0.82rem;color:var(--muted);line-height:1.5;}
+.guide-options{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.guide-opt{font-size:0.72rem;padding:3px 9px;border-radius:10px;background:var(--sand);color:var(--muted);font-weight:500;}
+.guide-note{margin-top:16px;padding:12px 14px;background:rgba(184,147,90,0.07);border-radius:6px;font-size:0.82rem;color:var(--muted);line-height:1.5;border-left:3px solid var(--accent);}
+
 .damage-table{width:100%;border-collapse:collapse;background:white;border:1px solid var(--border);border-radius:3px;overflow:hidden;}
 .damage-table th{background:var(--ink);color:rgba(250,248,244,0.8);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:600;padding:10px 14px;text-align:left;}
 .damage-table td{padding:12px 14px;border-bottom:1px solid var(--sand);font-size:0.88rem;vertical-align:middle;}
@@ -67,14 +87,14 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .wizard-back{background:none;border:none;color:var(--muted);font-family:'Jost',sans-serif;font-size:0.82rem;cursor:pointer;padding:0;margin-top:18px;text-decoration:underline;}
 
 /* PHOTO STEP */
-.photo-preview-wrap{width:100%;aspect-ratio:4/3;background:var(--sand);border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden;margin-bottom:14px;}
-.photo-preview-wrap img{width:100%;height:100%;object-fit:cover;border-radius:8px;}
-.photo-preview-placeholder{text-align:center;color:var(--muted);}
-.photo-preview-placeholder .cam-icon{font-size:2.5rem;display:block;margin-bottom:8px;}
-.photo-preview-placeholder p{font-size:0.85rem;}
 .photo-actions{display:flex;gap:10px;margin-bottom:16px;}
 .btn-photo{flex:1;padding:11px;border:1px solid var(--border);border-radius:6px;background:white;font-family:'Jost',sans-serif;font-size:0.85rem;cursor:pointer;color:var(--ink);transition:border-color 0.15s;}
 .btn-photo:hover{border-color:var(--accent);}
+.dmg-thumb-wrap{position:relative;width:72px;height:72px;flex-shrink:0;}
+.dmg-thumb-wrap img{width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--border);}
+.dmg-thumb-del{position:absolute;top:-5px;right:-5px;background:var(--red);color:white;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700;}
+.dmg-thumb-add{width:72px;height:72px;border:2px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--border);cursor:pointer;transition:border-color 0.15s;}
+.dmg-thumb-add:hover{border-color:var(--accent);color:var(--accent);}
 .btn-submit{width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:8px;font-family:'Jost',sans-serif;font-size:0.95rem;font-weight:600;cursor:pointer;transition:opacity 0.15s;}
 .btn-submit:hover{opacity:0.88;}
 .btn-skip{width:100%;padding:10px;background:none;border:none;color:var(--muted);font-family:'Jost',sans-serif;font-size:0.85rem;cursor:pointer;margin-top:8px;text-decoration:underline;}
@@ -154,24 +174,21 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       <button class="wizard-back" onclick="goBack(2)">← Back</button>
     </div>
 
-    <!-- Step 4: Photo -->
+    <!-- Step 4: Photos -->
     <div class="wizard-step" id="step-3">
-      <div class="wizard-q">Take a photo</div>
+      <div class="wizard-q">Add photos</div>
       <input type="file" accept="image/*" capture="environment" id="photo-cam" style="display:none;" onchange="handlePhoto(this)"/>
       <input type="file" accept="image/*" id="photo-lib" style="display:none;" onchange="handlePhoto(this)"/>
-      <div class="photo-preview-wrap" id="photo-preview-wrap" onclick="document.getElementById('photo-cam').click()">
-        <img id="photo-preview-img" src="" alt="" style="display:none;"/>
-        <div class="photo-preview-placeholder" id="photo-placeholder">
-          <span class="cam-icon">📷</span>
-          <p>Tap to take a photo</p>
-        </div>
-      </div>
+
+      <!-- Photo thumbnail strip -->
+      <div id="photo-strip" style="display:flex;flex-wrap:wrap;gap:8px;min-height:72px;margin-bottom:14px;"></div>
+
       <div class="photo-actions">
         <button class="btn-photo" onclick="document.getElementById('photo-cam').click()">📷 Camera</button>
         <button class="btn-photo" onclick="document.getElementById('photo-lib').click()">🖼️ Library</button>
       </div>
       <button class="btn-submit" onclick="submitReport()">Submit Report</button>
-      <button class="btn-skip" onclick="submitReport(true)">Skip photo & submit</button>
+      <button class="btn-skip" onclick="submitReport(true)">Skip photos & submit</button>
       <button class="wizard-back" onclick="goBack(3)">← Back</button>
     </div>
   </div>
@@ -199,8 +216,7 @@ const LABELS = {
 
 let reports = [];
 let _wizardData = {};
-let _photoFile = null;
-let _photoDataUrl = null;
+let _photos = []; // array of {dataUrl, file} objects
 
 // ── Table ──
 async function loadReports(){
@@ -237,9 +253,13 @@ function renderTable(){
         <td><span class="tag tag-location">${LABELS.location[r.location]||r.location}</span></td>
         <td><span class="tag tag-damage">${LABELS.damage_type[r.damage_type]||r.damage_type}</span></td>
         <td><span class="tag tag-furniture">${LABELS.furniture[r.furniture]||r.furniture}</span></td>
-        <td>${r.photo_url
-          ?`<img class="damage-thumb" src="${r.photo_url}" onclick="openLightbox('${r.photo_url}')" alt="damage photo"/>`
-          :`<span style="color:var(--border);font-size:0.8rem;">—</span>`}</td>
+        <td>${(() => {
+          if(!r.photo_url) return '<span style="color:var(--border);font-size:0.8rem;">—</span>';
+          let urls;
+          try{ urls=JSON.parse(r.photo_url); if(!Array.isArray(urls)) urls=[r.photo_url]; }
+          catch(e){ urls=[r.photo_url]; }
+          return urls.map(u=>`<img class="damage-thumb" src="${u}" onclick="openLightbox('${u}')" alt="damage photo" style="margin-right:4px;"/>`).join('');
+        })()}</td>
         <td><button class="del-btn" onclick="deleteReport('${r.id}')" title="Delete">✕</button></td>
       </tr>`).join('')}
     </tbody>
@@ -267,11 +287,9 @@ function openLightbox(url){
 
 // ── Wizard ──
 function openWizard(){
-  _wizardData={};_photoFile=null;_photoDataUrl=null;
+  _wizardData={};_photos=[];
+  renderPhotoStrip();
   showStep(0);
-  // Reset photo preview
-  document.getElementById('photo-preview-img').style.display='none';
-  document.getElementById('photo-placeholder').style.display='block';
   document.getElementById('wizard-overlay').classList.add('open');
 }
 
@@ -295,18 +313,30 @@ function goBack(step){
   showStep(step-1);
 }
 
-// ── Photo ──
+// ── Photo handling ──
+function renderPhotoStrip(){
+  const strip=document.getElementById('photo-strip');
+  if(!strip) return;
+  strip.innerHTML=_photos.map((p,i)=>`
+    <div class="dmg-thumb-wrap">
+      <img src="${p.dataUrl}" alt="photo ${i+1}"/>
+      <button class="dmg-thumb-del" onclick="removePhoto(${i})">✕</button>
+    </div>`).join('')
+    +`<div class="dmg-thumb-add" onclick="document.getElementById('photo-cam').click()">+</div>`;
+}
+
+function removePhoto(i){
+  _photos.splice(i,1);
+  renderPhotoStrip();
+}
+
 function handlePhoto(input){
   const file=input.files[0];
   if(!file) return;
-  _photoFile=file;
   const reader=new FileReader();
   reader.onload=e=>{
-    _photoDataUrl=e.target.result;
-    const img=document.getElementById('photo-preview-img');
-    img.src=_photoDataUrl;
-    img.style.display='block';
-    document.getElementById('photo-placeholder').style.display='none';
+    _photos.push({dataUrl:e.target.result, file});
+    renderPhotoStrip();
   };
   reader.readAsDataURL(file);
   input.value='';
@@ -314,7 +344,7 @@ function handlePhoto(input){
 
 async function uploadPhoto(file){
   const compressed=await compressImage(file,1200,0.75);
-  const path=`damage_${Date.now()}.jpg`;
+  const path=`damage_${Date.now()}_${Math.random().toString(36).slice(2,6)}.jpg`;
   const res=await fetch(`${SB_URL}/storage/v1/object/item-photos/${path}`,{
     method:'POST',
     headers:{'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'image/jpeg','cache-control':'3600'},
@@ -339,13 +369,15 @@ function compressImage(file,maxWidth,quality){
   });
 }
 
-async function submitReport(skipPhoto=false){
+async function submitReport(skipPhotos=false){
   const btn=document.querySelector('.btn-submit');
   btn.textContent='Saving…';btn.disabled=true;
   try{
     let photoUrl=null;
-    if(!skipPhoto && _photoFile){
-      photoUrl=await uploadPhoto(_photoFile);
+    if(!skipPhotos && _photos.length){
+      // Upload all photos and store URLs as JSON array
+      const urls=await Promise.all(_photos.map(p=>uploadPhoto(p.file)));
+      photoUrl=urls.length===1?urls[0]:JSON.stringify(urls);
     }
     const res=await fetch('/api/damages',{
       method:'POST',headers:{'Content-Type':'application/json'},

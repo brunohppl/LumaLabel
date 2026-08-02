@@ -87,6 +87,9 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .room-card-sub{font-size:0.72rem;color:var(--muted);margin-top:2px;}
 .room-delete-btn{background:none;border:none;cursor:pointer;padding:6px;color:var(--muted);border-radius:2px;transition:color 0.15s,background 0.15s;flex-shrink:0;display:flex;align-items:center;margin-left:auto;}
 .room-delete-btn:hover{color:var(--red);background:rgba(232,92,71,0.08);}
+.room-edit-btn{background:none;border:none;cursor:pointer;padding:6px;color:var(--muted);border-radius:2px;transition:color 0.15s,background 0.15s;flex-shrink:0;display:flex;align-items:center;}
+.room-edit-btn:hover{color:var(--accent);background:rgba(184,147,90,0.08);}
+.room-name-input{font-size:1rem;font-weight:600;color:var(--ink);border:none;border-bottom:2px solid var(--accent);background:none;outline:none;width:100%;font-family:'Jost',sans-serif;padding:0;}
 .add-room-row{margin-bottom:14px;}
 .add-room-form{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;}
 .add-room-btn{font-size:0.75rem;padding:6px 12px;}
@@ -556,9 +559,16 @@ function roomCardHTML(room, roomItemList, isExtra=false){
         <div class="ring-txt">${done?'<span class="ring-done-icon">✓</span>':`${picked}/${total}`}</div>
       </div>
       <div class="room-card-info">
-        <div class="room-card-name">${roomName}${roomNoteHtml}</div>
+        <div class="room-card-name" id="room-name-${key}">${roomName}${roomNoteHtml}</div>
         <div class="room-card-sub">${groups.length} line${groups.length!==1?'s':''} · ${total} item${total!==1?'s':''}</div>
       </div>
+      <button class="room-edit-btn" title="Rename room"
+        onclick="event.stopPropagation();startRenameRoom('${roomName}','${key}',[${itemIds}])">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
       <button class="room-delete-btn" title="Remove entire room"
         onclick="event.stopPropagation();deleteRoom('${roomName}',[${itemIds}])">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -983,6 +993,45 @@ function addRoom(){
     if(sel) sel.value=name;
     document.getElementById('new-desc')?.focus();
   },50);
+}
+
+function startRenameRoom(roomName, key, itemIds){
+  const nameDiv = document.getElementById(`room-name-${key}`);
+  if(!nameDiv) return;
+  const input = document.createElement('input');
+  input.className = 'room-name-input';
+  input.value = roomName;
+  input.onclick = e => e.stopPropagation();
+  input.onkeydown = e => {
+    if(e.key==='Enter'){ e.preventDefault(); saveRenameRoom(roomName, input.value.trim(), itemIds, key, nameDiv, input); }
+    if(e.key==='Escape'){ nameDiv.innerHTML = roomName; }
+  };
+  input.onblur = () => saveRenameRoom(roomName, input.value.trim(), itemIds, key, nameDiv, input);
+  nameDiv.innerHTML = '';
+  nameDiv.appendChild(input);
+  input.focus();
+  input.select();
+}
+
+async function saveRenameRoom(oldName, newName, itemIds, key, nameDiv, input){
+  // Prevent double-save when both blur and Enter fire
+  if(input._saving) return;
+  input._saving = true;
+  if(!newName || newName === oldName){
+    nameDiv.innerHTML = oldName;
+    return;
+  }
+  nameDiv.innerHTML = '<span style="color:var(--muted)">Saving…</span>';
+  // Update all items in the room to the new room name
+  await Promise.all(itemIds.map(id =>
+    fetch(`/api/items/${id}/check`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({room:newName})})
+  ));
+  // Update local cache
+  allItems.forEach(item => {
+    if(item.room === oldName) item.room = newName;
+  });
+  renderItems();
 }
 
 async function deleteRoom(roomName, itemIds){

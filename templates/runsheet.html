@@ -574,10 +574,10 @@ async function renderRunsheet(){
   const content=document.getElementById('runsheet-content');
   content.innerHTML='<div class="loading">Loading…</div>';
 
-  let dayJobs=[],daySchedule=[],dayCrew=[],dayTasks=[];
+  let dayJobs=[],daySchedule=[],dayCrew=[],dayTasks=[],data={};
   try{
     const res=await fetch(`/api/runsheet/${todayStr}`);
-    const data=await res.json();
+    data=await res.json();
     dayJobs=data.jobs||[];daySchedule=data.schedule||[];
     dayCrew=data.crew||[];dayTasks=data.tasks||[];
   }catch(e){content.innerHTML='<div class="runsheet-empty">Failed to load runsheet.</div>';return;}

@@ -304,6 +304,7 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
       <select id="runsheet-popover-type" class="runsheet-popover-input">
         <option value="install">Install</option>
         <option value="pickup">Pickup</option>
+        <option value="to_load">To Load</option>
       </select>
     </div>
   </div>
@@ -313,6 +314,9 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
   <div style="font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;">
     Two tiles will be created automatically — <strong>To Load</strong> on the day before and <strong>${'Install/Pickup'}</strong> on the date above. Times can be adjusted by tapping the tiles on the grid.
   </div>
+
+  <label class="runsheet-popover-label" style="margin-top:12px;">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+  <textarea id="runsheet-popover-notes" class="runsheet-popover-input" placeholder="Access info, special instructions…" style="height:56px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
 
   <div class="runsheet-popover-actions" style="margin-top:18px;">
     <button class="btn btn-outline" onclick="removeFromRunsheet()" id="runsheet-remove-btn" style="font-size:0.72rem;display:none;">Remove</button>
@@ -919,11 +923,14 @@ async function openRunsheetPopover(jobId){
   document.getElementById('runsheet-remove-btn').style.display=
     job?.runsheet_date?'inline-block':'none';
 
-  // Pre-fill vehicle chips from existing schedule entries
+  // Pre-fill vehicle chips and notes from existing schedule entries
   try{
     const res=await fetch(`/api/jobs/${jobId}/schedule`);
     const entries=await res.json();
     schedVehicleSelected=[...new Set(entries.map(e=>e.vehicle).filter(Boolean))];
+    const noteEntry=entries.find(e=>e.notes);
+    const notesEl=document.getElementById('runsheet-popover-notes');
+    if(notesEl) notesEl.value=noteEntry?.notes||'';
   }catch(e){}
 
   document.querySelectorAll('[data-sv]').forEach(el=>{
@@ -942,11 +949,9 @@ function closeRunsheetPopover(){
 async function saveRunsheetEntry(){
   const date=document.getElementById('runsheet-popover-date').value;
   const type=document.getElementById('runsheet-popover-type').value||'install';
+  const notes=document.getElementById('runsheet-popover-notes')?.value.trim()||null;
   if(!date){ alert('Pick an install date first.'); return; }
 
-  // The backend PATCH route calls seed_two_day_schedule which creates
-  // both the To Load tile (day before) and the Install/Pickup tile (date).
-  // We pass the selected vehicles so smart assignment is applied.
   const r1=await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
     method:'PATCH', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
@@ -957,6 +962,15 @@ async function saveRunsheetEntry(){
   });
   const d1=await r1.json();
   if(!d1.success){ alert('Failed to save: '+(d1.error||'unknown error')); return; }
+
+  // Apply notes to all seeded schedule entries if provided
+  if(notes){
+    const schedRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
+    const entries=await schedRes.json();
+    await Promise.all(entries.map(e=>
+      fetch(`/api/schedule/${e.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes})})
+    ));
+  }
 
   const job=jobsById.get(runsheetPopoverJobId);
   if(job){ job.runsheet_date=date; job.runsheet_type=type; }

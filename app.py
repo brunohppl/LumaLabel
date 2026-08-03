@@ -312,7 +312,9 @@ def get_truck_eta(lat, lng, destination_address):
 # Vehicles: van (Marlin, used by stylists) + three trucks.
 # Workers split by role — both lists are combined for the full
 # worker dropdown; keeping them separate lets the UI group them.
-RUNSHEET_VEHICLES = ['Marlin', 'Bruce', 'Nigel', 'Nemo', 'VUG']
+TRANSPORT_VEHICLES = ['Bruce', 'Nigel', 'Nemo']
+STYLING_VEHICLES   = ['Marlin', 'VUG']
+RUNSHEET_VEHICLES  = TRANSPORT_VEHICLES + STYLING_VEHICLES
 
 RUNSHEET_STYLISTS = ['Addy', 'Montie', 'Delphine', 'India', 'Hayley']
 RUNSHEET_DRIVERS  = ['Jo', 'Savio', 'Nick', 'Ayoub', 'Bruno', 'Phil', 'Tiago']
@@ -1650,6 +1652,18 @@ def api_damages_create():
         'notes':       data.get('notes') or None,
     })
     return jsonify({'success': bool(result), 'report': result[0] if result else None})
+
+@app.route('/api/damages/<report_id>', methods=['PATCH'])
+def api_damages_update(report_id):
+    data = request.get_json()
+    payload = {}
+    if 'location'    in data: payload['location']    = data['location']
+    if 'damage_type' in data: payload['damage_type'] = data['damage_type']
+    if 'furniture'   in data: payload['furniture']   = data['furniture']
+    if 'photo_url'   in data: payload['photo_url']   = data['photo_url'] or None
+    if 'notes'       in data: payload['notes']       = data['notes'] or None
+    result = sb_patch('damage_reports', f'id=eq.{report_id}', payload)
+    return jsonify({'success': bool(result)})
 
 @app.route('/api/damages/<report_id>', methods=['DELETE'])
 def api_damages_delete(report_id):

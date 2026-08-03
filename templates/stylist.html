@@ -657,8 +657,11 @@ function renderItems(){
     html+=roomCardHTML(room, roomItemList);
   }
 
-  // Build room list including any pending new rooms that have no items yet
-  const rooms_list=[...new Set([...allItems.map(i=>i.room).filter(r=>r), ...pendingRooms])];
+  // Render pending rooms (added via Add Room but no items yet)
+  for(const room of pendingRooms){
+    if(!rooms[room]) html+=roomCardHTML(room, []);
+  }
+
   body.innerHTML=html;
   // Restore add-room form state across re-renders
   if(addRoomFormOpen){

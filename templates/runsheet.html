@@ -560,6 +560,8 @@ async function loadRunsheetConfig(){
 
 const SLOT_H=46;
 const TOTAL_SLOTS=17;
+const TRANSPORT_VEHICLES=['Bruce','Nigel','Nemo'];
+const STYLING_VEHICLES=['Marlin','VUG','Own Vehicle'];
 function slotIndex(t){const[h,m]=t.split(':').map(Number);return(h-7)*2+(m===30?1:0)-1;}
 function formatSlotLabel(t){const[h,m]=t.split(':').map(Number);const p=h<12?'am':'pm',h12=h%12===0?12:h%12;return`${h12}:${String(m).padStart(2,'0')}${p}`;}
 function street_only_js(addr){if(!addr)return addr;return addr.split(',')[0].trim();}
@@ -619,7 +621,7 @@ async function renderRunsheet(){
     return;
   }
 
-  const vehicles=RS_CONFIG.vehicles;
+  const vehicles=TRANSPORT_VEHICLES;
   const slots=RS_CONFIG.time_slots;
   const nCols=vehicles.length;
 
@@ -813,41 +815,65 @@ function renderStyling(){
   const content=document.getElementById('styling-content');
   const styling=lastFetchedData?.styling||[];
   const jobs=lastFetchedData?.jobs||[];
-  if(!styling.length){
-    content.innerHTML='<div class="rs-list-empty">No styling entries for this day.<br>Tap + to add one.</div>';
-    return;
-  }
-  // Group by job
-  const byJob={};
+  const slots=RS_CONFIG.time_slots||[];
+  const vehicles=STYLING_VEHICLES;
+  const nCols=vehicles.length;
+  const HEADER_ROWS=2;
+
+  const schedByVehicle={};
+  vehicles.forEach(v=>{schedByVehicle[v]=[];});
   styling.forEach(e=>{
-    const job=jobs.find(j=>j.id===e.job_id)||{};
-    const key=e.job_id||'unlinked';
-    if(!byJob[key]) byJob[key]={job, entries:[]};
-    byJob[key].entries.push(e);
+    const job=jobs.find(j=>j.id===e.job_id);
+    if(!job) return;
+    // Map 'own vehicle' or null to 'Own Vehicle'
+    const v=vehicles.includes(e.vehicle)?e.vehicle:'Own Vehicle';
+    if(schedByVehicle[v]) schedByVehicle[v].push({...e,_job:job});
   });
-  content.innerHTML=Object.values(byJob).map(({job,entries})=>{
-    const ref=job.job_ref||job.job_number||'Unknown Job';
-    const addr=job.address?job.address.split(',')[0]:'';
-    return `<div class="rs-list-section">
-      <div class="rs-list-section-title">${ref}${addr?' · '+addr:''}</div>
-      ${entries.map(e=>{
-        const {time,ampm}=fmtTimeParts(e.start_time);
-        const dur=e.duration?` · ${e.duration} min`:'';
-        return `<div class="rs-list-card" style="border-left:4px solid #8a4fbf;">
-          <div class="rs-list-card-time">
-            <div class="rs-list-card-time-main">${time}</div>
-            <div class="rs-list-card-time-ampm">${ampm}</div>
-          </div>
-          <div class="rs-list-card-body">
-            <div class="rs-list-card-label" style="color:#8a4fbf;">Styling${dur}</div>
-            <div class="rs-list-card-ref">${e.person||'Unassigned'}</div>
-            ${e.notes?`<div class="rs-list-card-note">📝 ${e.notes}</div>`:''}
-          </div>
-          <button class="rs-list-card-edit" onclick="openStylingPopover('${e.id}')">⚙</button>
-        </div>`;
-      }).join('')}
-    </div>`;
-  }).join('');
+
+  let cells=[];
+  // Header row 1 — vehicle names
+  cells.push(`<div class="rs-header-cell" style="grid-column:1;grid-row:1;">Time</div>`);
+  vehicles.forEach((v,i)=>cells.push(`<div class="rs-header-cell" style="grid-column:${i+2};grid-row:1;">${v}</div>`));
+  // Header row 2 — crew (stylists)
+  cells.push(`<div class="rs-team-cell" style="grid-column:1;grid-row:2;"></div>`);
+  vehicles.forEach((v,i)=>cells.push(`<div class="rs-team-cell" style="grid-column:${i+2};grid-row:2;color:var(--muted);font-size:0.72rem;padding:6px 8px;">${v==='Own Vehicle'?'Personal cars':''}</div>`));
+  // Time slots
+  slots.forEach((slot,si)=>{
+    const gridRow=HEADER_ROWS+si+1;
+    cells.push(`<div class="rs-time" style="grid-column:1;grid-row:${gridRow};">${formatSlotLabel(slot)}</div>`);
+    vehicles.forEach((v,vi)=>{
+      cells.push(`<div class="rs-cell rs-cell-clickable" style="grid-column:${vi+2};grid-row:${gridRow};" onclick="openStylingPopover(null)"></div>`);
+    });
+  });
+  // Styling tiles
+  vehicles.forEach((v,vi)=>{
+    (schedByVehicle[v]||[]).forEach(entry=>{
+      const job=entry._job;
+      if(!entry.start_time) return;
+      const si=slotIndex(entry.start_time);
+      const dur=entry.duration||90;
+      const spanSlots=Math.max(1,Math.round(dur/30));
+      const rowStart=HEADER_ROWS+si+1;
+      const rowEnd=rowStart+spanSlots;
+      const ref=job.job_ref||job.job_number||'';
+      const addr=street_only_js(job.address||'');
+      const colour=COLOUR_MAP[job.colour]||'#8a4fbf';
+      cells.push(`<div class="rs-job rs-job-styling" style="grid-column:${vi+2};grid-row:${rowStart}/${rowEnd};border-left-color:#8a4fbf;z-index:2;">
+        <div class="rs-job-content">
+          <div class="rs-job-ref">${ref}</div>
+          <div class="rs-job-addr">${addr}</div>
+          <div style="font-size:0.68rem;color:#8a4fbf;margin-top:2px;">${entry.person||''}</div>
+          ${entry.notes?`<div class="rs-job-notes" onclick="event.stopPropagation();this.classList.toggle('expanded')" title="${entry.notes}">📝 ${entry.notes}</div>`:''}
+        </div>
+        <div class="rs-job-actions">
+          <button class="rs-job-btn-gear" onclick="openStylingPopover('${entry.id}')" title="Edit">${`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`}</button>
+        </div>
+      </div>`);
+    });
+  });
+
+  const html=`<div class="rs-scroll"><div class="rs-grid" style="grid-template-columns:60px repeat(${nCols},1fr);grid-template-rows:auto auto repeat(${TOTAL_SLOTS},${SLOT_H}px);">${cells.join('')}</div></div>`;
+  content.innerHTML=html;
 }
 
 let _stylingEntryId=null;
@@ -920,6 +946,87 @@ async function deleteStylingEntry(){
 }
 
 // ── Warehouse tab ────────────────────────────────────────────────────────────
+function renderWarehouse(){
+  const content=document.getElementById('warehouse-content');
+  const picks=lastFetchedData?.wh_picks||[];
+  const tasks=lastFetchedData?.tasks||[];
+  const jobs=lastFetchedData?.jobs||[];
+  const slots=RS_CONFIG.time_slots||[];
+
+  // Derive unique people from entries, plus an "All" column
+  const peopleSet=new Set();
+  [...picks,...tasks].forEach(e=>{
+    const p=e.person||e.vehicle||'All';
+    peopleSet.add(p==='ALL'?'All':p);
+  });
+  const people=['All',...[...(RS_CONFIG.drivers||[]),...(RS_CONFIG.stylists||[])].filter(w=>peopleSet.has(w))];
+  const uniquePeople=[...new Set(people)];
+  const nCols=uniquePeople.length||1;
+  const HEADER_ROWS=2;
+
+  if(!picks.length&&!tasks.length){
+    content.innerHTML='<div class="rs-list-empty">No warehouse tasks for this day.<br>Tap + to add one.</div>';
+    return;
+  }
+
+  // Map entries by person
+  const schedByPerson={};
+  uniquePeople.forEach(p=>{schedByPerson[p]=[];});
+  picks.forEach(e=>{
+    const p=e.person||'All';
+    if(schedByPerson[p]) schedByPerson[p].push({...e,_isTask:false,_label:'Pick'});
+    else schedByPerson['All'].push({...e,_isTask:false,_label:'Pick'});
+  });
+  tasks.forEach(t=>{
+    const p=(t.vehicle==='ALL'||!t.vehicle)?'All':t.vehicle;
+    if(schedByPerson[p]) schedByPerson[p].push({...t,_isTask:true,_label:t.title||'Task'});
+    else schedByPerson['All'].push({...t,_isTask:true,_label:t.title||'Task'});
+  });
+
+  let cells=[];
+  cells.push(`<div class="rs-header-cell" style="grid-column:1;grid-row:1;">Time</div>`);
+  uniquePeople.forEach((p,i)=>cells.push(`<div class="rs-header-cell" style="grid-column:${i+2};grid-row:1;">${p}</div>`));
+  cells.push(`<div class="rs-team-cell" style="grid-column:1;grid-row:2;"></div>`);
+  uniquePeople.forEach((_,i)=>cells.push(`<div class="rs-team-cell" style="grid-column:${i+2};grid-row:2;"></div>`));
+
+  slots.forEach((slot,si)=>{
+    const gridRow=HEADER_ROWS+si+1;
+    cells.push(`<div class="rs-time" style="grid-column:1;grid-row:${gridRow};">${formatSlotLabel(slot)}</div>`);
+    uniquePeople.forEach((_,pi)=>{
+      cells.push(`<div class="rs-cell rs-cell-clickable" style="grid-column:${pi+2};grid-row:${gridRow};" onclick="openWarehousePopover(null,'task')"></div>`);
+    });
+  });
+
+  // Warehouse tiles
+  uniquePeople.forEach((p,pi)=>{
+    (schedByPerson[p]||[]).forEach(entry=>{
+      if(!entry.start_time) return;
+      const si=slotIndex(entry.start_time);
+      const dur=entry.duration||60;
+      const spanSlots=Math.max(1,Math.round(dur/30));
+      const rowStart=HEADER_ROWS+si+1;
+      const rowEnd=rowStart+spanSlots;
+      const isTask=entry._isTask;
+      const colour=isTask?'var(--muted)':'var(--accent)';
+      const job=!isTask?jobs.find(j=>j.id===entry.job_id):null;
+      const label=isTask?(entry.title||'Task'):`Pick: ${job?job.job_ref||job.job_number:''}`;
+      const gearSVG=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+      cells.push(`<div class="rs-job" style="grid-column:${pi+2};grid-row:${rowStart}/${rowEnd};border-left-color:${colour};z-index:2;background:${isTask?'rgba(154,143,128,0.08)':'rgba(184,147,90,0.08)'};">
+        <div class="rs-job-content">
+          <div class="rs-job-ref" style="font-size:0.72rem;">${isTask?'🏭':'📦'} ${label}</div>
+          ${entry.notes?`<div class="rs-job-notes" onclick="event.stopPropagation();this.classList.toggle('expanded')">${entry.notes}</div>`:''}
+        </div>
+        <div class="rs-job-actions">
+          <button class="rs-job-btn-gear" onclick="openWarehousePopover('${entry.id}','${isTask?'task':'pick'}')" title="Edit">${gearSVG}</button>
+        </div>
+      </div>`);
+    });
+  });
+
+  const html=`<div class="rs-scroll"><div class="rs-grid" style="grid-template-columns:60px repeat(${nCols},1fr);grid-template-rows:auto auto repeat(${TOTAL_SLOTS},${SLOT_H}px);">${cells.join('')}</div></div>`;
+  content.innerHTML=html;
+}
+
 let _whType='pick';
 function setWarehouseType(type){
   _whType=type;

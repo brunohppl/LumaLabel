@@ -660,8 +660,11 @@ function renderItems(){
   // Build room list including any pending new rooms that have no items yet
   const rooms_list=[...new Set([...allItems.map(i=>i.room).filter(r=>r), ...pendingRooms])];
   body.innerHTML=html;
-  // Load photo strips lazily after DOM is ready — only fetches for items
-  // that already have at least one photo (photo_url is set)
+  // Restore add-room form state across re-renders
+  if(addRoomFormOpen){
+    const form=document.getElementById('add-room-form');
+    if(form){ form.style.display='flex'; setTimeout(()=>document.getElementById('new-room-name')?.focus(),50); }
+  }
   loadPhotoStrips();
 }
 
@@ -969,12 +972,14 @@ async function deleteGroup(ids, label){
 // "Removing a room" means deleting all items in that room.
 let pendingRooms=[]; // room names added via "Add Room" that have no items yet
 
+let addRoomFormOpen=false;
+
 function toggleAddRoomForm(){
+  addRoomFormOpen=!addRoomFormOpen;
   const form=document.getElementById('add-room-form');
-  const btn=document.querySelector('.add-room-btn');
-  const visible=form.style.display!=='none';
-  form.style.display=visible?'none':'flex';
-  if(!visible) setTimeout(()=>document.getElementById('new-room-name').focus(),50);
+  if(!form) return;
+  form.style.display=addRoomFormOpen?'flex':'none';
+  if(addRoomFormOpen) setTimeout(()=>document.getElementById('new-room-name')?.focus(),50);
 }
 
 function addRoom(){
@@ -986,8 +991,7 @@ function addRoom(){
     alert(`"${name}" already exists.`); return;
   }
   pendingRooms.push(name);
-  input.value='';
-  toggleAddRoomForm();
+  addRoomFormOpen=false;
   renderItems();
   // Scroll to the new room card after render
   setTimeout(()=>{

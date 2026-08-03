@@ -78,7 +78,9 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .transfer-tag-link{color:var(--blue);text-decoration:underline;font-weight:700;}
 .transfer-tag-link:hover{color:var(--ink);}
 .transfer-tag-link-out{color:var(--accent);}
-.job-address{font-size:1rem;color:var(--ink);margin-top:4px;}
+.job-address{font-size:1rem;color:var(--ink);margin-top:4px;cursor:pointer;border-radius:3px;padding:1px 3px;margin-left:-3px;transition:background 0.15s;}
+.job-address:hover{background:var(--sand);}
+.job-address-input{font-size:1rem;color:var(--ink);border:none;border-bottom:2px solid var(--accent);background:none;outline:none;width:100%;font-family:'Jost',sans-serif;padding:0;margin-top:4px;}
 .assignment-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
 .status-change-btn{display:inline-flex;align-items:center;gap:5px;background:none;border:none;padding:0;margin-top:9px;cursor:pointer;}
 .status-change-btn svg{color:var(--muted);transition:transform 0.15s;}
@@ -521,7 +523,7 @@ function jobCardHTML(job){
           <div class="job-ref">${job.job_ref||job.job_number}${transferTag}</div>
           <span class="pill ${pill}">${label}</span>
         </div>
-        <div class="job-address">${job.address}</div>
+        <div class="job-address" id="addr-${job.id}" onclick="startEditAddress('${job.id}')" title="Tap to edit address">${job.address||'<span style=\"color:var(--muted)\">No address</span>'}</div>
         ${(ownerBadge||truckBadge||runsheetBadge)?`<div class="assignment-row">${ownerBadge}${truckBadge}${runsheetBadge}</div>`:''}
         <button class="status-change-btn" onclick="event.stopPropagation();openStatusPopover('${job.id}', this)">
           <span class="pill ${pill}">${label}</span>
@@ -562,6 +564,46 @@ function jobCardHTML(job){
       </button>
     </div>
   </div>`;
+}
+
+function startEditAddress(jobId){
+  const div=document.getElementById(`addr-${jobId}`);
+  if(!div||div.querySelector('input')) return; // already editing
+  const job=lastFetchedJobs.find(j=>j.id===jobId);
+  const current=job?.address||'';
+  const input=document.createElement('input');
+  input.className='job-address-input';
+  input.value=current;
+  input.onclick=e=>e.stopPropagation();
+  input.onkeydown=e=>{
+    if(e.key==='Enter'){e.preventDefault();saveAddress(jobId,input.value.trim(),div);}
+    if(e.key==='Escape'){div.textContent=current||'No address';}
+  };
+  input.onblur=()=>saveAddress(jobId,input.value.trim(),div);
+  div.innerHTML='';
+  div.appendChild(input);
+  input.focus();
+  input.select();
+}
+
+async function saveAddress(jobId, newAddr, div){
+  if(div._saving) return;
+  div._saving=true;
+  const job=lastFetchedJobs.find(j=>j.id===jobId);
+  const old=job?.address||'';
+  if(!newAddr||newAddr===old){
+    div.textContent=old||'No address';
+    div._saving=false;
+    return;
+  }
+  div.textContent='Saving…';
+  await fetch(`/api/jobs/${jobId}/notes`,{
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({address:newAddr})
+  });
+  if(job) job.address=newAddr;
+  div.textContent=newAddr;
+  div._saving=false;
 }
 
 async function downloadLabels(jobId, jobRef){

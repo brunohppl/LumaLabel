@@ -819,6 +819,41 @@ async function finishLoading(){
 }
 
 loadJob();
+
+// Auto-refresh every 30 seconds to pick up stylist changes
+// (new items, bay locations, notes, room changes)
+// Preserves the driver's checked/on_truck state for items already loaded
+setInterval(async ()=>{
+  try{
+    const res=await fetch(`/api/jobs/${jobId}`);
+    const data=await res.json();
+    // Merge new items with existing checked state
+    const checkedMap=new Map(items.map(i=>[i.id,{checked:i.checked,on_truck:i.on_truck}]));
+    items=data.items.map(i=>({
+      ...i,
+      checked: checkedMap.has(i.id) ? checkedMap.get(i.id).checked : i.checked,
+      on_truck: checkedMap.has(i.id) ? checkedMap.get(i.id).on_truck : i.on_truck,
+    }));
+    // Only re-render if the item list changed (new items, bay locations, notes)
+    const newJob=data.job;
+    const jobChanged=
+      newJob.driver_notes!==job.driver_notes ||
+      newJob.accessory_tubs!==job.accessory_tubs ||
+      newJob.cushion_bags!==job.cushion_bags ||
+      data.items.length!==items.length ||
+      data.items.some(ni=>{
+        const oi=checkedMap.get(ni.id);
+        return !oi || ni.bay_location!==(items.find(i=>i.id===ni.id)?.bay_location);
+      });
+    if(jobChanged){
+      job=newJob;
+      renderRooms();
+      updateProgress();
+    }
+  }catch(e){
+    // Silently ignore refresh errors — driver keeps working
+  }
+}, 30000);
 </script>
 </body>
 </html>

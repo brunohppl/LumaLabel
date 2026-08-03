@@ -979,20 +979,22 @@ function toggleAddRoomForm(){
 
 function addRoom(){
   const input=document.getElementById('new-room-name');
-  const name=(input.value||'').trim().toUpperCase();
+  const name=(input.value||'').trim();
   if(!name){ alert('Please enter a room name.'); return; }
   const existing=[...new Set(allItems.map(i=>i.room).filter(r=>r))];
   if(existing.includes(name)||pendingRooms.includes(name)){
     alert(`"${name}" already exists.`); return;
   }
   pendingRooms.push(name);
+  input.value='';
+  toggleAddRoomForm();
   renderItems();
-  // Scroll to Add Item and pre-select the new room
+  // Scroll to the new room card after render
   setTimeout(()=>{
-    const sel=document.getElementById('new-room');
-    if(sel) sel.value=name;
-    document.getElementById('new-desc')?.focus();
-  },50);
+    const key=name.replace(/[^a-zA-Z0-9]/g,'_');
+    const card=document.getElementById(`stylist-room-${key}`);
+    if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
+  },100);
 }
 
 function startRenameRoom(roomName, key, itemIds){

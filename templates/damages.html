@@ -165,6 +165,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
         <button class="wizard-opt" onclick="choose(1,'damage_type','broken_leg')"><span class="opt-icon">🦵</span>Broken leg</button>
         <button class="wizard-opt" onclick="choose(1,'damage_type','broken_top')"><span class="opt-icon">⬛</span>Broken top</button>
         <button class="wizard-opt" onclick="choose(1,'damage_type','tear')"><span class="opt-icon">✂️</span>Tear</button>
+        <button class="wizard-opt" onclick="choose(1,'damage_type','crack')"><span class="opt-icon">💥</span>Crack</button>
       </div>
       <button class="wizard-back" onclick="goBack(1)">← Back</button>
     </div>
@@ -179,6 +180,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
         <button class="wizard-opt" onclick="choose(2,'furniture','rug')"><span class="opt-icon">⬜</span>Rug</button>
         <button class="wizard-opt" onclick="choose(2,'furniture','storage_unit')"><span class="opt-icon">🗄️</span>Storage unit</button>
         <button class="wizard-opt" onclick="choose(2,'furniture','bedhead')"><span class="opt-icon">🛏️</span>Bedhead</button>
+        <button class="wizard-opt" onclick="choose(2,'furniture','accessories')"><span class="opt-icon">📦</span>Accessories</button>
       </div>
       <button class="wizard-back" onclick="goBack(2)">← Back</button>
     </div>
@@ -219,13 +221,15 @@ const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 
 const LABELS = {
   location:   {pickup:'Pickup',install:'Install',transport:'Transport',warehouse:'Warehouse'},
-  damage_type:{scratch:'Scratch',dent:'Dent',broken_leg:'Broken leg',broken_top:'Broken top',tear:'Tear'},
-  furniture:  {sofa:'Sofa',table:'Table',chair:'Chair',rug:'Rug',storage_unit:'Storage unit',bedhead:'Bedhead'},
+  damage_type:{scratch:'Scratch',dent:'Dent',broken_leg:'Broken leg',broken_top:'Broken top',tear:'Tear',crack:'Crack'},
+  furniture:  {sofa:'Sofa',table:'Table',chair:'Chair',rug:'Rug',storage_unit:'Storage unit',bedhead:'Bedhead',accessories:'Accessories'},
 };
 
 let reports = [];
 let _wizardData = {};
 let _photos = []; // array of {dataUrl, file} objects
+let _editingId = null; // set when editing an existing report
+let _existingPhotoUrl = null; // existing photo(s) when editing
 
 // ── Table ──
 async function loadReports(){
@@ -269,7 +273,10 @@ function renderTable(){
           catch(e){ urls=[r.photo_url]; }
           return urls.map(u=>`<img class="damage-thumb" src="${u}" onclick="openLightbox('${u}')" alt="damage photo" style="margin-right:4px;"/>`).join('');
         })()}</td>
-        <td><button class="del-btn" onclick="deleteReport('${r.id}')" title="Delete">✕</button></td>
+        <td style="white-space:nowrap;">
+          <button class="del-btn" onclick="editReport('${r.id}')" title="Edit" style="color:var(--muted);margin-right:4px;">✎</button>
+          <button class="del-btn" onclick="deleteReport('${r.id}')" title="Delete">✕</button>
+        </td>
       </tr>`).join('')}
     </tbody>
   </table>`;
@@ -296,14 +303,52 @@ function openLightbox(url){
 
 // ── Wizard ──
 function openWizard(){
-  _wizardData={};_photos=[];
+  _wizardData={};_photos=[];_editingId=null;_existingPhotoUrl=null;
   renderPhotoStrip();
   showStep(0);
   document.getElementById('wizard-overlay').classList.add('open');
 }
 
+function editReport(id){
+  const r=reports.find(x=>x.id===id);
+  if(!r) return;
+  _editingId=id;
+  _wizardData={location:r.location, damage_type:r.damage_type, furniture:r.furniture};
+  _photos=[];
+  _existingPhotoUrl=r.photo_url||null;
+  // Highlight pre-selected options
+  showStep(0);
+  // Highlight the correct option buttons after a tick
+  setTimeout(()=>{
+    document.querySelectorAll('#step-0 .wizard-opt').forEach(btn=>{
+      btn.classList.toggle('selected', btn.getAttribute('onclick')?.includes(`'${r.location}'`));
+    });
+    document.querySelectorAll('#step-1 .wizard-opt').forEach(btn=>{
+      btn.classList.toggle('selected', btn.getAttribute('onclick')?.includes(`'${r.damage_type}'`));
+    });
+    document.querySelectorAll('#step-2 .wizard-opt').forEach(btn=>{
+      btn.classList.toggle('selected', btn.getAttribute('onclick')?.includes(`'${r.furniture}'`));
+    });
+  },50);
+  // Show photo step directly
+  showStep(3);
+  // Show existing photos as a note
+  const strip=document.getElementById('photo-strip');
+  if(strip && _existingPhotoUrl){
+    let urls;
+    try{ urls=JSON.parse(_existingPhotoUrl); if(!Array.isArray(urls)) urls=[_existingPhotoUrl]; }
+    catch(e){ urls=[_existingPhotoUrl]; }
+    strip.innerHTML=urls.map(u=>`<div class="dmg-thumb-wrap"><img src="${u}" style="width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--border);opacity:0.6;"/><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:var(--muted);text-align:center;line-height:1.2;">existing</div></div>`).join('')
+      +`<div class="dmg-thumb-add" onclick="document.getElementById('photo-cam').click()">+</div>`;
+  } else {
+    renderPhotoStrip();
+  }
+  document.getElementById('wizard-overlay').classList.add('open');
+}
+
 function closeWizard(){
   document.getElementById('wizard-overlay').classList.remove('open');
+  _editingId=null;_existingPhotoUrl=null;
 }
 
 function showStep(n){
@@ -382,18 +427,31 @@ async function submitReport(skipPhotos=false){
   const btn=document.querySelector('.btn-submit');
   btn.textContent='Saving…';btn.disabled=true;
   try{
-    let photoUrl=null;
+    let photoUrl=_existingPhotoUrl; // keep existing by default
     if(!skipPhotos && _photos.length){
-      // Upload all photos and store URLs as JSON array
+      // Upload new photos and replace existing
       const urls=await Promise.all(_photos.map(p=>uploadPhoto(p.file)));
       photoUrl=urls.length===1?urls[0]:JSON.stringify(urls);
     }
-    const res=await fetch('/api/damages',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({..._wizardData,photo_url:photoUrl}),
-    });
-    const data=await res.json();
-    if(data.report) reports.unshift(data.report);
+
+    if(_editingId){
+      // Edit existing report
+      await fetch(`/api/damages/${_editingId}`,{
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({..._wizardData, photo_url:photoUrl}),
+      });
+      const idx=reports.findIndex(r=>r.id===_editingId);
+      if(idx!==-1) reports[idx]={...reports[idx],..._wizardData,photo_url:photoUrl};
+    } else {
+      // Create new report
+      const res=await fetch('/api/damages',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({..._wizardData,photo_url:photoUrl}),
+      });
+      const data=await res.json();
+      if(data.report) reports.unshift(data.report);
+    }
+
     renderTable();
     closeWizard();
   }catch(e){

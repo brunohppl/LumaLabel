@@ -567,6 +567,12 @@
     </div>
 
     <div class="date-field">
+      <label>Install Address</label>
+      <input type="text" class="date-input" id="install-address" placeholder="e.g. 318 Given Tce, Paddington QLD" style="max-width:420px;" />
+      <span class="date-hint">Optional — overrides address from PDF</span>
+    </div>
+
+    <div class="date-field">
       <label>Job Owner</label>
       <input type="text" class="date-input" id="job-owner" placeholder="e.g. Sarah" style="max-width:260px;" />
       <span class="date-hint">Optional</span>
@@ -810,6 +816,7 @@ function resetUploadForm() {
   uploadZone.classList.remove('has-file', 'dragover');
   generateBtn.disabled = true;
   document.getElementById('install-date').value = '';
+  document.getElementById('install-address').value = '';
   document.getElementById('job-owner').value = '';
   selectedColour = null;
   document.getElementById('transfer-toggle').checked = false;
@@ -836,6 +843,7 @@ generateBtn.addEventListener('click', async () => {
 
     // Get install date if entered
     const installDate = document.getElementById('install-date').value;
+    const installAddress = document.getElementById('install-address').value.trim();
 
     // Call Render API
     const response = await fetch('/generate', {
@@ -846,6 +854,7 @@ generateBtn.addEventListener('click', async () => {
         fileName:    selectedFile.name,
         installDate: installDate || null,
         jobOwner:    document.getElementById('job-owner').value.trim() || '',
+        installAddress: installAddress || '',
         labelFormat: 18,
         colourName:  selectedColour,
         isTransfer:        isTransferJob,

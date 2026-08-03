@@ -197,6 +197,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   <label class="runsheet-popover-label" style="margin-top:12px;">Vehicle(s)</label>
   <div class="sched-chip-row" id="sched-vehicle-chips"></div>
   <div id="sched-hint" style="font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;"></div>
+  <label class="runsheet-popover-label" style="margin-top:12px;">Lead</label>
+  <select id="sched-lead" class="runsheet-popover-input"><option value="">— no lead set —</option></select>
+  <label class="runsheet-popover-label" style="margin-top:10px;">Team <span style="font-weight:400;text-transform:none;">(tap to select)</span></label>
+  <div class="sched-chip-row" id="sched-team-chips"></div>
 
   <!-- Per-vehicle time overrides — shown after vehicles are selected -->
   <div id="sched-vehicle-times" style="margin-top:12px;"></div>
@@ -215,38 +219,67 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 <div class="runsheet-popover" id="styling-popover" style="width:360px;max-height:90vh;overflow-y:auto;">
   <div class="runsheet-popover-title" id="styling-popover-title">Add Styling Entry</div>
   <input type="hidden" id="styling-entry-id"/>
-  <label class="runsheet-popover-label">Job</label>
-  <input type="text" id="styling-job-search" class="runsheet-popover-input" placeholder="Job number or address…" oninput="searchJobsForPopover(this.value,'styling-job-results','styling-job-selected','styling-job-id')"/>
-  <div id="styling-job-results" style="margin-top:4px;max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:2px;display:none;"></div>
-  <div id="styling-job-selected" style="display:none;margin-top:8px;padding:7px 10px;background:var(--sand);border-radius:3px;font-size:0.85rem;"></div>
-  <input type="hidden" id="styling-job-id"/>
-  <div class="sched-two-col" style="margin-top:12px;">
-    <div>
-      <label class="runsheet-popover-label">Date</label>
-      <input type="date" id="styling-date" class="runsheet-popover-input"/>
+
+  <!-- Mode selector -->
+  <div id="styling-mode-select" style="display:none;margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <button class="sched-mode-btn" onclick="setStylingMode('task')">
+        <div style="font-size:1.2rem;margin-bottom:4px;">📝</div>
+        <div style="font-size:0.78rem;font-weight:600;">Task</div>
+        <div style="font-size:0.7rem;color:var(--muted);margin-top:2px;">Prep, travel, etc.</div>
+      </button>
+      <button class="sched-mode-btn" onclick="setStylingMode('job')">
+        <div style="font-size:1.2rem;margin-bottom:4px;">🏠</div>
+        <div style="font-size:0.78rem;font-weight:600;">Job</div>
+        <div style="font-size:0.7rem;color:var(--muted);margin-top:2px;">Style a property</div>
+      </button>
     </div>
-    <div>
-      <label class="runsheet-popover-label">Stylist</label>
-      <select id="styling-person" class="runsheet-popover-input"><option value="">— select —</option></select>
-    </div>
+    <button class="btn btn-outline" onclick="closeStylingPopover()" style="width:100%;margin-top:12px;font-size:0.75rem;">Cancel</button>
   </div>
-  <div class="sched-two-col" style="margin-top:10px;">
-    <div>
-      <label class="runsheet-popover-label">Arrival time</label>
-      <select id="styling-time" class="runsheet-popover-input"><option value="">No time set</option></select>
+
+  <!-- Task form -->
+  <div id="styling-task-form" style="display:none;">
+    <label class="runsheet-popover-label">Task description</label>
+    <input type="text" id="styling-task-title" class="runsheet-popover-input" placeholder="e.g. Travel to property, Prep…"/>
+    <div class="sched-two-col" style="margin-top:10px;">
+      <div><label class="runsheet-popover-label">Date</label><input type="date" id="styling-task-date" class="runsheet-popover-input"/></div>
+      <div><label class="runsheet-popover-label">Time</label><select id="styling-task-time" class="runsheet-popover-input"><option value="">No time</option></select></div>
     </div>
-    <div>
-      <label class="runsheet-popover-label">Duration</label>
-      <select id="styling-duration" class="runsheet-popover-input"><option value="">—</option></select>
-    </div>
-  </div>
-  <label class="runsheet-popover-label" style="margin-top:10px;">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
-  <textarea id="styling-notes" class="runsheet-popover-input" placeholder="Access info, arrival instructions…" style="height:52px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
-  <div class="runsheet-popover-actions" style="margin-top:14px;">
-    <button class="btn btn-outline" id="styling-delete-btn" style="font-size:0.72rem;display:none;color:var(--red);border-color:var(--red);" onclick="deleteStylingEntry()">Delete</button>
-    <div style="display:flex;gap:8px;">
+    <label class="runsheet-popover-label" style="margin-top:10px;">Person</label>
+    <select id="styling-task-person" class="runsheet-popover-input"><option value="ALL">All stylists</option></select>
+    <label class="runsheet-popover-label" style="margin-top:10px;">Notes</label>
+    <textarea id="styling-task-notes" class="runsheet-popover-input" placeholder="Any details…" style="height:52px;resize:none;font-size:0.82rem;padding:7px 10px;"></textarea>
+    <div class="runsheet-popover-actions" style="margin-top:14px;">
       <button class="btn btn-outline" onclick="closeStylingPopover()" style="font-size:0.75rem;">Cancel</button>
-      <button class="btn btn-gold" onclick="saveStylingEntry()">Save</button>
+      <button class="btn btn-gold" onclick="saveStylingTask()">Save</button>
+    </div>
+  </div>
+
+  <!-- Job form -->
+  <div id="styling-job-form" style="display:none;">
+    <label class="runsheet-popover-label">Job</label>
+    <input type="text" id="styling-job-search" class="runsheet-popover-input" placeholder="Job number or address…" oninput="searchJobsForPopover(this.value,'styling-job-results','styling-job-selected','styling-job-id')"/>
+    <div id="styling-job-results" style="margin-top:4px;max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:2px;display:none;"></div>
+    <div id="styling-job-selected" style="display:none;margin-top:8px;padding:7px 10px;background:var(--sand);border-radius:3px;font-size:0.85rem;"></div>
+    <input type="hidden" id="styling-job-id"/>
+    <div class="sched-two-col" style="margin-top:12px;">
+      <div><label class="runsheet-popover-label">Date</label><input type="date" id="styling-date" class="runsheet-popover-input"/></div>
+      <div><label class="runsheet-popover-label">Arrival time</label><select id="styling-time" class="runsheet-popover-input"><option value="">No time</option></select></div>
+    </div>
+    <label class="runsheet-popover-label" style="margin-top:10px;">Duration</label>
+    <select id="styling-duration" class="runsheet-popover-input"><option value="">—</option></select>
+    <label class="runsheet-popover-label" style="margin-top:10px;">Lead stylist</label>
+    <select id="styling-lead" class="runsheet-popover-input"><option value="">— no lead set —</option></select>
+    <label class="runsheet-popover-label" style="margin-top:10px;">Team <span style="font-weight:400;text-transform:none;">(tap to select)</span></label>
+    <div class="sched-chip-row" id="styling-team-chips"></div>
+    <label class="runsheet-popover-label" style="margin-top:10px;">Notes</label>
+    <textarea id="styling-notes" class="runsheet-popover-input" placeholder="Access info, arrival instructions…" style="height:52px;resize:none;font-size:0.82rem;padding:7px 10px;"></textarea>
+    <div class="runsheet-popover-actions" style="margin-top:14px;">
+      <button class="btn btn-outline" id="styling-delete-btn" style="font-size:0.72rem;display:none;color:var(--red);border-color:var(--red);" onclick="deleteStylingEntry()">Delete</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" onclick="closeStylingPopover()" style="font-size:0.75rem;">Cancel</button>
+        <button class="btn btn-gold" onclick="saveStylingEntry()">Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -267,28 +300,33 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       <div style="font-size:0.78rem;font-weight:600;">General Task</div>
     </button>
   </div>
+
+  <!-- Pick form -->
   <div id="wh-job-row" style="display:none;">
     <label class="runsheet-popover-label">Job to pick</label>
     <input type="text" id="warehouse-job-search" class="runsheet-popover-input" placeholder="Job number or address…" oninput="searchJobsForPopover(this.value,'warehouse-job-results','warehouse-job-selected','warehouse-job-id')"/>
     <div id="warehouse-job-results" style="margin-top:4px;max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:2px;display:none;"></div>
     <div id="warehouse-job-selected" style="display:none;margin-top:8px;padding:7px 10px;background:var(--sand);border-radius:3px;font-size:0.85rem;"></div>
     <input type="hidden" id="warehouse-job-id"/>
+    <label class="runsheet-popover-label" style="margin-top:10px;">Lead</label>
+    <select id="warehouse-lead" class="runsheet-popover-input"><option value="">— no lead set —</option></select>
+    <label class="runsheet-popover-label" style="margin-top:10px;">Team <span style="font-weight:400;text-transform:none;">(tap to select)</span></label>
+    <div class="sched-chip-row" id="warehouse-team-chips"></div>
   </div>
+
+  <!-- General task form -->
   <div id="wh-title-row" style="display:none;">
     <label class="runsheet-popover-label">Task description</label>
     <input type="text" id="warehouse-title" class="runsheet-popover-input" placeholder="e.g. Stage sofa at bay A3, clean truck…"/>
+    <label class="runsheet-popover-label" style="margin-top:10px;">Assigned to</label>
+    <select id="warehouse-person" class="runsheet-popover-input"><option value="ALL">All team</option></select>
   </div>
+
   <div class="sched-two-col" style="margin-top:12px;">
-    <div>
-      <label class="runsheet-popover-label">Person</label>
-      <select id="warehouse-person" class="runsheet-popover-input"><option value="ALL">All team</option></select>
-    </div>
-    <div>
-      <label class="runsheet-popover-label">Time</label>
-      <select id="warehouse-time" class="runsheet-popover-input"><option value="">No time set</option></select>
-    </div>
+    <div><label class="runsheet-popover-label">Time</label><select id="warehouse-time" class="runsheet-popover-input"><option value="">No time set</option></select></div>
+    <div><label class="runsheet-popover-label">Duration</label><select id="warehouse-duration" class="runsheet-popover-input"><option value="">—</option></select></div>
   </div>
-  <label class="runsheet-popover-label" style="margin-top:10px;">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+  <label class="runsheet-popover-label" style="margin-top:10px;">Notes</label>
   <textarea id="warehouse-notes" class="runsheet-popover-input" placeholder="Bay location, special instructions…" style="height:52px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
   <div class="runsheet-popover-actions" style="margin-top:14px;">
     <button class="btn btn-outline" id="warehouse-delete-btn" style="font-size:0.72rem;display:none;color:var(--red);border-color:var(--red);" onclick="deleteWarehouseEntry()">Delete</button>
@@ -397,6 +435,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       <label class="runsheet-popover-label" style="margin-top:12px;">Vehicle(s)</label>
       <div class="sched-chip-row" id="job-sched-vehicle-chips"></div>
       <div id="job-sched-hint" style="font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;">Two tiles will be created — <strong>To Load</strong> the day before and <strong>Install</strong> on the date above.</div>
+      <label class="runsheet-popover-label" style="margin-top:12px;">Lead driver</label>
+      <select id="job-sched-lead" class="runsheet-popover-input"><option value="">— no lead set —</option></select>
+      <label class="runsheet-popover-label" style="margin-top:10px;">Team <span style="font-weight:400;text-transform:none;">(tap to select)</span></label>
+      <div class="sched-chip-row" id="job-sched-team-chips"></div>
       <div class="sched-two-col" style="margin-top:12px;">
         <div>
           <label class="runsheet-popover-label">Load time</label>
@@ -705,11 +747,13 @@ async function renderRunsheet(){
         transferHtml=`<div class="rs-job-transfer rs-job-transfer-to">↑ Transferring to ${dest.job_ref||dest.job_number}</div>`;
       }
 
+      const crewStr=[entry.lead,...(entry.team||[])].filter(Boolean).join(', ');
       cells.push(`<div class="rs-job ${typeClass}" style="grid-column:${vi+2};grid-row:${rowStart}/${rowEnd};border-left-color:${colour};z-index:2;">
         <div class="rs-job-content">
           <div class="rs-job-ref">${ref}</div>
           <div class="rs-job-addr">${addr}</div>
           ${typeLabel?`<div class="rs-job-type">${typeLabel}</div>`:''}
+          ${crewStr?`<div style="font-size:0.65rem;color:var(--muted);margin-top:1px;">👤 ${crewStr}</div>`:''}
           ${transferHtml}
           ${notes?`<div class="rs-job-notes" onclick="event.stopPropagation();this.classList.toggle('expanded')" title="${notes}">📝 ${notes}</div>`:''}
         </div>
@@ -877,28 +921,52 @@ function renderStyling(){
 }
 
 let _stylingEntryId=null;
+let _stylingMode='job';
+
+function setStylingMode(mode){
+  _stylingMode=mode;
+  document.getElementById('styling-mode-select').style.display='none';
+  document.getElementById('styling-task-form').style.display=mode==='task'?'block':'none';
+  document.getElementById('styling-job-form').style.display=mode==='job'?'block':'none';
+  document.getElementById('styling-popover-title').textContent=mode==='task'?'Add Styling Task':'Add Styling Entry';
+}
+
 function openStylingPopover(entryId){
   _stylingEntryId=entryId;
   const todayStr=localDateStr(runsheetViewDate);
-  document.getElementById('styling-popover-title').textContent=entryId?'Edit Styling Entry':'Add Styling Entry';
   document.getElementById('styling-entry-id').value=entryId||'';
   document.getElementById('styling-delete-btn').style.display=entryId?'inline-block':'none';
+
+  // Populate lead select and team chips
+  const leadEl=document.getElementById('styling-lead');
+  if(leadEl) leadEl.innerHTML=workerOptions('');
+  renderTeamChips('styling-team-chips',[]);
+
+  // Populate person select for tasks
+  const personSel=document.getElementById('styling-task-person');
+  if(personSel) personSel.innerHTML='<option value="ALL">All stylists</option>'+(RS_CONFIG.stylists||[]).map(s=>`<option value="${s}">${s}</option>`).join('');
+
+  document.getElementById('styling-time').innerHTML=timeOptions();
+  document.getElementById('styling-duration').innerHTML=durationOptions();
+  if(document.getElementById('styling-task-time')) document.getElementById('styling-task-time').innerHTML=timeOptions();
+
+  document.getElementById('styling-date').value=todayStr;
+  document.getElementById('styling-notes').value='';
   document.getElementById('styling-job-search').value='';
   document.getElementById('styling-job-results').style.display='none';
   document.getElementById('styling-job-selected').style.display='none';
   document.getElementById('styling-job-id').value='';
-  document.getElementById('styling-date').value=todayStr;
-  document.getElementById('styling-notes').value='';
-  // Populate person select with stylists
-  const sel=document.getElementById('styling-person');
-  sel.innerHTML='<option value="">— select stylist —</option>'+(RS_CONFIG.stylists||[]).map(s=>`<option value="${s}">${s}</option>`).join('');
-  document.getElementById('styling-time').innerHTML=timeOptions();
-  document.getElementById('styling-duration').innerHTML=durationOptions();
-  // Pre-fill if editing
+
   if(entryId){
+    // Edit mode — go straight to job form
+    document.getElementById('styling-mode-select').style.display='none';
+    document.getElementById('styling-task-form').style.display='none';
+    document.getElementById('styling-job-form').style.display='block';
+    document.getElementById('styling-popover-title').textContent='Edit Styling Entry';
     const entry=(lastFetchedData?.styling||[]).find(e=>e.id===entryId);
     if(entry){
-      sel.value=entry.person||'';
+      if(leadEl) leadEl.innerHTML=workerOptions(entry.lead||'');
+      renderTeamChips('styling-team-chips', entry.team||[]);
       document.getElementById('styling-date').value=entry.date||todayStr;
       document.getElementById('styling-time').value=entry.start_time||'';
       document.getElementById('styling-duration').value=entry.duration||'';
@@ -910,34 +978,57 @@ function openStylingPopover(entryId){
         document.getElementById('styling-job-id').value=entry.job_id;
       }
     }
+  } else {
+    // New entry — show mode selector
+    document.getElementById('styling-popover-title').textContent='Add to Styling';
+    document.getElementById('styling-mode-select').style.display='block';
+    document.getElementById('styling-task-form').style.display='none';
+    document.getElementById('styling-job-form').style.display='none';
   }
+
   document.getElementById('styling-popover-overlay').classList.add('open');
   document.getElementById('styling-popover').classList.add('open');
 }
+
 function closeStylingPopover(){
   document.getElementById('styling-popover-overlay').classList.remove('open');
   document.getElementById('styling-popover').classList.remove('open');
   _stylingEntryId=null;
 }
+
+async function saveStylingTask(){
+  const title=document.getElementById('styling-task-title').value.trim();
+  const date=document.getElementById('styling-task-date').value;
+  const person=document.getElementById('styling-task-person').value||'ALL';
+  const time=document.getElementById('styling-task-time').value||null;
+  if(!title||!date){alert('Please enter a description and date.');return;}
+  await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({title,vehicle:person,date,start_time:time,category:'styling'})});
+  closeStylingPopover();
+  renderRunsheet();
+}
+
 async function saveStylingEntry(){
   const jobId=document.getElementById('styling-job-id').value;
-  const person=document.getElementById('styling-person').value;
   const date=document.getElementById('styling-date').value;
-  if(!jobId||!person||!date){alert('Please select a job, stylist and date.');return;}
+  if(!jobId||!date){alert('Please select a job and date.');return;}
+  const lead=document.getElementById('styling-lead')?.value||null;
+  const team=getTeamChips('styling-team-chips');
   const payload={
-    date, person,
+    date, lead, team:team.length?team:null,
     start_time:document.getElementById('styling-time').value||null,
     duration:parseInt(document.getElementById('styling-duration').value)||null,
     notes:document.getElementById('styling-notes').value.trim()||null,
   };
   if(_stylingEntryId){
-    await fetch(`/api/schedule/${_stylingEntryId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,person,category:'styling'})});
+    await fetch(`/api/schedule/${_stylingEntryId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,category:'styling'})});
   } else {
     await fetch(`/api/jobs/${jobId}/styling`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   }
   closeStylingPopover();
   renderRunsheet();
 }
+
 async function deleteStylingEntry(){
   if(!confirm('Delete this styling entry?')) return;
   await fetch(`/api/schedule/${_stylingEntryId}`,{method:'DELETE'});
@@ -1106,48 +1197,70 @@ function openWarehousePopover(entryId, type='pick'){
   document.getElementById('warehouse-job-id').value='';
   document.getElementById('warehouse-title').value='';
   document.getElementById('warehouse-notes').value='';
-  // Populate person select
-  const sel=document.getElementById('warehouse-person');
-  const allWorkers=[...(RS_CONFIG.stylists||[]),...(RS_CONFIG.drivers||[])];
-  sel.innerHTML='<option value="ALL">All team</option>'+allWorkers.map(w=>`<option value="${w}">${w}</option>`).join('');
   document.getElementById('warehouse-time').innerHTML=timeOptions();
+  document.getElementById('warehouse-duration').innerHTML=durationOptions();
+  // Populate lead and team
+  const leadEl=document.getElementById('warehouse-lead');
+  if(leadEl) leadEl.innerHTML=workerOptions('');
+  renderTeamChips('warehouse-team-chips',[]);
+  // Populate person select
+  const personSel=document.getElementById('warehouse-person');
+  const allW=allWorkers();
+  if(personSel) personSel.innerHTML='<option value="ALL">All team</option>'+allW.map(w=>`<option value="${w}">${w}</option>`).join('');
   setWarehouseType(type);
   // Pre-fill if editing
   if(entryId){
     if(type==='task'){
       const task=(lastFetchedData?.tasks||[]).find(t=>t.id===entryId);
-      if(task){ document.getElementById('warehouse-title').value=task.title||''; document.getElementById('warehouse-notes').value=task.notes||''; document.getElementById('warehouse-time').value=task.start_time||''; sel.value=task.vehicle||'ALL'; }
+      if(task){
+        document.getElementById('warehouse-title').value=task.title||'';
+        document.getElementById('warehouse-notes').value=task.notes||'';
+        document.getElementById('warehouse-time').value=task.start_time||'';
+        if(personSel) personSel.value=task.vehicle||'ALL';
+      }
     } else {
       const pick=(lastFetchedData?.wh_picks||[]).find(e=>e.id===entryId);
-      if(pick){ sel.value=pick.person||'ALL'; document.getElementById('warehouse-time').value=pick.start_time||''; document.getElementById('warehouse-notes').value=pick.notes||'';
+      if(pick){
+        if(leadEl) leadEl.innerHTML=workerOptions(pick.lead||'');
+        renderTeamChips('warehouse-team-chips', pick.team||[]);
+        document.getElementById('warehouse-time').value=pick.start_time||'';
+        document.getElementById('warehouse-notes').value=pick.notes||'';
         const job=(lastFetchedData?.jobs||[]).find(j=>j.id===pick.job_id);
-        if(job){ document.getElementById('warehouse-job-selected').textContent=`${job.job_ref||job.job_number} — ${job.address||''}`; document.getElementById('warehouse-job-selected').style.display='block'; document.getElementById('warehouse-job-id').value=pick.job_id; }
+        if(job){
+          document.getElementById('warehouse-job-selected').textContent=`${job.job_ref||job.job_number} — ${job.address||''}`;
+          document.getElementById('warehouse-job-selected').style.display='block';
+          document.getElementById('warehouse-job-id').value=pick.job_id;
+        }
       }
     }
   }
   document.getElementById('warehouse-popover-overlay').classList.add('open');
   document.getElementById('warehouse-popover').classList.add('open');
 }
+
 function closeWarehousePopover(){
   document.getElementById('warehouse-popover-overlay').classList.remove('open');
   document.getElementById('warehouse-popover').classList.remove('open');
   _whEntryId=null;
 }
+
 async function saveWarehouseEntry(){
   const todayStr=localDateStr(runsheetViewDate);
-  const person=document.getElementById('warehouse-person').value;
   const time=document.getElementById('warehouse-time').value||null;
   const notes=document.getElementById('warehouse-notes').value.trim()||null;
   if(_whType==='pick'){
     const jobId=document.getElementById('warehouse-job-id').value;
     if(!jobId){alert('Please select a job.');return;}
+    const lead=document.getElementById('warehouse-lead')?.value||null;
+    const team=getTeamChips('warehouse-team-chips');
     if(_whEntryId){
-      await fetch(`/api/schedule/${_whEntryId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({person,start_time:time,notes,category:'warehouse_pick'})});
+      await fetch(`/api/schedule/${_whEntryId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({lead,team:team.length?team:null,start_time:time,notes,category:'warehouse_pick'})});
     } else {
-      await fetch(`/api/jobs/${jobId}/warehouse-pick`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:todayStr,person,start_time:time,notes})});
+      await fetch(`/api/jobs/${jobId}/warehouse-pick`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:todayStr,lead,team:team.length?team:null,start_time:time,notes})});
     }
   } else {
     const title=document.getElementById('warehouse-title').value.trim();
+    const person=document.getElementById('warehouse-person').value||'ALL';
     if(!title){alert('Please enter a task description.');return;}
     if(_whEntryId){
       await fetch(`/api/tasks/${_whEntryId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,vehicle:person,start_time:time,notes,category:'warehouse'})});
@@ -1158,6 +1271,7 @@ async function saveWarehouseEntry(){
   closeWarehousePopover();
   renderRunsheet();
 }
+
 async function deleteWarehouseEntry(){
   if(!confirm('Delete this entry?')) return;
   if(_whType==='task') await fetch(`/api/tasks/${_whEntryId}`,{method:'DELETE'});
@@ -1301,7 +1415,7 @@ let schedVehicleSelected=[];
 let schedVehicleTimes={};
 
 function workerOptions(selected=''){
-  return '<option value="">No lead</option>'
+  return '<option value="">— no lead set —</option>'
     +['── Stylists ──',...(RS_CONFIG.stylists||[]),'── Drivers ──',...(RS_CONFIG.drivers||[])]
       .map(w=>w.startsWith('──')
         ?`<option disabled>${w}</option>`
@@ -1309,12 +1423,29 @@ function workerOptions(selected=''){
       ).join('');
 }
 
+function allWorkers(){
+  return [...(RS_CONFIG.stylists||[]),...(RS_CONFIG.drivers||[])];
+}
+
+function renderTeamChips(containerId, selected=[]){
+  const el=document.getElementById(containerId);
+  if(!el) return;
+  el.innerHTML=allWorkers().map(w=>
+    `<button class="sched-chip${selected.includes(w)?' selected':''}" onclick="this.classList.toggle('selected')">${w}</button>`
+  ).join('');
+}
+
+function getTeamChips(containerId){
+  const el=document.getElementById(containerId);
+  if(!el) return [];
+  return [...el.querySelectorAll('.sched-chip.selected')].map(b=>b.textContent);
+}
+
 function populateSchedPopoverDropdowns(){
   const vRow=document.getElementById('sched-vehicle-chips');
   if(vRow) vRow.innerHTML=(RS_CONFIG.vehicles||[]).map(v=>
     `<button class="sched-chip" data-sv="${v}" onclick="toggleSchedVehicle(this,'${v}')">${v}</button>`
   ).join('');
-  // Lead select is populated fresh in openCrewPopover — no need to pre-fill here
 }
 
 function renderVehicleTimeInputs(){
@@ -1392,16 +1523,19 @@ async function openRunsheetPopover(jobId){
     const res=await fetch(`/api/jobs/${jobId}/schedule`);
     const entries=await res.json();
     schedVehicleSelected=[...new Set(entries.map(e=>e.vehicle).filter(Boolean))];
-    // Restore per-vehicle times and notes
     entries.forEach(e=>{
       if(e.vehicle&&(e.start_time||e.duration)){
         schedVehicleTimes[e.vehicle]={start_time:e.start_time||'',duration:e.duration||''};
       }
     });
-    // Pre-fill notes from first entry that has them
     const noteEntry=entries.find(e=>e.notes);
     const notesEl=document.getElementById('runsheet-popover-notes');
     if(notesEl) notesEl.value=noteEntry?.notes||'';
+    // Lead and team from first entry
+    const first=entries[0];
+    const leadEl=document.getElementById('sched-lead');
+    if(leadEl) leadEl.innerHTML=workerOptions(first?.lead||'');
+    renderTeamChips('sched-team-chips', first?.team||[]);
   }catch(e){}
   document.querySelectorAll('[data-sv]').forEach(el=>{el.classList.toggle('selected',schedVehicleSelected.includes(el.dataset.sv));});
   renderVehicleTimeInputs();
@@ -1417,38 +1551,34 @@ async function saveRunsheetEntry(){
   const date=document.getElementById('runsheet-popover-date').value;
   const type=document.getElementById('runsheet-popover-type').value||'install';
   const notes=document.getElementById('runsheet-popover-notes')?.value.trim()||null;
+  const lead=document.getElementById('sched-lead')?.value||null;
+  const team=getTeamChips('sched-team-chips');
   if(!date){alert('Pick an install date first.');return;}
 
-  // Collect per-vehicle time overrides
   const vehicleOverrides=schedVehicleSelected.map(v=>({
     vehicle:v,
     start_time:document.getElementById(`sched-time-${v}`)?.value||null,
     duration:parseInt(document.getElementById(`sched-dur-${v}`)?.value)||null,
   }));
 
-  // Check if this job already has schedule entries
   const existingRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
   const existingEntries=await existingRes.json();
 
   if(existingEntries.length){
-    // Job already has entries — patch them directly, no re-seeding
-    // This preserves independently set times per vehicle
     await Promise.all(existingEntries.map(async entry=>{
       const override=vehicleOverrides.find(o=>o.vehicle===entry.vehicle);
-      const patch={type, notes:notes||entry.notes||null};
+      const patch={type, notes:notes||entry.notes||null, lead, team:team.length?team:null};
       if(override?.start_time) patch.start_time=override.start_time;
       if(override?.duration)   patch.duration=override.duration;
       await fetch(`/api/schedule/${entry.id}`,{
         method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)
       });
     }));
-    // Update the job's runsheet_date/type
     await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
       method:'PATCH',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({runsheet_date:date,runsheet_type:type,vehicles:schedVehicleSelected.length?schedVehicleSelected:null,_skip_seed:true})
     });
   } else {
-    // No existing entries — seed fresh with the selected vehicles
     const r1=await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
       method:'PATCH',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({runsheet_date:date,runsheet_type:type,vehicles:schedVehicleSelected.length?schedVehicleSelected:null})
@@ -1456,21 +1586,18 @@ async function saveRunsheetEntry(){
     const d1=await r1.json();
     if(!d1.success){alert('Failed to save: '+(d1.error||'unknown error'));return;}
 
-    // Apply time overrides and notes to the freshly seeded entries
-    if(vehicleOverrides.some(o=>o.start_time||o.duration)||notes){
-      const schedRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
-      const entries=await schedRes.json();
-      await Promise.all(entries.map(async entry=>{
-        const override=vehicleOverrides.find(o=>o.vehicle===entry.vehicle);
-        const patch={};
-        if(override?.start_time) patch.start_time=override.start_time;
-        if(override?.duration)   patch.duration=override.duration;
-        if(notes) patch.notes=notes;
-        if(Object.keys(patch).length){
-          await fetch(`/api/schedule/${entry.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
-        }
-      }));
-    }
+    const schedRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
+    const entries=await schedRes.json();
+    await Promise.all(entries.map(async entry=>{
+      const override=vehicleOverrides.find(o=>o.vehicle===entry.vehicle);
+      const patch={lead, team:team.length?team:null};
+      if(override?.start_time) patch.start_time=override.start_time;
+      if(override?.duration)   patch.duration=override.duration;
+      if(notes) patch.notes=notes;
+      if(Object.keys(patch).length){
+        await fetch(`/api/schedule/${entry.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
+      }
+    }));
   }
 
   const job=jobsById.get(runsheetPopoverJobId);
@@ -1587,6 +1714,10 @@ function populateJobSchedForm(dateStr){
   document.getElementById('job-sched-save-btn').disabled=true;
   document.getElementById('job-sched-save-btn').style.opacity='0.5';
   document.getElementById('job-sched-notes').value='';
+  // Lead and team
+  const leadEl=document.getElementById('job-sched-lead');
+  if(leadEl) leadEl.innerHTML=workerOptions('');
+  renderTeamChips('job-sched-team-chips',[]);
   const chipsDiv=document.getElementById('job-sched-vehicle-chips');
   chipsDiv.innerHTML=(RS_CONFIG.vehicles||[]).map(v=>
     `<button class="sched-chip" data-jsv="${v}" onclick="toggleJobSchedVehicle(this,'${v}')">${v}</button>`
@@ -1675,11 +1806,13 @@ async function saveJobSched(){
     const loadTime=document.getElementById('job-sched-load-time').value;
     const installTime=document.getElementById('job-sched-install-time').value;
     const notes=document.getElementById('job-sched-notes').value.trim()||null;
-    if(loadTime||installTime||notes){
+    const lead=document.getElementById('job-sched-lead')?.value||null;
+    const team=getTeamChips('job-sched-team-chips');
+    if(loadTime||installTime||notes||lead||team.length){
       const schedRes=await fetch(`/api/jobs/${_jobSchedSelected}/schedule`);
       const entries=await schedRes.json();
       await Promise.all(entries.map(async e=>{
-        const patch={};
+        const patch={lead,team:team.length?team:null};
         if(e.type==='to_load' && loadTime) patch.start_time=loadTime;
         if(e.type!=='to_load' && installTime) patch.start_time=installTime;
         if(notes) patch.notes=notes;

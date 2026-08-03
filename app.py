@@ -1501,12 +1501,15 @@ def checklist():
         if not pdf_base64:
             return jsonify({'success': False, 'error': 'No pdfBase64 provided'}), 400
 
-        pdf_bytes    = base64.b64decode(pdf_base64)
-        install_date = data.get('installDate')
-        job_owner    = data.get('jobOwner', '')
-        label_format = int(data.get('labelFormat', 18))  # 9 or 18 per page
-        meta, items  = parse_packing_list(pdf_bytes)
+        pdf_bytes       = base64.b64decode(pdf_base64)
+        install_date    = data.get('installDate')
+        install_address = data.get('installAddress', '').strip()
+        job_owner       = data.get('jobOwner', '')
+        label_format    = int(data.get('labelFormat', 18))  # 9 or 18 per page
+        meta, items     = parse_packing_list(pdf_bytes)
         meta['job_owner'] = job_owner
+        if install_address:
+            meta['address'] = install_address
 
         if not items:
             return jsonify({'success': False, 'error': 'No items found'}), 400
@@ -1545,14 +1548,17 @@ def generate():
         if not pdf_base64:
             return jsonify({'success': False, 'error': 'No pdfBase64 provided'}), 400
 
-        pdf_bytes    = base64.b64decode(pdf_base64)
-        install_date = data.get('installDate')
-        job_owner    = data.get('jobOwner', '')
-        label_format = int(data.get('labelFormat', 18))  # 9 or 18 per page
-        colour_name  = data.get('colourName')  # manual colour choice, or None for Auto
-        is_transfer  = bool(data.get('isTransfer', False))
+        pdf_bytes       = base64.b64decode(pdf_base64)
+        install_date    = data.get('installDate')
+        install_address = data.get('installAddress', '').strip()
+        job_owner       = data.get('jobOwner', '')
+        label_format    = int(data.get('labelFormat', 18))  # 9 or 18 per page
+        colour_name     = data.get('colourName')  # manual colour choice, or None for Auto
+        is_transfer     = bool(data.get('isTransfer', False))
         transfer_from_job_id = data.get('transferFromJobId') or None
-        meta, items  = parse_packing_list(pdf_bytes)
+        meta, items     = parse_packing_list(pdf_bytes)
+        if install_address:
+            meta['address'] = install_address
 
         if not items:
             return jsonify({'success': False, 'error': 'No items found in packing list'}), 400

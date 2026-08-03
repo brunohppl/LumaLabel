@@ -1791,14 +1791,11 @@ def api_job_status(job_id):
 
 @app.route('/api/jobs/<job_id>/notes', methods=['PATCH'])
 def api_job_notes(job_id):
-    """Save job-level notes and accessory tub count — independent of status.
-    styling_notes: lead stylist's notes for other stylists picking the job.
-    driver_notes: stylist's notes for the driver — shown on both /stylist and /driver.
-    accessory_tubs: number of accessory tubs needed — set by stylist, shown on driver."""
     data    = request.get_json()
     payload = {}
     if 'styling_notes'  in data: payload['styling_notes']  = data['styling_notes']
     if 'driver_notes'   in data: payload['driver_notes']   = data['driver_notes']
+    if 'address'        in data: payload['address']        = data['address'] or None
     if 'accessory_tubs' in data:
         v = data['accessory_tubs']
         payload['accessory_tubs'] = int(v) if v not in (None, '', 0) else None

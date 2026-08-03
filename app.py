@@ -2067,6 +2067,8 @@ def api_job_styling_add(job_id):
         'job_id':     job_id,
         'date':       data.get('date'),
         'person':     data.get('person'),
+        'lead':       data.get('lead') or None,
+        'team':       data.get('team') or None,
         'vehicle':    None,
         'type':       'styling',
         'category':   'styling',
@@ -2093,6 +2095,8 @@ def api_job_wh_pick_add(job_id):
         'job_id':     job_id,
         'date':       data.get('date'),
         'person':     data.get('person'),
+        'lead':       data.get('lead') or None,
+        'team':       data.get('team') or None,
         'vehicle':    None,
         'type':       'warehouse_pick',
         'category':   'warehouse_pick',
@@ -2207,6 +2211,8 @@ def api_schedule_update(entry_id):
             return jsonify({'success': False, 'error': 'Unknown vehicle'}), 400
         payload['vehicle'] = data['vehicle']
     if 'person'   in data: payload['person']   = data['person'] or None
+    if 'lead'     in data: payload['lead']     = data['lead'] or None
+    if 'team'     in data: payload['team']     = data['team'] or None
     if 'category' in data: payload['category'] = data['category'] or 'transport'
     if 'type'     in data: payload['type']     = data['type']
     if 'date'     in data: payload['date']     = data['date']

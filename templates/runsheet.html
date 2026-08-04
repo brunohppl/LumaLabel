@@ -170,7 +170,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     <label class="fl">Job</label>
     <input type="text" class="fi" id="job-search" placeholder="Job number or address…" oninput="searchJobs(this.value)"/>
     <div id="job-results" style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;display:none;margin-top:4px;"></div>
-    <div id="job-selected" style="display:none;padding:7px 10px;background:var(--sand);border-radius:4px;font-size:0.84rem;margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
+    <div id="job-selected" style="display:none;padding:7px 10px;background:var(--sand);border-radius:4px;font-size:0.84rem;margin-top:6px;justify-content:space-between;align-items:center;">
       <span id="job-selected-label"></span>
       <button onclick="clearJob()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;">✕</button>
     </div>
@@ -408,7 +408,7 @@ async function deleteTeam(){
 }
 
 // ── Entry popover ──
-function openEntryPop(entryId,teamId,slot){
+async function openEntryPop(entryId,teamId,slot){
   document.getElementById('entry-pop-title').textContent=entryId?'Edit Entry':'Add Entry';
   document.getElementById('entry-id').value=entryId||'';
   document.getElementById('entry-team-id').value=teamId||'';
@@ -448,14 +448,16 @@ function openEntryPop(entryId,teamId,slot){
           document.getElementById('job-selected').style.display='flex';
         } else if(e.job_id){
           // Fetch the job directly — it may be on a different date
-          fetch(`/api/jobs/${e.job_id}`).then(r=>r.json()).then(d=>{
+          try{
+            const r=await fetch(`/api/jobs/${e.job_id}`);
+            const d=await r.json();
             const j=d.job||d;
             if(j&&j.id){
               if(!dayJobs.find(x=>x.id===j.id)) dayJobs.push(j);
               document.getElementById('job-selected-label').textContent=`${j.job_ref||j.job_number} — ${j.address||''}`;
               document.getElementById('job-selected').style.display='flex';
             }
-          }).catch(()=>{});
+          }catch(err){}
         }
       }
       tSel.value=e.start_time||'';

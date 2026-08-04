@@ -62,7 +62,26 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .nav-back{display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--muted);text-decoration:none;margin-bottom:16px;}
 .nav-back:hover{color:var(--accent);}
 
-/* Slack confirm popup */
+/* Grid view */
+.tv-wrap{overflow-x:auto;margin:0 -16px;padding:0 16px;}
+.tv-grid{display:grid;position:relative;min-width:500px;}
+.tv-time{font-size:0.65rem;color:var(--muted);text-align:right;padding-right:8px;padding-top:4px;width:52px;border-top:1px solid var(--border);}
+.tv-hdr{border-radius:8px 8px 0 0;padding:10px 10px 8px;margin:0 2px;}
+.tv-hdr-fn{font-size:0.58rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.65);margin-bottom:2px;}
+.tv-hdr-name{font-size:0.85rem;font-weight:700;color:white;}
+.tv-hdr-sub{font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px;}
+.tv-hdr-lead{font-size:0.7rem;color:rgba(255,255,255,0.9);font-weight:600;margin-top:2px;}
+.tv-cell{border-top:1px solid var(--border);margin:0 2px;position:relative;}
+.tv-tile{position:absolute;left:2px;right:2px;border-radius:5px;padding:5px 7px;overflow:hidden;z-index:2;border-left:3px solid rgba(0,0,0,0.15);}
+.tv-tile-label{font-size:0.58rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.75);}
+.tv-tile-ref{font-size:0.76rem;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tv-tile-addr{font-size:0.72rem;color:rgba(255,255,255,0.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tv-tile-note{font-size:0.63rem;color:rgba(255,255,255,0.7);font-style:italic;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tv-tile.install{background:#5b9bd5;color:white;}
+.tv-tile.pickup{background:#e07070;color:white;}
+.tv-tile.to_load{background:#6abf7a;color:white;}
+.tv-tile.task{background:#7a7060;}
+.tv-tile.styling{background:var(--purple);}
 .slack-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.55);z-index:400;align-items:center;justify-content:center;padding:24px;}
 .slack-overlay.open{display:flex;}
 .slack-sheet{background:white;border-radius:10px;padding:24px;max-width:320px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2);}
@@ -119,7 +138,121 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 </div>
 
 <script>
-const ALL_WORKERS=['Addy','Montie','Delphine','India','Hayley','Jo','Savio','Nick','Ayoub','Bruno','Phil','Tiago'];
+const SLOTS=[];for(let h=7;h<=15;h++)for(let m=0;m<60;m+=30){if(h===15&&m>30)break;SLOTS.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);}
+const SLOT_H=44;
+function slotIdx(t){if(!t)return 0;const[h,m]=t.split(':').map(Number);return Math.max(0,(h-7)*2+Math.floor(m/30));}
+function fmtSlot(t){if(!t)return'';const[h,m]=t.split(':').map(Number);return`${h%12||12}:${String(m).padStart(2,'0')}${h<12?'am':'pm'}`;}
+
+function renderGrid(teams, schedule, tasks, jobById){
+  const grid=document.getElementById('tv-grid');
+  if(!grid) return;
+  const n=teams.length;
+  const timew=52;
+  const cols=`${timew}px repeat(${n},minmax(130px,1fr))`;
+  const rows=`auto repeat(${SLOTS.length},${SLOT_H}px)`;
+
+  let g=`<div style="display:grid;grid-template-columns:${cols};grid-template-rows:${rows};" id="tv-inner">`;
+  g+=`<div style="grid-column:1;grid-row:1;"></div>`;
+  teams.forEach((t,i)=>{
+    const col=FN_COL[t.function]||'#1a1714';
+    const others=(t.members||[]).filter(m=>m!==t.lead).join(', ');
+    g+=`<div class="tv-hdr" style="grid-column:${i+2};grid-row:1;background:${col};">
+      <div class="tv-hdr-fn">${FN_LBL[t.function]||t.function}</div>
+      <div class="tv-hdr-name">${t.name||t.vehicle||'Team '+(i+1)}</div>
+      ${t.vehicle?`<div class="tv-hdr-sub">Vehicle: ${t.vehicle}</div>`:''}
+      ${t.lead?`<div class="tv-hdr-lead">Lead: ${t.lead}</div>`:''}
+      ${others?`<div class="tv-hdr-sub">${others}</div>`:''}
+    </div>`;
+  });
+
+  SLOTS.forEach((slot,si)=>{
+    const row=si+2;
+    const showLbl=slot.endsWith(':00');
+    g+=`<div class="tv-time" style="grid-column:1;grid-row:${row};">${showLbl?fmtSlot(slot):''}</div>`;
+    teams.forEach((_,i)=>{
+      g+=`<div class="tv-cell" style="grid-column:${i+2};grid-row:${row};" data-ti="${i}" data-slot="${slot}"></div>`;
+    });
+  });
+  g+='</div>';
+  grid.innerHTML=g;
+
+  // Group entries by team
+  const byTeam={};
+  teams.forEach(t=>{byTeam[t.id]=[];});
+  schedule.forEach(e=>{
+    const tid=e.team_id||(teams.find(t=>t.vehicle===e.vehicle)?.id);
+    if(tid&&byTeam[tid]) byTeam[tid].push({...e,_task:false});
+  });
+  tasks.forEach(e=>{
+    const tid=e.team_id||(teams.find(t=>t.vehicle===e.vehicle||e.vehicle==='ALL')?.id);
+    if(tid&&byTeam[tid]) byTeam[tid].push({...e,_task:true});
+  });
+
+  const inner=document.getElementById('tv-inner');
+  teams.forEach((team,ti)=>{
+    const entries=(byTeam[team.id]||[]).filter(e=>e.start_time);
+
+    // Detect overlaps and assign sub-columns
+    const placed=entries.map(e=>{
+      const si=slotIdx(e.start_time);
+      const span=Math.max(1,Math.round((e.duration||60)/30));
+      return{e,si,span,subCol:0,totalSubCols:1};
+    });
+    placed.forEach((a,ai)=>{
+      const overlaps=placed.filter((b,bi)=>bi!==ai&&b.si<a.si+a.span&&b.si+b.span>a.si);
+      if(overlaps.length){const group=[a,...overlaps].sort((x,y)=>x.si-y.si);group.forEach((item,idx)=>{item.subCol=idx;item.totalSubCols=group.length;});}
+    });
+
+    placed.forEach(({e,si,span,subCol,totalSubCols})=>{
+      const cell=inner.querySelector(`[data-ti="${ti}"][data-slot="${SLOTS[si]}"]`);
+      if(!cell) return;
+      const isTask=e._task;
+      const typeKey=isTask?'task':(e.type||'install');
+      const job=isTask?null:jobById[e.job_id];
+      const ref=isTask?(e.title||'Task'):(job?job.job_ref||job.job_number:'—');
+      const addr=job?job.address?.split(',')[0]||'':'';
+      const lbl=isTask?'Task':{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'';
+      const pct=100/totalSubCols;
+
+      const tile=document.createElement('div');
+      tile.className=`tv-tile ${typeKey}`;
+      tile.style.cssText=`top:0;left:calc(${subCol*pct}% + 2px);width:calc(${pct}% - 4px);height:${span*SLOT_H-3}px;position:absolute;`;
+      tile.innerHTML=`<div class="tv-tile-label">${lbl}</div><div class="tv-tile-ref">${ref}</div>${addr?`<div class="tv-tile-addr">${addr}</div>`:''} ${e.notes?`<div class="tv-tile-note">📝 ${e.notes}</div>`:''}`;
+      // Tap to see job actions
+      if(job){
+        tile.style.cursor='pointer';
+        tile.onclick=()=>{
+          const mapsUrl=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address||'')}`;
+          const actions=[
+            {label:'📍 Navigate', fn:()=>navigate(job.id,job.address||'')},
+            {label:'✎ Stylist',   fn:()=>window.open(`/stylist/${job.id}`,'_blank')},
+            {label:'🚛 Driver',   fn:()=>window.open(`/driver/${job.id}`,'_blank')},
+          ];
+          showTileActions(ref, addr, actions);
+        };
+      }
+      cell.style.position='relative';
+      cell.appendChild(tile);
+    });
+  });
+}
+
+// Quick action sheet when tapping a tile in full view
+let _actionSheet=null;
+function showTileActions(ref, addr, actions){
+  if(_actionSheet) _actionSheet.remove();
+  const sheet=document.createElement('div');
+  sheet.style.cssText='position:fixed;inset:0;background:rgba(26,23,20,0.5);z-index:300;display:flex;align-items:flex-end;justify-content:center;padding:16px;';
+  sheet.innerHTML=`<div style="background:white;border-radius:10px;padding:20px;width:100%;max-width:400px;">
+    <div style="font-weight:700;font-size:1rem;margin-bottom:4px;">${ref}</div>
+    <div style="font-size:0.82rem;color:var(--muted);margin-bottom:16px;">${addr}</div>
+    ${actions.map(a=>`<button onclick="this.closest('[style]').remove();(${a.fn.toString()})()" style="width:100%;padding:12px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background:white;font-family:'Jost',sans-serif;font-size:0.88rem;font-weight:600;cursor:pointer;text-align:left;">${a.label}</button>`).join('')}
+    <button onclick="this.closest('[style]').remove()" style="width:100%;padding:10px;border:none;background:none;font-family:'Jost',sans-serif;font-size:0.82rem;color:var(--muted);cursor:pointer;">Cancel</button>
+  </div>`;
+  sheet.onclick=e=>{if(e.target===sheet)sheet.remove();};
+  document.body.appendChild(sheet);
+  _actionSheet=sheet;
+}
 const FN_COL={transport:'#2e5a8a',styling:'#6a3d8a',warehouse:'#b8935a'};
 const FN_LBL={transport:'🚛 Transport',styling:'🎨 Styling',warehouse:'🏭 Warehouse'};
 const TYPE_LBL={install:'Install',pickup:'Pickup',to_load:'To Load',task:'Task',styling:'Styling'};
@@ -163,36 +296,14 @@ function renderDay(){
   const jobs=dayData.jobs||[];
   const jobById=Object.fromEntries(jobs.map(j=>[j.id,j]));
 
-  // Full day view — show all teams grouped
+  // Full day grid view — all teams as columns
   if(!name){
     if(!teams.length){
       content.innerHTML='<div class="empty"><div class="empty-title">Nothing scheduled</div><div class="empty-sub">No teams set up for this day yet.</div></div>';
       return;
     }
-    let html='';
-    teams.forEach(team=>{
-      const col=FN_COL[team.function]||'#1a1714';
-      const others=(team.members||[]).filter(m=>m!==team.lead).join(', ');
-      const teamEntries=[
-        ...schedule.filter(e=>e.team_id===team.id||(!e.team_id&&team.vehicle&&e.vehicle===team.vehicle)),
-        ...tasks.filter(t=>t.team_id===team.id||(!t.team_id&&team.vehicle&&(t.vehicle===team.vehicle||t.vehicle==='ALL'))),
-      ].sort((a,b)=>(a.start_time||'99:99').localeCompare(b.start_time||'99:99'));
-
-      html+=`<div style="margin-bottom:24px;">
-        <div class="team-badge" style="background:${col};margin-bottom:10px;">
-          ${FN_LBL[team.function]||team.function} · ${team.name||team.vehicle||'Team'}
-          ${team.lead?` · Lead: ${team.lead}`:''}
-          ${others?` · ${others}`:''}
-        </div>`;
-
-      if(!teamEntries.length){
-        html+=`<div style="font-size:0.82rem;color:var(--muted);padding:10px 0;">Nothing scheduled yet.</div>`;
-      } else {
-        html+=teamEntries.map(e=>cardHTML(e,jobById,true)).join('');
-      }
-      html+='</div>';
-    });
-    content.innerHTML=html;
+    content.innerHTML=`<div class="tv-wrap"><div id="tv-grid"></div></div>`;
+    renderGrid(teams, schedule, tasks, jobById);
     return;
   }
 

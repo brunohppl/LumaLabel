@@ -274,8 +274,8 @@ function cardHTML(e, jobById, showTeam){
       ${e.notes?`<div class="card-note">📝 ${e.notes}</div>`:''}
       ${job?`<div class="card-btns">
         <button class="card-btn card-btn-nav" onclick="navigate('${job.id}','${addr.replace(/'/g,"\\'")}')">📍 Navigate</button>
-        ${typeKey!=='to_load'?`<a href="/stylist/${job.id}" target="_blank" class="card-btn card-btn-stylist">✎ Stylist</a>`:''}
-        <a href="/driver/${job.id}" target="_blank" class="card-btn card-btn-driver">🚛 Driver</a>
+        ${e._team?.function==='styling'?`<a href="/stylist/${job.id}" target="_blank" class="card-btn card-btn-stylist">✎ Stylist</a>`:''}
+        ${e._team?.function!=='styling'?`<a href="/driver/${job.id}" target="_blank" class="card-btn card-btn-driver">🚛 Driver</a>`:''}
       </div>`:''}
     </div>
   </div>`;

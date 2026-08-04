@@ -249,7 +249,7 @@ async function load(){
   }catch(e){document.getElementById('rs-grid').innerHTML='<div class="loading">Failed to load.</div>';}
 }
 
-async function render(){
+function render(){
   const n=dayTeams.length;
   const timew=56,colw=Math.max(160,Math.floor((window.innerWidth-timew-40)/(n+1)));
   const cols=`${timew}px repeat(${n},${colw}px) ${Math.max(120,colw*0.7)}px`;
@@ -286,21 +286,8 @@ async function render(){
 
   document.getElementById('rs-grid').innerHTML=g;
 
-  // Inject tiles — first fetch any jobs not already in dayJobs
+  // Inject tiles
   const jobById=Object.fromEntries(dayJobs.map(j=>[j.id,j]));
-
-  // Find job_ids referenced in schedule that aren't in dayJobs
-  const missingIds=[...new Set(daySchedule.map(e=>e.job_id).filter(id=>id&&!jobById[id]))];
-  if(missingIds.length){
-    await Promise.all(missingIds.map(async id=>{
-      try{
-        const r=await fetch(`/api/jobs/${id}`);
-        const d=await r.json();
-        const j=d.job||d;
-        if(j&&j.id){jobById[j.id]=j;}
-      }catch(e){}
-    }));
-  }
   const byTeam={};
   dayTeams.forEach(t=>{byTeam[t.id]=[];});
 

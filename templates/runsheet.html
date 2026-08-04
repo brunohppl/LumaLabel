@@ -227,6 +227,24 @@ async function load(){
     const d=await dr.json();
     dayTeams=d.teams||[];daySchedule=d.schedule||[];dayTasks=d.tasks||[];dayJobs=d.jobs||[];
     templates=await tr.json();
+
+    // Auto-seed four default teams if none exist for this day
+    if(!dayTeams.length){
+      const defaults=[
+        {name:'Nemo Crew',   vehicle:'Nemo',   function:'transport', sort_order:0},
+        {name:'Bruce Crew',  vehicle:'Bruce',  function:'transport', sort_order:1},
+        {name:'Nigel Crew',  vehicle:'Nigel',  function:'transport', sort_order:2},
+        {name:'Styling',     vehicle:'Marlin', function:'styling',   sort_order:3},
+      ];
+      await Promise.all(defaults.map(t=>
+        fetch(`/api/teams/${ds}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(t)})
+      ));
+      // Re-fetch with the seeded teams
+      const dr2=await fetch(`/api/runsheet/${ds}`);
+      const d2=await dr2.json();
+      dayTeams=d2.teams||[];daySchedule=d2.schedule||[];dayTasks=d2.tasks||[];dayJobs=d2.jobs||[];
+    }
+
     render();
   }catch(e){document.getElementById('rs-grid').innerHTML='<div class="loading">Failed to load.</div>';}
 }

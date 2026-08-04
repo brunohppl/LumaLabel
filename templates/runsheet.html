@@ -302,22 +302,44 @@ function render(){
 
   const inner=document.getElementById('rs-inner');
   dayTeams.forEach((team,ti)=>{
-    (byTeam[team.id]||[]).forEach(e=>{
-      if(!e.start_time) return;
+    const entries=(byTeam[team.id]||[]).filter(e=>e.start_time);
+
+    // Detect overlapping groups and assign sub-columns
+    // Each entry gets {entry, si, span, subCol, totalSubCols}
+    const placed=entries.map(e=>{
       const si=slotIdx(e.start_time);
-      const dur=e.duration||60;
-      const span=Math.max(1,Math.round(dur/30));
+      const span=Math.max(1,Math.round((e.duration||60)/30));
+      return {e, si, span, subCol:0, totalSubCols:1};
+    });
+
+    // Group overlapping entries and split into sub-columns
+    placed.forEach((a,ai)=>{
+      const overlaps=placed.filter((b,bi)=>bi!==ai&&b.si<a.si+a.span&&b.si+b.span>a.si);
+      if(overlaps.length){
+        const group=[a,...overlaps].sort((x,y)=>x.si-y.si);
+        const total=group.length;
+        group.forEach((item,idx)=>{item.subCol=idx;item.totalSubCols=total;});
+      }
+    });
+
+    placed.forEach(({e,si,span,subCol,totalSubCols})=>{
       const cell=inner.querySelector(`[data-team="${ti}"][data-slot="${SLOTS[si]}"]`);
       if(!cell) return;
-      const tile=document.createElement('div');
       const isTask=e._task;
       const typeKey=isTask?'task':(e.type||'install');
       const job=isTask?null:jobById[e.job_id];
       const ref=isTask?(e.title||'Task'):(job?job.job_ref||job.job_number:'—');
       const addr=job?job.address?.split(',')[0]||'':'';
       const lbl=isTask?'Task':{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'';
+
+      // Sub-column positioning
+      const pct=100/totalSubCols;
+      const left=subCol*pct;
+      const width=pct;
+
+      const tile=document.createElement('div');
       tile.className=`rs-tile ${typeKey}`;
-      tile.style.cssText=`top:0;left:2px;right:2px;height:${span*SLOT_H-4}px;cursor:pointer;`;
+      tile.style.cssText=`top:0;left:calc(${left}% + 2px);width:calc(${width}% - 4px);height:${span*SLOT_H-4}px;cursor:pointer;position:absolute;`;
       tile.innerHTML=`<div class="rs-tile-label">${lbl}</div><div class="rs-tile-ref">${ref}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
       tile.onclick=()=>openEntryPop(e.id,team.id,null);
       cell.style.position='relative';

@@ -181,7 +181,7 @@ function renderDay(){
       html+=`<div style="margin-bottom:24px;">
         <div class="team-badge" style="background:${col};margin-bottom:10px;">
           ${FN_LBL[team.function]||team.function} · ${team.name||team.vehicle||'Team'}
-          ${team.lead?` · ⭐ ${team.lead}`:''}
+          ${team.lead?` · Lead: ${team.lead}`:''}
           ${others?` · ${others}`:''}
         </div>`;
 
@@ -220,7 +220,7 @@ function renderDay(){
   myTeams.forEach(t=>{
     const col=FN_COL[t.function]||'#1a1714';
     const others=(t.members||[]).filter(m=>m!==t.lead).join(', ');
-    html+=`<div class="team-badge" style="background:${col};">${FN_LBL[t.function]||t.function} · ${t.name||t.vehicle||'Team'}${t.lead?` · ⭐ ${t.lead}`:''}${others?` · ${others}`:''}</div><br/>`;
+    html+=`<div class="team-badge" style="background:${col};">${FN_LBL[t.function]||t.function} · ${t.name||t.vehicle||'Team'}${t.lead?` · Lead: ${t.lead}`:''}${others?` · ${others}`:''}</div><br/>`;
   });
   html+=combined.map(e=>cardHTML(e,jobById,false)).join('');
   content.innerHTML=html;

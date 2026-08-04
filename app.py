@@ -2031,19 +2031,17 @@ def api_job_runsheet(job_id):
 
 @app.route('/api/runsheet/<date_str>', methods=['GET'])
 def api_runsheet_day(date_str):
-    """Full day data for the runsheet — teams, schedule entries, jobs, tasks."""
+    """Full day data — teams, schedule entries, jobs (all referenced), tasks."""
     teams    = sb_get('day_teams',    f'date=eq.{date_str}&order=sort_order.asc,created_at.asc') or []
     schedule = sb_get('job_schedule', f'date=eq.{date_str}&order=start_time.asc,created_at.asc') or []
     tasks    = sb_get('runsheet_tasks', f'date=eq.{date_str}&order=start_time.asc') or []
 
-    job_ids     = list({e['job_id'] for e in schedule if e.get('job_id')})
-    legacy_jobs = sb_get('jobs', f'runsheet_date=eq.{date_str}') or []
-    legacy_ids  = [j['id'] for j in legacy_jobs]
-    all_ids     = list({*job_ids, *legacy_ids})
+    # Collect ALL job_ids referenced by schedule entries — regardless of their install date
+    job_ids = list({e['job_id'] for e in schedule if e.get('job_id')})
     jobs = []
-    if all_ids:
-        ids_str = ','.join(all_ids)
-        jobs    = sb_get('jobs', f'id=in.({ids_str})') or []
+    if job_ids:
+        ids_str = ','.join(job_ids)
+        jobs = sb_get('jobs', f'id=in.({ids_str})') or []
 
     return jsonify({
         'teams':    teams,

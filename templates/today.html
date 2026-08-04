@@ -203,8 +203,8 @@ function renderDay(){
   let html='';
   myTeams.forEach(t=>{
     const col=FN_COL[t.function]||'#1a1714';
-    const crew=[t.lead,...(t.members||[])].filter(Boolean).join(', ');
-    html+=`<div class="team-badge" style="background:${col};">${FN_LBL[t.function]||t.function} · ${t.name||t.vehicle||'Team'}<span style="opacity:0.65;font-weight:400;"> · ${crew}</span></div><br/>`;
+    const others=(t.members||[]).filter(m=>m!==t.lead).join(', ');
+    html+=`<div class="team-badge" style="background:${col};">${FN_LBL[t.function]||t.function} · ${t.name||t.vehicle||'Team'}${t.lead?` · ⭐ ${t.lead}`:''}${others?` · ${others}`:''}</div><br/>`;
   });
 
   html+=combined.map(e=>{

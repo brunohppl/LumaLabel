@@ -2288,10 +2288,12 @@ def api_job_schedule_add(job_id):
 
 @app.route('/api/schedule/<entry_id>', methods=['PATCH'])
 def api_schedule_update(entry_id):
-    """Edit a schedule entry. Body: any of {vehicle, person, category, date, type, start_time, duration, notes}"""
+    """Edit a schedule entry."""
     data    = request.get_json()
     payload = {}
-    if 'vehicle' in data:
+    if 'job_id'   in data: payload['job_id']   = data['job_id'] or None
+    if 'team_id'  in data: payload['team_id']  = data['team_id'] or None
+    if 'vehicle'  in data:
         if data['vehicle'] is not None and data['vehicle'] not in RUNSHEET_VEHICLES:
             return jsonify({'success': False, 'error': 'Unknown vehicle'}), 400
         payload['vehicle'] = data['vehicle']
@@ -2306,9 +2308,11 @@ def api_schedule_update(entry_id):
             return jsonify({'success': False, 'error': 'Invalid start_time'}), 400
         payload['start_time'] = data['start_time']
     if 'duration' in data:
-        if data['duration'] is not None and data['duration'] not in RUNSHEET_DURATIONS:
-            return jsonify({'success': False, 'error': 'Invalid duration'}), 400
-        payload['duration'] = data['duration']
+        dur = data['duration']
+        if dur is not None:
+            try: dur = int(dur)
+            except: return jsonify({'success': False, 'error': 'Invalid duration'}), 400
+        payload['duration'] = dur
     if 'notes'    in data: payload['notes'] = data['notes'] or None
     result = sb_patch('job_schedule', f'id=eq.{entry_id}', payload)
     return jsonify({'success': bool(result)})

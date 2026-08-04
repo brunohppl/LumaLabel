@@ -567,6 +567,7 @@ function jobCardHTML(job){
 }
 
 function startEditAddress(jobId){
+  if(!confirm('Edit the address for this job?')) return;
   const div=document.getElementById(`addr-${jobId}`);
   if(!div||div.querySelector('input')) return; // already editing
   const job=lastFetchedJobs.find(j=>j.id===jobId);

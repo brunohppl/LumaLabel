@@ -1627,6 +1627,11 @@ def catalogue_page():
     with open('templates/catalogue.html', 'r') as f:
         return f.read()
 
+@app.route('/today', methods=['GET'])
+def today_page():
+    with open('templates/today.html', 'r') as f:
+        return f.read()
+
 @app.route('/runsheet', methods=['GET'])
 def runsheet_page():
     with open('templates/runsheet.html', 'r') as f:
@@ -2021,36 +2026,108 @@ def api_job_runsheet(job_id):
 
 @app.route('/api/runsheet/<date_str>', methods=['GET'])
 def api_runsheet_day(date_str):
-    """Jobs + schedule entries (transport, styling, warehouse_pick) + crew + tasks for a date."""
+    """Full day data for the runsheet — teams, schedule entries, jobs, tasks."""
+    teams    = sb_get('day_teams',    f'date=eq.{date_str}&order=sort_order.asc,created_at.asc') or []
     schedule = sb_get('job_schedule', f'date=eq.{date_str}&order=start_time.asc,created_at.asc') or []
+    tasks    = sb_get('runsheet_tasks', f'date=eq.{date_str}&order=start_time.asc') or []
 
     job_ids     = list({e['job_id'] for e in schedule if e.get('job_id')})
     legacy_jobs = sb_get('jobs', f'runsheet_date=eq.{date_str}') or []
     legacy_ids  = [j['id'] for j in legacy_jobs]
     all_ids     = list({*job_ids, *legacy_ids})
-
     jobs = []
     if all_ids:
         ids_str = ','.join(all_ids)
         jobs    = sb_get('jobs', f'id=in.({ids_str})') or []
 
-    crew  = sb_get('vehicle_day_crew', f'date=eq.{date_str}') or []
-    tasks = sb_get('runsheet_tasks',   f'date=eq.{date_str}&order=start_time.asc') or []
-
-    # Split schedule by category for the three tabs
-    transport  = [e for e in schedule if (e.get('category') or 'transport') == 'transport']
-    styling    = [e for e in schedule if e.get('category') == 'styling']
-    wh_picks   = [e for e in schedule if e.get('category') == 'warehouse_pick']
-    wh_tasks   = [t for t in tasks if (t.get('category') or 'warehouse') == 'warehouse']
-
     return jsonify({
-        'jobs':      jobs,
-        'schedule':  transport,       # backward compat — transport entries
-        'styling':   styling,
-        'wh_picks':  wh_picks,
-        'tasks':     wh_tasks,
-        'crew':      crew,
+        'teams':    teams,
+        'schedule': schedule,
+        'tasks':    tasks,
+        'jobs':     jobs,
     })
+
+
+# ── Day teams CRUD ────────────────────────────────────────────────────────────
+
+@app.route('/api/schedule-entry', methods=['POST'])
+def api_schedule_entry_create():
+    """Create a job_schedule entry directly with full control."""
+    data   = request.get_json()
+    result = sb_post('job_schedule', {
+        'job_id':     data.get('job_id'),
+        'date':       data.get('date'),
+        'team_id':    data.get('team_id') or None,
+        'vehicle':    data.get('vehicle') or None,
+        'person':     data.get('person') or None,
+        'type':       data.get('type', 'install'),
+        'category':   data.get('category', 'transport'),
+        'start_time': data.get('start_time') or None,
+        'duration':   data.get('duration') or None,
+        'notes':      data.get('notes') or None,
+        'lead':       data.get('lead') or None,
+        'team':       data.get('team') or None,
+    })
+    return jsonify({'success': bool(result), 'entry': result[0] if result else None})
+
+@app.route('/api/teams/<date_str>', methods=['GET'])
+def api_teams_list(date_str):
+    teams = sb_get('day_teams', f'date=eq.{date_str}&order=sort_order.asc,created_at.asc') or []
+    return jsonify(teams)
+
+@app.route('/api/teams/<date_str>', methods=['POST'])
+def api_teams_create(date_str):
+    data = request.get_json()
+    result = sb_post('day_teams', {
+        'date':       date_str,
+        'name':       data.get('name') or None,
+        'vehicle':    data.get('vehicle') or None,
+        'function':   data.get('function', 'transport'),
+        'lead':       data.get('lead') or None,
+        'members':    data.get('members') or [],
+        'colour':     data.get('colour') or None,
+        'sort_order': data.get('sort_order', 0),
+    })
+    return jsonify({'success': bool(result), 'team': result[0] if result else None})
+
+@app.route('/api/teams/entry/<team_id>', methods=['PATCH'])
+def api_teams_update(team_id):
+    data    = request.get_json()
+    payload = {}
+    for f in ('name','vehicle','function','lead','members','colour','sort_order'):
+        if f in data: payload[f] = data[f]
+    result = sb_patch('day_teams', f'id=eq.{team_id}', payload)
+    return jsonify({'success': bool(result)})
+
+@app.route('/api/teams/entry/<team_id>', methods=['DELETE'])
+def api_teams_delete(team_id):
+    # Unlink schedule entries first
+    sb_patch('job_schedule', f'team_id=eq.{team_id}', {'team_id': None})
+    result = sb_delete('day_teams', f'id=eq.{team_id}')
+    return jsonify({'success': bool(result)})
+
+# ── Team templates ────────────────────────────────────────────────────────────
+
+@app.route('/api/team-templates', methods=['GET'])
+def api_team_templates_list():
+    return jsonify(sb_get('team_templates', 'order=name.asc') or [])
+
+@app.route('/api/team-templates', methods=['POST'])
+def api_team_templates_create():
+    data = request.get_json()
+    result = sb_post('team_templates', {
+        'name':     data.get('name'),
+        'vehicle':  data.get('vehicle') or None,
+        'function': data.get('function', 'transport'),
+        'lead':     data.get('lead') or None,
+        'members':  data.get('members') or [],
+    })
+    return jsonify({'success': bool(result), 'template': result[0] if result else None})
+
+@app.route('/api/team-templates/<tmpl_id>', methods=['DELETE'])
+def api_team_templates_delete(tmpl_id):
+    result = sb_delete('team_templates', f'id=eq.{tmpl_id}')
+    return jsonify({'success': bool(result)})
 
 
 # ── Styling schedule routes ──────────────────────────────────────────────────

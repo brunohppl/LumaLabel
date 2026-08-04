@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>My Day · LUMA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{--ink:#1a1714;--accent:#b8935a;--green:#4a7c59;--red:#e85c47;--blue:#2e5a8a;--purple:#6a3d8a;--muted:#9a8f80;--border:#e0d8ce;--sand:#f0ebe4;--warm:#faf8f4;}
+body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-height:100vh;}
+
+/* HERO */
+.hero{background:var(--ink);padding:24px 20px 20px;text-align:center;}
+.hero-logo{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;letter-spacing:0.14em;color:#faf8f4;}
+.hero-logo em{font-style:italic;color:var(--accent);}
+.hero-date{font-size:0.82rem;color:rgba(250,248,244,0.4);margin-top:6px;letter-spacing:0.06em;}
+
+.page{max-width:600px;margin:0 auto;padding:20px 16px 60px;}
+
+/* NAME PICKER */
+.who-card{background:white;border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:20px;}
+.who-label{font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.who-select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-family:'Jost',sans-serif;font-size:1rem;font-weight:500;color:var(--ink);background:white;outline:none;}
+.who-select:focus{border-color:var(--accent);}
+
+/* DATE NAV */
+.date-row{display:flex;align-items:center;gap:8px;margin-bottom:16px;}
+.date-nav{background:none;border:1px solid var(--border);border-radius:4px;padding:6px 12px;cursor:pointer;font-size:1rem;color:var(--ink);}
+.date-nav:hover{background:var(--sand);}
+.date-lbl{flex:1;text-align:center;font-size:0.88rem;font-weight:600;color:var(--ink);}
+.btn-today{padding:6px 14px;background:var(--accent);color:white;border:none;border-radius:4px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;cursor:pointer;}
+
+/* TEAM BADGE */
+.team-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:6px;margin-bottom:16px;font-size:0.82rem;font-weight:600;color:white;}
+
+/* CARDS */
+.card{background:white;border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:12px;display:flex;gap:14px;align-items:flex-start;border-left:4px solid transparent;}
+.card.install{border-left-color:var(--green);}
+.card.pickup{border-left-color:var(--blue);}
+.card.to_load{border-left-color:var(--accent);}
+.card.task{border-left-color:var(--muted);}
+.card.styling{border-left-color:var(--purple);}
+.card-time{text-align:center;min-width:48px;flex-shrink:0;}
+.card-time-h{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;line-height:1;color:var(--ink);}
+.card-time-ampm{font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-top:2px;}
+.card-body{flex:1;}
+.card-type{font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:3px;color:var(--muted);}
+.card-ref{font-size:1rem;font-weight:600;color:var(--ink);margin-bottom:2px;}
+.card-addr{font-size:0.85rem;color:var(--muted);margin-bottom:8px;}
+.card-note{font-size:0.8rem;color:var(--muted);font-style:italic;margin-bottom:8px;}
+.card-btns{display:flex;gap:8px;flex-wrap:wrap;}
+.card-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:6px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;cursor:pointer;text-decoration:none;border:none;}
+.card-btn-nav{background:var(--accent);color:white;}
+.card-btn-stylist{background:rgba(74,124,89,0.1);color:var(--green);}
+.card-btn-driver{background:rgba(46,90,138,0.1);color:var(--blue);}
+.empty{text-align:center;padding:48px 20px;}
+.empty-title{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--ink);margin-bottom:6px;}
+.empty-sub{font-size:0.85rem;color:var(--muted);}
+.loading{text-align:center;padding:40px;color:var(--muted);}
+.nav-back{display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--muted);text-decoration:none;margin-bottom:16px;}
+.nav-back:hover{color:var(--accent);}
+
+/* Slack confirm popup */
+.slack-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.55);z-index:400;align-items:center;justify-content:center;padding:24px;}
+.slack-overlay.open{display:flex;}
+.slack-sheet{background:white;border-radius:10px;padding:24px;max-width:320px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2);}
+.slack-title{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:600;margin-bottom:8px;}
+.slack-sub{font-size:0.85rem;color:var(--muted);margin-bottom:18px;line-height:1.4;}
+.slack-btns{display:flex;flex-direction:column;gap:8px;}
+.slack-btn{width:100%;padding:12px;border-radius:6px;font-family:'Jost',sans-serif;font-size:0.88rem;font-weight:600;cursor:pointer;border:none;}
+.slack-btn-yes{background:var(--accent);color:white;}
+.slack-btn-no{background:white;color:var(--ink);border:1px solid var(--border);}
+.slack-btn-cancel{background:none;color:var(--muted);font-size:0.82rem;}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-logo">LUMA <em>Design</em> Co</div>
+  <div class="hero-date" id="hero-date"></div>
+</div>
+
+<!-- Slack popup -->
+<div class="slack-overlay" id="slack-overlay">
+  <div class="slack-sheet">
+    <div style="font-size:1.8rem;margin-bottom:8px;">📍</div>
+    <div class="slack-title">Notify Slack?</div>
+    <div class="slack-sub">Send an ETA to Slack before opening Maps?</div>
+    <div class="slack-btns">
+      <button class="slack-btn slack-btn-yes" onclick="slackChoice('yes')">Yes — notify Slack</button>
+      <button class="slack-btn slack-btn-no"  onclick="slackChoice('no')">No — just open Maps</button>
+      <button class="slack-btn slack-btn-cancel" onclick="slackChoice('cancel')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+  <a href="/runsheet" class="nav-back">← Admin Runsheet</a>
+
+  <!-- Who am I -->
+  <div class="who-card">
+    <div class="who-label">I am</div>
+    <select class="who-select" id="who-select" onchange="saveName();renderDay()">
+      <option value="">— select your name —</option>
+    </select>
+  </div>
+
+  <!-- Date nav -->
+  <div class="date-row">
+    <button class="date-nav" onclick="shiftDate(-1)">‹</button>
+    <div class="date-lbl" id="date-lbl"></div>
+    <button class="date-nav" onclick="shiftDate(1)">›</button>
+    <button class="btn-today" onclick="goToday()">Today</button>
+  </div>
+
+  <div id="day-content"><div class="loading">Loading…</div></div>
+</div>
+
+<script>
+const ALL_WORKERS=['Addy','Montie','Delphine','India','Hayley','Jo','Savio','Nick','Ayoub','Bruno','Phil','Tiago'];
+const FN_COL={transport:'#2e5a8a',styling:'#6a3d8a',warehouse:'#b8935a'};
+const FN_LBL={transport:'🚛 Transport',styling:'🎨 Styling',warehouse:'🏭 Warehouse'};
+const TYPE_LBL={install:'Install',pickup:'Pickup',to_load:'To Load',task:'Task',styling:'Styling'};
+
+let viewDate=new Date();
+let dayData={teams:[],schedule:[],tasks:[],jobs:[]};
+let _pendingNav=null;
+
+function localDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function fmtDate(d){return d.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'});}
+function fmtTime(t){if(!t)return{h:'—',ampm:''};const[h,m]=t.split(':').map(Number);return{h:`${h%12||12}:${String(m).padStart(2,'0')}`,ampm:h<12?'am':'pm'};}
+
+// Populate name select
+const sel=document.getElementById('who-select');
+ALL_WORKERS.forEach(w=>{const o=document.createElement('option');o.value=w;o.textContent=w;sel.appendChild(o);});
+sel.value=localStorage.getItem('today-name')||'';
+function saveName(){localStorage.setItem('today-name',sel.value);}
+
+function shiftDate(n){viewDate=new Date(viewDate);viewDate.setDate(viewDate.getDate()+n);load();}
+function goToday(){viewDate=new Date();load();}
+
+async function load(){
+  const ds=localDate(viewDate);
+  document.getElementById('date-lbl').textContent=fmtDate(viewDate);
+  document.getElementById('hero-date').textContent=fmtDate(viewDate);
+  document.getElementById('day-content').innerHTML='<div class="loading">Loading…</div>';
+  try{
+    const res=await fetch(`/api/runsheet/${ds}`);
+    dayData=await res.json();
+    renderDay();
+  }catch(e){document.getElementById('day-content').innerHTML='<div class="loading">Failed to load.</div>';}
+}
+
+function renderDay(){
+  const name=sel.value;
+  const content=document.getElementById('day-content');
+  if(!name){content.innerHTML='<div class="empty"><div class="empty-title">Select your name above</div><div class="empty-sub">to see your schedule for today.</div></div>';return;}
+
+  const teams=dayData.teams||[];
+  const schedule=dayData.schedule||[];
+  const tasks=dayData.tasks||[];
+  const jobs=dayData.jobs||[];
+
+  // Find teams this person belongs to
+  const myTeams=teams.filter(t=>t.lead===name||(t.members||[]).includes(name));
+
+  if(!myTeams.length){
+    content.innerHTML=`<div class="empty"><div class="empty-title">Not assigned to a team today</div><div class="empty-sub">Ask your manager to add you to a team on the runsheet.</div></div>`;
+    return;
+  }
+
+  const jobById=Object.fromEntries(jobs.map(j=>[j.id,j]));
+  const combined=[];
+
+  myTeams.forEach(team=>{
+    // Schedule entries for this team
+    schedule.filter(e=>e.team_id===team.id||(dayData.teams.find(t=>t.id===e.team_id)?.vehicle===team.vehicle)).forEach(e=>{
+      combined.push({...e,_team:team,_isTask:false});
+    });
+    // Tasks for this team
+    tasks.filter(t=>t.team_id===team.id).forEach(t=>{
+      combined.push({...t,_team:team,_isTask:true});
+    });
+  });
+
+  combined.sort((a,b)=>(a.start_time||'99:99').localeCompare(b.start_time||'99:99'));
+
+  if(!combined.length){
+    const teamNames=myTeams.map(t=>t.name||t.vehicle||'your team').join(' & ');
+    content.innerHTML=`<div class="empty"><div class="empty-title">Nothing scheduled yet</div><div class="empty-sub">You're on ${teamNames} — check back once the schedule is filled in.</div></div>`;
+    return;
+  }
+
+  // Show team badges
+  let html='';
+  myTeams.forEach(t=>{
+    const col=FN_COL[t.function]||'#1a1714';
+    const crew=[t.lead,...(t.members||[])].filter(Boolean).join(', ');
+    html+=`<div class="team-badge" style="background:${col};">${FN_LBL[t.function]||t.function} · ${t.name||t.vehicle||'Team'}<span style="opacity:0.65;font-weight:400;"> · ${crew}</span></div><br/>`;
+  });
+
+  html+=combined.map(e=>{
+    const {h,ampm}=fmtTime(e.start_time);
+    const isTask=e._isTask;
+    const typeKey=isTask?'task':(e.type||'install');
+    const job=isTask?null:jobById[e.job_id];
+    const ref=isTask?(e.title||'Task'):(job?job.job_ref||job.job_number:'—');
+    const addr=job?job.address||'':'';
+    const street=addr.split(',')[0];
+    const typeLabel=TYPE_LBL[typeKey]||typeKey;
+    const dur=e.duration?` · ${e.duration>=60?e.duration/60+'h'+(e.duration%60?e.duration%60+'m':''):e.duration+'m'}`:'';
+
+    return `<div class="card ${typeKey}">
+      <div class="card-time">
+        <div class="card-time-h">${h}</div>
+        <div class="card-time-ampm">${ampm}</div>
+      </div>
+      <div class="card-body">
+        <div class="card-type">${typeLabel}${dur}</div>
+        <div class="card-ref">${ref}</div>
+        ${street?`<div class="card-addr">${street}</div>`:''}
+        ${e.notes?`<div class="card-note">📝 ${e.notes}</div>`:''}
+        ${job?`<div class="card-btns">
+          <button class="card-btn card-btn-nav" onclick="navigate('${job.id}','${addr.replace(/'/g,"\\'")}')">📍 Navigate</button>
+          ${typeKey!=='to_load'?`<a href="/stylist/${job.id}" target="_blank" class="card-btn card-btn-stylist">✎ Stylist</a>`:''}
+          <a href="/driver/${job.id}" target="_blank" class="card-btn card-btn-driver">🚛 Driver</a>
+        </div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  content.innerHTML=html;
+}
+
+// Navigate with Slack confirm
+function navigate(jobId, addr){
+  _pendingNav={jobId,addr};
+  document.getElementById('slack-overlay').classList.add('open');
+}
+function slackChoice(choice){
+  document.getElementById('slack-overlay').classList.remove('open');
+  const{jobId,addr}=_pendingNav||{};
+  _pendingNav=null;
+  if(choice==='cancel') return;
+  const mapsUrl=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr||'')}`;
+  if(choice==='no'){window.open(mapsUrl,'_blank');return;}
+  if(!navigator.geolocation){window.open(mapsUrl,'_blank');return;}
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      fetch(`/api/jobs/${jobId}/eta`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,role:'team'})})
+        .then(()=>window.open(mapsUrl,'_blank')).catch(()=>window.open(mapsUrl,'_blank'));
+    },
+    ()=>window.open(mapsUrl,'_blank'),
+    {timeout:8000}
+  );
+}
+
+load();
+</script>
+</body>
+</html>

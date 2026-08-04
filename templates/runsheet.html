@@ -1,168 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Runsheet · LUMA Design Co</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Runsheet · LUMA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
-:root{--cream:#FAF8F4;--warm:#F2EDE4;--sand:#E5DDD0;--border:#D8CFBF;--muted:#9A8F80;--ink:#1A1714;--accent:#B8935A;--green:#4A7C59;--red:#A63D2F;--blue:#4A7EB8;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font-weight:400;font-size:18px;min-height:100vh;}
-
+:root{--ink:#1a1714;--accent:#b8935a;--green:#4a7c59;--red:#e85c47;--blue:#2e5a8a;--purple:#6a3d8a;--muted:#9a8f80;--border:#e0d8ce;--sand:#f0ebe4;--warm:#faf8f4;}
+body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-height:100vh;}
 header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
-.logo{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;letter-spacing:0.1em;color:#FAF8F4;white-space:nowrap;}
+.logo{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;letter-spacing:0.1em;color:#faf8f4;white-space:nowrap;}
 .logo em{font-style:italic;color:var(--accent);}
 .nav-links{display:flex;gap:16px;flex-wrap:wrap;}
 .nav-link{color:rgba(250,248,244,0.45);text-decoration:none;font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;transition:color 0.2s;white-space:nowrap;}
 .nav-link:hover,.nav-link.active{color:var(--accent);}
-@media(max-width:480px){header{padding:12px 16px;}.logo{font-size:1.2rem;}.nav-link{font-size:0.68rem;letter-spacing:0.06em;}.nav-links{gap:12px;}}
-
-.main{max-width:1200px;margin:0 auto;padding:36px 24px;}
-.page-title{font-family:'Cormorant Garamond',serif;font-size:2.6rem;font-weight:300;margin-bottom:4px;}
-.page-sub{font-size:0.9rem;color:var(--muted);margin-bottom:24px;}
-
-/* ── DATE NAV ── */
-.runsheet-date-row{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
-.runsheet-nav-btn{background:white;border:1px solid var(--border);border-radius:2px;width:34px;height:34px;font-size:1.1rem;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color 0.15s;}
-.runsheet-nav-btn:hover{border-color:var(--accent);color:var(--accent);}
-.runsheet-date-label{font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--ink);min-width:240px;}
-.btn-today{padding:7px 16px;background:white;border:1px solid var(--border);border-radius:2px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;color:var(--muted);transition:all 0.15s;}
-.btn-today:hover{border-color:var(--accent);color:var(--accent);}
-.runsheet-empty{padding:60px 20px;text-align:center;color:var(--muted);font-size:0.9rem;background:white;border:1px dashed var(--border);border-radius:3px;}
-
-/* ── RUNSHEET GRID ── */
-.rs-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.rs-grid{display:grid;min-width:700px;border:1px solid var(--border);border-radius:3px;background:white;overflow:hidden;}
-.rs-header-cell{padding:8px 10px;background:var(--ink);color:rgba(250,248,244,0.85);font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;text-align:center;border-right:1px solid rgba(255,255,255,0.1);}
-.rs-header-cell:first-child{text-align:right;background:rgba(26,23,20,0.95);}
-.rs-header-cell:last-child{border-right:none;}
-.rs-team-cell{padding:5px 8px;background:rgba(26,23,20,0.85);color:rgba(250,248,244,0.55);font-size:0.68rem;text-align:center;border-right:1px solid rgba(255,255,255,0.08);border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s;}
-.rs-team-cell:hover{background:rgba(184,147,90,0.25);color:var(--accent);}
-.rs-team-cell.has-crew{color:rgba(250,248,244,0.8);}
-.rs-team-cell:first-child{cursor:default;}
-.rs-team-cell:first-child:hover{background:rgba(26,23,20,0.85);}
-.rs-time{padding:0 8px;font-size:0.72rem;font-weight:600;color:var(--muted);text-align:right;border-right:1px solid var(--border);border-bottom:1px solid var(--sand);display:flex;align-items:flex-start;justify-content:flex-end;padding-top:6px;}
-.rs-cell{border-right:1px solid var(--sand);border-bottom:1px solid var(--sand);position:relative;min-height:46px;padding:4px;}
-.rs-cell:last-child{border-right:none;}
-.rs-cell-clickable{cursor:pointer;}
-.rs-cell-clickable:hover{background:rgba(184,147,90,0.06);}
-.rs-cell-clickable:hover::after{content:'+';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.1rem;color:rgba(184,147,90,0.4);pointer-events:none;}
-
-/* ── JOB TILES ── */
-.rs-job{border-radius:3px;border-left:4px solid transparent;box-shadow:0 2px 6px rgba(0,0,0,0.12);display:flex;flex-direction:column;transition:box-shadow 0.15s;}
-.rs-job:hover{box-shadow:0 3px 12px rgba(0,0,0,0.2);}
-.rs-job-install{background:#e8f3ea;border-left-color:var(--green);}
-.rs-job-pickup{background:#e8eef8;border-left-color:var(--blue);}
-.rs-job-to_load{background:#f5f0e8;border-left-color:var(--accent);}
-.rs-job-content{padding:6px 8px 4px;flex:1;min-height:0;}
-.rs-job-ref{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:700;color:var(--ink);line-height:1;}
-.rs-job-addr{font-size:0.8rem;color:#444;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
-.rs-job-type{font-size:0.68rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin-top:3px;color:#555;}
-.rs-job-transfer{font-size:0.68rem;font-weight:600;margin-top:3px;padding:2px 5px;border-radius:2px;display:inline-block;}
-.rs-job-transfer-from{background:rgba(74,126,184,0.12);color:#1a5299;}
-.rs-job-transfer-to{background:rgba(184,147,90,0.15);color:#8a5c1a;}
-.rs-job-notes{font-size:0.7rem;color:#666;margin-top:3px;font-style:italic;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;padding:2px 0;}
-.rs-job-notes::after{content:' ▾';font-style:normal;font-size:0.6rem;color:var(--accent);opacity:0.7;}
-.rs-job-notes.expanded{white-space:normal;overflow:visible;text-overflow:unset;background:rgba(184,147,90,0.08);border-radius:3px;padding:4px 5px;}
-.rs-job-notes.expanded::after{content:' ▴';}
-.rs-job-actions{display:flex;justify-content:flex-end;padding:4px;}
-.rs-job-btn-gear{width:24px;height:24px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,0.25);border-radius:3px;transition:color 0.12s,background 0.12s;flex-shrink:0;}
-.rs-job-btn-gear:hover{color:var(--accent);background:rgba(184,147,90,0.1);}
-
-/* ── TASK TILES ── */
-.rs-task{border-radius:3px;border-left:4px dashed #aaa;background:#f5f5f4;box-shadow:0 1px 4px rgba(0,0,0,0.08);display:flex;flex-direction:column;transition:box-shadow 0.15s;cursor:pointer;}
-.rs-task:hover{box-shadow:0 2px 8px rgba(0,0,0,0.14);}
-.rs-task-content{padding:6px 8px 4px;flex:1;}
-.rs-task-title{font-size:0.88rem;font-weight:700;color:var(--ink);line-height:1.2;}
-.rs-task-notes{font-size:0.75rem;color:#666;margin-top:3px;font-style:italic;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;cursor:pointer;}
-.rs-task-notes.expanded{display:block;overflow:visible;background:rgba(0,0,0,0.05);border-radius:3px;padding:5px 6px;}
-
-/* ── UNSCHEDULED STRIP ── */
-.rs-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px;}
-.rs-tab{background:none;border:none;padding:10px 20px;font-family:'Jost',sans-serif;font-size:0.82rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color 0.15s,border-color 0.15s;}
-.rs-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
-.rs-tab:hover{color:var(--ink);}
-.myday-who-row{display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
-.myday-who-label{font-size:0.82rem;font-weight:600;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;white-space:nowrap;}
-.myday-select{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--border);border-radius:4px;font-family:'Jost',sans-serif;font-size:0.85rem;background:white;color:var(--ink);}
-.myday-card{background:white;border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:14px;display:flex;gap:16px;align-items:flex-start;}
-.myday-card-time{text-align:center;min-width:52px;flex-shrink:0;}
-.myday-card-time-main{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;color:var(--ink);line-height:1;}
-.myday-card-time-ampm{font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-top:2px;}
-.myday-card-body{flex:1;}
-.myday-card-type{font-size:0.68rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:4px;}
-.myday-card-type.install{color:var(--green);}
-.myday-card-type.to_load{color:var(--accent);}
-.myday-card-type.pickup{color:#2e5a8a;}
-.myday-card-ref{font-size:1rem;font-weight:600;color:var(--ink);margin-bottom:2px;}
-.myday-card-addr{font-size:0.85rem;color:var(--muted);line-height:1.4;margin-bottom:8px;}
-.myday-card-notes{font-size:0.8rem;color:var(--muted);font-style:italic;margin-bottom:8px;}
-.myday-card-crew{font-size:0.78rem;color:var(--muted);margin-bottom:10px;}
-.myday-card-btns{display:flex;gap:8px;flex-wrap:wrap;}
-.myday-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:6px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;cursor:pointer;text-decoration:none;border:none;transition:opacity 0.15s;}
-.myday-btn:hover{opacity:0.85;}
-.myday-btn-nav{background:var(--accent);color:white;cursor:pointer;}
-.myday-btn-stylist{background:rgba(74,124,89,0.12);color:var(--green);}
-.myday-btn-driver{background:rgba(46,90,138,0.12);color:#2e5a8a;}
-.myday-empty{text-align:center;padding:48px 20px;color:var(--muted);}
-.myday-empty-title{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--ink);margin-bottom:6px;}
-@media(max-width:480px){.myday-card{padding:14px;gap:12px;}.myday-card-time-main{font-size:1.2rem;}}
-.rs-list-card{background:white;border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start;}
-.rs-list-card-time{text-align:center;min-width:44px;flex-shrink:0;}
-.rs-list-card-time-main{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:600;line-height:1;color:var(--ink);}
-.rs-list-card-time-ampm{font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
-.rs-list-card-body{flex:1;}
-.rs-list-card-label{font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:3px;}
-.rs-list-card-ref{font-size:0.95rem;font-weight:600;color:var(--ink);}
-.rs-list-card-sub{font-size:0.8rem;color:var(--muted);margin-top:2px;}
-.rs-list-card-note{font-size:0.78rem;color:var(--muted);font-style:italic;margin-top:4px;}
-.rs-list-card-edit{background:none;border:none;cursor:pointer;color:var(--border);padding:4px;border-radius:3px;transition:color 0.15s;flex-shrink:0;}
-.rs-list-card-edit:hover{color:var(--accent);}
-.rs-list-section{margin-bottom:22px;}
-.rs-list-section-title{font-size:0.68rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--sand);}
-.rs-list-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:0.88rem;}
-.wh-type-selected{border-color:var(--accent)!important;background:rgba(184,147,90,0.08)!important;}
-.rs-unscheduled{margin-top:18px;}
-.rs-unscheduled-title{font-size:0.72rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
-.rs-unscheduled-chips{display:flex;flex-wrap:wrap;gap:8px;}
-.rs-unscheduled-chip{background:white;border:1px solid var(--border);border-radius:2px;padding:7px 11px;cursor:pointer;font-size:0.82rem;color:var(--ink);display:flex;align-items:center;gap:7px;transition:border-color 0.15s;}
-.rs-unscheduled-chip:hover{border-color:var(--accent);}
-.rs-chip-ref{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--accent);}
-
-/* ── POPOVERS ── */
-.runsheet-popover-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.35);z-index:200;}
-.runsheet-popover-overlay.open{display:block;}
-.runsheet-popover{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:4px;box-shadow:0 12px 40px rgba(0,0,0,0.2);padding:22px;z-index:201;max-height:90vh;overflow-y:auto;}
-.runsheet-popover.open{display:block;}
-.runsheet-popover-title{font-family:'Cormorant Garamond',serif;font-size:1.3rem;margin-bottom:14px;color:var(--ink);}
-.runsheet-popover-label{display:block;font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px;margin-top:12px;}
-.runsheet-popover-input{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:2px;font-family:'Jost',sans-serif;font-size:0.92rem;color:var(--ink);outline:none;box-sizing:border-box;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239A8F80' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:14px;padding-right:30px;}
-.runsheet-popover-input:focus{border-color:var(--accent);}
-.sched-two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.sched-chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
-.sched-chip{padding:5px 11px;border:1px solid var(--border);border-radius:12px;background:white;font-family:'Jost',sans-serif;font-size:0.78rem;color:var(--muted);cursor:pointer;transition:all 0.15s;}
-.sched-chip:hover{border-color:var(--accent);}
-.sched-chip.selected{border-color:var(--accent);background:rgba(184,147,90,0.1);color:var(--accent);font-weight:600;}
-.sched-mode-btn{padding:16px 10px;border:1.5px solid var(--border);border-radius:8px;background:white;cursor:pointer;text-align:center;transition:all 0.15s;font-family:'Jost',sans-serif;}
-.sched-mode-btn:hover{border-color:var(--accent);background:rgba(184,147,90,0.06);}
-.job-search-result{padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--sand);font-size:0.85rem;}
+@media(max-width:480px){header{padding:12px 16px;}.logo{font-size:1.2rem;}.nav-link{font-size:0.68rem;}.nav-links{gap:12px;}}
+.page{padding:20px 16px 60px;}
+.page-hdr{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;}
+.page-title{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:400;}
+.dev-banner{background:rgba(184,147,90,0.1);border:1px solid rgba(184,147,90,0.3);border-radius:6px;padding:8px 14px;font-size:0.8rem;color:var(--accent);display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+.team-view-link{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--green);color:white;text-decoration:none;border-radius:6px;font-size:0.78rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-left:auto;}
+.team-view-link:hover{opacity:0.88;}
+.date-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.date-nav-btn{background:none;border:1px solid var(--border);border-radius:4px;padding:6px 12px;cursor:pointer;font-size:1rem;color:var(--ink);}
+.date-nav-btn:hover{background:var(--sand);}
+.date-label{font-size:1rem;font-weight:600;min-width:200px;text-align:center;}
+.btn-today{padding:6px 14px;background:var(--accent);color:white;border:none;border-radius:4px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;cursor:pointer;}
+.rs-wrap{overflow-x:auto;}
+.rs-grid{display:grid;position:relative;}
+.rs-time{font-size:0.65rem;color:var(--muted);text-align:right;padding-right:8px;padding-top:4px;width:56px;}
+.rs-team-hdr{border-radius:8px 8px 0 0;padding:12px;margin:0 3px;cursor:pointer;transition:opacity 0.15s;}
+.rs-team-hdr:hover{opacity:0.88;}
+.rs-team-hdr-fn{font-size:0.6rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;opacity:0.65;margin-bottom:3px;color:white;}
+.rs-team-hdr-name{font-size:0.9rem;font-weight:600;color:white;margin-bottom:3px;}
+.rs-team-hdr-sub{font-size:0.7rem;color:rgba(255,255,255,0.55);margin-top:2px;}
+.rs-add-team-btn{border:2px dashed var(--border);border-radius:8px 8px 0 0;padding:12px;margin:0 3px;cursor:pointer;color:var(--muted);font-family:'Jost',sans-serif;font-size:0.82rem;display:flex;align-items:center;justify-content:center;gap:6px;min-width:150px;background:none;transition:all 0.15s;}
+.rs-add-team-btn:hover{border-color:var(--accent);color:var(--accent);}
+.rs-cell{border-top:1px solid var(--border);cursor:pointer;transition:background 0.12s;position:relative;margin:0 3px;}
+.rs-cell:hover{background:rgba(184,147,90,0.05);}
+.rs-tile{position:absolute;left:4px;right:4px;border-radius:5px;padding:5px 7px;overflow:hidden;cursor:pointer;z-index:2;border-left:3px solid transparent;transition:opacity 0.12s;}
+.rs-tile:hover{opacity:0.88;}
+.rs-tile-label{font-size:0.6rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;opacity:0.7;}
+.rs-tile-ref{font-size:0.78rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rs-tile-addr{font-size:0.68rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rs-tile-note{font-size:0.65rem;color:var(--muted);font-style:italic;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rs-tile-gear{position:absolute;bottom:2px;right:3px;background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.2);font-size:0.68rem;padding:2px;}
+.rs-tile.install{background:rgba(74,124,89,0.1);border-left-color:var(--green);}
+.rs-tile.pickup{background:rgba(46,90,138,0.1);border-left-color:var(--blue);}
+.rs-tile.to_load{background:rgba(184,147,90,0.1);border-left-color:var(--accent);}
+.rs-tile.task{background:rgba(154,143,128,0.1);border-left-color:var(--muted);}
+.rs-tile.styling{background:rgba(106,61,138,0.1);border-left-color:var(--purple);}
+.pop-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.5);z-index:200;}
+.pop-overlay.open{display:block;}
+.pop{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:10px;padding:22px;width:min(420px,94vw);max-height:90vh;overflow-y:auto;z-index:201;box-shadow:0 12px 48px rgba(0,0,0,0.25);}
+.pop.open{display:block;}
+.pop-title{font-family:'Cormorant Garamond',serif;font-size:1.35rem;font-weight:600;margin-bottom:14px;}
+.fl{font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block;margin-top:12px;}
+.fi{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:4px;font-family:'Jost',sans-serif;font-size:0.86rem;background:white;color:var(--ink);outline:none;}
+.fi:focus{border-color:var(--accent);}
+.chip-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
+.chip{padding:5px 11px;border:1.5px solid var(--border);border-radius:20px;font-size:0.74rem;font-weight:600;cursor:pointer;background:white;transition:all 0.15s;font-family:'Jost',sans-serif;}
+.chip.selected{border-color:var(--accent);background:rgba(184,147,90,0.1);color:var(--accent);}
+.fn-btn{flex:1;padding:9px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer;background:white;transition:all 0.15s;font-family:'Jost',sans-serif;display:flex;align-items:center;justify-content:center;gap:5px;}
+.fn-btn.active-transport{border-color:var(--blue);background:rgba(46,90,138,0.08);color:var(--blue);}
+.fn-btn.active-styling{border-color:var(--purple);background:rgba(106,61,138,0.08);color:var(--purple);}
+.fn-btn.active-warehouse{border-color:var(--accent);background:rgba(184,147,90,0.08);color:var(--accent);}
+.pop-actions{display:flex;justify-content:flex-end;align-items:center;margin-top:18px;gap:8px;}
+.btn{padding:8px 16px;border-radius:6px;font-family:'Jost',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;border:none;}
+.btn-gold{background:var(--accent);color:white;}
+.btn-outline{background:white;color:var(--ink);border:1px solid var(--border);}
+.btn-red{background:none;color:var(--red);border:1px solid var(--red);font-size:0.74rem;}
+.job-search-result{padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--sand);font-size:0.84rem;}
 .job-search-result:last-child{border-bottom:none;}
 .job-search-result:hover{background:var(--sand);}
-.job-search-ref{font-weight:700;color:var(--accent);margin-right:8px;}
-.job-search-addr{color:var(--muted);font-size:0.78rem;}
-.runsheet-popover-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;}
-.btn{padding:9px 18px;border-radius:2px;font-family:'Jost',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:opacity 0.15s;}
-.btn-gold{background:var(--accent);color:white;border-color:var(--accent);}
-.btn-gold:hover{opacity:0.88;}
-.btn-outline{background:white;color:var(--muted);border-color:var(--border);}
-.btn-outline:hover{border-color:var(--ink);color:var(--ink);}
-.loading{text-align:center;padding:40px 20px;color:var(--muted);font-size:0.88rem;}
+.jsr-ref{font-weight:700;color:var(--accent);margin-right:6px;}
+.jsr-addr{color:var(--muted);font-size:0.77rem;}
+.loading{text-align:center;padding:40px;color:var(--muted);}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.template-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
 </style>
 </head>
 <body>
-
 <header>
   <div class="logo">LUMA <em>Design</em> Co</div>
   <div class="nav-links">
@@ -175,1685 +95,375 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   </div>
 </header>
 
-<!-- Schedule popover -->
-<div class="runsheet-popover-overlay" id="runsheet-popover-overlay" onclick="closeRunsheetPopover()"></div>
-<div class="runsheet-popover" id="runsheet-popover" style="width:360px;">
-  <div class="runsheet-popover-title">Schedule Job</div>
-  <div id="sched-popover-ref" style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;line-height:1.4;"></div>
-  <div class="sched-two-col">
-    <div>
-      <label class="runsheet-popover-label" id="sched-date-label">Date</label>
-      <input type="date" id="runsheet-popover-date" class="runsheet-popover-input"/>
-    </div>
-    <div>
-      <label class="runsheet-popover-label">Type</label>
-      <select id="runsheet-popover-type" class="runsheet-popover-input" onchange="updateSchedHint()">
-        <option value="install">Install</option>
-        <option value="pickup">Pickup</option>
-        <option value="to_load">To Load</option>
-      </select>
-    </div>
-  </div>
-  <label class="runsheet-popover-label" style="margin-top:12px;">Vehicle(s)</label>
-  <div class="sched-chip-row" id="sched-vehicle-chips"></div>
-  <div id="sched-hint" style="font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;"></div>
-  <label class="runsheet-popover-label" style="margin-top:12px;">Lead</label>
-  <select id="sched-lead" class="runsheet-popover-input"><option value="">— no lead set —</option></select>
-  <label class="runsheet-popover-label" style="margin-top:10px;">Team <span style="font-weight:400;text-transform:none;">(tap to select)</span></label>
-  <div class="sched-chip-row" id="sched-team-chips"></div>
-
-  <!-- Per-vehicle time overrides — shown after vehicles are selected -->
-  <div id="sched-vehicle-times" style="margin-top:12px;"></div>
-
-  <label class="runsheet-popover-label" style="margin-top:12px;">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
-  <textarea id="runsheet-popover-notes" class="runsheet-popover-input" placeholder="Access info, special instructions…" style="height:56px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
-
-  <div class="runsheet-popover-actions" style="margin-top:18px;">
-    <button class="btn btn-outline" onclick="removeFromRunsheet()" id="runsheet-remove-btn" style="font-size:0.72rem;display:none;">Remove</button>
-    <button class="btn btn-gold" onclick="saveRunsheetEntry()">Save</button>
-  </div>
-</div>
-
-<!-- Styling popover -->
-<div class="runsheet-popover-overlay" id="styling-popover-overlay" onclick="closeStylingPopover()"></div>
-<div class="runsheet-popover" id="styling-popover" style="width:360px;max-height:90vh;overflow-y:auto;">
-  <div class="runsheet-popover-title" id="styling-popover-title">Add Styling Entry</div>
-  <input type="hidden" id="styling-entry-id"/>
-
-  <!-- Mode selector -->
-  <div id="styling-mode-select" style="display:none;margin-bottom:14px;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <button class="sched-mode-btn" onclick="setStylingMode('task')">
-        <div style="font-size:1.2rem;margin-bottom:4px;">📝</div>
-        <div style="font-size:0.78rem;font-weight:600;">Task</div>
-        <div style="font-size:0.7rem;color:var(--muted);margin-top:2px;">Prep, travel, etc.</div>
-      </button>
-      <button class="sched-mode-btn" onclick="setStylingMode('job')">
-        <div style="font-size:1.2rem;margin-bottom:4px;">🏠</div>
-        <div style="font-size:0.78rem;font-weight:600;">Job</div>
-        <div style="font-size:0.7rem;color:var(--muted);margin-top:2px;">Style a property</div>
-      </button>
-    </div>
-    <button class="btn btn-outline" onclick="closeStylingPopover()" style="width:100%;margin-top:12px;font-size:0.75rem;">Cancel</button>
-  </div>
-
-  <!-- Task form -->
-  <div id="styling-task-form" style="display:none;">
-    <label class="runsheet-popover-label">Task description</label>
-    <input type="text" id="styling-task-title" class="runsheet-popover-input" placeholder="e.g. Travel to property, Prep…"/>
-    <div class="sched-two-col" style="margin-top:10px;">
-      <div><label class="runsheet-popover-label">Date</label><input type="date" id="styling-task-date" class="runsheet-popover-input"/></div>
-      <div><label class="runsheet-popover-label">Time</label><select id="styling-task-time" class="runsheet-popover-input"><option value="">No time</option></select></div>
-    </div>
-    <label class="runsheet-popover-label" style="margin-top:10px;">Person</label>
-    <select id="styling-task-person" class="runsheet-popover-input"><option value="ALL">All stylists</option></select>
-    <label class="runsheet-popover-label" style="margin-top:10px;">Notes</label>
-    <textarea id="styling-task-notes" class="runsheet-popover-input" placeholder="Any details…" style="height:52px;resize:none;font-size:0.82rem;padding:7px 10px;"></textarea>
-    <div class="runsheet-popover-actions" style="margin-top:14px;">
-      <button class="btn btn-outline" onclick="closeStylingPopover()" style="font-size:0.75rem;">Cancel</button>
-      <button class="btn btn-gold" onclick="saveStylingTask()">Save</button>
-    </div>
-  </div>
-
-  <!-- Job form -->
-  <div id="styling-job-form" style="display:none;">
-    <label class="runsheet-popover-label">Job</label>
-    <input type="text" id="styling-job-search" class="runsheet-popover-input" placeholder="Job number or address…" oninput="searchJobsForPopover(this.value,'styling-job-results','styling-job-selected','styling-job-id')"/>
-    <div id="styling-job-results" style="margin-top:4px;max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:2px;display:none;"></div>
-    <div id="styling-job-selected" style="display:none;margin-top:8px;padding:7px 10px;background:var(--sand);border-radius:3px;font-size:0.85rem;"></div>
-    <input type="hidden" id="styling-job-id"/>
-    <div class="sched-two-col" style="margin-top:12px;">
-      <div><label class="runsheet-popover-label">Date</label><input type="date" id="styling-date" class="runsheet-popover-input"/></div>
-      <div><label class="runsheet-popover-label">Arrival time</label><select id="styling-time" class="runsheet-popover-input"><option value="">No time</option></select></div>
-    </div>
-    <label class="runsheet-popover-label" style="margin-top:10px;">Duration</label>
-    <select id="styling-duration" class="runsheet-popover-input"><option value="">—</option></select>
-    <label class="runsheet-popover-label" style="margin-top:10px;">Lead stylist</label>
-    <select id="styling-lead" class="runsheet-popover-input"><option value="">— no lead set —</option></select>
-    <label class="runsheet-popover-label" style="margin-top:10px;">Team <span style="font-weight:400;text-transform:none;">(tap to select)</span></label>
-    <div class="sched-chip-row" id="styling-team-chips"></div>
-    <label class="runsheet-popover-label" style="margin-top:10px;">Notes</label>
-    <textarea id="styling-notes" class="runsheet-popover-input" placeholder="Access info, arrival instructions…" style="height:52px;resize:none;font-size:0.82rem;padding:7px 10px;"></textarea>
-    <div class="runsheet-popover-actions" style="margin-top:14px;">
-      <button class="btn btn-outline" id="styling-delete-btn" style="font-size:0.72rem;display:none;color:var(--red);border-color:var(--red);" onclick="deleteStylingEntry()">Delete</button>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-outline" onclick="closeStylingPopover()" style="font-size:0.75rem;">Cancel</button>
-        <button class="btn btn-gold" onclick="saveStylingEntry()">Save</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Warehouse popover -->
-<div class="runsheet-popover-overlay" id="warehouse-popover-overlay" onclick="closeWarehousePopover()"></div>
-<div class="runsheet-popover" id="warehouse-popover" style="width:360px;max-height:90vh;overflow-y:auto;">
-  <div class="runsheet-popover-title" id="warehouse-popover-title">Add Warehouse Task</div>
-  <input type="hidden" id="warehouse-entry-id"/>
-  <input type="hidden" id="warehouse-entry-type"/>
-  <div style="display:flex;gap:8px;margin-bottom:14px;">
-    <button class="sched-mode-btn" id="wh-type-pick" onclick="setWarehouseType('pick')" style="flex:1;">
-      <div style="font-size:1.2rem;margin-bottom:4px;">📦</div>
-      <div style="font-size:0.78rem;font-weight:600;">Pick Job</div>
-    </button>
-    <button class="sched-mode-btn" id="wh-type-task" onclick="setWarehouseType('task')" style="flex:1;">
-      <div style="font-size:1.2rem;margin-bottom:4px;">🏭</div>
-      <div style="font-size:0.78rem;font-weight:600;">General Task</div>
-    </button>
-  </div>
-
-  <!-- Pick form -->
-  <div id="wh-job-row" style="display:none;">
-    <label class="runsheet-popover-label">Job to pick</label>
-    <input type="text" id="warehouse-job-search" class="runsheet-popover-input" placeholder="Job number or address…" oninput="searchJobsForPopover(this.value,'warehouse-job-results','warehouse-job-selected','warehouse-job-id')"/>
-    <div id="warehouse-job-results" style="margin-top:4px;max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:2px;display:none;"></div>
-    <div id="warehouse-job-selected" style="display:none;margin-top:8px;padding:7px 10px;background:var(--sand);border-radius:3px;font-size:0.85rem;"></div>
-    <input type="hidden" id="warehouse-job-id"/>
-    <label class="runsheet-popover-label" style="margin-top:10px;">Lead</label>
-    <select id="warehouse-lead" class="runsheet-popover-input"><option value="">— no lead set —</option></select>
-    <label class="runsheet-popover-label" style="margin-top:10px;">Team <span style="font-weight:400;text-transform:none;">(tap to select)</span></label>
-    <div class="sched-chip-row" id="warehouse-team-chips"></div>
-  </div>
-
-  <!-- General task form -->
-  <div id="wh-title-row" style="display:none;">
-    <label class="runsheet-popover-label">Task description</label>
-    <input type="text" id="warehouse-title" class="runsheet-popover-input" placeholder="e.g. Stage sofa at bay A3, clean truck…"/>
-    <label class="runsheet-popover-label" style="margin-top:10px;">Assigned to</label>
-    <select id="warehouse-person" class="runsheet-popover-input"><option value="ALL">All team</option></select>
-  </div>
-
-  <div class="sched-two-col" style="margin-top:12px;">
-    <div><label class="runsheet-popover-label">Time</label><select id="warehouse-time" class="runsheet-popover-input"><option value="">No time set</option></select></div>
-    <div><label class="runsheet-popover-label">Duration</label><select id="warehouse-duration" class="runsheet-popover-input"><option value="">—</option></select></div>
-  </div>
-  <label class="runsheet-popover-label" style="margin-top:10px;">Notes</label>
-  <textarea id="warehouse-notes" class="runsheet-popover-input" placeholder="Bay location, special instructions…" style="height:52px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
-  <div class="runsheet-popover-actions" style="margin-top:14px;">
-    <button class="btn btn-outline" id="warehouse-delete-btn" style="font-size:0.72rem;display:none;color:var(--red);border-color:var(--red);" onclick="deleteWarehouseEntry()">Delete</button>
-    <div style="display:flex;gap:8px;">
-      <button class="btn btn-outline" onclick="closeWarehousePopover()" style="font-size:0.75rem;">Cancel</button>
-      <button class="btn btn-gold" onclick="saveWarehouseEntry()">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- Crew popover -->
-<div class="runsheet-popover-overlay" id="crew-popover-overlay" onclick="closeCrewPopover()"></div>
-<div class="runsheet-popover" id="crew-popover" style="width:320px;">
-  <div class="runsheet-popover-title" id="crew-popover-title">Set Crew</div>
-  <input type="hidden" id="crew-popover-vehicle"/>
-  <input type="hidden" id="crew-popover-date"/>
-  <label class="runsheet-popover-label">Lead</label>
-  <select id="crew-popover-lead" class="runsheet-popover-input"><option value="">No lead</option></select>
-  <label class="runsheet-popover-label">Offsiders</label>
-  <div class="sched-chip-row" id="crew-popover-offsiders"></div>
-  <div class="runsheet-popover-actions" style="margin-top:16px;">
-    <button class="btn btn-outline" onclick="closeCrewPopover()" style="font-size:0.75rem;">Cancel</button>
-    <button class="btn btn-gold" onclick="saveCrewEntry()">Save</button>
-  </div>
-</div>
-
-<!-- Task popover -->
-<div class="runsheet-popover-overlay" id="task-popover-overlay" onclick="closeTaskPopover()"></div>
-<div class="runsheet-popover" id="task-popover" style="width:360px;max-height:90vh;overflow-y:auto;">
-
-  <!-- Mode selector — shown when opening a new entry from an empty cell -->
-  <div id="task-mode-select" style="display:none;">
-    <div class="runsheet-popover-title">Add to Runsheet</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;">
-      <button class="sched-mode-btn" onclick="setTaskMode('task')">
-        <div style="font-size:1.4rem;margin-bottom:6px;">📝</div>
-        <div style="font-size:0.82rem;font-weight:600;">Task</div>
-        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">Briefing, delivery, etc.</div>
-      </button>
-      <button class="sched-mode-btn" onclick="setTaskMode('job')">
-        <div style="font-size:1.4rem;margin-bottom:6px;">🏠</div>
-        <div style="font-size:0.82rem;font-weight:600;">Job</div>
-        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">Schedule a job</div>
-      </button>
-    </div>
-    <button class="btn btn-outline" onclick="closeTaskPopover()" style="width:100%;margin-top:14px;font-size:0.75rem;">Cancel</button>
-  </div>
-
-  <!-- Task form -->
-  <div id="task-form" style="display:none;">
-    <div class="runsheet-popover-title" id="task-popover-title">New Task</div>
-    <input type="hidden" id="task-popover-id"/>
-    <input type="hidden" id="task-popover-date"/>
-    <label class="runsheet-popover-label">Title</label>
-    <input type="text" id="task-popover-title-input" class="runsheet-popover-input" placeholder="e.g. Unload truck, Team briefing…"/>
-    <label class="runsheet-popover-label">Vehicle</label>
-    <select id="task-popover-vehicle" class="runsheet-popover-input"><option value="ALL">All Vehicles</option></select>
-    <div class="sched-two-col" style="margin-top:12px;">
-      <div>
-        <label class="runsheet-popover-label">Start time</label>
-        <select id="task-popover-time" class="runsheet-popover-input"><option value="">No time yet</option></select>
-      </div>
-      <div>
-        <label class="runsheet-popover-label">Duration</label>
-        <select id="task-popover-duration" class="runsheet-popover-input"><option value="">1 hr (default)</option></select>
-      </div>
-    </div>
-    <label class="runsheet-popover-label">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
-    <textarea id="task-popover-notes" class="runsheet-popover-input" placeholder="Any extra details…" style="height:60px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
-    <div class="runsheet-popover-actions" style="margin-top:16px;">
-      <button class="btn btn-outline" onclick="deleteTask()" id="task-delete-btn" style="font-size:0.72rem;display:none;color:var(--red);border-color:var(--red);">Delete</button>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-outline" onclick="closeTaskPopover()" style="font-size:0.75rem;">Cancel</button>
-        <button class="btn btn-gold" onclick="saveTask()">Save</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Job scheduling form -->
-  <div id="job-sched-form" style="display:none;">
-    <div class="runsheet-popover-title">Schedule a Job</div>
-    <input type="hidden" id="job-sched-date"/>
-    <label class="runsheet-popover-label">Search job</label>
-    <input type="text" id="job-search-input" class="runsheet-popover-input" placeholder="Job number or address…"
-      oninput="searchJobsForSched(this.value)"/>
-    <div id="job-search-results" style="margin-top:6px;max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:2px;display:none;"></div>
-    <div id="job-sched-selected" style="display:none;margin-top:10px;padding:8px 10px;background:var(--sand);border-radius:3px;font-size:0.85rem;">
-      <span id="job-sched-selected-label"></span>
-      <button onclick="clearJobSchedSelection()" style="float:right;background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.8rem;">✕</button>
-    </div>
-    <div id="job-sched-details" style="display:none;">
-      <div class="sched-two-col" style="margin-top:12px;">
-        <div>
-          <label class="runsheet-popover-label">Install date</label>
-          <input type="date" id="job-sched-install-date" class="runsheet-popover-input"/>
-        </div>
-        <div>
-          <label class="runsheet-popover-label">Type</label>
-          <select id="job-sched-type" class="runsheet-popover-input" onchange="updateJobSchedHint()">
-            <option value="install">Install</option>
-            <option value="pickup">Pickup</option>
-            <option value="to_load">To Load</option>
-          </select>
-        </div>
-      </div>
-      <label class="runsheet-popover-label" style="margin-top:12px;">Vehicle(s)</label>
-      <div class="sched-chip-row" id="job-sched-vehicle-chips"></div>
-      <div id="job-sched-hint" style="font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;">Two tiles will be created — <strong>To Load</strong> the day before and <strong>Install</strong> on the date above.</div>
-      <label class="runsheet-popover-label" style="margin-top:12px;">Lead driver</label>
-      <select id="job-sched-lead" class="runsheet-popover-input"><option value="">— no lead set —</option></select>
-      <label class="runsheet-popover-label" style="margin-top:10px;">Team <span style="font-weight:400;text-transform:none;">(tap to select)</span></label>
-      <div class="sched-chip-row" id="job-sched-team-chips"></div>
-      <div class="sched-two-col" style="margin-top:12px;">
-        <div>
-          <label class="runsheet-popover-label">Load time</label>
-          <select id="job-sched-load-time" class="runsheet-popover-input"><option value="">Default (1:30pm)</option></select>
-        </div>
-        <div>
-          <label class="runsheet-popover-label">Install time</label>
-          <select id="job-sched-install-time" class="runsheet-popover-input"><option value="">Default (7:30am)</option></select>
-        </div>
-      </div>
-      <label class="runsheet-popover-label" style="margin-top:12px;">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
-      <textarea id="job-sched-notes" class="runsheet-popover-input" placeholder="Access info, special instructions…" style="height:56px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
-    </div>
-    <div class="runsheet-popover-actions" style="margin-top:16px;">
-      <button class="btn btn-outline" onclick="closeTaskPopover()" style="font-size:0.75rem;">Cancel</button>
-      <button class="btn btn-gold" onclick="saveJobSched()" id="job-sched-save-btn" disabled style="opacity:0.5;">Schedule</button>
-    </div>
-  </div>
-
-</div>
-
-<div class="main">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+<div class="page">
+  <div class="page-hdr">
     <h1 class="page-title">Runsheet</h1>
+    <a href="/today" class="team-view-link">👥 Team View →</a>
+  </div>
+  <div class="dev-banner">🚧 Admin scheduling — set up teams and assign jobs for the day. Team members see their schedule at <strong>/today</strong>.</div>
+
+  <div class="date-row">
+    <button class="date-nav-btn" onclick="shiftDate(-1)">‹</button>
+    <div class="date-label" id="date-label"></div>
+    <button class="date-nav-btn" onclick="shiftDate(1)">›</button>
+    <button class="btn-today" onclick="goToday()">Today</button>
   </div>
 
-  <!-- Tabs -->
-  <div class="rs-tabs">
-    <button class="rs-tab active" id="tab-grid"      onclick="switchTab('grid')">🚛 Transport</button>
-    <button class="rs-tab"        id="tab-styling"   onclick="switchTab('styling')">🎨 Styling</button>
-    <button class="rs-tab"        id="tab-warehouse" onclick="switchTab('warehouse')">🏭 Warehouse</button>
-    <button class="rs-tab"        id="tab-myday"     onclick="switchTab('myday')">My Day</button>
-  </div>
-
-  <div style="background:rgba(184,147,90,0.1);border:1px solid rgba(184,147,90,0.3);border-radius:6px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
-    <span style="font-size:1.1rem;">🚧</span>
-    <span style="font-size:0.82rem;color:var(--accent);font-weight:500;">This page is under active development — some features may be incomplete or change.</span>
-  </div>
-
-  <!-- Date nav — shared between both tabs -->
-  <div class="runsheet-date-row">
-    <button class="runsheet-nav-btn" onclick="shiftRunsheetDate(-1)">‹</button>
-    <div class="runsheet-date-label" id="runsheet-date-label"></div>
-    <button class="runsheet-nav-btn" onclick="shiftRunsheetDate(1)">›</button>
-    <button class="btn-today" onclick="goToToday()">Today</button>
-  </div>
-
-  <!-- Grid view (Transport) -->
-  <div id="view-grid">
-    <div id="runsheet-content"><div class="loading">Loading runsheet…</div></div>
-  </div>
-
-  <!-- Styling view -->
-  <div id="view-styling" style="display:none;">
-    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-      <button class="btn-add" onclick="openStylingPopover(null)" title="Add styling entry" style="width:36px;height:36px;font-size:1.2rem;">+</button>
-    </div>
-    <div id="styling-content"><div class="loading">Loading…</div></div>
-  </div>
-
-  <!-- Warehouse view -->
-  <div id="view-warehouse" style="display:none;">
-    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-      <button class="btn-add" onclick="openWarehousePopover(null)" title="Add warehouse task" style="width:36px;height:36px;font-size:1.2rem;">+</button>
-    </div>
-    <div id="warehouse-content"><div class="loading">Loading…</div></div>
-  </div>
-
-  <!-- My Day view -->
-  <div id="view-myday" style="display:none;">
-    <div class="myday-who-row">
-      <span class="myday-who-label">I am</span>
-      <select id="myday-person" class="myday-select" onchange="saveMydayPerson();renderMyDay()">
-        <option value="">— select your name —</option>
-      </select>
-    </div>
-    <div id="myday-content"><div class="loading">Select your name above to see your day.</div></div>
+  <div class="rs-wrap">
+    <div id="rs-grid"><div class="loading">Loading…</div></div>
   </div>
 </div>
 
-<!-- Slack / Navigate confirmation popup -->
-<div id="slack-confirm-overlay" style="display:none;position:fixed;inset:0;background:rgba(26,23,20,0.55);z-index:400;align-items:center;justify-content:center;padding:24px;">
-  <div style="background:white;border-radius:4px;padding:28px 24px;max-width:320px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.25);">
-    <div style="font-size:1.8rem;margin-bottom:10px;">📍</div>
-    <div style="font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:600;color:var(--ink);margin-bottom:8px;">Notify Slack?</div>
-    <div style="font-size:0.88rem;color:var(--muted);line-height:1.5;margin-bottom:22px;">Send an ETA notification to Slack before opening Maps?</div>
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <button onclick="rsSlackChoice('yes')" style="width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:2px;font-family:'Jost',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;letter-spacing:0.04em;">Yes — notify Slack</button>
-      <button onclick="rsSlackChoice('no')" style="width:100%;padding:12px;background:white;color:var(--ink);border:1px solid var(--border);border-radius:2px;font-family:'Jost',sans-serif;font-size:0.9rem;cursor:pointer;">No — just open Maps</button>
-      <button onclick="rsSlackChoice('cancel')" style="width:100%;padding:10px;background:none;color:var(--muted);border:none;font-family:'Jost',sans-serif;font-size:0.85rem;cursor:pointer;">Cancel</button>
+<!-- Team popover -->
+<div class="pop-overlay" id="team-overlay" onclick="closeTeamPop()"></div>
+<div class="pop" id="team-pop">
+  <div class="pop-title" id="team-pop-title">Add Team</div>
+  <input type="hidden" id="team-id"/>
+  <label class="fl">Function</label>
+  <div style="display:flex;gap:6px;" id="fn-btns">
+    <button class="fn-btn" onclick="setFn('transport')">🚛 Transport</button>
+    <button class="fn-btn" onclick="setFn('styling')">🎨 Styling</button>
+    <button class="fn-btn" onclick="setFn('warehouse')">🏭 Warehouse</button>
+  </div>
+  <label class="fl">Name <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+  <input type="text" class="fi" id="team-name" placeholder="e.g. Nemo Crew, Morning Team…"/>
+  <label class="fl">Vehicle</label>
+  <div class="chip-row" id="vehicle-chips">
+    <button class="chip" onclick="pickVehicle(this,'Bruce')">Bruce</button>
+    <button class="chip" onclick="pickVehicle(this,'Nigel')">Nigel</button>
+    <button class="chip" onclick="pickVehicle(this,'Nemo')">Nemo</button>
+    <button class="chip" onclick="pickVehicle(this,'Marlin')">Marlin</button>
+    <button class="chip" onclick="pickVehicle(this,'VUG')">VUG</button>
+    <button class="chip" onclick="pickVehicle(this,'Own Car')">Own Car</button>
+    <button class="chip" onclick="pickVehicle(this,'')">None</button>
+  </div>
+  <label class="fl">Lead</label>
+  <select class="fi" id="team-lead"><option value="">— no lead —</option></select>
+  <label class="fl">Members <span style="font-weight:400;text-transform:none;">(tap to add)</span></label>
+  <div class="chip-row" id="member-chips"></div>
+  <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+    <input type="checkbox" id="save-tmpl"/>
+    <label for="save-tmpl" style="font-size:0.82rem;color:var(--muted);cursor:pointer;">Save as template</label>
+  </div>
+  <div id="tmpl-section" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--sand);">
+    <div style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px;">Load template</div>
+    <div class="template-row" id="tmpl-list"></div>
+  </div>
+  <div class="pop-actions">
+    <button class="btn btn-red" id="team-del-btn" style="display:none;margin-right:auto;" onclick="deleteTeam()">Delete</button>
+    <button class="btn btn-outline" onclick="closeTeamPop()">Cancel</button>
+    <button class="btn btn-gold" onclick="saveTeam()">Save</button>
+  </div>
+</div>
+
+<!-- Entry popover -->
+<div class="pop-overlay" id="entry-overlay" onclick="closeEntryPop()"></div>
+<div class="pop" id="entry-pop">
+  <div class="pop-title" id="entry-pop-title">Add Entry</div>
+  <input type="hidden" id="entry-id"/>
+  <input type="hidden" id="entry-team-id"/>
+  <div style="display:flex;gap:8px;margin-bottom:14px;">
+    <button class="fn-btn" id="mode-job"  onclick="setMode('job')"  style="flex:1;">🏠 Job</button>
+    <button class="fn-btn" id="mode-task" onclick="setMode('task')" style="flex:1;">📝 Task</button>
+  </div>
+  <div id="job-fields">
+    <label class="fl">Job</label>
+    <input type="text" class="fi" id="job-search" placeholder="Job number or address…" oninput="searchJobs(this.value)"/>
+    <div id="job-results" style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;display:none;margin-top:4px;"></div>
+    <div id="job-selected" style="display:none;padding:7px 10px;background:var(--sand);border-radius:4px;font-size:0.84rem;margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
+      <span id="job-selected-label"></span>
+      <button onclick="clearJob()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;">✕</button>
     </div>
+    <input type="hidden" id="job-id"/>
+    <label class="fl">Type</label>
+    <div class="chip-row" id="type-chips">
+      <button class="chip selected" onclick="pickType(this,'install')">Install</button>
+      <button class="chip" onclick="pickType(this,'pickup')">Pickup</button>
+      <button class="chip" onclick="pickType(this,'to_load')">To Load</button>
+    </div>
+  </div>
+  <div id="task-fields" style="display:none;">
+    <label class="fl">Description</label>
+    <input type="text" class="fi" id="task-title" placeholder="e.g. Stage sofa at bay B3, pick up linen…"/>
+  </div>
+  <div class="two-col" style="margin-top:12px;">
+    <div><label class="fl">Start time</label><select class="fi" id="entry-time"></select></div>
+    <div><label class="fl">Duration</label><select class="fi" id="entry-dur"></select></div>
+  </div>
+  <label class="fl">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+  <textarea class="fi" id="entry-notes" rows="2" placeholder="Access info, instructions…" style="resize:none;font-size:0.84rem;padding:8px 10px;"></textarea>
+  <div class="pop-actions">
+    <button class="btn btn-red" id="entry-del-btn" style="display:none;margin-right:auto;" onclick="deleteEntry()">Delete</button>
+    <button class="btn btn-outline" onclick="closeEntryPop()">Cancel</button>
+    <button class="btn btn-gold" onclick="saveEntry()">Save</button>
   </div>
 </div>
 
 <script>
-let _rsNavJobId=null, _rsNavAddress=null;
-
-function openRunsheetNavigate(jobId, address){
-  _rsNavJobId=jobId;
-  _rsNavAddress=address;
-  document.getElementById('slack-confirm-overlay').style.display='flex';
-}
-
-function rsSlackChoice(choice){
-  document.getElementById('slack-confirm-overlay').style.display='none';
-  const jobId=_rsNavJobId, address=_rsNavAddress;
-  _rsNavJobId=null; _rsNavAddress=null;
-  if(choice==='cancel') return;
-  const mapsUrl=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address||'')}`;
-  if(choice==='no'){ window.open(mapsUrl,'_blank'); return; }
-  // yes — ETA + Slack + Maps
-  if(!navigator.geolocation){ window.open(mapsUrl,'_blank'); return; }
-  navigator.geolocation.getCurrentPosition(
-    (pos)=>{
-      fetch(`/api/jobs/${jobId}/eta`,{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,role:'runsheet'})
-      }).then(()=>window.open(mapsUrl,'_blank')).catch(()=>window.open(mapsUrl,'_blank'));
-    },
-    ()=>window.open(mapsUrl,'_blank'),
-    {timeout:8000}
-  );
-}
-const COLOUR_MAP={Red:'#D62828',Blue:'#1565C0',Green:'#2E7D32',Yellow:'#F9A825',Purple:'#6A0DAD',Orange:'#E65100',Teal:'#00838F',Magenta:'#AD1457',Brown:'#4E342E',Olive:'#558B2F',Indigo:'#283593',Cyan:'#00ACC1',Pink:'#F06292',Grey:'#757575'};
-const RUNSHEET_TYPE_LABELS={install:'Install',pickup:'Pickup',to_load:'To Load'};
-
-// Job cache — populated from the runsheet day fetch
-// The runsheet page doesn't load ALL jobs, only those scheduled for the day.
-// jobsById and transferringToMap are built fresh on each renderRunsheet() call.
-let jobsById=new Map();
-let transferringToMap=new Map();
-
-function localDateStr(d){
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-
-let runsheetViewDate=new Date();
-function shiftRunsheetDate(delta){
-  runsheetViewDate=new Date(runsheetViewDate);
-  runsheetViewDate.setDate(runsheetViewDate.getDate()+delta);
-  renderRunsheet();
-}
-function goToToday(){
-  runsheetViewDate=new Date();
-  renderRunsheet();
-}
-
-// ── Runsheet config ──
-let RS_CONFIG={
-  vehicles:['Marlin','Bruce','Nigel','Nemo','VUG'],
-  stylists:['Addy','Montie','Delphine','India','Hayley'],
-  drivers:['Jo','Savio','Nick','Ayoub','Bruno','Phil','Tiago'],
-  workers:[],time_slots:[],durations:[30,60,90,120,150,180,210,240],
-};
-let lastFetchedData={jobs:[],schedule:[],styling:[],wh_picks:[],tasks:[],crew:{}};
-
-async function loadRunsheetConfig(){
-  try{const res=await fetch('/api/runsheet-config');RS_CONFIG=await res.json();}catch(e){}
-  populateSchedPopoverDropdowns();
-  initTabs();
-}
-
+const VEHICLES=['Bruce','Nigel','Nemo','Marlin','VUG','Own Car'];
+const ALL_WORKERS=['Addy','Montie','Delphine','India','Hayley','Jo','Savio','Nick','Ayoub','Bruno','Phil','Tiago'];
+const SLOTS=[];for(let h=7;h<=15;h++)for(let m=0;m<60;m+=30){if(h===15&&m>30)break;SLOTS.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);}
+const DURS=[30,60,90,120,150,180,210,240];
 const SLOT_H=46;
-const TOTAL_SLOTS=17;
-const TRANSPORT_VEHICLES=['Bruce','Nigel','Nemo'];
-const STYLING_VEHICLES=['Marlin','VUG','Own Vehicle'];
-function slotIndex(t){const[h,m]=t.split(':').map(Number);return(h-7)*2+(m===30?1:0)-1;}
-function formatSlotLabel(t){const[h,m]=t.split(':').map(Number);const p=h<12?'am':'pm',h12=h%12===0?12:h%12;return`${h12}:${String(m).padStart(2,'0')}${p}`;}
-function street_only_js(addr){if(!addr)return addr;return addr.split(',')[0].trim();}
-function timeOptions(){return'<option value="">No time yet</option>'+(RS_CONFIG.time_slots||[]).map(t=>`<option value="${t}">${formatSlotLabel(t)}</option>`).join('');}
-function durationOptions(){return'<option value="">1 hr (default)</option>'+(RS_CONFIG.durations||[]).map(d=>{const h=Math.floor(d/60),m=d%60;return`<option value="${d}">${h&&m?`${h}h ${m}m`:h?`${h} hr`:`${m} min`}</option>`;}).join('');}
+const FN_COL={transport:'#2e5a8a',styling:'#6a3d8a',warehouse:'#b8935a'};
+const FN_LBL={transport:'🚛 Transport',styling:'🎨 Styling',warehouse:'🏭 Warehouse'};
 
-let currentDaySchedule=[];
-let currentDayCrew={};
-let currentDayTasksById={};
+let viewDate=new Date(),dayTeams=[],daySchedule=[],dayTasks=[],dayJobs=[],templates=[];
+let _fn='transport',_vehicle='',_mode='job',_type='install',_jobId=null,_jsTimer=null;
 
-async function renderRunsheet(){
-  const todayStr=localDateStr(runsheetViewDate);
-  const label=document.getElementById('runsheet-date-label');
-  const isToday=localDateStr(new Date())===todayStr;
-  label.textContent=runsheetViewDate.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})+(isToday?' (Today)':'');
+function localDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function fmtDate(d){return d.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
+function shiftDate(n){viewDate=new Date(viewDate);viewDate.setDate(viewDate.getDate()+n);load();}
+function goToday(){viewDate=new Date();load();}
+function fmtSlot(t){if(!t)return'';const[h,m]=t.split(':').map(Number);return`${h%12||12}:${String(m).padStart(2,'0')}${h<12?'am':'pm'}`;}
+function slotIdx(t){if(!t)return 0;const[h,m]=t.split(':').map(Number);return Math.max(0,(h-7)*2+Math.floor(m/30));}
 
-  const content=document.getElementById('runsheet-content');
-  content.innerHTML='<div class="loading">Loading…</div>';
-
-  let dayJobs=[],daySchedule=[],dayCrew=[],dayTasks=[],data={};
+async function load(){
+  document.getElementById('date-label').textContent=fmtDate(viewDate);
+  document.getElementById('rs-grid').innerHTML='<div class="loading">Loading…</div>';
+  const ds=localDate(viewDate);
   try{
-    const res=await fetch(`/api/runsheet/${todayStr}`);
-    data=await res.json();
-    dayJobs=data.jobs||[];daySchedule=data.schedule||[];
-    dayCrew=data.crew||[];dayTasks=data.tasks||[];
-  }catch(e){content.innerHTML='<div class="runsheet-empty">Failed to load runsheet.</div>';return;}
+    const[dr,tr]=await Promise.all([fetch(`/api/runsheet/${ds}`),fetch('/api/team-templates')]);
+    const d=await dr.json();
+    dayTeams=d.teams||[];daySchedule=d.schedule||[];dayTasks=d.tasks||[];dayJobs=d.jobs||[];
+    templates=await tr.json();
+    render();
+  }catch(e){document.getElementById('rs-grid').innerHTML='<div class="loading">Failed to load.</div>';}
+}
 
-  currentDaySchedule=daySchedule;
-  currentDayTasksById=Object.fromEntries(dayTasks.map(t=>[t.id,t]));
+function render(){
+  const n=dayTeams.length;
+  const timew=56,colw=Math.max(160,Math.floor((window.innerWidth-timew-40)/(n+1)));
+  const cols=`${timew}px repeat(${n},${colw}px) ${Math.max(120,colw*0.7)}px`;
+  const rows=`auto repeat(${SLOTS.length},${SLOT_H}px)`;
 
-  // Convert crew array to dict keyed by vehicle for easy lookup
-  const _crewDict = Object.fromEntries((dayCrew||[]).map(c=>[c.vehicle, c]));
-
-  // Store for all tabs
-  lastFetchedData={
-    jobs:     dayJobs,
-    schedule: daySchedule,
-    styling:  data.styling  || [],
-    wh_picks: data.wh_picks || [],
-    tasks:    dayTasks,
-    crew:     _crewDict,
-  };
-
-  // Refresh non-grid tabs if active
-  if(currentTab==='myday')     renderMyDay();
-  if(currentTab==='styling')   renderStyling();
-  if(currentTab==='warehouse') renderWarehouse();
-
-  // Build job caches for this day
-  jobsById=new Map(dayJobs.map(j=>[j.id,j]));
-  transferringToMap=new Map(
-    dayJobs.filter(j=>j.is_transfer&&j.transfer_from_job_id).map(j=>[j.transfer_from_job_id,j])
-  );
-
-  if(!dayJobs.length&&!dayTasks.length){
-    content.innerHTML=`<div class="runsheet-empty">Nothing scheduled for this day yet.<br>Go to a job tile in <a href="/jobs" style="color:var(--accent);">Jobs</a> and use the calendar icon to schedule it.</div>`;
-    return;
-  }
-
-  const vehicles=TRANSPORT_VEHICLES;
-  const slots=RS_CONFIG.time_slots;
-  const nCols=vehicles.length;
-
-  const schedByVehicle={};
-  vehicles.forEach(v=>{schedByVehicle[v]=[];});
-  const jobById=Object.fromEntries(dayJobs.map(j=>[j.id,j]));
-  for(const entry of daySchedule){
-    const job=jobById[entry.job_id];
-    if(!job)continue;
-    if(schedByVehicle[entry.vehicle])schedByVehicle[entry.vehicle].push({...entry,_job:job});
-  }
-
-  const scheduledJobIds=new Set(daySchedule.map(e=>e.job_id));
-  const unscheduled=dayJobs.filter(j=>!scheduledJobIds.has(j.id));
-
-  const crewByVehicle={};
-  dayCrew.forEach(c=>{crewByVehicle[c.vehicle]=c;});
-  currentDayCrew=crewByVehicle;
-
-  const HEADER_ROWS=2;
-  let cells=[];
+  let g=`<div style="display:grid;grid-template-columns:${cols};grid-template-rows:${rows};" id="rs-inner">`;
 
   // Header
-  cells.push(`<div class="rs-header-cell" style="grid-column:1;grid-row:1;">Time</div>`);
-  vehicles.forEach((v,i)=>{cells.push(`<div class="rs-header-cell" style="grid-column:${i+2};grid-row:1;">${v}</div>`);});
-
-  // Team row
-  cells.push(`<div class="rs-team-cell" style="grid-column:1;grid-row:2;cursor:default;"></div>`);
-  vehicles.forEach((v,i)=>{
-    const crew=crewByVehicle[v];
-    const hasCrew=!!(crew?.lead||(crew?.offsiders||[]).length);
-    let crewText='+ Set crew';
-    if(hasCrew){
-      const leadLine=crew.lead?`<span style="opacity:0.55;font-weight:600;">Lead:</span> ${crew.lead}`:'';
-      const offsiderNames=(crew.offsiders||[]).filter(Boolean).join(', ');
-      const offLine=offsiderNames?`<span style="opacity:0.55;font-weight:600;">Offsider(s):</span> ${offsiderNames}`:'';
-      crewText=[leadLine,offLine].filter(Boolean).join('<br>');
-    }
-    cells.push(`<div class="rs-team-cell${hasCrew?' has-crew':''}" style="grid-column:${i+2};grid-row:2;line-height:1.5;padding:6px 8px;" onclick="openCrewPopover('${v}','${todayStr}')" title="Set ${v} crew">${crewText}</div>`);
-  });
-
-  // Time slots + empty cells
-  slots.forEach((slot,si)=>{
-    const gridRow=HEADER_ROWS+si+1;
-    cells.push(`<div class="rs-time" style="grid-column:1;grid-row:${gridRow};">${formatSlotLabel(slot)}</div>`);
-    vehicles.forEach((v,vi)=>{
-      cells.push(`<div class="rs-cell rs-cell-clickable" style="grid-column:${vi+2};grid-row:${gridRow};" onclick="openTaskPopover(null,'${v}','${todayStr}','${slot}')"></div>`);
-    });
-  });
-
-  // Job tiles
-  const gearSVG=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
-  const stylistSVG=`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.71 4.04c.39-.39.39-1.05 0-1.44l-2.31-2.31a.996.996 0 0 0-1.41 0L15.13 2.16l3.71 3.71M3 17.25V21h3.75L20.81 6.94l-3.75-3.75z"/></svg>`;
-  const driverSVG=`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>`;
-  const navSVG=`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>`;
-
-  vehicles.forEach((v,vi)=>{
-    (schedByVehicle[v]||[]).forEach(entry=>{
-      const job=entry._job;
-      if(!entry.start_time)return;
-      const si=slotIndex(entry.start_time);
-      const dur=entry.duration||60;
-      const spanSlots=Math.max(1,Math.round(dur/30));
-      const rowStart=HEADER_ROWS+si+1;
-      const rowEnd=rowStart+spanSlots;
-      const entryType=entry.type||job.runsheet_type||'install';
-      const typeClass=`rs-job-${entryType}`;
-      const colour=COLOUR_MAP[job.colour]||'#888';
-      const ref=job.job_ref||job.job_number||'';
-      const addr=street_only_js(job.address||'');
-      const typeLabel=RUNSHEET_TYPE_LABELS[entryType]||'';
-      const notes=entry.notes||'';
-
-      let transferHtml='';
-      if(job.is_transfer&&job.transfer_from_job_id){
-        const src=jobsById.get(job.transfer_from_job_id);
-        const srcRef=src?(src.job_ref||src.job_number):'?';
-        transferHtml=`<div class="rs-job-transfer rs-job-transfer-from">↓ Transfer from ${srcRef}</div>`;
-      }else if(transferringToMap.has(job.id)){
-        const dest=transferringToMap.get(job.id);
-        transferHtml=`<div class="rs-job-transfer rs-job-transfer-to">↑ Transferring to ${dest.job_ref||dest.job_number}</div>`;
-      }
-
-      const crewStr=[entry.lead,...(entry.team||[])].filter(Boolean).join(', ');
-      cells.push(`<div class="rs-job ${typeClass}" style="grid-column:${vi+2};grid-row:${rowStart}/${rowEnd};border-left-color:${colour};z-index:2;">
-        <div class="rs-job-content">
-          <div class="rs-job-ref">${ref}</div>
-          <div class="rs-job-addr">${addr}</div>
-          ${typeLabel?`<div class="rs-job-type">${typeLabel}</div>`:''}
-          ${crewStr?`<div style="font-size:0.65rem;color:var(--muted);margin-top:1px;">👤 ${crewStr}</div>`:''}
-          ${transferHtml}
-          ${notes?`<div class="rs-job-notes" onclick="event.stopPropagation();this.classList.toggle('expanded')" title="${notes}">📝 ${notes}</div>`:''}
-        </div>
-        <div class="rs-job-actions">
-          <button class="rs-job-btn-gear" onclick="openRunsheetPopover('${job.id}')" title="Edit schedule">${gearSVG}</button>
-        </div>
-      </div>`);
-    });
-    (schedByVehicle[v]||[]).filter(e=>!e.start_time).forEach(entry=>{
-      const job=entry._job;
-      if(!unscheduled.find(u=>u.id===job.id))unscheduled.push(job);
-    });
-  });
-
-  // Task tiles
-  dayTasks.forEach(task=>{
-    if(!task.start_time)return;
-    const si=slotIndex(task.start_time);
-    if(si<0||si>=TOTAL_SLOTS)return;
-    const dur=task.duration||60;
-    const spanSlots=Math.max(1,Math.round(dur/30));
-    const rowStart=HEADER_ROWS+si+1;
-    const rowEnd=rowStart+spanSlots;
-    const targetCols=task.vehicle==='ALL'?vehicles.map((_,vi)=>vi+2):[vehicles.indexOf(task.vehicle)+2].filter(c=>c>=2);
-    targetCols.forEach(col=>{
-      cells.push(`<div class="rs-task" style="grid-column:${col};grid-row:${rowStart}/${rowEnd};z-index:2;" onclick="openTaskPopover('${task.id}','${task.vehicle}','${task.date}',null)">
-        <div class="rs-task-content">
-          <div class="rs-task-title">${task.title}</div>
-          ${task.notes?`<div class="rs-task-notes" onclick="event.stopPropagation();this.classList.toggle('expanded')">${task.notes}</div>`:''}
-        </div>
-      </div>`);
-    });
-  });
-
-  let html=`<div class="rs-scroll"><div class="rs-grid" style="grid-template-columns:60px repeat(${nCols},1fr);grid-template-rows:auto auto repeat(${TOTAL_SLOTS},${SLOT_H}px);">${cells.join('')}</div></div>`;
-
-  if(unscheduled.length){
-    html+=`<div class="rs-unscheduled">
-      <div class="rs-unscheduled-title">Not yet placed <span style="background:var(--sand);border-radius:10px;padding:1px 8px;font-size:0.7rem;font-weight:400;">${unscheduled.length}</span></div>
-      <div class="rs-unscheduled-chips">${unscheduled.map(j=>`<div class="rs-unscheduled-chip" onclick="openRunsheetPopover('${j.id}')"><div class="rs-chip-ref">${j.job_ref||j.job_number}</div><div style="font-size:0.76rem;color:var(--muted);">${street_only_js(j.address||'')}</div></div>`).join('')}</div>
+  g+=`<div style="grid-column:1;grid-row:1;"></div>`;
+  dayTeams.forEach((t,i)=>{
+    const col=FN_COL[t.function]||'#1a1714';
+    const crew=[t.lead,...(t.members||[])].filter(Boolean).join(', ');
+    g+=`<div class="rs-team-hdr" style="grid-column:${i+2};grid-row:1;background:${col};" onclick="openTeamPop('${t.id}')">
+      <div class="rs-team-hdr-fn">${FN_LBL[t.function]||t.function}</div>
+      <div class="rs-team-hdr-name">${t.name||t.vehicle||'Team '+(i+1)}</div>
+      ${t.vehicle?`<div class="rs-team-hdr-sub">🚗 ${t.vehicle}</div>`:''}
+      ${crew?`<div class="rs-team-hdr-sub">👤 ${crew}</div>`:''}
     </div>`;
-  }
-
-  content.innerHTML=html;
-  // If My Day tab is active, refresh it with the new data too
-  if(currentTab==='myday') renderMyDay();
-}
-
-// ── Tabs ──
-let currentTab = localStorage.getItem('rs-tab') || 'grid';
-
-function switchTab(tab){
-  currentTab = tab;
-  localStorage.setItem('rs-tab', tab);
-  ['grid','styling','warehouse','myday'].forEach(t=>{
-    document.getElementById(`tab-${t}`)?.classList.toggle('active', t===tab);
-    document.getElementById(`view-${t}`)?.style && (document.getElementById(`view-${t}`).style.display = t===tab ? '' : 'none');
   });
-  if(tab==='styling')   renderStyling();
-  if(tab==='warehouse') renderWarehouse();
-  if(tab==='myday')     renderMyDay();
+  g+=`<button class="rs-add-team-btn" style="grid-column:${n+2};grid-row:1;" onclick="openTeamPop(null)">+ Add Team</button>`;
+
+  // Time rows
+  SLOTS.forEach((slot,si)=>{
+    const row=si+2;
+    const showLbl=slot.endsWith(':00');
+    g+=`<div class="rs-time" style="grid-column:1;grid-row:${row};">${showLbl?fmtSlot(slot):''}</div>`;
+    dayTeams.forEach((_,i)=>{
+      g+=`<div class="rs-cell" style="grid-column:${i+2};grid-row:${row};" data-team="${i}" data-slot="${slot}" onclick="openEntryPop(null,'${dayTeams[i].id}','${slot}')"></div>`;
+    });
+    g+=`<div style="grid-column:${n+2};grid-row:${row};border-top:1px solid var(--border);"></div>`;
+  });
+  g+='</div>';
+
+  document.getElementById('rs-grid').innerHTML=g;
+
+  // Inject tiles
+  const jobById=Object.fromEntries(dayJobs.map(j=>[j.id,j]));
+  const byTeam={};
+  dayTeams.forEach(t=>{byTeam[t.id]=[];});
+
+  daySchedule.forEach(e=>{
+    const tid=e.team_id||(dayTeams.find(t=>t.vehicle===e.vehicle)?.id);
+    if(tid&&byTeam[tid]) byTeam[tid].push({...e,_task:false});
+  });
+  dayTasks.forEach(e=>{
+    const tid=e.team_id||(dayTeams.find(t=>t.vehicle===e.vehicle||e.vehicle==='ALL')?.id);
+    if(tid&&byTeam[tid]) byTeam[tid].push({...e,_task:true});
+  });
+
+  const inner=document.getElementById('rs-inner');
+  dayTeams.forEach((team,ti)=>{
+    (byTeam[team.id]||[]).forEach(e=>{
+      if(!e.start_time) return;
+      const si=slotIdx(e.start_time);
+      const dur=e.duration||60;
+      const span=Math.max(1,Math.round(dur/30));
+      const cell=inner.querySelector(`[data-team="${ti}"][data-slot="${SLOTS[si]}"]`);
+      if(!cell) return;
+      const tile=document.createElement('div');
+      const isTask=e._task;
+      const typeKey=isTask?'task':(e.type||'install');
+      const job=isTask?null:jobById[e.job_id];
+      const ref=isTask?(e.title||'Task'):(job?job.job_ref||job.job_number:'—');
+      const addr=job?job.address?.split(',')[0]||'':'';
+      const lbl=isTask?'Task':{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'';
+      tile.className=`rs-tile ${typeKey}`;
+      tile.style.cssText=`top:0;left:2px;right:2px;height:${span*SLOT_H-4}px;`;
+      tile.innerHTML=`<div class="rs-tile-label">${lbl}</div><div class="rs-tile-ref">${ref}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}<button class="rs-tile-gear" onclick="event.stopPropagation();openEntryPop('${e.id}','${team.id}',null)">⚙</button>`;
+      tile.onclick=()=>openEntryPop(e.id,team.id,null);
+      cell.style.position='relative';
+      cell.appendChild(tile);
+    });
+  });
 }
 
-function initTabs(){
-  populateMydaySelects();
-  switchTab(currentTab);
+// ── Team popover ──
+function openTeamPop(id){
+  const team=id?dayTeams.find(t=>t.id===id):null;
+  document.getElementById('team-pop-title').textContent=team?'Edit Team':'Add Team';
+  document.getElementById('team-id').value=id||'';
+  document.getElementById('team-name').value=team?.name||'';
+  document.getElementById('team-del-btn').style.display=team?'inline-flex':'none';
+  document.getElementById('save-tmpl').checked=false;
+  _fn=team?.function||'transport';
+  _vehicle=team?.vehicle||'';
+  setFn(_fn,true);
+  document.querySelectorAll('#vehicle-chips .chip').forEach(b=>{const v=b.getAttribute('onclick').match(/'([^']*)'/)[1];b.classList.toggle('selected',v===_vehicle);});
+  const leadSel=document.getElementById('team-lead');
+  leadSel.innerHTML='<option value="">— no lead —</option>'+ALL_WORKERS.map(w=>`<option${w===team?.lead?' selected':''}>${w}</option>`).join('');
+  const sel=team?.members||[];
+  document.getElementById('member-chips').innerHTML=ALL_WORKERS.map(w=>`<button class="chip${sel.includes(w)?' selected':''}" onclick="this.classList.toggle('selected')">${w}</button>`).join('');
+  // Templates
+  const tl=document.getElementById('tmpl-list');
+  tl.innerHTML=templates.length?templates.map(t=>`<button class="chip" onclick="applyTmpl('${t.id}')">${t.name}</button>`).join(''):'<span style="font-size:0.8rem;color:var(--muted);">No templates yet</span>';
+  document.getElementById('team-overlay').classList.add('open');
+  document.getElementById('team-pop').classList.add('open');
+}
+function closeTeamPop(){document.getElementById('team-overlay').classList.remove('open');document.getElementById('team-pop').classList.remove('open');}
+
+function setFn(fn,silent){
+  _fn=fn;
+  document.querySelectorAll('#fn-btns .fn-btn').forEach(b=>{
+    const f=b.getAttribute('onclick').match(/'(\w+)'/)[1];
+    b.className='fn-btn'+(f===fn?' active-'+fn:'');
+  });
+}
+function pickVehicle(btn,v){_vehicle=v;document.querySelectorAll('#vehicle-chips .chip').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');}
+function applyTmpl(id){
+  const t=templates.find(x=>x.id===id);if(!t)return;
+  document.getElementById('team-name').value=t.name||'';
+  _fn=t.function||'transport';setFn(_fn,true);
+  _vehicle=t.vehicle||'';
+  document.querySelectorAll('#vehicle-chips .chip').forEach(b=>{const v=b.getAttribute('onclick').match(/'([^']*)'/)[1];b.classList.toggle('selected',v===_vehicle);});
+  document.getElementById('team-lead').value=t.lead||'';
+  document.querySelectorAll('#member-chips .chip').forEach(b=>b.classList.toggle('selected',(t.members||[]).includes(b.textContent)));
+}
+async function saveTeam(){
+  const id=document.getElementById('team-id').value;
+  const lead=document.getElementById('team-lead').value||null;
+  const members=[...document.querySelectorAll('#member-chips .chip.selected')].map(b=>b.textContent);
+  const name=document.getElementById('team-name').value.trim()||null;
+  const p={name,vehicle:_vehicle||null,function:_fn,lead,members};
+  if(id){await fetch(`/api/teams/entry/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});}
+  else{const ds=localDate(viewDate);p.sort_order=dayTeams.length;await fetch(`/api/teams/${ds}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});}
+  if(document.getElementById('save-tmpl').checked&&name){await fetch('/api/team-templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,vehicle:_vehicle||null,function:_fn,lead,members})});}
+  closeTeamPop();load();
+}
+async function deleteTeam(){
+  const id=document.getElementById('team-id').value;
+  if(!id||!confirm('Delete this team? Entries will be unlinked.'))return;
+  await fetch(`/api/teams/entry/${id}`,{method:'DELETE'});
+  closeTeamPop();load();
 }
 
-// ── Shared job search for popovers ─────────────────────────────────────────
-let _jobSearchTimers={};
-async function searchJobsForPopover(q, resultsId, selectedId, hiddenId){
-  clearTimeout(_jobSearchTimers[resultsId]);
-  const results=document.getElementById(resultsId);
-  if(!results) return;
-  if(!q.trim()){ results.style.display='none'; return; }
-  _jobSearchTimers[resultsId]=setTimeout(async()=>{
-    const res=await fetch('/api/jobs');
-    const jobs=await res.json();
+// ── Entry popover ──
+function openEntryPop(entryId,teamId,slot){
+  document.getElementById('entry-pop-title').textContent=entryId?'Edit Entry':'Add Entry';
+  document.getElementById('entry-id').value=entryId||'';
+  document.getElementById('entry-team-id').value=teamId||'';
+  document.getElementById('entry-del-btn').style.display=entryId?'inline-flex':'none';
+  document.getElementById('job-search').value='';
+  document.getElementById('job-results').style.display='none';
+  document.getElementById('job-selected').style.display='none';
+  document.getElementById('job-id').value='';
+  document.getElementById('task-title').value='';
+  document.getElementById('entry-notes').value='';
+  _jobId=null;
+  const tSel=document.getElementById('entry-time');
+  tSel.innerHTML='<option value="">No time</option>'+SLOTS.map(s=>`<option value="${s}">${fmtSlot(s)}</option>`).join('');
+  if(slot)tSel.value=slot;
+  document.getElementById('entry-dur').innerHTML='<option value="">—</option>'+DURS.map(d=>`<option value="${d}">${d>=60?d/60+'h'+(d%60?d%60+'m':''):d+'m'}</option>`).join('');
+  document.querySelectorAll('#type-chips .chip').forEach((b,i)=>b.classList.toggle('selected',i===0));
+  _type='install';
+  if(entryId){
+    const e=daySchedule.find(x=>x.id===entryId)||dayTasks.find(x=>x.id===entryId);
+    if(e){
+      const isTask=dayTasks.some(x=>x.id===entryId);
+      setMode(isTask?'task':'job');
+      if(isTask){document.getElementById('task-title').value=e.title||'';}
+      else{
+        _type=e.type||'install';
+        document.querySelectorAll('#type-chips .chip').forEach(b=>{const t=b.getAttribute('onclick').match(/'([^']+)'/)[1];b.classList.toggle('selected',t===_type);});
+        _jobId=e.job_id;
+        const job=dayJobs.find(j=>j.id===e.job_id);
+        if(job){document.getElementById('job-selected-label').textContent=`${job.job_ref||job.job_number} — ${job.address||''}`;document.getElementById('job-selected').style.display='flex';document.getElementById('job-id').value=e.job_id;}
+      }
+      tSel.value=e.start_time||'';
+      document.getElementById('entry-dur').value=e.duration||'';
+      document.getElementById('entry-notes').value=e.notes||'';
+    }
+  }else{setMode('job');}
+  document.getElementById('entry-overlay').classList.add('open');
+  document.getElementById('entry-pop').classList.add('open');
+}
+function closeEntryPop(){document.getElementById('entry-overlay').classList.remove('open');document.getElementById('entry-pop').classList.remove('open');_jobId=null;}
+function setMode(m){
+  _mode=m;
+  document.getElementById('job-fields').style.display=m==='job'?'block':'none';
+  document.getElementById('task-fields').style.display=m==='task'?'block':'none';
+  document.getElementById('mode-job').className='fn-btn'+(m==='job'?' active-transport':'');
+  document.getElementById('mode-task').className='fn-btn'+(m==='task'?' active-transport':'');
+}
+function pickType(btn,t){_type=t;document.querySelectorAll('#type-chips .chip').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');}
+function searchJobs(q){
+  clearTimeout(_jsTimer);
+  const res=document.getElementById('job-results');
+  if(!q.trim()){res.style.display='none';return;}
+  _jsTimer=setTimeout(async()=>{
+    const r=await fetch('/api/jobs');const jobs=await r.json();
     const ql=q.toLowerCase();
-    const matches=jobs.filter(j=>
-      (j.job_ref||'').toLowerCase().includes(ql)||
-      (j.job_number||'').toLowerCase().includes(ql)||
-      (j.address||'').toLowerCase().includes(ql)
-    ).slice(0,8);
-    results.innerHTML=matches.length
-      ? matches.map(j=>`<div class="job-search-result" onclick="selectJobForPopover('${j.id}','${(j.job_ref||j.job_number||'').replace(/'/g,"\\'")}','${(j.address||'').replace(/'/g,"\\'")}','${resultsId}','${selectedId}','${hiddenId}')">
-          <span class="job-search-ref">${j.job_ref||j.job_number}</span>
-          <span class="job-search-addr">${j.address||''}</span>
-        </div>`).join('')
-      : '<div class="job-search-result" style="color:var(--muted)">No jobs found</div>';
-    results.style.display='block';
+    const m=jobs.filter(j=>(j.job_ref||'').toLowerCase().includes(ql)||(j.job_number||'').toLowerCase().includes(ql)||(j.address||'').toLowerCase().includes(ql)).slice(0,8);
+    res.innerHTML=m.length?m.map(j=>`<div class="job-search-result" onclick="pickJob('${j.id}','${(j.job_ref||j.job_number||'').replace(/'/g,"\\'")}','${(j.address||'').replace(/'/g,"\\'")}')"><span class="jsr-ref">${j.job_ref||j.job_number}</span><span class="jsr-addr">${j.address||''}</span></div>`).join(''):'<div class="job-search-result" style="color:var(--muted)">No jobs found</div>';
+    res.style.display='block';
   },300);
 }
-function selectJobForPopover(jobId, ref, addr, resultsId, selectedId, hiddenId){
-  document.getElementById(resultsId).style.display='none';
-  document.getElementById(selectedId).textContent=`${ref} — ${addr}`;
-  document.getElementById(selectedId).style.display='block';
-  document.getElementById(hiddenId).value=jobId;
-}
-
-// ── Styling tab ─────────────────────────────────────────────────────────────
-function renderStyling(){
-  const content=document.getElementById('styling-content');
-  const styling=lastFetchedData?.styling||[];
-  const jobs=lastFetchedData?.jobs||[];
-  const slots=RS_CONFIG.time_slots||[];
-  const vehicles=STYLING_VEHICLES;
-  const nCols=vehicles.length;
-  const HEADER_ROWS=2;
-
-  const schedByVehicle={};
-  vehicles.forEach(v=>{schedByVehicle[v]=[];});
-  styling.forEach(e=>{
-    const job=jobs.find(j=>j.id===e.job_id);
-    if(!job) return;
-    // Map 'own vehicle' or null to 'Own Vehicle'
-    const v=vehicles.includes(e.vehicle)?e.vehicle:'Own Vehicle';
-    if(schedByVehicle[v]) schedByVehicle[v].push({...e,_job:job});
-  });
-
-  let cells=[];
-  // Header row 1 — vehicle names
-  cells.push(`<div class="rs-header-cell" style="grid-column:1;grid-row:1;">Time</div>`);
-  vehicles.forEach((v,i)=>cells.push(`<div class="rs-header-cell" style="grid-column:${i+2};grid-row:1;">${v}</div>`));
-  // Header row 2 — crew (stylists)
-  cells.push(`<div class="rs-team-cell" style="grid-column:1;grid-row:2;"></div>`);
-  vehicles.forEach((v,i)=>cells.push(`<div class="rs-team-cell" style="grid-column:${i+2};grid-row:2;color:var(--muted);font-size:0.72rem;padding:6px 8px;">${v==='Own Vehicle'?'Personal cars':''}</div>`));
-  // Time slots
-  slots.forEach((slot,si)=>{
-    const gridRow=HEADER_ROWS+si+1;
-    cells.push(`<div class="rs-time" style="grid-column:1;grid-row:${gridRow};">${formatSlotLabel(slot)}</div>`);
-    vehicles.forEach((v,vi)=>{
-      cells.push(`<div class="rs-cell rs-cell-clickable" style="grid-column:${vi+2};grid-row:${gridRow};" onclick="openStylingPopover(null)"></div>`);
-    });
-  });
-  // Styling tiles
-  vehicles.forEach((v,vi)=>{
-    (schedByVehicle[v]||[]).forEach(entry=>{
-      const job=entry._job;
-      if(!entry.start_time) return;
-      const si=slotIndex(entry.start_time);
-      const dur=entry.duration||90;
-      const spanSlots=Math.max(1,Math.round(dur/30));
-      const rowStart=HEADER_ROWS+si+1;
-      const rowEnd=rowStart+spanSlots;
-      const ref=job.job_ref||job.job_number||'';
-      const addr=street_only_js(job.address||'');
-      const colour=COLOUR_MAP[job.colour]||'#8a4fbf';
-      cells.push(`<div class="rs-job rs-job-styling" style="grid-column:${vi+2};grid-row:${rowStart}/${rowEnd};border-left-color:#8a4fbf;z-index:2;">
-        <div class="rs-job-content">
-          <div class="rs-job-ref">${ref}</div>
-          <div class="rs-job-addr">${addr}</div>
-          <div style="font-size:0.68rem;color:#8a4fbf;margin-top:2px;">${entry.person||''}</div>
-          ${entry.notes?`<div class="rs-job-notes" onclick="event.stopPropagation();this.classList.toggle('expanded')" title="${entry.notes}">📝 ${entry.notes}</div>`:''}
-        </div>
-        <div class="rs-job-actions">
-          <button class="rs-job-btn-gear" onclick="openStylingPopover('${entry.id}')" title="Edit">${`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`}</button>
-        </div>
-      </div>`);
-    });
-  });
-
-  const html=`<div class="rs-scroll"><div class="rs-grid" style="grid-template-columns:60px repeat(${nCols},1fr);grid-template-rows:auto auto repeat(${TOTAL_SLOTS},${SLOT_H}px);">${cells.join('')}</div></div>`;
-  content.innerHTML=html;
-}
-
-let _stylingEntryId=null;
-let _stylingMode='job';
-
-function setStylingMode(mode){
-  _stylingMode=mode;
-  document.getElementById('styling-mode-select').style.display='none';
-  document.getElementById('styling-task-form').style.display=mode==='task'?'block':'none';
-  document.getElementById('styling-job-form').style.display=mode==='job'?'block':'none';
-  document.getElementById('styling-popover-title').textContent=mode==='task'?'Add Styling Task':'Add Styling Entry';
-}
-
-function openStylingPopover(entryId){
-  _stylingEntryId=entryId;
-  const todayStr=localDateStr(runsheetViewDate);
-  document.getElementById('styling-entry-id').value=entryId||'';
-  document.getElementById('styling-delete-btn').style.display=entryId?'inline-block':'none';
-
-  // Populate lead select and team chips
-  const leadEl=document.getElementById('styling-lead');
-  if(leadEl) leadEl.innerHTML=workerOptions('');
-  renderTeamChips('styling-team-chips',[]);
-
-  // Populate person select for tasks
-  const personSel=document.getElementById('styling-task-person');
-  if(personSel) personSel.innerHTML='<option value="ALL">All stylists</option>'+(RS_CONFIG.stylists||[]).map(s=>`<option value="${s}">${s}</option>`).join('');
-
-  document.getElementById('styling-time').innerHTML=timeOptions();
-  document.getElementById('styling-duration').innerHTML=durationOptions();
-  if(document.getElementById('styling-task-time')) document.getElementById('styling-task-time').innerHTML=timeOptions();
-
-  document.getElementById('styling-date').value=todayStr;
-  document.getElementById('styling-notes').value='';
-  document.getElementById('styling-job-search').value='';
-  document.getElementById('styling-job-results').style.display='none';
-  document.getElementById('styling-job-selected').style.display='none';
-  document.getElementById('styling-job-id').value='';
-
-  if(entryId){
-    // Edit mode — go straight to job form
-    document.getElementById('styling-mode-select').style.display='none';
-    document.getElementById('styling-task-form').style.display='none';
-    document.getElementById('styling-job-form').style.display='block';
-    document.getElementById('styling-popover-title').textContent='Edit Styling Entry';
-    const entry=(lastFetchedData?.styling||[]).find(e=>e.id===entryId);
-    if(entry){
-      if(leadEl) leadEl.innerHTML=workerOptions(entry.lead||'');
-      renderTeamChips('styling-team-chips', entry.team||[]);
-      document.getElementById('styling-date').value=entry.date||todayStr;
-      document.getElementById('styling-time').value=entry.start_time||'';
-      document.getElementById('styling-duration').value=entry.duration||'';
-      document.getElementById('styling-notes').value=entry.notes||'';
-      const job=(lastFetchedData?.jobs||[]).find(j=>j.id===entry.job_id);
-      if(job){
-        document.getElementById('styling-job-selected').textContent=`${job.job_ref||job.job_number} — ${job.address||''}`;
-        document.getElementById('styling-job-selected').style.display='block';
-        document.getElementById('styling-job-id').value=entry.job_id;
-      }
+function pickJob(id,ref,addr){_jobId=id;document.getElementById('job-results').style.display='none';document.getElementById('job-selected-label').textContent=`${ref} — ${addr}`;document.getElementById('job-selected').style.display='flex';document.getElementById('job-id').value=id;document.getElementById('job-search').value='';}
+function clearJob(){_jobId=null;document.getElementById('job-selected').style.display='none';document.getElementById('job-id').value='';}
+async function saveEntry(){
+  const eid=document.getElementById('entry-id').value;
+  const tid=document.getElementById('entry-team-id').value;
+  const time=document.getElementById('entry-time').value||null;
+  const dur=parseInt(document.getElementById('entry-dur').value)||null;
+  const notes=document.getElementById('entry-notes').value.trim()||null;
+  const team=dayTeams.find(t=>t.id===tid);
+  const ds=localDate(viewDate);
+  if(_mode==='job'){
+    const jid=_jobId||document.getElementById('job-id').value;
+    if(!jid){alert('Please select a job.');return;}
+    const p={job_id:jid,date:ds,team_id:tid,vehicle:team?.vehicle||null,type:_type,category:team?.function||'transport',start_time:time,duration:dur,notes};
+    if(eid){await fetch(`/api/schedule/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});}
+    else{
+      // Create directly in job_schedule
+      await fetch(`/api/schedule-entry`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
     }
-  } else {
-    // New entry — show mode selector
-    document.getElementById('styling-popover-title').textContent='Add to Styling';
-    document.getElementById('styling-mode-select').style.display='block';
-    document.getElementById('styling-task-form').style.display='none';
-    document.getElementById('styling-job-form').style.display='none';
+  }else{
+    const title=document.getElementById('task-title').value.trim();
+    if(!title){alert('Please enter a description.');return;}
+    if(eid){await fetch(`/api/tasks/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,start_time:time,duration:dur,notes,team_id:tid})});}
+    else{await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,date:ds,start_time:time,duration:dur,notes,team_id:tid,vehicle:team?.vehicle||'ALL',category:team?.function||'warehouse'})});}
   }
-
-  document.getElementById('styling-popover-overlay').classList.add('open');
-  document.getElementById('styling-popover').classList.add('open');
+  closeEntryPop();load();
+}
+async function deleteEntry(){
+  const eid=document.getElementById('entry-id').value;
+  if(!eid||!confirm('Delete this entry?'))return;
+  const isTask=dayTasks.some(t=>t.id===eid);
+  if(isTask)await fetch(`/api/tasks/${eid}`,{method:'DELETE'});
+  else await fetch(`/api/schedule/${eid}`,{method:'DELETE'});
+  closeEntryPop();load();
 }
 
-function closeStylingPopover(){
-  document.getElementById('styling-popover-overlay').classList.remove('open');
-  document.getElementById('styling-popover').classList.remove('open');
-  _stylingEntryId=null;
-}
-
-async function saveStylingTask(){
-  const title=document.getElementById('styling-task-title').value.trim();
-  const date=document.getElementById('styling-task-date').value;
-  const person=document.getElementById('styling-task-person').value||'ALL';
-  const time=document.getElementById('styling-task-time').value||null;
-  if(!title||!date){alert('Please enter a description and date.');return;}
-  await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({title,vehicle:person,date,start_time:time,category:'styling'})});
-  closeStylingPopover();
-  renderRunsheet();
-}
-
-async function saveStylingEntry(){
-  const jobId=document.getElementById('styling-job-id').value;
-  const date=document.getElementById('styling-date').value;
-  if(!jobId||!date){alert('Please select a job and date.');return;}
-  const lead=document.getElementById('styling-lead')?.value||null;
-  const team=getTeamChips('styling-team-chips');
-  const payload={
-    date, lead, team:team.length?team:null,
-    start_time:document.getElementById('styling-time').value||null,
-    duration:parseInt(document.getElementById('styling-duration').value)||null,
-    notes:document.getElementById('styling-notes').value.trim()||null,
-  };
-  if(_stylingEntryId){
-    await fetch(`/api/schedule/${_stylingEntryId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,category:'styling'})});
-  } else {
-    await fetch(`/api/jobs/${jobId}/styling`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  }
-  closeStylingPopover();
-  renderRunsheet();
-}
-
-async function deleteStylingEntry(){
-  if(!confirm('Delete this styling entry?')) return;
-  await fetch(`/api/schedule/${_stylingEntryId}`,{method:'DELETE'});
-  closeStylingPopover();
-  renderRunsheet();
-}
-
-// ── Warehouse tab ────────────────────────────────────────────────────────────
-function renderWarehouse(){
-  const content=document.getElementById('warehouse-content');
-  const picks=lastFetchedData?.wh_picks||[];
-  const tasks=lastFetchedData?.tasks||[];
-  const jobs=lastFetchedData?.jobs||[];
-  const slots=RS_CONFIG.time_slots||[];
-
-  // Derive unique people from entries, plus an "All" column
-  const peopleSet=new Set();
-  [...picks,...tasks].forEach(e=>{
-    const p=e.person||e.vehicle||'All';
-    peopleSet.add(p==='ALL'?'All':p);
-  });
-  const people=['All',...[...(RS_CONFIG.drivers||[]),...(RS_CONFIG.stylists||[])].filter(w=>peopleSet.has(w))];
-  const uniquePeople=[...new Set(people)];
-  const nCols=uniquePeople.length||1;
-  const HEADER_ROWS=2;
-
-  if(!picks.length&&!tasks.length){
-    content.innerHTML='<div class="rs-list-empty">No warehouse tasks for this day.<br>Tap + to add one.</div>';
-    return;
-  }
-
-  // Map entries by person
-  const schedByPerson={};
-  uniquePeople.forEach(p=>{schedByPerson[p]=[];});
-  picks.forEach(e=>{
-    const p=e.person||'All';
-    if(schedByPerson[p]) schedByPerson[p].push({...e,_isTask:false,_label:'Pick'});
-    else schedByPerson['All'].push({...e,_isTask:false,_label:'Pick'});
-  });
-  tasks.forEach(t=>{
-    const p=(t.vehicle==='ALL'||!t.vehicle)?'All':t.vehicle;
-    if(schedByPerson[p]) schedByPerson[p].push({...t,_isTask:true,_label:t.title||'Task'});
-    else schedByPerson['All'].push({...t,_isTask:true,_label:t.title||'Task'});
-  });
-
-  let cells=[];
-  cells.push(`<div class="rs-header-cell" style="grid-column:1;grid-row:1;">Time</div>`);
-  uniquePeople.forEach((p,i)=>cells.push(`<div class="rs-header-cell" style="grid-column:${i+2};grid-row:1;">${p}</div>`));
-  cells.push(`<div class="rs-team-cell" style="grid-column:1;grid-row:2;"></div>`);
-  uniquePeople.forEach((_,i)=>cells.push(`<div class="rs-team-cell" style="grid-column:${i+2};grid-row:2;"></div>`));
-
-  slots.forEach((slot,si)=>{
-    const gridRow=HEADER_ROWS+si+1;
-    cells.push(`<div class="rs-time" style="grid-column:1;grid-row:${gridRow};">${formatSlotLabel(slot)}</div>`);
-    uniquePeople.forEach((_,pi)=>{
-      cells.push(`<div class="rs-cell rs-cell-clickable" style="grid-column:${pi+2};grid-row:${gridRow};" onclick="openWarehousePopover(null,'task')"></div>`);
-    });
-  });
-
-  // Warehouse tiles
-  uniquePeople.forEach((p,pi)=>{
-    (schedByPerson[p]||[]).forEach(entry=>{
-      if(!entry.start_time) return;
-      const si=slotIndex(entry.start_time);
-      const dur=entry.duration||60;
-      const spanSlots=Math.max(1,Math.round(dur/30));
-      const rowStart=HEADER_ROWS+si+1;
-      const rowEnd=rowStart+spanSlots;
-      const isTask=entry._isTask;
-      const colour=isTask?'var(--muted)':'var(--accent)';
-      const job=!isTask?jobs.find(j=>j.id===entry.job_id):null;
-      const label=isTask?(entry.title||'Task'):`Pick: ${job?job.job_ref||job.job_number:''}`;
-      const gearSVG=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
-      cells.push(`<div class="rs-job" style="grid-column:${pi+2};grid-row:${rowStart}/${rowEnd};border-left-color:${colour};z-index:2;background:${isTask?'rgba(154,143,128,0.08)':'rgba(184,147,90,0.08)'};">
-        <div class="rs-job-content">
-          <div class="rs-job-ref" style="font-size:0.72rem;">${isTask?'🏭':'📦'} ${label}</div>
-          ${entry.notes?`<div class="rs-job-notes" onclick="event.stopPropagation();this.classList.toggle('expanded')">${entry.notes}</div>`:''}
-        </div>
-        <div class="rs-job-actions">
-          <button class="rs-job-btn-gear" onclick="openWarehousePopover('${entry.id}','${isTask?'task':'pick'}')" title="Edit">${gearSVG}</button>
-        </div>
-      </div>`);
-    });
-  });
-
-  const html=`<div class="rs-scroll"><div class="rs-grid" style="grid-template-columns:60px repeat(${nCols},1fr);grid-template-rows:auto auto repeat(${TOTAL_SLOTS},${SLOT_H}px);">${cells.join('')}</div></div>`;
-  content.innerHTML=html;
-}
-
-let _whType='pick';
-function setWarehouseType(type){
-  _whType=type;
-  document.getElementById('wh-type-pick').classList.toggle('wh-type-selected', type==='pick');
-  document.getElementById('wh-type-task').classList.toggle('wh-type-selected', type==='task');
-  document.getElementById('wh-job-row').style.display=type==='pick'?'block':'none';
-  document.getElementById('wh-title-row').style.display=type==='task'?'block':'none';
-}
-
-function renderWarehouse(){
-  const content=document.getElementById('warehouse-content');
-  const picks=lastFetchedData?.wh_picks||[];
-  const tasks=lastFetchedData?.tasks||[];
-  const jobs=lastFetchedData?.jobs||[];
-  if(!picks.length&&!tasks.length){
-    content.innerHTML='<div class="rs-list-empty">No warehouse tasks for this day.<br>Tap + to add one.</div>';
-    return;
-  }
-  let html='';
-  if(picks.length){
-    html+=`<div class="rs-list-section">
-      <div class="rs-list-section-title">📦 Picking</div>
-      ${picks.map(e=>{
-        const job=jobs.find(j=>j.id===e.job_id)||{};
-        const ref=job.job_ref||job.job_number||'Job';
-        const addr=job.address?job.address.split(',')[0]:'';
-        const {time,ampm}=fmtTimeParts(e.start_time);
-        return `<div class="rs-list-card" style="border-left:4px solid var(--accent);">
-          <div class="rs-list-card-time">
-            <div class="rs-list-card-time-main">${time}</div>
-            <div class="rs-list-card-time-ampm">${ampm}</div>
-          </div>
-          <div class="rs-list-card-body">
-            <div class="rs-list-card-label" style="color:var(--accent);">Pick · ${e.person||'Unassigned'}</div>
-            <div class="rs-list-card-ref">${ref}</div>
-            <div class="rs-list-card-sub">${addr}</div>
-            ${e.notes?`<div class="rs-list-card-note">📝 ${e.notes}</div>`:''}
-          </div>
-          <button class="rs-list-card-edit" onclick="openWarehousePopover('${e.id}','pick')">⚙</button>
-        </div>`;
-      }).join('')}
-    </div>`;
-  }
-  if(tasks.length){
-    html+=`<div class="rs-list-section">
-      <div class="rs-list-section-title">🏭 General Tasks</div>
-      ${tasks.map(t=>{
-        const {time,ampm}=fmtTimeParts(t.start_time);
-        return `<div class="rs-list-card" style="border-left:4px solid var(--muted);">
-          <div class="rs-list-card-time">
-            <div class="rs-list-card-time-main">${time}</div>
-            <div class="rs-list-card-time-ampm">${ampm}</div>
-          </div>
-          <div class="rs-list-card-body">
-            <div class="rs-list-card-label" style="color:var(--muted);">Task · ${t.vehicle==='ALL'?'All team':t.vehicle||'Unassigned'}</div>
-            <div class="rs-list-card-ref">${t.title||'Untitled'}</div>
-            ${t.notes?`<div class="rs-list-card-note">📝 ${t.notes}</div>`:''}
-          </div>
-          <button class="rs-list-card-edit" onclick="openWarehousePopover('${t.id}','task')">⚙</button>
-        </div>`;
-      }).join('')}
-    </div>`;
-  }
-  content.innerHTML=html;
-}
-
-let _whEntryId=null;
-function openWarehousePopover(entryId, type='pick'){
-  _whEntryId=entryId;
-  const todayStr=localDateStr(runsheetViewDate);
-  document.getElementById('warehouse-popover-title').textContent=entryId?'Edit Warehouse Entry':'Add Warehouse Task';
-  document.getElementById('warehouse-entry-id').value=entryId||'';
-  document.getElementById('warehouse-delete-btn').style.display=entryId?'inline-block':'none';
-  document.getElementById('warehouse-job-search').value='';
-  document.getElementById('warehouse-job-results').style.display='none';
-  document.getElementById('warehouse-job-selected').style.display='none';
-  document.getElementById('warehouse-job-id').value='';
-  document.getElementById('warehouse-title').value='';
-  document.getElementById('warehouse-notes').value='';
-  document.getElementById('warehouse-time').innerHTML=timeOptions();
-  document.getElementById('warehouse-duration').innerHTML=durationOptions();
-  // Populate lead and team
-  const leadEl=document.getElementById('warehouse-lead');
-  if(leadEl) leadEl.innerHTML=workerOptions('');
-  renderTeamChips('warehouse-team-chips',[]);
-  // Populate person select
-  const personSel=document.getElementById('warehouse-person');
-  const allW=allWorkers();
-  if(personSel) personSel.innerHTML='<option value="ALL">All team</option>'+allW.map(w=>`<option value="${w}">${w}</option>`).join('');
-  setWarehouseType(type);
-  // Pre-fill if editing
-  if(entryId){
-    if(type==='task'){
-      const task=(lastFetchedData?.tasks||[]).find(t=>t.id===entryId);
-      if(task){
-        document.getElementById('warehouse-title').value=task.title||'';
-        document.getElementById('warehouse-notes').value=task.notes||'';
-        document.getElementById('warehouse-time').value=task.start_time||'';
-        if(personSel) personSel.value=task.vehicle||'ALL';
-      }
-    } else {
-      const pick=(lastFetchedData?.wh_picks||[]).find(e=>e.id===entryId);
-      if(pick){
-        if(leadEl) leadEl.innerHTML=workerOptions(pick.lead||'');
-        renderTeamChips('warehouse-team-chips', pick.team||[]);
-        document.getElementById('warehouse-time').value=pick.start_time||'';
-        document.getElementById('warehouse-notes').value=pick.notes||'';
-        const job=(lastFetchedData?.jobs||[]).find(j=>j.id===pick.job_id);
-        if(job){
-          document.getElementById('warehouse-job-selected').textContent=`${job.job_ref||job.job_number} — ${job.address||''}`;
-          document.getElementById('warehouse-job-selected').style.display='block';
-          document.getElementById('warehouse-job-id').value=pick.job_id;
-        }
-      }
-    }
-  }
-  document.getElementById('warehouse-popover-overlay').classList.add('open');
-  document.getElementById('warehouse-popover').classList.add('open');
-}
-
-function closeWarehousePopover(){
-  document.getElementById('warehouse-popover-overlay').classList.remove('open');
-  document.getElementById('warehouse-popover').classList.remove('open');
-  _whEntryId=null;
-}
-
-async function saveWarehouseEntry(){
-  const todayStr=localDateStr(runsheetViewDate);
-  const time=document.getElementById('warehouse-time').value||null;
-  const notes=document.getElementById('warehouse-notes').value.trim()||null;
-  if(_whType==='pick'){
-    const jobId=document.getElementById('warehouse-job-id').value;
-    if(!jobId){alert('Please select a job.');return;}
-    const lead=document.getElementById('warehouse-lead')?.value||null;
-    const team=getTeamChips('warehouse-team-chips');
-    if(_whEntryId){
-      await fetch(`/api/schedule/${_whEntryId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({lead,team:team.length?team:null,start_time:time,notes,category:'warehouse_pick'})});
-    } else {
-      await fetch(`/api/jobs/${jobId}/warehouse-pick`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:todayStr,lead,team:team.length?team:null,start_time:time,notes})});
-    }
-  } else {
-    const title=document.getElementById('warehouse-title').value.trim();
-    const person=document.getElementById('warehouse-person').value||'ALL';
-    if(!title){alert('Please enter a task description.');return;}
-    if(_whEntryId){
-      await fetch(`/api/tasks/${_whEntryId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,vehicle:person,start_time:time,notes,category:'warehouse'})});
-    } else {
-      await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,vehicle:person,date:todayStr,start_time:time,notes,category:'warehouse'})});
-    }
-  }
-  closeWarehousePopover();
-  renderRunsheet();
-}
-
-async function deleteWarehouseEntry(){
-  if(!confirm('Delete this entry?')) return;
-  if(_whType==='task') await fetch(`/api/tasks/${_whEntryId}`,{method:'DELETE'});
-  else await fetch(`/api/schedule/${_whEntryId}`,{method:'DELETE'});
-  closeWarehousePopover();
-  renderRunsheet();
-}
-
-// Shared time formatter for list views
-function fmtTimeParts(t){
-  if(!t) return {time:'—',ampm:''};
-  const[h,m]=t.split(':').map(Number);
-  return {time:`${h%12===0?12:h%12}:${String(m).padStart(2,'0')}`,ampm:h<12?'am':'pm'};
-}
-
-function populateMydaySelects(){
-  const personSel = document.getElementById('myday-person');
-  const allWorkers = [...(RS_CONFIG.stylists||[]), ...(RS_CONFIG.drivers||[])];
-  personSel.innerHTML = '<option value="">— select your name —</option>'
-    + allWorkers.map(w=>`<option value="${w}">${w}</option>`).join('');
-  personSel.value = localStorage.getItem('myday-person') || '';
-}
-
-function saveMydayPerson(){
-  localStorage.setItem('myday-person', document.getElementById('myday-person').value);
-}
-function saveMydayVehicle(){
-  localStorage.setItem('myday-vehicle', document.getElementById('myday-vehicle').value);
-}
-
-function renderMyDay(){
-  const person  = document.getElementById('myday-person').value;
-  const content = document.getElementById('myday-content');
-
-  if(!person){
-    content.innerHTML = '<div class="myday-empty"><div class="myday-empty-title">Select your name above</div></div>';
-    return;
-  }
-
-  const dayJobs    = lastFetchedData?.jobs || [];
-  const daySchedule= lastFetchedData?.schedule || [];
-  const dayTasks   = lastFetchedData?.tasks || [];
-  const dayCrew    = lastFetchedData?.crew || {};
-
-  // Find which vehicles this person is on today
-  const myVehicles = Object.entries(dayCrew)
-    .filter(([v, crew]) => crew.lead === person || (crew.offsiders||[]).includes(person))
-    .map(([v]) => v);
-
-  // Get schedule entries for those vehicles
-  const myEntries = daySchedule.filter(e => myVehicles.includes(e.vehicle));
-
-  // Tasks assigned to any of their vehicles or ALL
-  const myTasks = dayTasks.filter(t => myVehicles.includes(t.vehicle) || t.vehicle === 'ALL');
-
-  const combined = [];
-  myEntries.forEach(e => {
-    const job = dayJobs.find(j => j.id === e.job_id);
-    if(job) combined.push({...e, job, isTask:false});
-  });
-  myTasks.forEach(t => combined.push({...t, isTask:true}));
-  combined.sort((a,b) => (a.start_time||'99:99').localeCompare(b.start_time||'99:99'));
-
-  if(!myVehicles.length){
-    content.innerHTML = `<div class="myday-empty">
-      <div class="myday-empty-title">Not assigned to a truck today</div>
-      <p style="font-size:0.85rem;margin-top:6px;">Ask your manager to add you to a crew on the runsheet.</p>
-    </div>`;
-    return;
-  }
-
-  if(!combined.length){
-    content.innerHTML = `<div class="myday-empty">
-      <div class="myday-empty-title">Nothing scheduled yet</div>
-      <p style="font-size:0.85rem;margin-top:6px;">You're on ${myVehicles.join(' & ')} — check back once the runsheet is filled in.</p>
-    </div>`;
-    return;
-  }
-
-  const typeLabel = {install:'Install',to_load:'To Load',pickup:'Pickup'};
-
-  function fmtTime(t){
-    // Returns {time:'7:30', ampm:'am'}
-    if(!t) return {time:'—', ampm:''};
-    const[h,m]=t.split(':').map(Number);
-    const ampm=h<12?'am':'pm';
-    const h12=h%12===0?12:h%12;
-    return {time:`${h12}:${String(m).padStart(2,'0')}`, ampm};
-  }
-
-  content.innerHTML = combined.map(item => {
-    if(item.isTask){
-      const {time, ampm} = fmtTime(item.start_time);
-      return `<div class="myday-card" style="border-left:4px solid var(--border);">
-        <div class="myday-card-time">
-          <div class="myday-card-time-main">${time}</div>
-          <div class="myday-card-time-ampm">${ampm}</div>
-        </div>
-        <div class="myday-card-body">
-          <div class="myday-card-type" style="color:var(--muted);">Task · ${item.vehicle||'All'}</div>
-          <div class="myday-card-ref">${item.title||'Untitled task'}</div>
-          ${item.notes?`<div class="myday-card-notes">📝 ${item.notes}</div>`:''}
-        </div>
-      </div>`;
-    }
-
-    const job = item.job;
-    const type = item.type || 'install';
-    const {time, ampm} = fmtTime(item.start_time);
-    const ref = job.job_ref || job.job_number || '';
-    const addr = job.address || '';
-    const streetOnly = addr.split(',')[0];
-    const crew = dayCrew[item.vehicle] || {};
-    const crewStr = [crew.lead, ...(crew.offsiders||[])].filter(Boolean).join(', ');
-    const borderColor = type==='install'?'var(--green)':type==='to_load'?'var(--accent)':'#2e5a8a';
-
-    return `<div class="myday-card" style="border-left:4px solid ${borderColor};">
-      <div class="myday-card-time">
-        <div class="myday-card-time-main">${time}</div>
-        <div class="myday-card-time-ampm">${ampm}</div>
-      </div>
-      <div class="myday-card-body">
-        <div class="myday-card-type ${type}">${typeLabel[type]||type} · ${item.vehicle||''}</div>
-        <div class="myday-card-ref">${ref}</div>
-        <div class="myday-card-addr">${streetOnly}</div>
-        ${item.notes?`<div class="myday-card-notes">📝 ${item.notes}</div>`:''}
-        ${crewStr?`<div class="myday-card-crew">👥 ${crewStr}</div>`:''}
-        <div class="myday-card-btns">
-          <button class="myday-btn myday-btn-nav" onclick="openRunsheetNavigate('${job.id}','${addr.replace(/'/g,"\\'")}')">📍 Navigate</button>
-          ${type!=='to_load'?`<a href="/stylist/${job.id}" target="_blank" class="myday-btn myday-btn-stylist">✎ Stylist</a>`:''}
-          <a href="/driver/${job.id}" target="_blank" class="myday-btn myday-btn-driver">🚛 Driver</a>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-
-let runsheetPopoverJobId=null;
-let schedVehicleSelected=[];
-let schedVehicleTimes={};
-
-function workerOptions(selected=''){
-  return '<option value="">— no lead set —</option>'
-    +['── Stylists ──',...(RS_CONFIG.stylists||[]),'── Drivers ──',...(RS_CONFIG.drivers||[])]
-      .map(w=>w.startsWith('──')
-        ?`<option disabled>${w}</option>`
-        :`<option value="${w}"${w===selected?' selected':''}>${w}</option>`
-      ).join('');
-}
-
-function allWorkers(){
-  return [...(RS_CONFIG.stylists||[]),...(RS_CONFIG.drivers||[])];
-}
-
-function renderTeamChips(containerId, selected=[]){
-  const el=document.getElementById(containerId);
-  if(!el) return;
-  el.innerHTML=allWorkers().map(w=>
-    `<button class="sched-chip${selected.includes(w)?' selected':''}" onclick="this.classList.toggle('selected')">${w}</button>`
-  ).join('');
-}
-
-function getTeamChips(containerId){
-  const el=document.getElementById(containerId);
-  if(!el) return [];
-  return [...el.querySelectorAll('.sched-chip.selected')].map(b=>b.textContent);
-}
-
-function populateSchedPopoverDropdowns(){
-  const vRow=document.getElementById('sched-vehicle-chips');
-  if(vRow) vRow.innerHTML=(RS_CONFIG.vehicles||[]).map(v=>
-    `<button class="sched-chip" data-sv="${v}" onclick="toggleSchedVehicle(this,'${v}')">${v}</button>`
-  ).join('');
-}
-
-function renderVehicleTimeInputs(){
-  const container=document.getElementById('sched-vehicle-times');
-  if(!container) return;
-  if(!schedVehicleSelected.length){ container.innerHTML=''; return; }
-  container.innerHTML=`<div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px;margin-top:4px;">Time per vehicle</div>`
-    + schedVehicleSelected.map(v=>{
-      const t=schedVehicleTimes[v]||{};
-      return `<div style="margin-bottom:10px;">
-        <div style="font-size:0.73rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink);margin-bottom:5px;">${v}</div>
-        <div class="sched-two-col">
-          <select id="sched-time-${v}" class="runsheet-popover-input">${timeOptions()}</select>
-          <select id="sched-dur-${v}" class="runsheet-popover-input">${durationOptions()}</select>
-        </div>
-      </div>`;
-    }).join('');
-  // Restore saved values
-  schedVehicleSelected.forEach(v=>{
-    const t=schedVehicleTimes[v]||{};
-    const ts=document.getElementById(`sched-time-${v}`);
-    const ds=document.getElementById(`sched-dur-${v}`);
-    if(ts&&t.start_time) ts.value=t.start_time;
-    if(ds&&t.duration) ds.value=t.duration;
-  });
-}
-
-function toggleSchedVehicle(btn,v){
-  btn.classList.toggle('selected');
-  if(btn.classList.contains('selected'))schedVehicleSelected.push(v);
-  else schedVehicleSelected=schedVehicleSelected.filter(x=>x!==v);
-  renderVehicleTimeInputs();
-}
-
-function updateSchedHint(){
-  const type=document.getElementById('runsheet-popover-type')?.value||'install';
-  const label=document.getElementById('sched-date-label');
-  const hint=document.getElementById('sched-hint');
-  if(type==='pickup'){
-    if(label) label.textContent='Pickup date';
-    if(hint) hint.innerHTML='One tile only — <strong>Pickup</strong> on this date. No load tile created.';
-  } else if(type==='install'){
-    if(label) label.textContent='Install date';
-    if(hint) hint.innerHTML='Two tiles — <strong>To Load</strong> the day before (weekend-aware) and <strong>Install</strong> on this date.';
-  } else if(type==='to_load'){
-    if(label) label.textContent='Load date';
-    if(hint) hint.innerHTML='Two tiles — <strong>To Load</strong> on this date and <strong>Install</strong> the next business day.';
-  }
-}
-
-function updateJobSchedHint(){
-  const type=document.getElementById('job-sched-type')?.value||'install';
-  const hint=document.getElementById('job-sched-hint');
-  if(!hint) return;
-  if(type==='pickup'){
-    hint.innerHTML='One tile only — <strong>Pickup</strong> on this date. No load tile created.';
-  } else if(type==='install'){
-    hint.innerHTML='Two tiles — <strong>To Load</strong> the day before and <strong>Install</strong> on this date.';
-  } else if(type==='to_load'){
-    hint.innerHTML='Two tiles — <strong>To Load</strong> on this date and <strong>Install</strong> the next business day.';
-  }
-}
-
-async function openRunsheetPopover(jobId){
-  runsheetPopoverJobId=jobId;
-  schedVehicleSelected=[];
-  schedVehicleTimes={};
-  const job=jobsById.get(jobId);
-  document.getElementById('sched-popover-ref').textContent=[job?.job_ref||job?.job_number,job?.address?street_only_js(job.address):null].filter(Boolean).join(' — ');
-  document.getElementById('runsheet-popover-date').value=job?.runsheet_date||'';
-  document.getElementById('runsheet-popover-type').value=job?.runsheet_type||'install';
-  updateSchedHint();
-  document.getElementById('runsheet-remove-btn').style.display=job?.runsheet_date?'inline-block':'none';
-  try{
-    const res=await fetch(`/api/jobs/${jobId}/schedule`);
-    const entries=await res.json();
-    schedVehicleSelected=[...new Set(entries.map(e=>e.vehicle).filter(Boolean))];
-    entries.forEach(e=>{
-      if(e.vehicle&&(e.start_time||e.duration)){
-        schedVehicleTimes[e.vehicle]={start_time:e.start_time||'',duration:e.duration||''};
-      }
-    });
-    const noteEntry=entries.find(e=>e.notes);
-    const notesEl=document.getElementById('runsheet-popover-notes');
-    if(notesEl) notesEl.value=noteEntry?.notes||'';
-    // Lead and team from first entry
-    const first=entries[0];
-    const leadEl=document.getElementById('sched-lead');
-    if(leadEl) leadEl.innerHTML=workerOptions(first?.lead||'');
-    renderTeamChips('sched-team-chips', first?.team||[]);
-  }catch(e){}
-  document.querySelectorAll('[data-sv]').forEach(el=>{el.classList.toggle('selected',schedVehicleSelected.includes(el.dataset.sv));});
-  renderVehicleTimeInputs();
-  document.getElementById('runsheet-popover-overlay').classList.add('open');
-  document.getElementById('runsheet-popover').classList.add('open');
-}
-function closeRunsheetPopover(){
-  document.getElementById('runsheet-popover-overlay').classList.remove('open');
-  document.getElementById('runsheet-popover').classList.remove('open');
-  runsheetPopoverJobId=null;
-}
-async function saveRunsheetEntry(){
-  const date=document.getElementById('runsheet-popover-date').value;
-  const type=document.getElementById('runsheet-popover-type').value||'install';
-  const notes=document.getElementById('runsheet-popover-notes')?.value.trim()||null;
-  const lead=document.getElementById('sched-lead')?.value||null;
-  const team=getTeamChips('sched-team-chips');
-  if(!date){alert('Pick an install date first.');return;}
-
-  const vehicleOverrides=schedVehicleSelected.map(v=>({
-    vehicle:v,
-    start_time:document.getElementById(`sched-time-${v}`)?.value||null,
-    duration:parseInt(document.getElementById(`sched-dur-${v}`)?.value)||null,
-  }));
-
-  const existingRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
-  const existingEntries=await existingRes.json();
-
-  if(existingEntries.length){
-    await Promise.all(existingEntries.map(async entry=>{
-      const override=vehicleOverrides.find(o=>o.vehicle===entry.vehicle);
-      const patch={type, notes:notes||entry.notes||null, lead, team:team.length?team:null};
-      if(override?.start_time) patch.start_time=override.start_time;
-      if(override?.duration)   patch.duration=override.duration;
-      await fetch(`/api/schedule/${entry.id}`,{
-        method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)
-      });
-    }));
-    await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
-      method:'PATCH',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({runsheet_date:date,runsheet_type:type,vehicles:schedVehicleSelected.length?schedVehicleSelected:null,_skip_seed:true})
-    });
-  } else {
-    const r1=await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
-      method:'PATCH',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({runsheet_date:date,runsheet_type:type,vehicles:schedVehicleSelected.length?schedVehicleSelected:null})
-    });
-    const d1=await r1.json();
-    if(!d1.success){alert('Failed to save: '+(d1.error||'unknown error'));return;}
-
-    const schedRes=await fetch(`/api/jobs/${runsheetPopoverJobId}/schedule`);
-    const entries=await schedRes.json();
-    await Promise.all(entries.map(async entry=>{
-      const override=vehicleOverrides.find(o=>o.vehicle===entry.vehicle);
-      const patch={lead, team:team.length?team:null};
-      if(override?.start_time) patch.start_time=override.start_time;
-      if(override?.duration)   patch.duration=override.duration;
-      if(notes) patch.notes=notes;
-      if(Object.keys(patch).length){
-        await fetch(`/api/schedule/${entry.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
-      }
-    }));
-  }
-
-  const job=jobsById.get(runsheetPopoverJobId);
-  if(job){job.runsheet_date=date;job.runsheet_type=type;}
-  closeRunsheetPopover();
-  renderRunsheet();
-}
-async function removeFromRunsheet(){
-  if(!confirm('Remove this job from the runsheet and clear all vehicle assignments?'))return;
-  await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({runsheet_date:null,runsheet_type:null})});
-  closeRunsheetPopover();
-  renderRunsheet();
-}
-
-// ── Crew popover ──
-function openCrewPopover(vehicle,dateStr){
-  document.getElementById('crew-popover-vehicle').value=vehicle;
-  document.getElementById('crew-popover-date').value=dateStr;
-  document.getElementById('crew-popover-title').textContent=`${vehicle} — Crew`;
-  const crew=currentDayCrew[vehicle];
-  // Populate lead select fresh each time — guarantees options are present
-  // regardless of when loadRunsheetConfig() completed
-  const lSel=document.getElementById('crew-popover-lead');
-  lSel.innerHTML=workerOptions(crew?.lead||'');
-  const selected=crew?.offsiders||[];
-  document.getElementById('crew-popover-offsiders').innerHTML=[...(RS_CONFIG.stylists||[]),...(RS_CONFIG.drivers||[])].map(w=>`<button class="sched-chip${selected.includes(w)?' selected':''}" onclick="this.classList.toggle('selected')">${w}</button>`).join('');
-  document.getElementById('crew-popover-overlay').classList.add('open');
-  document.getElementById('crew-popover').classList.add('open');
-}
-function closeCrewPopover(){document.getElementById('crew-popover-overlay').classList.remove('open');document.getElementById('crew-popover').classList.remove('open');}
-async function saveCrewEntry(){
-  const vehicle=document.getElementById('crew-popover-vehicle').value;
-  const dateStr=document.getElementById('crew-popover-date').value;
-  const lead=document.getElementById('crew-popover-lead').value||null;
-  const offsiders=Array.from(document.querySelectorAll('#crew-popover-offsiders .sched-chip.selected')).map(el=>el.textContent);
-  const res=await fetch(`/api/crew/${dateStr}/${vehicle}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({lead,offsiders})});
-  const data=await res.json();
-  if(!data.success){alert('Failed to save crew: '+(data.error||'unknown error'));return;}
-  closeCrewPopover();
-  renderRunsheet();
-}
-
-// ── Task popover ──
-function openTaskPopover(taskId, vehicle, dateStr, prefilledTime){
-  const isEdit=!!taskId;
-
-  // Show mode selector for new entries (clicking empty cell)
-  // Show task form directly for editing existing tasks
-  document.getElementById('task-mode-select').style.display = isEdit ? 'none' : 'block';
-  document.getElementById('task-form').style.display = isEdit ? 'block' : 'none';
-  document.getElementById('job-sched-form').style.display = 'none';
-
-  // Store context for whichever mode is chosen
-  _taskContext = {taskId, vehicle, dateStr, prefilledTime};
-
-  if(isEdit){
-    populateTaskForm(taskId, vehicle, dateStr, prefilledTime);
-  }
-
-  document.getElementById('task-popover-overlay').classList.add('open');
-  document.getElementById('task-popover').classList.add('open');
-}
-
-let _taskContext = {};
-let _jobSchedSelected = null;
-let _jobSchedVehicles = [];
-
-function setTaskMode(mode){
-  document.getElementById('task-mode-select').style.display='none';
-  if(mode==='task'){
-    document.getElementById('task-form').style.display='block';
-    populateTaskForm(null, _taskContext.vehicle, _taskContext.dateStr, _taskContext.prefilledTime);
-  } else {
-    document.getElementById('job-sched-form').style.display='block';
-    populateJobSchedForm(_taskContext.dateStr);
-  }
-}
-
-function populateTaskForm(taskId, vehicle, dateStr, prefilledTime){
-  document.getElementById('task-popover-title').textContent = taskId ? 'Edit Task' : 'New Task';
-  document.getElementById('task-popover-id').value = taskId||'';
-  document.getElementById('task-popover-date').value = dateStr||'';
-  document.getElementById('task-delete-btn').style.display = taskId ? 'inline-block' : 'none';
-  const vSel=document.getElementById('task-popover-vehicle');
-  vSel.innerHTML='<option value="ALL">All Vehicles</option>'+(RS_CONFIG.vehicles||[]).map(v=>`<option value="${v}">${v}</option>`).join('');
-  vSel.value=vehicle||'ALL';
-  const tSel=document.getElementById('task-popover-time');
-  tSel.innerHTML=timeOptions(); tSel.value=prefilledTime||'';
-  document.getElementById('task-popover-duration').innerHTML=durationOptions();
-  if(taskId){
-    const task=currentDayTasksById[taskId]||{};
-    document.getElementById('task-popover-title-input').value=task.title||'';
-    document.getElementById('task-popover-notes').value=task.notes||'';
-    tSel.value=task.start_time||'';
-    document.getElementById('task-popover-duration').value=task.duration||'';
-    vSel.value=task.vehicle||'ALL';
-  } else {
-    document.getElementById('task-popover-title-input').value='';
-    document.getElementById('task-popover-notes').value='';
-    document.getElementById('task-popover-duration').value='';
-  }
-  setTimeout(()=>document.getElementById('task-popover-title-input').focus(),80);
-}
-
-function populateJobSchedForm(dateStr){
-  _jobSchedSelected=null;
-  _jobSchedVehicles=[];
-  document.getElementById('job-sched-date').value=dateStr||'';
-  document.getElementById('job-sched-install-date').value=dateStr||'';
-  document.getElementById('job-search-input').value='';
-  document.getElementById('job-search-results').style.display='none';
-  document.getElementById('job-sched-selected').style.display='none';
-  document.getElementById('job-sched-details').style.display='none';
-  document.getElementById('job-sched-save-btn').disabled=true;
-  document.getElementById('job-sched-save-btn').style.opacity='0.5';
-  document.getElementById('job-sched-notes').value='';
-  // Lead and team
-  const leadEl=document.getElementById('job-sched-lead');
-  if(leadEl) leadEl.innerHTML=workerOptions('');
-  renderTeamChips('job-sched-team-chips',[]);
-  const chipsDiv=document.getElementById('job-sched-vehicle-chips');
-  chipsDiv.innerHTML=(RS_CONFIG.vehicles||[]).map(v=>
-    `<button class="sched-chip" data-jsv="${v}" onclick="toggleJobSchedVehicle(this,'${v}')">${v}</button>`
-  ).join('');
-
-  // Populate time dropdowns
-  const loadTimeSel=document.getElementById('job-sched-load-time');
-  const installTimeSel=document.getElementById('job-sched-install-time');
-  loadTimeSel.innerHTML='<option value="">Default (1:30pm)</option>'+(RS_CONFIG.time_slots||[]).map(t=>`<option value="${t}">${formatSlotLabel(t)}</option>`).join('');
-  installTimeSel.innerHTML='<option value="">Default (7:30am)</option>'+(RS_CONFIG.time_slots||[]).map(t=>`<option value="${t}">${formatSlotLabel(t)}</option>`).join('');
-}
-
-let _jobSearchTimer=null;
-async function searchJobsForSched(q){
-  clearTimeout(_jobSearchTimer);
-  const results=document.getElementById('job-search-results');
-  if(!q.trim()){ results.style.display='none'; return; }
-  _jobSearchTimer=setTimeout(async()=>{
-    try{
-      const res=await fetch('/api/jobs');
-      const jobs=await res.json();
-      const ql=q.toLowerCase();
-      const matches=jobs.filter(j=>
-        (j.job_ref||'').toLowerCase().includes(ql)||
-        (j.job_number||'').toLowerCase().includes(ql)||
-        (j.address||'').toLowerCase().includes(ql)
-      ).slice(0,8);
-      if(!matches.length){ results.innerHTML='<div class="job-search-result" style="color:var(--muted);">No jobs found</div>'; results.style.display='block'; return; }
-      results.innerHTML=matches.map(j=>`
-        <div class="job-search-result" onclick="selectJobForSched('${j.id}','${(j.job_ref||j.job_number||'').replace(/'/g,"\\'")}','${(j.address||'').replace(/'/g,"\\'")}','${j.runsheet_date||''}','${j.runsheet_type||'install'}')">
-          <span class="job-search-ref">${j.job_ref||j.job_number}</span>
-          <span class="job-search-addr">${j.address||''}</span>
-        </div>`).join('');
-      results.style.display='block';
-    }catch(e){}
-  },300);
-}
-
-function selectJobForSched(jobId, ref, addr, existingDate, existingType){
-  _jobSchedSelected=jobId;
-  document.getElementById('job-search-results').style.display='none';
-  document.getElementById('job-search-input').value='';
-  document.getElementById('job-sched-selected-label').textContent=`${ref} — ${addr}`;
-  document.getElementById('job-sched-selected').style.display='block';
-  document.getElementById('job-sched-details').style.display='block';
-  document.getElementById('job-sched-save-btn').disabled=false;
-  document.getElementById('job-sched-save-btn').style.opacity='1';
-  if(existingDate) document.getElementById('job-sched-install-date').value=existingDate;
-  document.getElementById('job-sched-type').value=existingType||'install';
-  updateJobSchedHint();
-}
-
-function clearJobSchedSelection(){
-  _jobSchedSelected=null;
-  document.getElementById('job-sched-selected').style.display='none';
-  document.getElementById('job-sched-details').style.display='none';
-  document.getElementById('job-sched-save-btn').disabled=true;
-  document.getElementById('job-sched-save-btn').style.opacity='0.5';
-}
-
-function toggleJobSchedVehicle(btn,v){
-  btn.classList.toggle('selected');
-  if(btn.classList.contains('selected')) _jobSchedVehicles.push(v);
-  else _jobSchedVehicles=_jobSchedVehicles.filter(x=>x!==v);
-}
-
-async function saveJobSched(){
-  if(!_jobSchedSelected) return;
-  const date=document.getElementById('job-sched-install-date').value;
-  const type=document.getElementById('job-sched-type').value||'install';
-  if(!date){ alert('Please pick an install date.'); return; }
-
-  const btn=document.getElementById('job-sched-save-btn');
-  btn.textContent='Saving…'; btn.disabled=true;
-
-  try{
-    const r=await fetch(`/api/jobs/${_jobSchedSelected}/runsheet`,{
-      method:'PATCH', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({runsheet_date:date, runsheet_type:type,
-        vehicles:_jobSchedVehicles.length?_jobSchedVehicles:null})
-    });
-    const d=await r.json();
-    if(!d.success){ alert('Failed to schedule job.'); return; }
-
-    // Apply time overrides and notes if set
-    const loadTime=document.getElementById('job-sched-load-time').value;
-    const installTime=document.getElementById('job-sched-install-time').value;
-    const notes=document.getElementById('job-sched-notes').value.trim()||null;
-    const lead=document.getElementById('job-sched-lead')?.value||null;
-    const team=getTeamChips('job-sched-team-chips');
-    if(loadTime||installTime||notes||lead||team.length){
-      const schedRes=await fetch(`/api/jobs/${_jobSchedSelected}/schedule`);
-      const entries=await schedRes.json();
-      await Promise.all(entries.map(async e=>{
-        const patch={lead,team:team.length?team:null};
-        if(e.type==='to_load' && loadTime) patch.start_time=loadTime;
-        if(e.type!=='to_load' && installTime) patch.start_time=installTime;
-        if(notes) patch.notes=notes;
-        if(Object.keys(patch).length)
-          await fetch(`/api/schedule/${e.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
-      }));
-    }
-
-    closeTaskPopover();
-    renderRunsheet();
-  } catch(e){
-    alert('Error saving schedule.');
-  } finally{
-    btn.textContent='Schedule'; btn.disabled=false;
-  }
-}
-function closeTaskPopover(){document.getElementById('task-popover-overlay').classList.remove('open');document.getElementById('task-popover').classList.remove('open');}
-async function saveTask(){
-  const taskId=document.getElementById('task-popover-id').value||null;
-  const dateStr=document.getElementById('task-popover-date').value;
-  const title=document.getElementById('task-popover-title-input').value.trim();
-  const vehicle=document.getElementById('task-popover-vehicle').value;
-  const time=document.getElementById('task-popover-time').value||null;
-  const durVal=document.getElementById('task-popover-duration').value;
-  const duration=durVal?parseInt(durVal):null;
-  const notes=document.getElementById('task-popover-notes').value.trim()||null;
-  if(!title){alert('Please enter a title for the task.');return;}
-  if(taskId){const res=await fetch(`/api/tasks/${taskId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,vehicle,start_time:time,duration,notes})});const data=await res.json();if(!data.success){alert('Failed to update task: '+(data.error||'unknown error'));return;}}
-  else{const res=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({vehicle,date:dateStr,title,notes,start_time:time,duration})});const data=await res.json();if(!data.success){alert('Failed to create task: '+(data.error||'unknown error'));return;}}
-  closeTaskPopover();renderRunsheet();
-}
-async function deleteTask(){
-  const taskId=document.getElementById('task-popover-id').value;
-  if(!taskId)return;
-  if(!confirm('Delete this task?'))return;
-  await fetch(`/api/tasks/${taskId}`,{method:'DELETE'});
-  closeTaskPopover();renderRunsheet();
-}
-
-loadRunsheetConfig();
-renderRunsheet();
+load();
 </script>
 </body>
 </html>

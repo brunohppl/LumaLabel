@@ -138,6 +138,7 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 </div>
 
 <script>
+const ALL_WORKERS=['Addy','Montie','Delphine','India','Hayley','Jo','Savio','Nick','Ayoub','Bruno','Phil','Tiago'];
 const SLOTS=[];for(let h=7;h<=15;h++)for(let m=0;m<60;m+=30){if(h===15&&m>30)break;SLOTS.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);}
 const SLOT_H=44;
 function slotIdx(t){if(!t)return 0;const[h,m]=t.split(':').map(Number);return Math.max(0,(h-7)*2+Math.floor(m/30));}

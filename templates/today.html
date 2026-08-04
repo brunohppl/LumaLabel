@@ -175,12 +175,18 @@ function renderDay(){
   const combined=[];
 
   myTeams.forEach(team=>{
-    // Schedule entries for this team
-    schedule.filter(e=>e.team_id===team.id||(dayData.teams.find(t=>t.id===e.team_id)?.vehicle===team.vehicle)).forEach(e=>{
+    // Match schedule entries to this team — by team_id first, then vehicle as fallback
+    schedule.filter(e=>
+      e.team_id===team.id ||
+      (!e.team_id && team.vehicle && e.vehicle===team.vehicle)
+    ).forEach(e=>{
       combined.push({...e,_team:team,_isTask:false});
     });
-    // Tasks for this team
-    tasks.filter(t=>t.team_id===team.id).forEach(t=>{
+    // Tasks for this team — by team_id first, then vehicle as fallback
+    tasks.filter(t=>
+      t.team_id===team.id ||
+      (!t.team_id && team.vehicle && (t.vehicle===team.vehicle||t.vehicle==='ALL'))
+    ).forEach(t=>{
       combined.push({...t,_team:team,_isTask:true});
     });
   });

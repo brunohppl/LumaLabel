@@ -42,16 +42,16 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .rs-cell:hover{background:rgba(184,147,90,0.05);}
 .rs-tile{position:absolute;left:4px;right:4px;border-radius:5px;padding:5px 7px;overflow:hidden;cursor:pointer;z-index:2;border-left:3px solid transparent;transition:opacity 0.12s;}
 .rs-tile:hover{opacity:0.88;}
-.rs-tile-label{font-size:0.6rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;opacity:0.7;}
-.rs-tile-ref{font-size:0.78rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rs-tile-addr{font-size:0.68rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rs-tile-note{font-size:0.65rem;color:var(--muted);font-style:italic;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rs-tile-gear{position:absolute;bottom:2px;right:3px;background:none;border:none;cursor:pointer;color:rgba(0,0,0,0.2);font-size:0.68rem;padding:2px;}
-.rs-tile.install{background:rgba(74,124,89,0.1);border-left-color:var(--green);}
-.rs-tile.pickup{background:rgba(46,90,138,0.1);border-left-color:var(--blue);}
-.rs-tile.to_load{background:rgba(184,147,90,0.1);border-left-color:var(--accent);}
-.rs-tile.task{background:rgba(154,143,128,0.1);border-left-color:var(--muted);}
-.rs-tile.styling{background:rgba(106,61,138,0.1);border-left-color:var(--purple);}
+.rs-tile-label{font-size:0.6rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;opacity:0.75;color:rgba(255,255,255,0.8);}
+.rs-tile-ref{font-size:0.78rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:white;}
+.rs-tile-addr{font-size:0.78rem;color:rgba(255,255,255,0.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rs-tile-note{font-size:0.65rem;color:rgba(255,255,255,0.7);font-style:italic;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rs-tile-gear{position:absolute;bottom:2px;right:3px;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.4);font-size:0.68rem;padding:2px;}
+.rs-tile.install{background:var(--green);border-left-color:rgba(0,0,0,0.15);}
+.rs-tile.pickup{background:var(--blue);border-left-color:rgba(0,0,0,0.15);}
+.rs-tile.to_load{background:var(--accent);border-left-color:rgba(0,0,0,0.15);}
+.rs-tile.task{background:#7a7060;border-left-color:rgba(0,0,0,0.15);}
+.rs-tile.styling{background:var(--purple);border-left-color:rgba(0,0,0,0.15);}
 .pop-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.5);z-index:200;}
 .pop-overlay.open{display:block;}
 .pop{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:10px;padding:22px;width:min(420px,94vw);max-height:90vh;overflow-y:auto;z-index:201;box-shadow:0 12px 48px rgba(0,0,0,0.25);}
@@ -265,8 +265,8 @@ function render(){
     g+=`<div class="rs-team-hdr" style="grid-column:${i+2};grid-row:1;background:${col};" onclick="openTeamPop('${t.id}')">
       <div class="rs-team-hdr-fn">${FN_LBL[t.function]||t.function}</div>
       <div class="rs-team-hdr-name">${t.name||t.vehicle||'Team '+(i+1)}</div>
-      ${t.vehicle?`<div class="rs-team-hdr-sub">🚗 ${t.vehicle}</div>`:''}
-      ${t.lead?`<div class="rs-team-hdr-sub" style="color:rgba(255,255,255,0.9);font-weight:600;">⭐ ${t.lead}</div>`:''}
+      ${t.vehicle?`<div class="rs-team-hdr-sub">Vehicle: ${t.vehicle}</div>`:''}
+      ${t.lead?`<div class="rs-team-hdr-sub" style="color:rgba(255,255,255,0.9);font-weight:600;">Lead: ${t.lead}</div>`:''}
       ${others?`<div class="rs-team-hdr-sub">👥 ${others}</div>`:''}
     </div>`;
   });

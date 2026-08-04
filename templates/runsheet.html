@@ -261,12 +261,13 @@ function render(){
   g+=`<div style="grid-column:1;grid-row:1;"></div>`;
   dayTeams.forEach((t,i)=>{
     const col=FN_COL[t.function]||'#1a1714';
-    const crew=[t.lead,...(t.members||[])].filter(Boolean).join(', ');
+    const others=(t.members||[]).filter(m=>m!==t.lead).join(', ');
     g+=`<div class="rs-team-hdr" style="grid-column:${i+2};grid-row:1;background:${col};" onclick="openTeamPop('${t.id}')">
       <div class="rs-team-hdr-fn">${FN_LBL[t.function]||t.function}</div>
       <div class="rs-team-hdr-name">${t.name||t.vehicle||'Team '+(i+1)}</div>
       ${t.vehicle?`<div class="rs-team-hdr-sub">🚗 ${t.vehicle}</div>`:''}
-      ${crew?`<div class="rs-team-hdr-sub">👤 ${crew}</div>`:''}
+      ${t.lead?`<div class="rs-team-hdr-sub" style="color:rgba(255,255,255,0.9);font-weight:600;">⭐ ${t.lead}</div>`:''}
+      ${others?`<div class="rs-team-hdr-sub">👥 ${others}</div>`:''}
     </div>`;
   });
   g+=`<button class="rs-add-team-btn" style="grid-column:${n+2};grid-row:1;" onclick="openTeamPop(null)">+ Add Team</button>`;
@@ -316,8 +317,8 @@ function render(){
       const addr=job?job.address?.split(',')[0]||'':'';
       const lbl=isTask?'Task':{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'';
       tile.className=`rs-tile ${typeKey}`;
-      tile.style.cssText=`top:0;left:2px;right:2px;height:${span*SLOT_H-4}px;`;
-      tile.innerHTML=`<div class="rs-tile-label">${lbl}</div><div class="rs-tile-ref">${ref}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}<button class="rs-tile-gear" onclick="event.stopPropagation();openEntryPop('${e.id}','${team.id}',null)">⚙</button>`;
+      tile.style.cssText=`top:0;left:2px;right:2px;height:${span*SLOT_H-4}px;cursor:pointer;`;
+      tile.innerHTML=`<div class="rs-tile-label">${lbl}</div><div class="rs-tile-ref">${ref}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
       tile.onclick=()=>openEntryPop(e.id,team.id,null);
       cell.style.position='relative';
       cell.appendChild(tile);

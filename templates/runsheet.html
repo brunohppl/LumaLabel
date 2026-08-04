@@ -431,13 +431,32 @@ function openEntryPop(entryId,teamId,slot){
     if(e){
       const isTask=dayTasks.some(x=>x.id===entryId);
       setMode(isTask?'task':'job');
-      if(isTask){document.getElementById('task-title').value=e.title||'';}
-      else{
+      if(isTask){
+        document.getElementById('task-title').value=e.title||'';
+      } else {
         _type=e.type||'install';
-        document.querySelectorAll('#type-chips .chip').forEach(b=>{const t=b.getAttribute('onclick').match(/'([^']+)'/)[1];b.classList.toggle('selected',t===_type);});
+        document.querySelectorAll('#type-chips .chip').forEach(b=>{
+          const t=b.getAttribute('onclick').match(/'([^']+)'/)[1];
+          b.classList.toggle('selected',t===_type);
+        });
         _jobId=e.job_id;
-        const job=dayJobs.find(j=>j.id===e.job_id);
-        if(job){document.getElementById('job-selected-label').textContent=`${job.job_ref||job.job_number} — ${job.address||''}`;document.getElementById('job-selected').style.display='flex';document.getElementById('job-id').value=e.job_id;}
+        document.getElementById('job-id').value=e.job_id||'';
+        // Look up job in dayJobs first, fetch if missing
+        let job=dayJobs.find(j=>j.id===e.job_id);
+        if(job){
+          document.getElementById('job-selected-label').textContent=`${job.job_ref||job.job_number} — ${job.address||''}`;
+          document.getElementById('job-selected').style.display='flex';
+        } else if(e.job_id){
+          // Fetch the job directly — it may be on a different date
+          fetch(`/api/jobs/${e.job_id}`).then(r=>r.json()).then(d=>{
+            const j=d.job||d;
+            if(j&&j.id){
+              if(!dayJobs.find(x=>x.id===j.id)) dayJobs.push(j);
+              document.getElementById('job-selected-label').textContent=`${j.job_ref||j.job_number} — ${j.address||''}`;
+              document.getElementById('job-selected').style.display='flex';
+            }
+          }).catch(()=>{});
+        }
       }
       tSel.value=e.start_time||'';
       document.getElementById('entry-dur').value=e.duration||'';

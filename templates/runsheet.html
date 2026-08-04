@@ -428,6 +428,10 @@ async function openEntryPop(entryId,teamId,slot){
   _type='install';
   if(entryId){
     const e=daySchedule.find(x=>x.id===entryId)||dayTasks.find(x=>x.id===entryId);
+    console.log('[openEntryPop] entryId:', entryId);
+    console.log('[openEntryPop] entry found:', e);
+    console.log('[openEntryPop] dayJobs count:', dayJobs.length);
+    if(e) console.log('[openEntryPop] job_id:', e.job_id, '| job in dayJobs:', !!dayJobs.find(j=>j.id===e.job_id));
     if(e){
       const isTask=dayTasks.some(x=>x.id===entryId);
       setMode(isTask?'task':'job');

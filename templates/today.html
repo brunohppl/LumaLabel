@@ -101,7 +101,7 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 
   <!-- Who am I -->
   <div class="who-card">
-    <div class="who-label">I am</div>
+    <div class="who-label">Filter by name — or leave blank to see the full day</div>
     <select class="who-select" id="who-select" onchange="saveName();renderDay()">
       <option value="">— select your name —</option>
     </select>
@@ -156,41 +156,58 @@ async function load(){
 function renderDay(){
   const name=sel.value;
   const content=document.getElementById('day-content');
-  if(!name){content.innerHTML='<div class="empty"><div class="empty-title">Select your name above</div><div class="empty-sub">to see your schedule for today.</div></div>';return;}
 
   const teams=dayData.teams||[];
   const schedule=dayData.schedule||[];
   const tasks=dayData.tasks||[];
   const jobs=dayData.jobs||[];
+  const jobById=Object.fromEntries(jobs.map(j=>[j.id,j]));
 
-  // Find teams this person belongs to
-  const myTeams=teams.filter(t=>t.lead===name||(t.members||[]).includes(name));
+  // Full day view — show all teams grouped
+  if(!name){
+    if(!teams.length){
+      content.innerHTML='<div class="empty"><div class="empty-title">Nothing scheduled</div><div class="empty-sub">No teams set up for this day yet.</div></div>';
+      return;
+    }
+    let html='';
+    teams.forEach(team=>{
+      const col=FN_COL[team.function]||'#1a1714';
+      const others=(team.members||[]).filter(m=>m!==team.lead).join(', ');
+      const teamEntries=[
+        ...schedule.filter(e=>e.team_id===team.id||(!e.team_id&&team.vehicle&&e.vehicle===team.vehicle)),
+        ...tasks.filter(t=>t.team_id===team.id||(!t.team_id&&team.vehicle&&(t.vehicle===team.vehicle||t.vehicle==='ALL'))),
+      ].sort((a,b)=>(a.start_time||'99:99').localeCompare(b.start_time||'99:99'));
 
-  if(!myTeams.length){
-    content.innerHTML=`<div class="empty"><div class="empty-title">Not assigned to a team today</div><div class="empty-sub">Ask your manager to add you to a team on the runsheet.</div></div>`;
+      html+=`<div style="margin-bottom:24px;">
+        <div class="team-badge" style="background:${col};margin-bottom:10px;">
+          ${FN_LBL[team.function]||team.function} · ${team.name||team.vehicle||'Team'}
+          ${team.lead?` · ⭐ ${team.lead}`:''}
+          ${others?` · ${others}`:''}
+        </div>`;
+
+      if(!teamEntries.length){
+        html+=`<div style="font-size:0.82rem;color:var(--muted);padding:10px 0;">Nothing scheduled yet.</div>`;
+      } else {
+        html+=teamEntries.map(e=>cardHTML(e,jobById,true)).join('');
+      }
+      html+='</div>';
+    });
+    content.innerHTML=html;
     return;
   }
 
-  const jobById=Object.fromEntries(jobs.map(j=>[j.id,j]));
+  // Personal view — filter to teams this person is on
+  const myTeams=teams.filter(t=>t.lead===name||(t.members||[]).includes(name));
+  if(!myTeams.length){
+    content.innerHTML=`<div class="empty"><div class="empty-title">Not assigned to a team today</div><div class="empty-sub">Ask your manager to add you to a team on the scheduler.</div></div>`;
+    return;
+  }
+
   const combined=[];
-
   myTeams.forEach(team=>{
-    // Match schedule entries to this team — by team_id first, then vehicle as fallback
-    schedule.filter(e=>
-      e.team_id===team.id ||
-      (!e.team_id && team.vehicle && e.vehicle===team.vehicle)
-    ).forEach(e=>{
-      combined.push({...e,_team:team,_isTask:false});
-    });
-    // Tasks for this team — by team_id first, then vehicle as fallback
-    tasks.filter(t=>
-      t.team_id===team.id ||
-      (!t.team_id && team.vehicle && (t.vehicle===team.vehicle||t.vehicle==='ALL'))
-    ).forEach(t=>{
-      combined.push({...t,_team:team,_isTask:true});
-    });
+    schedule.filter(e=>e.team_id===team.id||(!e.team_id&&team.vehicle&&e.vehicle===team.vehicle)).forEach(e=>{combined.push({...e,_team:team,_isTask:false});});
+    tasks.filter(t=>t.team_id===team.id||(!t.team_id&&team.vehicle&&(t.vehicle===team.vehicle||t.vehicle==='ALL'))).forEach(t=>{combined.push({...t,_team:team,_isTask:true});});
   });
-
   combined.sort((a,b)=>(a.start_time||'99:99').localeCompare(b.start_time||'99:99'));
 
   if(!combined.length){
@@ -199,45 +216,45 @@ function renderDay(){
     return;
   }
 
-  // Show team badges
   let html='';
   myTeams.forEach(t=>{
     const col=FN_COL[t.function]||'#1a1714';
     const others=(t.members||[]).filter(m=>m!==t.lead).join(', ');
     html+=`<div class="team-badge" style="background:${col};">${FN_LBL[t.function]||t.function} · ${t.name||t.vehicle||'Team'}${t.lead?` · ⭐ ${t.lead}`:''}${others?` · ${others}`:''}</div><br/>`;
   });
-
-  html+=combined.map(e=>{
-    const {h,ampm}=fmtTime(e.start_time);
-    const isTask=e._isTask;
-    const typeKey=isTask?'task':(e.type||'install');
-    const job=isTask?null:jobById[e.job_id];
-    const ref=isTask?(e.title||'Task'):(job?job.job_ref||job.job_number:'—');
-    const addr=job?job.address||'':'';
-    const street=addr.split(',')[0];
-    const typeLabel=TYPE_LBL[typeKey]||typeKey;
-    const dur=e.duration?` · ${e.duration>=60?e.duration/60+'h'+(e.duration%60?e.duration%60+'m':''):e.duration+'m'}`:'';
-
-    return `<div class="card ${typeKey}">
-      <div class="card-time">
-        <div class="card-time-h">${h}</div>
-        <div class="card-time-ampm">${ampm}</div>
-      </div>
-      <div class="card-body">
-        <div class="card-type">${typeLabel}${dur}</div>
-        <div class="card-ref">${ref}</div>
-        ${street?`<div class="card-addr">${street}</div>`:''}
-        ${e.notes?`<div class="card-note">📝 ${e.notes}</div>`:''}
-        ${job?`<div class="card-btns">
-          <button class="card-btn card-btn-nav" onclick="navigate('${job.id}','${addr.replace(/'/g,"\\'")}')">📍 Navigate</button>
-          ${typeKey!=='to_load'?`<a href="/stylist/${job.id}" target="_blank" class="card-btn card-btn-stylist">✎ Stylist</a>`:''}
-          <a href="/driver/${job.id}" target="_blank" class="card-btn card-btn-driver">🚛 Driver</a>
-        </div>`:''}
-      </div>
-    </div>`;
-  }).join('');
-
+  html+=combined.map(e=>cardHTML(e,jobById,false)).join('');
   content.innerHTML=html;
+}
+
+function cardHTML(e, jobById, showTeam){
+  const isTask=!!(e._isTask||(e.title&&!e.job_id));
+  const typeKey=isTask?'task':(e.type||'install');
+  const job=isTask?null:jobById[e.job_id];
+  const ref=isTask?(e.title||'Task'):(job?job.job_ref||job.job_number:'—');
+  const addr=job?job.address||'':'';
+  const street=addr.split(',')[0];
+  const{h,ampm}=fmtTime(e.start_time);
+  const dur=e.duration?` · ${e.duration>=60?e.duration/60+'h'+(e.duration%60?e.duration%60+'m':''):e.duration+'m'}`:'';
+  const typeLabel=TYPE_LBL[typeKey]||typeKey;
+  const teamLabel=showTeam&&e._team?`<div style="font-size:0.68rem;color:var(--muted);margin-bottom:4px;">${e._team.name||e._team.vehicle||''}</div>`:'';
+  return `<div class="card ${typeKey}">
+    <div class="card-time">
+      <div class="card-time-h">${h}</div>
+      <div class="card-time-ampm">${ampm}</div>
+    </div>
+    <div class="card-body">
+      ${teamLabel}
+      <div class="card-type">${typeLabel}${dur}</div>
+      <div class="card-ref">${ref}</div>
+      ${street?`<div class="card-addr">${street}</div>`:''}
+      ${e.notes?`<div class="card-note">📝 ${e.notes}</div>`:''}
+      ${job?`<div class="card-btns">
+        <button class="card-btn card-btn-nav" onclick="navigate('${job.id}','${addr.replace(/'/g,"\\'")}')">📍 Navigate</button>
+        ${typeKey!=='to_load'?`<a href="/stylist/${job.id}" target="_blank" class="card-btn card-btn-stylist">✎ Stylist</a>`:''}
+        <a href="/driver/${job.id}" target="_blank" class="card-btn card-btn-driver">🚛 Driver</a>
+      </div>`:''}
+    </div>
+  </div>`;
 }
 
 // Navigate with Slack confirm

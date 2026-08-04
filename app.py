@@ -1634,6 +1634,11 @@ def today_page():
 
 @app.route('/runsheet', methods=['GET'])
 def runsheet_page():
+    with open('templates/today.html', 'r') as f:
+        return f.read()
+
+@app.route('/scheduler', methods=['GET'])
+def scheduler_page():
     with open('templates/runsheet.html', 'r') as f:
         return f.read()
 

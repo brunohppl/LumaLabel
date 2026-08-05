@@ -75,8 +75,8 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
   .paper-acc-btn{padding:5px 12px;font-size:0.72rem;}
 
   /* Paper grid — rooms as columns */
-  .paper-grid{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(160px,1fr);grid-template-rows:auto;gap:0;border:1px solid var(--border);border-radius:3px;overflow:hidden;overflow-x:auto;}
-  .paper-col{border-right:1px solid var(--border);min-width:150px;}
+  .paper-grid{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(160px,1fr);grid-template-rows:auto;gap:0;border:1px solid var(--border);border-radius:3px;overflow-x:auto;align-items:start;}
+  .paper-col{border-right:1px solid var(--border);min-width:150px;display:flex;flex-direction:column;}
   .paper-col:last-child{border-right:none;}
   .paper-col-hdr{background:var(--ink);color:white;padding:7px 10px;font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;gap:6px;position:sticky;top:0;z-index:2;}
   .paper-col-hdr-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -91,10 +91,11 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
   .paper-item.picked .paper-item-desc{text-decoration:line-through;color:var(--muted);}
   .paper-item-serial{font-size:0.65rem;color:var(--accent);font-weight:600;}
   .paper-item-bay{font-size:0.65rem;color:var(--muted);margin-top:1px;}
-  .paper-room-note{padding:4px 8px;border-bottom:1px solid var(--sand);background:rgba(184,147,90,0.04);}
-  .paper-room-note-input{width:100%;border:none;background:none;font-family:'Jost',sans-serif;font-size:0.72rem;color:var(--accent);font-style:italic;outline:none;padding:2px 0;}
-  .paper-room-note-input::placeholder{color:var(--border);}
-  .paper-item-meta{display:flex;align-items:center;gap:3px;margin-top:2px;}
+  .paper-room-note{padding:3px 10px 4px;border-bottom:1px solid var(--sand);background:rgba(184,147,90,0.07);}
+  .paper-room-note-text{font-size:0.7rem;color:var(--accent);font-style:italic;line-height:1.3;}
+  .paper-item-meta{display:flex;align-items:center;gap:3px;margin-top:3px;}
+  .paper-photo-strip{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+  .paper-photo-thumb{width:44px;height:44px;object-fit:cover;border-radius:3px;border:1px solid var(--border);cursor:pointer;display:block;}
   .paper-add-input{width:100%;border:none;background:none;font-family:'Jost',sans-serif;font-size:0.78rem;color:var(--muted);outline:none;padding:3px 0;}
   .paper-add-input:focus{color:var(--ink);}
   .paper-add-item-row{display:grid;grid-template-columns:1fr;margin-bottom:6px;}
@@ -744,18 +745,17 @@ function renderPaperGrid(){
     const picked=items.filter(i=>i.picked).length;
     const total=items.length;
     const key=(room||'extra').replace(/[^a-zA-Z0-9]/g,'_');
-    const note=roomNotes[room]&&roomNotes[room][0]?roomNotes[room][0].note:'';
+    const noteTexts=roomNotes[room]||[];
+    const noteHtml=noteTexts.length
+      ? `<div class="paper-room-note"><span class="paper-room-note-text">${noteTexts.join(' · ')}</span></div>`
+      : '';
 
     html+=`<div class="paper-col" id="paper-col-${key}">
       <div class="paper-col-hdr">
         <span class="paper-col-hdr-name">${room||'Extra'}</span>
         <span class="paper-col-hdr-count">${picked}/${total}</span>
       </div>
-      <div class="paper-room-note">
-        <input class="paper-room-note-input" value="${(note||'').replace(/"/g,'&quot;')}"
-          placeholder="Room note…"
-          onblur="paperSaveRoomNote('${room}',this.value)"/>
-      </div>`;
+      ${noteHtml}`;
 
     items.forEach(item=>{
       const bayLoc=item.bay_location||'';
@@ -764,6 +764,7 @@ function renderPaperGrid(){
       const baySet=!!bayLoc;
       const ddStyle=`font-size:0.68rem;padding:2px 3px;border:1px solid ${baySet?'var(--green)':'var(--border)'};border-radius:2px;color:${baySet?'var(--green)':'var(--muted)'};background:white;font-family:'Jost',sans-serif;width:30px;text-align:center;-webkit-appearance:none;`;
       const camId=`paper-cam-${item.id}`;
+      const stripId=`paper-strip-${item.id}`;
 
       html+=`<div class="paper-item${item.picked?' picked':''}" id="paper-item-${item.id}">
         <div class="paper-check${item.picked?' checked':''}" onclick="paperTogglePick('${item.id}')">${item.picked?'✓':''}</div>
@@ -774,15 +775,16 @@ function renderPaperGrid(){
               <option value="">–</option>
               ${['A','B','C','D','E','F'].map(a=>`<option value="${a}"${a===bayAisle?' selected':''}>${a}</option>`).join('')}
             </select>
-            <select id="bay-num-p-${item.id}" style="${ddStyle}" onchange="paperSaveBay('${item.id}',document.querySelector('[onchange*=\\'bay-num-p-${item.id}\\']').value,this.value)">
+            <select id="bay-num-p-${item.id}" style="${ddStyle}" onchange="paperSaveBayNum('${item.id}',this.value)">
               <option value="">–</option>
               ${['1','2','3','4'].map(n=>`<option value="${n}"${n===bayNum?' selected':''}>${n}</option>`).join('')}
             </select>
             <input type="file" accept="image/*" capture="environment" id="${camId}" style="display:none;"
-              onchange="paperHandlePhoto(this,'${item.id}')"/>
+              onchange="paperHandlePhoto(this,'${item.id}','${stripId}')"/>
             <button onclick="document.getElementById('${camId}').click()" title="Add photo"
               style="background:none;border:none;cursor:pointer;padding:1px 3px;font-size:0.85rem;opacity:${item.photo_url?'1':'0.4'};">📷</button>
           </div>
+          <div class="paper-photo-strip" id="${stripId}" data-item-id="${item.id}"></div>
         </div>
       </div>`;
     });
@@ -816,7 +818,8 @@ function renderPaperGrid(){
   }
 }
 
-async function paperSaveBay(itemId, aisle, num){
+async function paperSaveBay(itemId, aisle, numSelectId){
+  const num=document.getElementById(numSelectId)?.value||'';
   if(!aisle||!num) return;
   const bayLoc=aisle+num;
   const item=allItems.find(i=>i.id===itemId);
@@ -824,18 +827,20 @@ async function paperSaveBay(itemId, aisle, num){
   await fetch(`/api/items/${itemId}/check`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({bay_location:bayLoc})});
 }
 
-async function paperSaveRoomNote(room, value){
-  // Use the same room-notes API
-  await fetch(`/api/jobs/${jobId}/room-notes`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({room,note:value})}).catch(()=>{});
-  if(!roomNotes[room]) roomNotes[room]=[];
-  if(roomNotes[room][0]) roomNotes[room][0].note=value;
-  else roomNotes[room]=[{note:value}];
+async function paperSaveBayNum(itemId, num){
+  const numSel=document.getElementById(`bay-num-p-${itemId}`);
+  const aisleSel=numSel?.previousElementSibling;
+  const aisle=aisleSel?.value||'';
+  if(!aisle||!num) return;
+  const bayLoc=aisle+num;
+  const item=allItems.find(i=>i.id===itemId);
+  if(item) item.bay_location=bayLoc;
+  await fetch(`/api/items/${itemId}/check`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({bay_location:bayLoc})});
 }
 
-async function paperHandlePhoto(input, itemId){
+async function paperHandlePhoto(input, itemId, stripId){
   if(!input.files||!input.files[0]) return;
   const file=input.files[0];
-  // Reuse the existing handlePhotoUpload logic via FormData
   const formData=new FormData();
   formData.append('file',file);
   const res=await fetch(`/api/items/${itemId}/photos`,{method:'POST',body:formData});
@@ -843,9 +848,31 @@ async function paperHandlePhoto(input, itemId){
   if(data.url){
     const item=allItems.find(i=>i.id===itemId);
     if(item) item.photo_url=data.url;
-    // Update camera icon opacity
-    const btn=input.nextElementSibling;
+    const camInput=document.getElementById(`paper-cam-${itemId}`);
+    const btn=camInput?.nextElementSibling;
     if(btn) btn.style.opacity='1';
+    const strip=document.getElementById(stripId);
+    if(strip) await renderPaperPhotoStrip(strip, itemId);
+  }
+}
+
+async function renderPaperPhotoStrip(strip, itemId){
+  try{
+    const res=await fetch(`/api/items/${itemId}/photos`);
+    const photos=await res.json();
+    if(!photos.length){ strip.innerHTML=''; return; }
+    strip.innerHTML=photos.map(p=>`
+      <img class="paper-photo-thumb" src="${p.url}"
+        onclick="window.open('${p.url}','_blank')" title="View full size"/>`).join('');
+  }catch(e){ strip.innerHTML=''; }
+}
+
+async function loadPaperPhotoStrips(){
+  const strips=document.querySelectorAll('.paper-photo-strip[data-item-id]');
+  for(const strip of strips){
+    const itemId=strip.dataset.itemId;
+    const item=allItems.find(i=>i.id===itemId);
+    if(item?.photo_url) await renderPaperPhotoStrip(strip, itemId);
   }
 }
 
@@ -952,7 +979,7 @@ function renderItems(){
   loadPhotoStrips();
 
   // On tablet, also render the paper grid
-  if(isTablet()) renderPaperGrid();
+  if(isTablet()){ renderPaperGrid(); loadPaperPhotoStrips(); }
 }
 
 function notTransferringCardHTML(notTransferItems){

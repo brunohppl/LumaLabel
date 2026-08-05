@@ -445,14 +445,22 @@ async function loadJob(){
   // Accessory tubs
   const tubsInput = document.getElementById('accessory-tubs-input');
   const tubsSection = document.getElementById('accessory-tubs-section');
+  const tubsInputM = document.getElementById('accessory-tubs-input-mobile');
+  const tubsSectionM = document.getElementById('accessory-tubs-section-mobile');
   if(tubsInput) tubsInput.value = currentJob.accessory_tubs || '';
   if(tubsSection) tubsSection.style.display = 'block';
+  if(tubsInputM) tubsInputM.value = currentJob.accessory_tubs || '';
+  if(tubsSectionM) tubsSectionM.style.display = 'block';
 
   // Cushion bags
   const bagsInput = document.getElementById('cushion-bags-input');
   const bagsSection = document.getElementById('cushion-bags-section');
+  const bagsInputM = document.getElementById('cushion-bags-input-mobile');
+  const bagsSectionM = document.getElementById('cushion-bags-section-mobile');
   if(bagsInput) bagsInput.value = currentJob.cushion_bags || '';
   if(bagsSection) bagsSection.style.display = 'block';
+  if(bagsInputM) bagsInputM.value = currentJob.cushion_bags || '';
+  if(bagsSectionM) bagsSectionM.style.display = 'block';
 
   renderStatus();
   renderItems();

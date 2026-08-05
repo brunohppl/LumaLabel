@@ -51,39 +51,62 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .driver-link a{color:var(--accent);text-decoration:none;font-weight:500;}
 .driver-link a:hover{text-decoration:underline;}
 
-/* ── TABLET LAYOUT (11" Android) ── */
+/* ── CONTENT (mobile default) ── */
+.content{padding:16px 16px 60px;}
+
+/* ── PAPER VIEW (tablet 768px+) ── */
 @media(min-width:768px){
-  body{font-size:16px;}
-  .hdr{padding:20px 32px;}
-  .actions-bar{padding:14px 32px;}
+  body{font-size:14px;}
+  .hdr{padding:14px 24px;}
+  .hdr-ref{font-size:1.8rem;}
+  .actions-bar{padding:10px 24px;}
 
-  /* Two-column layout */
-  .tablet-layout{display:flex;gap:0;min-height:calc(100vh - 180px);}
+  .content{padding:12px 16px 40px;}
 
-  /* Left panel — job info, notes, actions */
-  .tablet-left{width:300px;flex-shrink:0;border-right:1px solid var(--border);padding:20px 24px;position:sticky;top:0;height:calc(100vh - 180px);overflow-y:auto;background:var(--warm);}
+  /* Notes bar — horizontal strip above the paper grid */
+  .paper-notes-bar{display:flex;gap:12px;margin-bottom:12px;}
+  .paper-notes-bar .styling-notes-box{flex:1;margin:0;}
+  .paper-notes-bar .styling-notes-input{font-size:0.82rem;padding:7px 10px;}
 
-  /* Right panel — room cards */
-  .tablet-right{flex:1;padding:20px 24px 60px;overflow-y:auto;}
+  /* Accessories inline */
+  .paper-accessories{display:flex;gap:16px;align-items:center;margin-bottom:12px;padding:10px 14px;background:var(--warm);border:1px solid var(--border);border-radius:3px;flex-wrap:wrap;}
+  .paper-acc-label{font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);font-weight:700;}
+  .paper-acc-input{width:52px;padding:5px;border:1px solid var(--border);border-radius:2px;font-family:'Jost',sans-serif;font-size:0.9rem;text-align:center;outline:none;}
+  .paper-acc-btn{padding:5px 12px;font-size:0.72rem;}
 
-  /* Room cards in 2-column grid on tablet */
-  .rooms-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;align-items:start;}
-  .rooms-grid .room-card{margin-bottom:0;}
-  .rooms-grid .add-room-row{grid-column:1/-1;}
+  /* Paper grid — rooms as columns */
+  .paper-grid{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(160px,1fr);grid-template-rows:auto;gap:0;border:1px solid var(--border);border-radius:3px;overflow:hidden;overflow-x:auto;}
+  .paper-col{border-right:1px solid var(--border);min-width:150px;}
+  .paper-col:last-child{border-right:none;}
+  .paper-col-hdr{background:var(--ink);color:white;padding:7px 10px;font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;gap:6px;position:sticky;top:0;z-index:2;}
+  .paper-col-hdr-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .paper-col-hdr-count{font-size:0.65rem;opacity:0.55;font-weight:400;white-space:nowrap;}
+  .paper-item{display:flex;align-items:flex-start;gap:7px;padding:6px 10px;border-bottom:1px solid var(--sand);transition:background 0.1s;}
+  .paper-item:last-child{border-bottom:none;}
+  .paper-item.picked{background:rgba(74,124,89,0.06);}
+  .paper-check{width:18px;height:18px;border:2px solid var(--border);border-radius:3px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:1px;transition:all 0.15s;}
+  .paper-check.checked{background:var(--green);border-color:var(--green);color:white;font-size:11px;}
+  .paper-item-body{flex:1;min-width:0;}
+  .paper-item-desc{font-size:0.8rem;line-height:1.35;color:var(--ink);}
+  .paper-item.picked .paper-item-desc{text-decoration:line-through;color:var(--muted);}
+  .paper-item-serial{font-size:0.65rem;color:var(--accent);font-weight:600;}
+  .paper-item-bay{font-size:0.65rem;color:var(--muted);margin-top:1px;}
+  .paper-add-item{padding:6px 10px;border-top:1px dashed var(--border);}
+  .paper-add-input{width:100%;border:none;background:none;font-family:'Jost',sans-serif;font-size:0.78rem;color:var(--muted);outline:none;padding:3px 0;}
+  .paper-add-input:focus{color:var(--ink);}
+  .paper-add-item-row{display:grid;grid-template-columns:1fr;margin-bottom:6px;}
+  .paper-add-room-btn{grid-column:1/-1;padding:7px 10px;font-size:0.7rem;margin-bottom:0;}
 
-  /* Bigger touch targets */
-  .pick-btn{width:40px;height:40px;}
-  .item-desc{font-size:1rem;}
-  .room-card-name{font-size:1.05rem;}
-  .bay-select{font-size:0.85rem;padding:5px 8px;}
+  /* Hide mobile-only elements on tablet */
+  .mobile-only{display:none;}
+  .paper-only{display:block;}
 }
 
 @media(max-width:767px){
-  .tablet-layout{display:block;}
-  .tablet-left{padding:16px 20px;border-bottom:1px solid var(--border);background:var(--warm);}
-  .tablet-right{padding:16px 20px 60px;}
-  .rooms-grid{display:block;}
-  .tablet-left .styling-notes-box{margin-bottom:12px;}
+  .paper-only{display:none;}
+  .mobile-only{display:block;}
+  .paper-notes-bar{display:block;}
+  .styling-notes-box{margin-bottom:12px;}
 }
 
 .styling-notes-box{background:var(--warm);border:1px solid var(--sand);border-radius:2px;padding:14px 16px;margin-bottom:22px;}
@@ -220,64 +243,94 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 
 <div class="actions-bar" id="actions-bar"></div>
 
-<div class="tablet-layout">
+<div class="content">
 
-  <!-- LEFT PANEL — job info, notes, accessories (tablet only) -->
-  <div class="tablet-left" id="tablet-left-panel">
+  <!-- TABLET: notes bar + accessories inline -->
+  <div class="paper-only">
+    <div class="paper-notes-bar">
+      <div class="styling-notes-box" style="margin-bottom:0;">
+        <div class="styling-notes-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+          Styling Notes
+        </div>
+        <textarea id="styling-notes" class="styling-notes-input" rows="2"
+          placeholder="Notes for other stylists…"
+          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+          onblur="saveStylingNotes(this.value)"></textarea>
+      </div>
+      <div class="styling-notes-box driver-notes-box" style="margin-bottom:0;">
+        <div class="styling-notes-label driver-notes-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>
+          Driver Notes
+        </div>
+        <textarea id="driver-notes-tablet" class="styling-notes-input" rows="2"
+          placeholder="Access, parking, transfers…"
+          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+          onblur="saveDriverNotes(this.value)"></textarea>
+      </div>
+    </div>
+    <div id="accessory-tubs-section" class="paper-accessories" style="display:none;">
+      <span class="paper-acc-label">Tubs</span>
+      <input type="number" id="accessory-tubs-input" class="paper-acc-input" min="0" max="99" placeholder="0"
+        onkeydown="if(event.key==='Enter')saveAccessoryTubs()"/>
+      <button class="btn btn-gold paper-acc-btn" onclick="saveAccessoryTubs()">Save</button>
+      <span id="accessory-tubs-saved" style="font-size:0.75rem;color:var(--green);display:none;">✓</span>
+      <span class="paper-acc-label" style="margin-left:12px;">Cushion Bags</span>
+      <input type="number" id="cushion-bags-input" class="paper-acc-input" min="0" max="99" placeholder="0"
+        onkeydown="if(event.key==='Enter')saveCushionBags()"/>
+      <button class="btn btn-gold paper-acc-btn" onclick="saveCushionBags()">Save</button>
+      <span id="cushion-bags-saved" style="font-size:0.75rem;color:var(--green);display:none;">✓</span>
+    </div>
+    <!-- Paper grid rendered by JS into this div -->
+    <div id="paper-grid-container"></div>
+  </div>
+
+  <!-- MOBILE: original notes + card layout -->
+  <div class="mobile-only">
     <div class="styling-notes-box">
       <div class="styling-notes-label">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
         Styling Notes
       </div>
-      <textarea id="styling-notes" class="styling-notes-input" rows="3"
+      <textarea id="styling-notes-mobile" class="styling-notes-input" rows="2"
         placeholder="Notes for the other stylists picking this job…"
         oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
         onblur="saveStylingNotes(this.value)"></textarea>
     </div>
-    <div class="styling-notes-box driver-notes-box" style="margin-top:12px;">
+    <div class="styling-notes-box driver-notes-box">
       <div class="styling-notes-label driver-notes-label">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>
         Notes for Driver
       </div>
-      <textarea id="driver-notes" class="styling-notes-input" rows="3"
+      <textarea id="driver-notes" class="styling-notes-input" rows="2"
         placeholder="Anything the driver needs to know — transfers, access, parking…"
         oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
         onblur="saveDriverNotes(this.value)"></textarea>
     </div>
-    <div id="accessory-tubs-section" style="margin-top:12px;padding:16px;background:var(--warm);border:1px solid var(--border);border-radius:3px;display:none;">
+    <div id="accessory-tubs-section-mobile" style="margin-top:24px;padding:16px;background:var(--warm);border:1px solid var(--border);border-radius:3px;display:none;">
       <div style="font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px;">Accessory Tubs</div>
       <div style="display:flex;align-items:center;gap:10px;">
-        <input type="number" id="accessory-tubs-input" min="0" max="99" step="1"
+        <input type="number" id="accessory-tubs-input-mobile" min="0" max="99" step="1"
           style="width:64px;padding:8px;border:1px solid var(--border);border-radius:2px;font-family:'Jost',sans-serif;font-size:1rem;text-align:center;outline:none;"
-          placeholder="0"
-          onfocus="this.style.borderColor='var(--accent)'"
-          onblur="this.style.borderColor='var(--border)'"
-          onkeydown="if(event.key==='Enter')saveAccessoryTubs()"/>
+          placeholder="0" onkeydown="if(event.key==='Enter')saveAccessoryTubs()"/>
         <button class="btn btn-gold" onclick="saveAccessoryTubs()" style="font-size:0.78rem;padding:8px 16px;">Save</button>
-        <span id="accessory-tubs-saved" style="font-size:0.75rem;color:var(--green);display:none;">✓</span>
+        <span id="accessory-tubs-saved-mobile" style="font-size:0.75rem;color:var(--green);display:none;">✓ Saved</span>
       </div>
     </div>
-    <div id="cushion-bags-section" style="margin-top:12px;padding:16px;background:var(--warm);border:1px solid var(--border);border-radius:3px;display:none;">
+    <div id="cushion-bags-section-mobile" style="margin-top:12px;padding:16px;background:var(--warm);border:1px solid var(--border);border-radius:3px;display:none;">
       <div style="font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px;">Cushion Bags</div>
       <div style="display:flex;align-items:center;gap:10px;">
-        <input type="number" id="cushion-bags-input" min="0" max="99" step="1"
+        <input type="number" id="cushion-bags-input-mobile" min="0" max="99" step="1"
           style="width:64px;padding:8px;border:1px solid var(--border);border-radius:2px;font-family:'Jost',sans-serif;font-size:1rem;text-align:center;outline:none;"
-          placeholder="0"
-          onfocus="this.style.borderColor='var(--accent)'"
-          onblur="this.style.borderColor='var(--border)'"
-          onkeydown="if(event.key==='Enter')saveCushionBags()"/>
+          placeholder="0" onkeydown="if(event.key==='Enter')saveCushionBags()"/>
         <button class="btn btn-gold" onclick="saveCushionBags()" style="font-size:0.78rem;padding:8px 16px;">Save</button>
-        <span id="cushion-bags-saved" style="font-size:0.75rem;color:var(--green);display:none;">✓</span>
+        <span id="cushion-bags-saved-mobile" style="font-size:0.75rem;color:var(--green);display:none;">✓ Saved</span>
       </div>
     </div>
   </div>
 
-  <!-- RIGHT PANEL — room cards -->
-  <div class="tablet-right">
-    <div class="rooms-grid" id="items-container">
-      <div class="loading"><div class="spinner"></div>Loading job…</div>
-    </div>
-  </div>
+  <!-- Items container (mobile card view) -->
+  <div id="items-container" class="mobile-only"></div>
 
 </div>
 
@@ -354,15 +407,17 @@ async function loadJob(){
     transferOutBanner.style.display = 'none';
   }
 
-  const notesEl = document.getElementById('styling-notes');
-  notesEl.value = currentJob.styling_notes || '';
-  notesEl.style.height = 'auto';
-  notesEl.style.height = notesEl.scrollHeight + 'px';
+  const stylingVal = currentJob.styling_notes || '';
+  const driverVal  = currentJob.driver_notes  || '';
 
-  const driverNotesEl = document.getElementById('driver-notes');
-  driverNotesEl.value = currentJob.driver_notes || '';
-  driverNotesEl.style.height = 'auto';
-  driverNotesEl.style.height = driverNotesEl.scrollHeight + 'px';
+  ['styling-notes','styling-notes-mobile'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.value=stylingVal;el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+  });
+  ['driver-notes','driver-notes-tablet'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.value=driverVal;el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+  });
 
   // Accessory tubs
   const tubsInput = document.getElementById('accessory-tubs-input');
@@ -659,6 +714,137 @@ function rerenderRoomProgress(){
   }
 }
 
+// ── Paper view (tablet) ──────────────────────────────────────────────────
+const isTablet = ()=>window.innerWidth>=768;
+
+function renderPaperGrid(){
+  const container=document.getElementById('paper-grid-container');
+  if(!container) return;
+
+  const regularItems = currentJobIsTransferSource
+    ? allItems.filter(i=>!i.not_transferring)
+    : allItems;
+
+  const rooms={};
+  for(const item of regularItems){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
+  // Add pending rooms
+  for(const room of pendingRooms){ if(!rooms[room]) rooms[room]=[]; }
+
+  const roomList=Object.entries(rooms);
+  if(!roomList.length){
+    container.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);">No rooms yet — add one above.</div>';
+    return;
+  }
+
+  let html=`<div class="paper-grid">`;
+  roomList.forEach(([room, items])=>{
+    const picked=items.filter(i=>i.picked).length;
+    const total=items.length;
+    const key=(room||'extra').replace(/[^a-zA-Z0-9]/g,'_');
+    html+=`<div class="paper-col" id="paper-col-${key}">
+      <div class="paper-col-hdr">
+        <span class="paper-col-hdr-name">${room||'Extra'}</span>
+        <span class="paper-col-hdr-count">${picked}/${total}</span>
+      </div>`;
+
+    items.forEach(item=>{
+      const bay=item.bay_location?`<div class="paper-item-bay">📦 ${item.bay_location}</div>`:'';
+      html+=`<div class="paper-item${item.picked?' picked':''}" id="paper-item-${item.id}">
+        <div class="paper-check${item.picked?' checked':''}" onclick="paperTogglePick('${item.id}')">
+          ${item.picked?'✓':''}
+        </div>
+        <div class="paper-item-body">
+          <div class="paper-item-serial">${item.serial||''}</div>
+          <div class="paper-item-desc">${item.description||''}</div>
+          ${bay}
+        </div>
+      </div>`;
+    });
+
+    // Add item input at bottom of each column
+    html+=`<div class="paper-add-item">
+      <input class="paper-add-input" placeholder="+ add item" id="paper-add-${key}"
+        onkeydown="if(event.key==='Enter')paperAddItem('${room}',this)"/>
+    </div>`;
+
+    html+=`</div>`;
+  });
+
+  // Add room button as final column
+  html+=`<div class="paper-col" style="min-width:120px;background:var(--warm);display:flex;align-items:flex-start;padding:10px;">
+    <button class="btn btn-outline paper-add-room-btn" onclick="toggleAddRoomForm()" style="width:100%;font-size:0.72rem;">+ Add Room</button>
+    <div id="add-room-form" style="display:none;flex-direction:column;gap:6px;width:100%;margin-top:6px;">
+      <input type="text" id="new-room-name" class="add-input" placeholder="Room name"
+        style="text-transform:uppercase;font-size:0.8rem;" onkeydown="if(event.key==='Enter')addRoom()"/>
+      <button class="btn btn-gold" onclick="addRoom()" style="font-size:0.72rem;">Add</button>
+      <button class="btn btn-outline" onclick="toggleAddRoomForm()" style="font-size:0.72rem;">Cancel</button>
+    </div>
+  </div>`;
+
+  html+=`</div>`;
+  container.innerHTML=html;
+
+  if(addRoomFormOpen){
+    const form=document.getElementById('add-room-form');
+    if(form){form.style.display='flex';setTimeout(()=>document.getElementById('new-room-name')?.focus(),50);}
+  }
+}
+
+async function paperTogglePick(itemId){
+  const item=allItems.find(i=>i.id===itemId);
+  if(!item) return;
+  item.picked=!item.picked;
+  // Update DOM immediately
+  const row=document.getElementById(`paper-item-${itemId}`);
+  if(row){
+    row.classList.toggle('picked',item.picked);
+    const check=row.querySelector('.paper-check');
+    if(check){check.classList.toggle('checked',item.picked);check.textContent=item.picked?'✓':'';}
+  }
+  // Update column header count
+  const room=item.room;
+  const key=(room||'extra').replace(/[^a-zA-Z0-9]/g,'_');
+  const col=document.getElementById(`paper-col-${key}`);
+  if(col){
+    const roomItems=allItems.filter(i=>i.room===room);
+    const picked=roomItems.filter(i=>i.picked).length;
+    const countEl=col.querySelector('.paper-col-hdr-count');
+    if(countEl) countEl.textContent=`${picked}/${roomItems.length}`;
+  }
+  // Save to DB
+  await fetch(`${SB_URL}/rest/v1/items?id=eq.${itemId}`,{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
+    body:JSON.stringify({picked:item.picked})
+  });
+}
+
+async function paperAddItem(room, input){
+  const desc=input.value.trim();
+  if(!desc) return;
+  input.value='';
+  // Use same addItem logic as card view
+  const body={job_id:jobId,room,description:desc,picked:false,is_extra:true};
+  const res=await fetch(`${SB_URL}/rest/v1/items`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=representation'},
+    body:JSON.stringify(body)
+  });
+  const newItems=await res.json();
+  if(newItems&&newItems[0]) allItems.push(newItems[0]);
+  renderPaperGrid();
+}
+
+function syncNotesFields(){
+  // Keep mobile and tablet notes fields in sync on load
+  const stylingVal=document.getElementById('styling-notes')?.value||document.getElementById('styling-notes-mobile')?.value||'';
+  const driverVal=document.getElementById('driver-notes-tablet')?.value||document.getElementById('driver-notes')?.value||'';
+  if(document.getElementById('styling-notes')) document.getElementById('styling-notes').value=stylingVal;
+  if(document.getElementById('styling-notes-mobile')) document.getElementById('styling-notes-mobile').value=stylingVal;
+  if(document.getElementById('driver-notes-tablet')) document.getElementById('driver-notes-tablet').value=driverVal;
+  if(document.getElementById('driver-notes')) document.getElementById('driver-notes').value=driverVal;
+}
+
 function renderItems(){
   const body=document.getElementById('items-container');
 
@@ -705,6 +891,9 @@ function renderItems(){
     if(form){ form.style.display='flex'; setTimeout(()=>document.getElementById('new-room-name')?.focus(),50); }
   }
   loadPhotoStrips();
+
+  // On tablet, also render the paper grid
+  if(isTablet()) renderPaperGrid();
 }
 
 function notTransferringCardHTML(notTransferItems){

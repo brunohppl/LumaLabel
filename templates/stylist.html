@@ -75,9 +75,11 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
   .paper-acc-btn{padding:5px 12px;font-size:0.72rem;}
 
   /* Paper grid — rooms as columns */
-  .paper-grid{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(160px,1fr);grid-template-rows:auto;gap:0;border:1px solid var(--border);border-radius:3px;overflow-x:auto;align-items:start;}
-  .paper-col{border-right:1px solid var(--border);min-width:150px;display:flex;flex-direction:column;}
+  .paper-band{border:1px solid var(--border);border-radius:3px;margin-bottom:10px;display:grid;grid-template-columns:repeat(5,1fr);}
+  .paper-band:last-child{margin-bottom:0;}
+  .paper-col{border-right:1px solid var(--border);display:flex;flex-direction:column;}
   .paper-col:last-child{border-right:none;}
+  .paper-col.paper-col-empty{background:rgba(245,241,234,0.5);}
   .paper-col-hdr{background:var(--ink);color:white;padding:7px 10px;font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;gap:6px;position:sticky;top:0;z-index:2;}
   .paper-col-hdr-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .paper-col-hdr-count{font-size:0.65rem;opacity:0.55;font-weight:400;white-space:nowrap;}
@@ -757,7 +759,57 @@ function paperItemRow(grp){
   </div>`;
 }
 
+// Room cluster order matching LUMA packing slip convention:
+// Entry/Hallway → Living areas → Kitchen/Dining → Bedrooms → Outdoor → Bathrooms → Other
+const PAPER_CLUSTER_ORDER = [
+  ['entry','hallway','foyer','lobby'],
+  ['living','lounge','media','family','rumpus','theatre','study','office'],
+  ['kitchen','dining','breakfast'],
+  ['master','bedroom','bed'],
+  ['outdoor','alfresco','balcony','patio','deck','terrace','garden','pool'],
+  ['bathroom','ensuite','powder','wc','laundry','utility'],
+];
+
+function paperRoomCluster(room){
+  const r=(room||'').toLowerCase();
+  for(let i=0;i<PAPER_CLUSTER_ORDER.length;i++){
+    if(PAPER_CLUSTER_ORDER[i].some(k=>r.includes(k))) return i;
+  }
+  return PAPER_CLUSTER_ORDER.length; // unknown → end
+}
+
+function sortRoomsForPaper(roomList){
+  // Stable sort: primary = cluster index, secondary = original packing-slip order (index)
+  return roomList.map((entry,i)=>({entry,cluster:paperRoomCluster(entry[0]),i}))
+    .sort((a,b)=>a.cluster!==b.cluster ? a.cluster-b.cluster : a.i-b.i)
+    .map(x=>x.entry);
+}
+
+function paperColHTML(room, items){
+  const groups=groupItems(items);
+  const picked=items.filter(i=>i.picked).length;
+  const total=items.length;
+  const key=(room||'extra').replace(/[^a-zA-Z0-9]/g,'_');
+  const noteTexts=roomNotes[room]||[];
+  const noteHtml=noteTexts.length
+    ? `<div class="paper-room-note"><span class="paper-room-note-text">${noteTexts.join(' · ')}</span></div>`
+    : '';
+  return `<div class="paper-col" id="paper-col-${key}">
+    <div class="paper-col-hdr">
+      <span class="paper-col-hdr-name">${room||'Extra'}</span>
+      <span class="paper-col-hdr-count">${picked}/${total}</span>
+    </div>
+    ${noteHtml}
+    ${groups.map(paperItemRow).join('')}
+    <div class="paper-add-item">
+      <input class="paper-add-input" placeholder="+ add item" id="paper-add-${key}"
+        onkeydown="if(event.key==='Enter')paperAddItem('${room}',this)"/>
+    </div>
+  </div>`;
+}
+
 function renderPaperGrid(){
+  const COLS=5;
   const container=document.getElementById('paper-grid-container');
   if(!container) return;
 
@@ -769,41 +821,29 @@ function renderPaperGrid(){
   for(const item of regularItems){if(!rooms[item.room])rooms[item.room]=[];rooms[item.room].push(item);}
   for(const room of pendingRooms){ if(!rooms[room]) rooms[room]=[]; }
 
-  const roomList=Object.entries(rooms);
+  const roomList=sortRoomsForPaper(Object.entries(rooms));
   if(!roomList.length){
     container.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);">No rooms yet — add one above.</div>';
     return;
   }
 
-  let html=`<div class="paper-grid">`;
-  roomList.forEach(([room, items])=>{
-    const groups=groupItems(items);
-    const picked=items.filter(i=>i.picked).length;
-    const total=items.length;
-    const key=(room||'extra').replace(/[^a-zA-Z0-9]/g,'_');
-    const noteTexts=roomNotes[room]||[];
-    const noteHtml=noteTexts.length
-      ? `<div class="paper-room-note"><span class="paper-room-note-text">${noteTexts.join(' · ')}</span></div>`
-      : '';
+  // Chunk into rows of COLS, pad last row with empty cells
+  const chunks=[];
+  for(let i=0;i<roomList.length;i+=COLS) chunks.push(roomList.slice(i,i+COLS));
 
-    html+=`<div class="paper-col" id="paper-col-${key}">
-      <div class="paper-col-hdr">
-        <span class="paper-col-hdr-name">${room||'Extra'}</span>
-        <span class="paper-col-hdr-count">${picked}/${total}</span>
-      </div>
-      ${noteHtml}
-      ${groups.map(paperItemRow).join('')}
-      <div class="paper-add-item">
-        <input class="paper-add-input" placeholder="+ add item" id="paper-add-${key}"
-          onkeydown="if(event.key==='Enter')paperAddItem('${room}',this)"/>
-      </div>
-    </div>`;
+  let html='';
+  chunks.forEach(chunk=>{
+    html+=`<div class="paper-band">`;
+    chunk.forEach(([room,items])=>{ html+=paperColHTML(room,items); });
+    // Pad short last row
+    for(let p=chunk.length;p<COLS;p++) html+=`<div class="paper-col paper-col-empty"></div>`;
+    html+=`</div>`;
   });
 
-  // Add room button as final column
-  html+=`<div class="paper-col" style="min-width:120px;background:var(--warm);display:flex;flex-direction:column;align-items:flex-start;padding:10px;">
-    <button class="btn btn-outline paper-add-room-btn" onclick="toggleAddRoomForm()" style="width:100%;font-size:0.72rem;">+ Add Room</button>
-    <div id="add-room-form" style="display:none;flex-direction:column;gap:6px;width:100%;margin-top:6px;">
+  // Add room / controls row below the bands
+  html+=`<div style="display:flex;gap:8px;align-items:center;margin-top:10px;padding:0 2px;">
+    <button class="btn btn-outline paper-add-room-btn" onclick="toggleAddRoomForm()" style="font-size:0.72rem;">+ Add Room</button>
+    <div id="add-room-form" style="display:none;align-items:center;gap:6px;">
       <input type="text" id="new-room-name" class="add-input" placeholder="Room name"
         style="text-transform:uppercase;font-size:0.8rem;" onkeydown="if(event.key==='Enter')addRoom()"/>
       <button class="btn btn-gold" onclick="addRoom()" style="font-size:0.72rem;">Add</button>
@@ -811,7 +851,6 @@ function renderPaperGrid(){
     </div>
   </div>`;
 
-  html+=`</div>`;
   container.innerHTML=html;
 
   if(addRoomFormOpen){

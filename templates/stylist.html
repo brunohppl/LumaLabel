@@ -106,6 +106,12 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
   .paper-only{display:block;}
 }
 
+/* JS-controlled override — .tablet-mode added/removed by toggle */
+body.tablet-mode .mobile-only{display:none !important;}
+body.tablet-mode .paper-only{display:block !important;}
+body.mobile-mode .paper-only{display:none !important;}
+body.mobile-mode .mobile-only{display:block !important;}
+
 @media(max-width:767px){
   .paper-only{display:none;}
   .mobile-only{display:block;}
@@ -248,6 +254,19 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 <div class="actions-bar" id="actions-bar"></div>
 
 <div class="content">
+
+  <!-- View mode toggle (tablet-sized screens only) -->
+  <div id="view-mode-toggle-bar" style="display:none;justify-content:flex-end;align-items:center;gap:8px;padding:8px 0 4px;">
+    <span style="font-size:0.72rem;color:var(--muted);font-family:'Jost',sans-serif;">View:</span>
+    <button id="btn-mobile-view" onclick="setViewMode('mobile')"
+      style="font-family:'Jost',sans-serif;font-size:0.72rem;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:white;cursor:pointer;transition:all 0.15s;">
+      📱 Card
+    </button>
+    <button id="btn-tablet-view" onclick="setViewMode('tablet')"
+      style="font-family:'Jost',sans-serif;font-size:0.72rem;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:white;cursor:pointer;transition:all 0.15s;">
+      🗒 Paper
+    </button>
+  </div>
 
   <!-- TABLET: notes bar + accessories inline -->
   <div class="paper-only">
@@ -719,7 +738,39 @@ function rerenderRoomProgress(){
 }
 
 // ── Paper view (tablet) ──────────────────────────────────────────────────
-const isTablet = ()=>window.innerWidth>=768;
+const TABLET_BREAKPOINT = 768;
+let _tabletMode = null; // null = not yet determined
+
+function isTablet(){ return _tabletMode === true; }
+
+function setViewMode(mode){
+  _tabletMode = (mode === 'tablet');
+  localStorage.setItem('luma_view_mode', mode);
+  document.body.classList.toggle('tablet-mode', _tabletMode);
+  document.body.classList.toggle('mobile-mode', !_tabletMode);
+  // Update toggle button styles
+  const btnT = document.getElementById('btn-tablet-view');
+  const btnM = document.getElementById('btn-mobile-view');
+  if(btnT) btnT.style.cssText += _tabletMode
+    ? 'background:var(--ink);color:white;border-color:var(--ink);'
+    : 'background:white;color:var(--ink);border-color:var(--border);';
+  if(btnM) btnM.style.cssText += !_tabletMode
+    ? 'background:var(--ink);color:white;border-color:var(--ink);'
+    : 'background:white;color:var(--ink);border-color:var(--border);';
+  // Re-render if switching into tablet mode after items are loaded
+  if(_tabletMode && allItems.length){ renderPaperGrid(); loadPhotoStrips(); }
+}
+
+function initViewMode(){
+  const isWide = window.innerWidth >= TABLET_BREAKPOINT;
+  // Show toggle bar only on wide screens
+  const bar = document.getElementById('view-mode-toggle-bar');
+  if(bar) bar.style.display = isWide ? 'flex' : 'none';
+  // Restore saved preference, or default to tablet on wide / mobile on narrow
+  const saved = localStorage.getItem('luma_view_mode');
+  const mode = saved || (isWide ? 'tablet' : 'mobile');
+  setViewMode(mode);
+}
 
 function paperItemRow(grp){
   // Compact paper-view row — reuses the same IDs as groupRow() so loadPhotoStrips()
@@ -1399,6 +1450,7 @@ async function addItemToRoom(room, input){
 }
 
 
+initViewMode();
 loadJob();
 </script>
 </body>

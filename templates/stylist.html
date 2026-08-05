@@ -736,6 +736,10 @@ function paperItemRow(grp){
   const bayNum=bayLoc?bayLoc.slice(1):'';
   const ddStyle=`font-size:0.68rem;padding:2px 3px;border:1px solid ${bayLoc?'var(--green)':'var(--border)'};border-radius:2px;color:${bayLoc?'var(--green)':'var(--muted)'};background:white;font-family:'Jost',sans-serif;width:30px;text-align:center;-webkit-appearance:none;`;
 
+  const camColour=hasPhoto?'var(--green)':'var(--border)';
+  const camIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${camColour}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
+  const galleryIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${camColour}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
+
   return `<div class="paper-item${picked?' picked':''}" id="paper-item-${firstItemId}">
     <div class="paper-check${picked?' checked':''}" onclick="toggleGroupPicked('${ids}',this)">${picked?'✓':''}</div>
     <div class="paper-item-body">
@@ -751,8 +755,12 @@ function paperItemRow(grp){
         </select>
         <input type="file" accept="image/*" capture="environment" id="${inputId}-cam" style="display:none;"
           onchange="handlePhotoUpload(this,'${firstItemId}','${stripId}')"/>
-        <button onclick="document.getElementById('${inputId}-cam').click()" title="Add photo"
-          style="background:none;border:none;cursor:pointer;padding:1px 3px;font-size:0.85rem;opacity:${hasPhoto?'1':'0.4'};">📷</button>
+        <input type="file" accept="image/*" id="${inputId}-lib" style="display:none;"
+          onchange="handlePhotoUpload(this,'${firstItemId}','${stripId}')"/>
+        <button onclick="document.getElementById('${inputId}-cam').click()" title="Take photo"
+          style="background:none;border:none;cursor:pointer;padding:1px 3px;line-height:0;">${camIcon}</button>
+        <button onclick="document.getElementById('${inputId}-lib').click()" title="Upload from library"
+          style="background:none;border:none;cursor:pointer;padding:1px 3px;line-height:0;opacity:0.6;">${galleryIcon}</button>
       </div>
       <div class="photo-strip" id="${stripId}" data-item-id="${firstItemId}"></div>
     </div>

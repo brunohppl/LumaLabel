@@ -2703,7 +2703,44 @@ def api_delete_job(job_id):
 def monday_page():
     return open(os.path.join(app.template_folder, 'monday.html')).read()
 
-@app.route('/api/monday/board')
+@app.route('/api/monday/debug')
+def api_monday_debug():
+    """Show raw Monday property values vs Luma addresses for matching diagnosis."""
+    items_q = '''
+    query($bid: ID!) {
+      boards(ids: [$bid]) {
+        columns { id title type }
+        items_page(limit: 50) {
+          items {
+            id
+            name
+            column_values { id text value }
+          }
+        }
+      }
+    }'''
+    result = monday_query(items_q, {'bid': MONDAY_BOARD_ID})
+    if 'errors' in result:
+        return jsonify({'error': result['errors']}), 500
+
+    board   = result['data']['boards'][0]
+    columns = {c['id']: c['title'] for c in board['columns']}
+    items   = board['items_page']['items']
+
+    monday_props = []
+    for item in items:
+        row = {'name': item['name'], 'columns': {}}
+        for cv in item['column_values']:
+            if cv.get('text'):
+                row['columns'][columns.get(cv['id'], cv['id'])] = cv['text']
+        monday_props.append(row)
+
+    luma_jobs = sb_get('jobs', 'select=id,job_ref,job_number,address&order=created_at.desc') or []
+    luma_addrs = [{'job_ref': j.get('job_ref',''), 'address': j.get('address','')} for j in luma_jobs if j.get('address')]
+
+    return jsonify({'monday_items': monday_props, 'luma_addresses': luma_addrs})
+
+
 def api_monday_board():
     """Fetch board groups + items from Monday, match jobs by address (property column)."""
     # Step 1: get board structure — groups and column IDs
@@ -2776,15 +2813,17 @@ def api_monday_board():
         col_map = {cv['id']: cv for cv in item['column_values']}
 
         property_val = col_map.get(property_col_id, {}).get('text', '') if property_col_id else ''
+        # Fall back to item name if property column is empty
+        address_to_match = property_val or item['name']
         status_val   = col_map.get(status_col_id,   {}).get('text', '') if status_col_id   else ''
 
-        # Try to match Luma job by address
-        luma_job = luma_by_addr.get(norm(property_val))
+        # Try to match Luma job by address (property col or item name)
+        luma_job = luma_by_addr.get(norm(address_to_match))
 
         row = {
             'monday_id':   item['id'],
             'name':        item['name'],
-            'property':    property_val,
+            'property':    address_to_match,
             'status':      status_val,
             'group_id':    gid,
             'group_title': gtitle,

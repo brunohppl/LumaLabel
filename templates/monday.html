@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Monday Sync — LUMA</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{--cream:#FAF8F4;--warm:#F2EDE4;--sand:#E5DDD0;--border:#D8CFBF;--muted:#9A8F80;--ink:#1A1714;--accent:#B8935A;--green:#4A7C59;--red:#A63D2F;--blue:#4A7EB8;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font-size:15px;min-height:100vh;}
+
+header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.logo{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:300;color:white;letter-spacing:0.05em;}
+.logo em{font-style:italic;color:var(--accent);}
+.header-right{display:flex;align-items:center;gap:12px;}
+.nav-link{color:rgba(255,255,255,0.6);font-size:0.8rem;text-decoration:none;letter-spacing:0.08em;text-transform:uppercase;}
+.nav-link:hover{color:var(--accent);}
+
+.page-wrap{max-width:1200px;margin:0 auto;padding:28px 20px;}
+
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;}
+.page-title{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:300;}
+.page-title span{color:var(--accent);font-style:italic;}
+
+.sync-bar{display:flex;align-items:center;gap:12px;}
+.btn-sync{background:var(--ink);color:white;border:none;border-radius:3px;padding:9px 18px;font-family:'Jost',sans-serif;font-size:0.8rem;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;gap:7px;transition:opacity 0.15s;}
+.btn-sync:hover{opacity:0.85;}
+.btn-sync:disabled{opacity:0.45;cursor:not-allowed;}
+.sync-status{font-size:0.78rem;color:var(--muted);}
+.sync-spinner{display:none;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.board-name{font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:20px;}
+
+/* Group section */
+.group-section{margin-bottom:28px;}
+.group-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--ink);}
+.group-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.group-title{font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-weight:500;}
+.group-count{font-size:0.7rem;color:var(--muted);background:var(--sand);border-radius:10px;padding:1px 9px;font-weight:600;}
+
+/* Table */
+.sync-table{width:100%;border-collapse:collapse;font-size:0.82rem;}
+.sync-table th{background:var(--warm);color:var(--muted);font-weight:600;font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);}
+.sync-table td{padding:10px 12px;border-bottom:1px solid var(--sand);vertical-align:middle;}
+.sync-table tr:last-child td{border-bottom:none;}
+.sync-table tr:hover td{background:var(--warm);}
+
+/* Status badge */
+.status-badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:0.7rem;font-weight:600;letter-spacing:0.04em;}
+.status-badge.matched{background:rgba(74,124,89,0.12);color:var(--green);}
+.status-badge.unmatched{background:rgba(154,143,128,0.15);color:var(--muted);}
+
+/* Luma link */
+.luma-ref{font-size:0.78rem;color:var(--accent);font-weight:600;}
+.luma-date{font-size:0.72rem;color:var(--muted);margin-top:2px;}
+.luma-none{font-size:0.75rem;color:var(--border);font-style:italic;}
+
+/* Monday status pill — colour set by JS */
+.monday-status{display:inline-block;padding:2px 10px;border-radius:10px;font-size:0.72rem;font-weight:600;color:white;}
+
+/* Error / empty states */
+.state-msg{padding:48px 24px;text-align:center;color:var(--muted);font-size:0.9rem;}
+.state-msg strong{display:block;font-size:1.1rem;color:var(--ink);margin-bottom:6px;}
+
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:0.72rem;color:var(--muted);}
+.legend-dot{width:8px;height:8px;border-radius:50%;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">LU<em>MA</em></div>
+  <div class="header-right">
+    <a href="/jobs" class="nav-link">Jobs</a>
+    <a href="/runsheet" class="nav-link">Runsheet</a>
+  </div>
+</header>
+
+<div class="page-wrap">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Monday <span>Sync</span></h1>
+      <div class="board-name" id="board-name">Loading board…</div>
+    </div>
+    <div class="sync-bar">
+      <span class="sync-status" id="sync-status"></span>
+      <button class="btn-sync" id="btn-sync" onclick="syncBoard()">
+        <div class="sync-spinner" id="spinner"></div>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Sync Now
+      </button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--green);"></div> Matched to a Luma job</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--border);"></div> No matching Luma job found</div>
+  </div>
+
+  <div id="board-content">
+    <div class="state-msg"><strong>Ready to sync</strong>Click Sync Now to pull the latest data from Monday.</div>
+  </div>
+</div>
+
+<script>
+// Distinct colours for group dots (cycles if more groups than colours)
+const GROUP_COLOURS = ['#B8935A','#4A7C59','#4A7EB8','#A63D2F','#7A6B8A','#5A8A8A','#8A7A4A','#6A4A7C'];
+
+// Map common Monday status labels to a readable colour
+const STATUS_COLOURS = {
+  'done':        '#4A7C59',
+  'working on it':'#B8935A',
+  'stuck':       '#A63D2F',
+  'not started': '#9A8F80',
+  'in progress': '#4A7EB8',
+  'pending':     '#B8935A',
+  'cancelled':   '#9A8F80',
+};
+
+function statusColour(label){
+  if(!label) return '#9A8F80';
+  const key = label.toLowerCase().trim();
+  for(const [k,v] of Object.entries(STATUS_COLOURS)){
+    if(key.includes(k)) return v;
+  }
+  return '#9A8F80';
+}
+
+function formatDate(iso){
+  if(!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+}
+
+async function syncBoard(){
+  const btn     = document.getElementById('btn-sync');
+  const spinner = document.getElementById('spinner');
+  const status  = document.getElementById('sync-status');
+  const content = document.getElementById('board-content');
+
+  btn.disabled       = true;
+  spinner.style.display = 'block';
+  status.textContent = 'Syncing…';
+  content.innerHTML  = '<div class="state-msg">Fetching from Monday…</div>';
+
+  try {
+    const res  = await fetch('/api/monday/board');
+    const data = await res.json();
+
+    if(data.error){
+      content.innerHTML = `<div class="state-msg"><strong>Error</strong>${JSON.stringify(data.error)}</div>`;
+      status.textContent = 'Sync failed';
+      return;
+    }
+
+    document.getElementById('board-name').textContent = data.board_name;
+
+    const groups = data.groups;
+    const groupNames = Object.keys(groups);
+
+    if(!groupNames.length){
+      content.innerHTML = '<div class="state-msg"><strong>No items found</strong>The board appears to be empty.</div>';
+      status.textContent = 'Done — no items';
+      return;
+    }
+
+    let html = '';
+    groupNames.forEach((gname, gi) => {
+      const items     = groups[gname];
+      const dotColour = GROUP_COLOURS[gi % GROUP_COLOURS.length];
+      const matched   = items.filter(i=>i.luma_job).length;
+
+      html += `<div class="group-section">
+        <div class="group-header">
+          <div class="group-dot" style="background:${dotColour};"></div>
+          <span class="group-title">${gname}</span>
+          <span class="group-count">${items.length} item${items.length!==1?'s':''}</span>
+          <span class="group-count" style="background:rgba(74,124,89,0.12);color:var(--green);">${matched} matched</span>
+        </div>
+        <table class="sync-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Property (Monday)</th>
+              <th>Monday Status</th>
+              <th>Luma Job</th>
+              <th>Install Date</th>
+              <th>Match</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+      items.forEach(item => {
+        const sc      = statusColour(item.status);
+        const sLabel  = item.status || '—';
+        const luma    = item.luma_job;
+
+        html += `<tr>
+          <td style="font-weight:500;">${item.name||'—'}</td>
+          <td>${item.property||'<span style="color:var(--border);font-style:italic;">no address</span>'}</td>
+          <td><span class="monday-status" style="background:${sc};">${sLabel}</span></td>
+          <td>${luma
+            ? `<div class="luma-ref">${luma.job_ref||luma.job_number||luma.id.slice(0,8)}</div>
+               <div style="font-size:0.7rem;color:var(--muted);margin-top:1px;">${luma.address}</div>`
+            : `<span class="luma-none">No match</span>`}</td>
+          <td>${luma?.runsheet_date
+            ? `<span style="color:var(--green);font-weight:600;">${formatDate(luma.runsheet_date)}</span>`
+            : '<span style="color:var(--border);">—</span>'}</td>
+          <td><span class="status-badge ${luma?'matched':'unmatched'}">${luma?'✓ Matched':'—'}</span></td>
+        </tr>`;
+      });
+
+      html += `</tbody></table></div>`;
+    });
+
+    content.innerHTML  = html;
+    const now          = new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
+    status.textContent = `Last synced ${now}`;
+
+  } catch(e){
+    content.innerHTML  = `<div class="state-msg"><strong>Network error</strong>${e.message}</div>`;
+    status.textContent = 'Sync failed';
+  } finally {
+    btn.disabled          = false;
+    spinner.style.display = 'none';
+  }
+}
+
+// Auto-sync on load
+syncBoard();
+</script>
+</body>
+</html>

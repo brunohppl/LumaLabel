@@ -531,7 +531,7 @@ function jobCardHTML(job){
         </button>
         <div class="job-meta">
           ${job.runsheet_date
-            ? `<span class="tile-date tile-date-install">${formatRunsheetBadgeDate(job.runsheet_date)}</span>`
+            ? `<span class="tile-date tile-date-install" id="date-${job.id}" onclick="startEditDate('${job.id}')" title="Tap to edit install date" style="cursor:pointer;">${formatRunsheetBadgeDate(job.runsheet_date)}</span>`
             : job.stage_date
               ? `<span class="tile-date tile-date-load">${job.stage_date}</span>`
               : ''}
@@ -605,6 +605,46 @@ async function saveAddress(jobId, newAddr, div){
   if(job) job.address=newAddr;
   div.textContent=newAddr;
   div._saving=false;
+}
+
+function startEditDate(jobId){
+  const span=document.getElementById(`date-${jobId}`);
+  if(!span||span.querySelector('input')) return;
+  const job=lastFetchedJobs.find(j=>j.id===jobId);
+  const current=job?.runsheet_date||''; // YYYY-MM-DD
+  const input=document.createElement('input');
+  input.type='date';
+  input.value=current;
+  input.style.cssText='font-size:0.75rem;border:1px solid var(--green);border-radius:3px;padding:1px 4px;font-family:inherit;background:white;color:var(--ink);';
+  input.onclick=e=>e.stopPropagation();
+  input.onchange=()=>saveInstallDate(jobId,input.value,span);
+  input.onkeydown=e=>{
+    if(e.key==='Escape'){ span.textContent=formatRunsheetBadgeDate(current); }
+  };
+  input.onblur=()=>{ if(!span._saving) span.textContent=formatRunsheetBadgeDate(job?.runsheet_date||current); };
+  span.innerHTML='';
+  span.appendChild(input);
+  input.focus();
+  input.showPicker?.();
+}
+
+async function saveInstallDate(jobId, newDate, span){
+  if(span._saving) return;
+  span._saving=true;
+  const job=lastFetchedJobs.find(j=>j.id===jobId);
+  if(!newDate||newDate===job?.runsheet_date){
+    span.textContent=formatRunsheetBadgeDate(job?.runsheet_date||'');
+    span._saving=false;
+    return;
+  }
+  span.textContent='Saving…';
+  await fetch(`/api/jobs/${jobId}/notes`,{
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({runsheet_date:newDate})
+  });
+  if(job) job.runsheet_date=newDate;
+  span.textContent=formatRunsheetBadgeDate(newDate);
+  span._saving=false;
 }
 
 async function downloadLabels(jobId, jobRef){

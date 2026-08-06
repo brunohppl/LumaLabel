@@ -19,7 +19,31 @@ from reportlab.lib.colors import HexColor
 
 app = Flask(__name__)
 
-# ── Supabase config ──
+# ── Monday.com config ──
+MONDAY_TOKEN = os.environ.get('MONDAY_API_TOKEN', 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY5MDQ1MDg0OCwiYWFpIjoxMSwidWlkIjoxMDYyNjU1MjksImlhZCI6IjIwMjYtMDgtMDZUMTE6MjI6MTYuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjIxMjU3NDI4LCJyZ24iOiJhcHNlMiJ9.mAS-Mwi35B0avY5TcDMwzoXkN5NrSRlXfDaZcx8nOM8')
+MONDAY_BOARD_ID = '5030462035'
+MONDAY_API_URL  = 'https://api.monday.com/v2'
+
+def monday_query(query, variables=None):
+    payload = {'query': query}
+    if variables:
+        payload['variables'] = variables
+    req = urllib.request.Request(
+        MONDAY_API_URL,
+        data=json.dumps(payload).encode(),
+        headers={
+            'Content-Type':  'application/json',
+            'Authorization': MONDAY_TOKEN,
+            'API-Version':   '2024-01',
+        }
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.loads(r.read())
+    except Exception as e:
+        return {'errors': [str(e)]}
+
+
 SUPABASE_URL  = os.environ.get('SUPABASE_URL', 'https://aqgxojawmohhogkhcxdb.supabase.co')
 SUPABASE_KEY  = os.environ.get('SUPABASE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxZ3hvamF3bW9oaG9na2hjeGRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NDc5ODYsImV4cCI6MjA5NDMyMzk4Nn0.-2UOdGY52jDEmCmBBtQA2XEy6dVT8ZPA_AIPcM7RFX4')
 SUPABASE_REST = SUPABASE_URL + '/rest/v1'
@@ -2671,6 +2695,118 @@ def api_delete_job(job_id):
     sb_delete('room_notes', f'job_id=eq.{job_id}')
     result = sb_delete('jobs', f'id=eq.{job_id}')
     return jsonify({'success': bool(result)})
+
+
+# ── Monday.com sync ──
+
+@app.route('/monday')
+def monday_page():
+    return open(os.path.join(app.template_folder, 'monday.html')).read()
+
+@app.route('/api/monday/board')
+def api_monday_board():
+    """Fetch board groups + items from Monday, match jobs by address (property column)."""
+    # Step 1: get board structure — groups and column IDs
+    structure_q = '''
+    query($bid: ID!) {
+      boards(ids: [$bid]) {
+        name
+        groups { id title }
+        columns { id title type }
+      }
+    }'''
+    structure = monday_query(structure_q, {'bid': MONDAY_BOARD_ID})
+    if 'errors' in structure:
+        return jsonify({'error': structure['errors']}), 500
+
+    board      = structure['data']['boards'][0]
+    groups_map = {g['id']: g['title'] for g in board['groups']}
+    columns    = board['columns']
+
+    # Find the 'property' column id (case-insensitive)
+    property_col_id = next(
+        (c['id'] for c in columns if 'property' in c['title'].lower()), None
+    )
+    status_col_id = next(
+        (c['id'] for c in columns if c['type'] == 'color' or 'status' in c['title'].lower()), None
+    )
+
+    # Step 2: fetch all items with column values
+    items_q = '''
+    query($bid: ID!, $cursor: String) {
+      boards(ids: [$bid]) {
+        items_page(limit: 100, cursor: $cursor) {
+          cursor
+          items {
+            id
+            name
+            group { id }
+            column_values { id text value }
+          }
+        }
+      }
+    }'''
+    all_items = []
+    cursor = None
+    for _ in range(10):  # max 1000 items
+        vars_ = {'bid': MONDAY_BOARD_ID}
+        if cursor:
+            vars_['cursor'] = cursor
+        result = monday_query(items_q, vars_)
+        if 'errors' in result:
+            return jsonify({'error': result['errors']}), 500
+        page    = result['data']['boards'][0]['items_page']
+        all_items += page['items']
+        cursor   = page.get('cursor')
+        if not cursor:
+            break
+
+    # Step 3: load all Luma jobs for address matching
+    luma_jobs = sb_get('jobs', 'order=created_at.desc') or []
+    # Build address index — normalise to lowercase stripped
+    def norm(s):
+        return (s or '').lower().strip()
+    luma_by_addr = {norm(j.get('address','')): j for j in luma_jobs if j.get('address')}
+
+    # Step 4: build response — group items, attach luma job if matched
+    groups_out = {}
+    for item in all_items:
+        gid     = item['group']['id']
+        gtitle  = groups_map.get(gid, gid)
+        col_map = {cv['id']: cv for cv in item['column_values']}
+
+        property_val = col_map.get(property_col_id, {}).get('text', '') if property_col_id else ''
+        status_val   = col_map.get(status_col_id,   {}).get('text', '') if status_col_id   else ''
+
+        # Try to match Luma job by address
+        luma_job = luma_by_addr.get(norm(property_val))
+
+        row = {
+            'monday_id':   item['id'],
+            'name':        item['name'],
+            'property':    property_val,
+            'status':      status_val,
+            'group_id':    gid,
+            'group_title': gtitle,
+            'luma_job':    {
+                'id':           luma_job['id'],
+                'job_ref':      luma_job.get('job_ref',''),
+                'job_number':   luma_job.get('job_number',''),
+                'runsheet_date':luma_job.get('runsheet_date',''),
+                'address':      luma_job.get('address',''),
+            } if luma_job else None,
+        }
+
+        if gtitle not in groups_out:
+            groups_out[gtitle] = []
+        groups_out[gtitle].append(row)
+
+    return jsonify({
+        'board_name': board['name'],
+        'groups':     groups_out,
+        'columns':    [{'id': c['id'], 'title': c['title'], 'type': c['type']} for c in columns],
+    })
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

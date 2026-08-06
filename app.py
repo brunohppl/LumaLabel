@@ -2779,11 +2779,11 @@ def api_monday_board():
     )
 
     # Step 2: fetch all items with column values
-    first_q = '''
+    # Use a single query without cursor for simplicity — handles up to 100 items
+    items_q = '''
     query($bid: ID!) {
       boards(ids: [$bid]) {
         items_page(limit: 100) {
-          cursor
           items {
             id name
             group { id }
@@ -2792,34 +2792,12 @@ def api_monday_board():
         }
       }
     }'''
-    next_q = '''
-    query($cursor: String!) {
-      next_items_page(limit: 100, cursor: $cursor) {
-        cursor
-        items {
-          id name
-          group { id }
-          column_values { id text value }
-        }
-      }
-    }'''
     all_items = []
     try:
-        result = monday_query(first_q, {'bid': MONDAY_BOARD_ID})
+        result = monday_query(items_q, {'bid': MONDAY_BOARD_ID})
         if 'errors' in result:
             return jsonify({'error': result['errors']}), 500
-        page = result['data']['boards'][0]['items_page']
-        all_items += page['items']
-        cursor = page.get('cursor')
-        for _ in range(9):  # up to 1000 items total
-            if not cursor:
-                break
-            result = monday_query(next_q, {'cursor': cursor})
-            if 'errors' in result:
-                break
-            page = result['data']['next_items_page']
-            all_items += page['items']
-            cursor = page.get('cursor')
+        all_items = result['data']['boards'][0]['items_page']['items']
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

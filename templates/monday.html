@@ -148,6 +148,12 @@ async function syncBoard(){
 
   try {
     const res  = await fetch('/api/monday/board');
+    if(!res.ok){
+      const txt = await res.text();
+      content.innerHTML = `<div class="state-msg"><strong>Server error ${res.status}</strong><pre style="font-size:0.75rem;text-align:left;overflow:auto;margin-top:8px;">${txt.slice(0,800)}</pre></div>`;
+      status.textContent = 'Sync failed';
+      return;
+    }
     const data = await res.json();
 
     if(data.error){

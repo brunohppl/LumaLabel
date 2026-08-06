@@ -1812,6 +1812,7 @@ def api_job_notes(job_id):
     if 'styling_notes'  in data: payload['styling_notes']  = data['styling_notes']
     if 'driver_notes'   in data: payload['driver_notes']   = data['driver_notes']
     if 'address'        in data: payload['address']        = data['address'] or None
+    if 'runsheet_date'  in data: payload['runsheet_date']  = data['runsheet_date'] or None
     if 'accessory_tubs' in data:
         v = data['accessory_tubs']
         payload['accessory_tubs'] = int(v) if v not in (None, '', 0) else None

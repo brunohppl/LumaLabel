@@ -1739,7 +1739,7 @@ def api_job_labels_pdf(job_id):
         'job_number':  job.get('job_number', ''),
         'job_ref':     job.get('job_ref', ''),
         'address':     job.get('address', ''),
-        'stage_date':  job.get('stage_date', ''),
+        'stage_date':  job.get('runsheet_date') or job.get('stage_date', ''),
         'job_owner':   job.get('job_owner', ''),
     }
 
@@ -1812,7 +1812,6 @@ def api_job_notes(job_id):
     if 'styling_notes'  in data: payload['styling_notes']  = data['styling_notes']
     if 'driver_notes'   in data: payload['driver_notes']   = data['driver_notes']
     if 'address'        in data: payload['address']        = data['address'] or None
-    if 'runsheet_date'  in data: payload['runsheet_date']  = data['runsheet_date'] or None
     if 'accessory_tubs' in data:
         v = data['accessory_tubs']
         payload['accessory_tubs'] = int(v) if v not in (None, '', 0) else None

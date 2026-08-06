@@ -2802,8 +2802,37 @@ def api_monday_board():
     luma_jobs = sb_get('jobs', 'order=created_at.desc') or []
     # Build address index — normalise to lowercase stripped
     def norm(s):
-        return (s or '').lower().strip()
-    luma_by_addr = {norm(j.get('address','')): j for j in luma_jobs if j.get('address')}
+        if not s: return ''
+        s = s.lower().strip()
+        # Expand common street abbreviations
+        abbrevs = [
+            (r'\bst\b', 'street'), (r'\brd\b', 'road'), (r'\bave?\b', 'avenue'),
+            (r'\bdr\b', 'drive'), (r'\bcr?\b', 'crescent'), (r'\bct\b', 'court'),
+            (r'\bpl\b', 'place'), (r'\bblvd\b', 'boulevard'), (r'\bln\b', 'lane'),
+            (r'\bpde\b', 'parade'), (r'\bhwy\b', 'highway'), (r'\bmt\b', 'mount'),
+        ]
+        for pattern, replacement in abbrevs:
+            s = re.sub(pattern, replacement, s)
+        # Remove punctuation and extra whitespace
+        s = re.sub(r'[,\.\-/#]', ' ', s)
+        s = re.sub(r'\s+', ' ', s).strip()
+        return s
+
+    def street_key(s):
+        # Extract just the street number + first word of street name
+        # e.g. "32 oak street paddington qld 4064" → "32 oak"
+        # This lets us match even when suburb/state/postcode differ
+        parts = norm(s).split()
+        if len(parts) >= 2:
+            return ' '.join(parts[:2])
+        return norm(s)
+    luma_by_addr = {}
+    luma_by_key  = {}
+    for j in luma_jobs:
+        addr = j.get('address','')
+        if addr:
+            luma_by_addr[norm(addr)] = j
+            luma_by_key[street_key(addr)] = j
 
     # Step 4: build response — group items, attach luma job if matched
     groups_out = {}
@@ -2818,7 +2847,9 @@ def api_monday_board():
         status_val   = col_map.get(status_col_id,   {}).get('text', '') if status_col_id   else ''
 
         # Try to match Luma job by address (property col or item name)
-        luma_job = luma_by_addr.get(norm(address_to_match))
+        # Try full normalised match first, then street-number+name fallback
+        luma_job = (luma_by_addr.get(norm(address_to_match)) or
+                    luma_by_key.get(street_key(address_to_match)))
 
         row = {
             'monday_id':   item['id'],

@@ -148,6 +148,12 @@ async function syncBoard(){
 
   try {
     const res  = await fetch('/api/monday/board');
+    if(!res.ok){
+      const txt = await res.text();
+      content.innerHTML = `<div class="state-msg"><strong>Server error ${res.status}</strong><pre style="font-size:0.75rem;text-align:left;overflow:auto;margin-top:8px;">${txt.slice(0,800)}</pre></div>`;
+      status.textContent = 'Sync failed';
+      return;
+    }
     const data = await res.json();
 
     if(data.error){
@@ -183,10 +189,9 @@ async function syncBoard(){
         <table class="sync-table">
           <thead>
             <tr>
-              <th>Item</th>
-              <th>Property (Monday)</th>
+              <th>Address (Monday)</th>
+              <th>Job Number</th>
               <th>Monday Status</th>
-              <th>Luma Job</th>
               <th>Install Date</th>
               <th>Match</th>
             </tr>
@@ -200,12 +205,10 @@ async function syncBoard(){
 
         html += `<tr>
           <td style="font-weight:500;">${item.name||'—'}</td>
-          <td>${item.property||'<span style="color:var(--border);font-style:italic;">no address</span>'}</td>
-          <td><span class="monday-status" style="background:${sc};">${sLabel}</span></td>
           <td>${luma
-            ? `<div class="luma-ref">${luma.job_ref||luma.job_number||luma.id.slice(0,8)}</div>
-               <div style="font-size:0.7rem;color:var(--muted);margin-top:1px;">${luma.address}</div>`
-            : `<span class="luma-none">No match</span>`}</td>
+            ? `<span style="font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:500;color:var(--accent);">${luma.job_number||luma.job_ref||'—'}</span>`
+            : `<span style="color:var(--border);font-style:italic;font-size:0.75rem;">No match</span>`}</td>
+          <td><span class="monday-status" style="background:${sc};">${sLabel}</span></td>
           <td>${luma?.runsheet_date
             ? `<span style="color:var(--green);font-weight:600;">${formatDate(luma.runsheet_date)}</span>`
             : '<span style="color:var(--border);">—</span>'}</td>

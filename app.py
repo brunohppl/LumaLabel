@@ -2769,34 +2769,49 @@ def api_monday_board():
     )
 
     # Step 2: fetch all items with column values
-    items_q = '''
-    query($bid: ID!, $cursor: String) {
+    first_q = '''
+    query($bid: ID!) {
       boards(ids: [$bid]) {
-        items_page(limit: 100, cursor: $cursor) {
+        items_page(limit: 100) {
           cursor
           items {
-            id
-            name
+            id name
             group { id }
             column_values { id text value }
           }
         }
       }
     }'''
+    next_q = '''
+    query($cursor: String!) {
+      next_items_page(limit: 100, cursor: $cursor) {
+        cursor
+        items {
+          id name
+          group { id }
+          column_values { id text value }
+        }
+      }
+    }'''
     all_items = []
-    cursor = None
-    for _ in range(10):  # max 1000 items
-        vars_ = {'bid': MONDAY_BOARD_ID}
-        if cursor:
-            vars_['cursor'] = cursor
-        result = monday_query(items_q, vars_)
+    try:
+        result = monday_query(first_q, {'bid': MONDAY_BOARD_ID})
         if 'errors' in result:
             return jsonify({'error': result['errors']}), 500
-        page    = result['data']['boards'][0]['items_page']
+        page = result['data']['boards'][0]['items_page']
         all_items += page['items']
-        cursor   = page.get('cursor')
-        if not cursor:
-            break
+        cursor = page.get('cursor')
+        for _ in range(9):  # up to 1000 items total
+            if not cursor:
+                break
+            result = monday_query(next_q, {'cursor': cursor})
+            if 'errors' in result:
+                break
+            page = result['data']['next_items_page']
+            all_items += page['items']
+            cursor = page.get('cursor')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
     # Step 3: load all Luma jobs for address matching
     luma_jobs = sb_get('jobs', 'order=created_at.desc') or []

@@ -39,7 +39,17 @@ def monday_query(query, variables=None):
     )
     try:
         with urllib.request.urlopen(req, timeout=15) as r:
-            return json.loads(r.read())
+            raw = r.read()
+            try:
+                return json.loads(raw)
+            except Exception:
+                return {'errors': [f'Non-JSON response: {raw[:500].decode("utf-8","replace")}']}
+    except urllib.error.HTTPError as e:
+        raw = e.read()
+        try:
+            return json.loads(raw)
+        except Exception:
+            return {'errors': [f'HTTP {e.code}: {raw[:500].decode("utf-8","replace")}']}
     except Exception as e:
         return {'errors': [str(e)]}
 

@@ -1318,6 +1318,25 @@ async function loadPhotoStrips(){
   }
 }
 
+async function onBayDropdownChange(ids, serial){
+  const aisle = document.getElementById(`bay-aisle-${serial}`)?.value || '';
+  const num   = document.getElementById(`bay-num-${serial}`)?.value   || '';
+  const bayLoc = (aisle && num) ? aisle+num : null;
+  for(const id of ids.split(',')){
+    const item = allItems.find(i=>i.id===id);
+    if(item) item.bay_location = bayLoc;
+    await fetch(`/api/items/${id}/check`,{
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({bay_location: bayLoc})
+    }).catch(()=>{});
+  }
+  // Update dropdown border colour
+  ['bay-aisle-','bay-num-'].forEach(prefix=>{
+    const el = document.getElementById(`${prefix}${serial}`);
+    if(el){ el.style.borderColor = bayLoc?'var(--green)':'var(--border)'; el.style.color = bayLoc?'var(--green)':'var(--muted)'; }
+  });
+}
+
 async function toggleGroupPicked(ids, btn){
   const idList = ids.split(',');
   const firstItem = allItems.find(i=>i.id===idList[0]);

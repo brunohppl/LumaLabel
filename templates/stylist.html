@@ -389,7 +389,20 @@ async function loadJob(){
   ]);
   const data = await jobRes.json();
   roomNotes = await notesRes.json().catch(()=>({}));
-  currentJob = data.job; allItems = data.items;
+  currentJob = data.job;
+  // Separate placeholder items (room anchors) from real items
+  const allFetched = data.items || [];
+  const placeholders = allFetched.filter(i=>i.description===ROOM_PLACEHOLDER);
+  allItems = allFetched.filter(i=>i.description!==ROOM_PLACEHOLDER);
+  // Restore pendingRooms and placeholderIds from DB placeholders
+  placeholderIds={};
+  pendingRooms=[];
+  for(const ph of placeholders){
+    if(ph.room && !allItems.some(i=>i.room===ph.room)){
+      pendingRooms.push(ph.room);
+      placeholderIds[ph.room]=ph.id;
+    }
+  }
 
   document.getElementById('job-ref').textContent = currentJob.job_ref || currentJob.job_number;
   const addrLink = document.getElementById('job-address');
@@ -961,7 +974,6 @@ async function paperAddItem(room, input){
   const desc=input.value.trim();
   if(!desc) return;
   input.value='';
-  // Use same addItem logic as card view
   const body={job_id:jobId,room,description:desc,picked:false,is_extra:true};
   const res=await fetch(`${SB_URL}/rest/v1/items`,{
     method:'POST',
@@ -970,6 +982,12 @@ async function paperAddItem(room, input){
   });
   const newItems=await res.json();
   if(newItems&&newItems[0]) allItems.push(newItems[0]);
+  // Delete placeholder for this room if it exists
+  if(placeholderIds[room]){
+    await fetch(`/api/items/${placeholderIds[room]}`,{method:'DELETE'}).catch(()=>{});
+    delete placeholderIds[room];
+    pendingRooms=pendingRooms.filter(r=>r!==room);
+  }
   renderPaperGrid();
 }
 
@@ -1336,7 +1354,9 @@ async function deleteGroup(ids, label){
 // Rooms are derived from item.room — there's no separate room entity.
 // "Adding a room" means making its name available in the Add Item dropdown.
 // "Removing a room" means deleting all items in that room.
-let pendingRooms=[]; // room names added via "Add Room" that have no items yet
+let pendingRooms=[]; // room names added client-side not yet having real items
+let placeholderIds={}; // room name → placeholder item id in DB
+const ROOM_PLACEHOLDER='__room_placeholder__';
 
 let addRoomFormOpen=false;
 
@@ -1348,18 +1368,32 @@ function toggleAddRoomForm(){
   if(addRoomFormOpen) setTimeout(()=>document.getElementById('new-room-name')?.focus(),50);
 }
 
-function addRoom(){
+async function addRoom(){
   const input=document.getElementById('new-room-name');
-  const name=(input.value||'').trim();
+  const name=(input.value||'').trim().toUpperCase();
   if(!name){ alert('Please enter a room name.'); return; }
   const existing=[...new Set(allItems.map(i=>i.room).filter(r=>r))];
   if(existing.includes(name)||pendingRooms.includes(name)){
     alert(`"${name}" already exists.`); return;
   }
+  // Immediately persist a placeholder item so the room survives a page refresh
+  try{
+    const res=await fetch(`/api/jobs/${currentJob.id}/items`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({serial:'000',room:name,description:ROOM_PLACEHOLDER,is_extra:true})
+    });
+    const ph=await res.json();
+    if(ph?.id){
+      placeholderIds[name]=ph.id;
+      // Add to allItems so renderItems sees the room (will be filtered from display)
+      allItems.push(ph);
+    }
+  }catch(e){ console.error('Could not persist room placeholder',e); }
   pendingRooms.push(name);
+  input.value='';
   addRoomFormOpen=false;
   renderItems();
-  // Scroll to the new room card after render
+  if(isTablet()) renderPaperGrid();
   setTimeout(()=>{
     const key=name.replace(/[^a-zA-Z0-9]/g,'_');
     const card=document.getElementById(`stylist-room-${key}`);
@@ -1437,7 +1471,12 @@ async function addItemToRoom(room, input){
   const res=await fetch(`/api/jobs/${currentJob.id}/items`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serial:newSerial,room,description:desc,is_extra:false})});
   const newItem=await res.json();
   allItems.push(newItem);
-  input.value='';
+  // Delete placeholder for this room if it exists
+  if(placeholderIds[room]){
+    await fetch(`/api/items/${placeholderIds[room]}`,{method:'DELETE'}).catch(()=>{});
+    delete placeholderIds[room];
+    pendingRooms=pendingRooms.filter(r=>r!==room);
+  }
   // Insert the new item row directly into the room card without a full re-render
   const key=(room||'extra').replace(/[^a-zA-Z0-9]/g,'_');
   const roomItemsDiv=document.querySelector(`#stylist-room-${key} .room-items`);

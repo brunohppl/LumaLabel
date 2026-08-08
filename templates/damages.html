@@ -423,6 +423,13 @@ async function ensureJobsLoaded(){
   return _allJobsCache;
 }
 
+// Matches label logic: strip non-digits, take last 3
+function shortJobNumber(job){
+  const raw=job?.job_number||job?.job_ref||'';
+  const digits=raw.replace(/\D/g,'');
+  return digits ? digits.slice(-3) : (raw||'—');
+}
+
 async function onJobSearchInput(query){
   const resultsEl=document.getElementById('job-search-results');
   const q=query.trim().toLowerCase();
@@ -439,7 +446,7 @@ async function onJobSearchInput(query){
   }
   resultsEl.innerHTML=matches.map(j=>`
     <button onclick='selectJob(${JSON.stringify(j.id)})' style="text-align:left;background:white;border:1px solid var(--border);border-radius:6px;padding:9px 11px;cursor:pointer;font-family:inherit;">
-      <div style="font-weight:600;font-size:0.85rem;color:var(--ink);">${j.job_number||j.job_ref||'—'}</div>
+      <div style="font-weight:600;font-size:0.85rem;color:var(--ink);">#${shortJobNumber(j)}</div>
       <div style="font-size:0.75rem;color:var(--muted);margin-top:1px;">${j.address||''}</div>
     </button>
   `).join('');
@@ -451,7 +458,7 @@ async function selectJob(jobId){
   if(!job) return;
   _selectedJob=job;
   _wizardData.job_id=job.id;
-  _wizardData.job_ref_snapshot=`${job.job_number||job.job_ref||''} — ${job.address||''}`;
+  _wizardData.job_ref_snapshot=`#${shortJobNumber(job)} — ${job.address||''}`;
   document.getElementById('job-search-input').value='';
   document.getElementById('job-search-results').innerHTML='';
   document.getElementById('job-search-selected').style.display='block';

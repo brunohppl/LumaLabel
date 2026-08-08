@@ -207,6 +207,8 @@ create policy "Allow all" on damage_reports for all using (true) with check (tru
 -- Property damage support (run manually if damage_reports already exists)
 alter table damage_reports add column if not exists report_category text default 'furniture';
 alter table damage_reports add column if not exists property_element text;
+alter table damage_reports add column if not exists job_id uuid references jobs(id) on delete set null;
+alter table damage_reports add column if not exists job_ref_snapshot text;
 alter table damage_reports alter column furniture drop not null;
 
 -- Runsheet restructure: category and person fields

@@ -144,6 +144,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       <div class="wizard-dot" id="dot-2"></div>
       <div class="wizard-dot" id="dot-3"></div>
       <div class="wizard-dot" id="dot-4"></div>
+      <div class="wizard-dot" id="dot-5"></div>
     </div>
 
     <!-- Step 0: Category -->
@@ -155,7 +156,24 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       </div>
     </div>
 
-    <!-- Step 1: Where -->
+    <!-- Step (property only): Job search -->
+    <div class="wizard-step" id="step-job-search">
+      <div class="wizard-q">Which job? <span style="font-weight:400;color:var(--muted);font-size:0.75rem;">(optional)</span></div>
+      <input type="text" id="job-search-input" placeholder="Search job number or address…"
+        style="width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;margin-bottom:10px;"
+        oninput="onJobSearchInput(this.value)"/>
+      <div id="job-search-results" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:14px;"></div>
+      <div id="job-search-selected" style="display:none;background:rgba(74,124,89,0.08);border:1px solid var(--green);border-radius:6px;padding:10px 12px;margin-bottom:14px;">
+        <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Selected job</div>
+        <div id="job-search-selected-text" style="font-weight:600;color:var(--ink);margin-top:2px;"></div>
+        <button onclick="clearSelectedJob()" style="background:none;border:none;color:var(--red);font-size:0.75rem;cursor:pointer;padding:4px 0 0;">Remove</button>
+      </div>
+      <button class="btn-submit" onclick="showStep('0')" style="margin-bottom:8px;">Continue</button>
+      <button class="btn-skip" onclick="skipJobSearch()">Skip — no job number</button>
+      <button class="wizard-back" onclick="goBackToCategory()">← Back</button>
+    </div>
+
+    <!-- Step 1: Where (furniture — all 4 options) -->
     <div class="wizard-step" id="step-0">
       <div class="wizard-q">Where did it happen?</div>
       <div class="wizard-options">
@@ -166,6 +184,17 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       </div>
       <button class="wizard-back" onclick="goBackToCategory()">← Back</button>
     </div>
+
+    <!-- Step 1b: Where (property — only pickup/install) -->
+    <div class="wizard-step" id="step-prop-where">
+      <div class="wizard-q">Where did it happen?</div>
+      <div class="wizard-options">
+        <button class="wizard-opt" onclick="choose(0,'location','pickup')"><span class="opt-icon">🚛</span>Pickup</button>
+        <button class="wizard-opt" onclick="choose(0,'location','install')"><span class="opt-icon">🏠</span>Install</button>
+      </div>
+      <button class="wizard-back" onclick="showStep('job-search')">← Back</button>
+    </div>
+
 
     <!-- Step 2: Damage type (furniture) -->
     <div class="wizard-step" id="step-1">
@@ -313,7 +342,9 @@ function renderTable(){
         <td style="white-space:nowrap;color:var(--muted);font-size:0.8rem;">${formatDate(r.created_at)}</td>
         <td><span class="tag tag-location">${LABELS.location[r.location]||r.location}${r.report_category==='property'?' <span style="opacity:0.55;">🏠</span>':''}</span></td>
         <td><span class="tag tag-damage">${LABELS.damage_type[r.damage_type]||r.damage_type}</span></td>
-        <td><span class="tag tag-furniture">${r.report_category==='property' ? (LABELS.property_element[r.property_element]||r.property_element||'—') : (LABELS.furniture[r.furniture]||r.furniture)}</span></td>
+        <td><span class="tag tag-furniture">${r.report_category==='property' ? (LABELS.property_element[r.property_element]||r.property_element||'—') : (LABELS.furniture[r.furniture]||r.furniture)}</span>
+          ${r.report_category==='property' && r.job_ref_snapshot ? `<div style="font-size:0.7rem;color:var(--muted);margin-top:3px;">${r.job_ref_snapshot}</div>` : ''}
+        </td>
         <td>${(() => {
           if(!r.photo_url) return '<span style="color:var(--border);font-size:0.8rem;">—</span>';
           let urls;
@@ -351,10 +382,14 @@ function openLightbox(url){
 
 // ── Wizard ──
 function openWizard(){
-  _wizardData={};_photos=[];_editingId=null;_existingPhotoUrl=null;
+  _wizardData={};_photos=[];_editingId=null;_existingPhotoUrl=null;_selectedJob=null;
   renderPhotoStrip();
   const notesEl=document.getElementById('wizard-notes');
   if(notesEl) notesEl.value='';
+  const jobSearchInput=document.getElementById('job-search-input');
+  if(jobSearchInput) jobSearchInput.value='';
+  document.getElementById('job-search-results').innerHTML='';
+  document.getElementById('job-search-selected').style.display='none';
   showStep('cat');
   document.getElementById('wizard-overlay').classList.add('open');
 }
@@ -362,11 +397,77 @@ function openWizard(){
 function chooseCategory(cat){
   _wizardData.report_category=cat;
   event.currentTarget.classList.add('selected');
-  setTimeout(()=>showStep(cat==='property'?'0':'0'), 220);
+  setTimeout(()=>{
+    if(cat==='property'){
+      showStep('job-search');
+    } else {
+      showStep('0');
+    }
+  }, 220);
 }
 
 function goBackToCategory(){
   showStep('cat');
+}
+
+// ── Job search (property damage only) ──
+let _allJobsCache=null;
+let _selectedJob=null;
+
+async function ensureJobsLoaded(){
+  if(_allJobsCache) return _allJobsCache;
+  try{
+    const res=await fetch('/api/jobs');
+    _allJobsCache=await res.json();
+  }catch(e){ _allJobsCache=[]; }
+  return _allJobsCache;
+}
+
+async function onJobSearchInput(query){
+  const resultsEl=document.getElementById('job-search-results');
+  const q=query.trim().toLowerCase();
+  if(!q){ resultsEl.innerHTML=''; return; }
+  const jobs=await ensureJobsLoaded();
+  const matches=jobs.filter(j=>
+    (j.job_number||'').toLowerCase().includes(q) ||
+    (j.job_ref||'').toLowerCase().includes(q) ||
+    (j.address||'').toLowerCase().includes(q)
+  ).slice(0,8);
+  if(!matches.length){
+    resultsEl.innerHTML='<div style="font-size:0.8rem;color:var(--muted);padding:6px 2px;">No jobs found</div>';
+    return;
+  }
+  resultsEl.innerHTML=matches.map(j=>`
+    <button onclick='selectJob(${JSON.stringify(j.id)})' style="text-align:left;background:white;border:1px solid var(--border);border-radius:6px;padding:9px 11px;cursor:pointer;font-family:inherit;">
+      <div style="font-weight:600;font-size:0.85rem;color:var(--ink);">${j.job_number||j.job_ref||'—'}</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-top:1px;">${j.address||''}</div>
+    </button>
+  `).join('');
+}
+
+async function selectJob(jobId){
+  const jobs=await ensureJobsLoaded();
+  const job=jobs.find(j=>j.id===jobId);
+  if(!job) return;
+  _selectedJob=job;
+  _wizardData.job_id=job.id;
+  _wizardData.job_ref_snapshot=`${job.job_number||job.job_ref||''} — ${job.address||''}`;
+  document.getElementById('job-search-input').value='';
+  document.getElementById('job-search-results').innerHTML='';
+  document.getElementById('job-search-selected').style.display='block';
+  document.getElementById('job-search-selected-text').textContent=_wizardData.job_ref_snapshot;
+}
+
+function clearSelectedJob(){
+  _selectedJob=null;
+  _wizardData.job_id=null;
+  _wizardData.job_ref_snapshot=null;
+  document.getElementById('job-search-selected').style.display='none';
+}
+
+function skipJobSearch(){
+  clearSelectedJob();
+  showStep('0');
 }
 
 function editReport(id){
@@ -376,13 +477,20 @@ function editReport(id){
   _wizardData={
     location:r.location, damage_type:r.damage_type, furniture:r.furniture,
     report_category:r.report_category||'furniture', property_element:r.property_element,
-    notes:r.notes||''
+    notes:r.notes||'', job_id:r.job_id||null, job_ref_snapshot:r.job_ref_snapshot||null
   };
   _photos=[];
   _existingPhotoUrl=r.photo_url||null;
+  if(r.job_id && r.job_ref_snapshot){
+    document.getElementById('job-search-selected').style.display='block';
+    document.getElementById('job-search-selected-text').textContent=r.job_ref_snapshot;
+  } else {
+    document.getElementById('job-search-selected').style.display='none';
+  }
   showStep('0');
   setTimeout(()=>{
-    document.querySelectorAll('#step-0 .wizard-opt').forEach(btn=>{
+    const whereStepId = _wizardData.report_category==='property' ? '#step-prop-where' : '#step-0';
+    document.querySelectorAll(`${whereStepId} .wizard-opt`).forEach(btn=>{
       btn.classList.toggle('selected', btn.getAttribute('onclick')?.includes(`'${r.location}'`));
     });
     const typeStepId = _wizardData.report_category==='property' ? '#step-prop-type' : '#step-1';
@@ -421,12 +529,13 @@ function closeWizard(){
   _editingId=null;_existingPhotoUrl=null;
 }
 
-// Step names: 'cat', '0', '1' (or 'prop-type'), '2' (or 'prop-element'), '3'
+// Step names: 'cat', 'job-search', '0' (where), '1' (type), '2' (sub), '3' (photos)
 function showStep(name){
   const isProperty = _wizardData.report_category==='property';
   const stepIdMap = {
     'cat':'step-cat',
-    '0':'step-0',
+    'job-search':'step-job-search',
+    '0': isProperty ? 'step-prop-where' : 'step-0',
     '1': isProperty ? 'step-prop-type' : 'step-1',
     '2': isProperty ? 'step-prop-element' : 'step-2',
     '3':'step-3',
@@ -435,9 +544,9 @@ function showStep(name){
   document.querySelectorAll('.wizard-step').forEach(s=>s.classList.remove('active'));
   const target=document.getElementById(targetId);
   if(target) target.classList.add('active');
-  // Progress dots: cat=0, where=1, type=2, sub=3, photos=4
-  const order=['cat','0','1','2','3'];
-  const idx=order.indexOf(name);
+  // Progress dots
+  const order=['cat','job-search','0','1','2','3'];
+  const idx=order.indexOf(String(name));
   document.querySelectorAll('.wizard-dot').forEach((d,i)=>d.classList.toggle('done',i<=idx));
 }
 

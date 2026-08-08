@@ -39,7 +39,17 @@ def monday_query(query, variables=None):
     )
     try:
         with urllib.request.urlopen(req, timeout=15) as r:
-            return json.loads(r.read())
+            raw = r.read()
+            try:
+                return json.loads(raw)
+            except Exception:
+                return {'errors': [f'Non-JSON response: {raw[:500].decode("utf-8","replace")}']}
+    except urllib.error.HTTPError as e:
+        raw = e.read()
+        try:
+            return json.loads(raw)
+        except Exception:
+            return {'errors': [f'HTTP {e.code}: {raw[:500].decode("utf-8","replace")}']}
     except Exception as e:
         return {'errors': [str(e)]}
 
@@ -1685,11 +1695,13 @@ def api_damages_list():
 def api_damages_create():
     data = request.get_json()
     result = sb_post('damage_reports', {
-        'location':    data.get('location'),
-        'damage_type': data.get('damage_type'),
-        'furniture':   data.get('furniture'),
-        'photo_url':   data.get('photo_url') or None,
-        'notes':       data.get('notes') or None,
+        'location':         data.get('location'),
+        'damage_type':      data.get('damage_type'),
+        'furniture':        data.get('furniture'),
+        'report_category':  data.get('report_category') or 'furniture',
+        'property_element': data.get('property_element'),
+        'photo_url':        data.get('photo_url') or None,
+        'notes':            data.get('notes') or None,
     })
     return jsonify({'success': bool(result), 'report': result[0] if result else None})
 
@@ -1697,11 +1709,13 @@ def api_damages_create():
 def api_damages_update(report_id):
     data = request.get_json()
     payload = {}
-    if 'location'    in data: payload['location']    = data['location']
-    if 'damage_type' in data: payload['damage_type'] = data['damage_type']
-    if 'furniture'   in data: payload['furniture']   = data['furniture']
-    if 'photo_url'   in data: payload['photo_url']   = data['photo_url'] or None
-    if 'notes'       in data: payload['notes']       = data['notes'] or None
+    if 'location'         in data: payload['location']         = data['location']
+    if 'damage_type'      in data: payload['damage_type']      = data['damage_type']
+    if 'furniture'        in data: payload['furniture']        = data['furniture'] or None
+    if 'report_category'  in data: payload['report_category']  = data['report_category']
+    if 'property_element' in data: payload['property_element'] = data['property_element'] or None
+    if 'photo_url'        in data: payload['photo_url']        = data['photo_url'] or None
+    if 'notes'            in data: payload['notes']            = data['notes'] or None
     result = sb_patch('damage_reports', f'id=eq.{report_id}', payload)
     return jsonify({'success': bool(result)})
 
@@ -2703,7 +2717,44 @@ def api_delete_job(job_id):
 def monday_page():
     return open(os.path.join(app.template_folder, 'monday.html')).read()
 
-@app.route('/api/monday/board')
+@app.route('/api/monday/debug')
+def api_monday_debug():
+    """Show raw Monday property values vs Luma addresses for matching diagnosis."""
+    items_q = '''
+    query($bid: ID!) {
+      boards(ids: [$bid]) {
+        columns { id title type }
+        items_page(limit: 50) {
+          items {
+            id
+            name
+            column_values { id text value }
+          }
+        }
+      }
+    }'''
+    result = monday_query(items_q, {'bid': MONDAY_BOARD_ID})
+    if 'errors' in result:
+        return jsonify({'error': result['errors']}), 500
+
+    board   = result['data']['boards'][0]
+    columns = {c['id']: c['title'] for c in board['columns']}
+    items   = board['items_page']['items']
+
+    monday_props = []
+    for item in items:
+        row = {'name': item['name'], 'columns': {}}
+        for cv in item['column_values']:
+            if cv.get('text'):
+                row['columns'][columns.get(cv['id'], cv['id'])] = cv['text']
+        monday_props.append(row)
+
+    luma_jobs = sb_get('jobs', 'select=id,job_ref,job_number,address&order=created_at.desc') or []
+    luma_addrs = [{'job_ref': j.get('job_ref',''), 'address': j.get('address','')} for j in luma_jobs if j.get('address')]
+
+    return jsonify({'monday_items': monday_props, 'luma_addresses': luma_addrs})
+
+
 def api_monday_board():
     """Fetch board groups + items from Monday, match jobs by address (property column)."""
     # Step 1: get board structure — groups and column IDs
@@ -2732,14 +2783,13 @@ def api_monday_board():
     )
 
     # Step 2: fetch all items with column values
+    # Use a single query without cursor for simplicity — handles up to 100 items
     items_q = '''
-    query($bid: ID!, $cursor: String) {
+    query($bid: ID!) {
       boards(ids: [$bid]) {
-        items_page(limit: 100, cursor: $cursor) {
-          cursor
+        items_page(limit: 100) {
           items {
-            id
-            name
+            id name
             group { id }
             column_values { id text value }
           }
@@ -2747,26 +2797,49 @@ def api_monday_board():
       }
     }'''
     all_items = []
-    cursor = None
-    for _ in range(10):  # max 1000 items
-        vars_ = {'bid': MONDAY_BOARD_ID}
-        if cursor:
-            vars_['cursor'] = cursor
-        result = monday_query(items_q, vars_)
+    try:
+        result = monday_query(items_q, {'bid': MONDAY_BOARD_ID})
         if 'errors' in result:
             return jsonify({'error': result['errors']}), 500
-        page    = result['data']['boards'][0]['items_page']
-        all_items += page['items']
-        cursor   = page.get('cursor')
-        if not cursor:
-            break
+        all_items = result['data']['boards'][0]['items_page']['items']
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
     # Step 3: load all Luma jobs for address matching
     luma_jobs = sb_get('jobs', 'order=created_at.desc') or []
     # Build address index — normalise to lowercase stripped
     def norm(s):
-        return (s or '').lower().strip()
-    luma_by_addr = {norm(j.get('address','')): j for j in luma_jobs if j.get('address')}
+        if not s: return ''
+        s = s.lower().strip()
+        # Expand common street abbreviations
+        abbrevs = [
+            (r'\bst\b', 'street'), (r'\brd\b', 'road'), (r'\bave?\b', 'avenue'),
+            (r'\bdr\b', 'drive'), (r'\bcr?\b', 'crescent'), (r'\bct\b', 'court'),
+            (r'\bpl\b', 'place'), (r'\bblvd\b', 'boulevard'), (r'\bln\b', 'lane'),
+            (r'\bpde\b', 'parade'), (r'\bhwy\b', 'highway'), (r'\bmt\b', 'mount'),
+        ]
+        for pattern, replacement in abbrevs:
+            s = re.sub(pattern, replacement, s)
+        # Remove punctuation and extra whitespace
+        s = re.sub(r'[,\.\-/#]', ' ', s)
+        s = re.sub(r'\s+', ' ', s).strip()
+        return s
+
+    def street_key(s):
+        # Extract just the street number + first word of street name
+        # e.g. "32 oak street paddington qld 4064" → "32 oak"
+        # This lets us match even when suburb/state/postcode differ
+        parts = norm(s).split()
+        if len(parts) >= 2:
+            return ' '.join(parts[:2])
+        return norm(s)
+    luma_by_addr = {}
+    luma_by_key  = {}
+    for j in luma_jobs:
+        addr = j.get('address','')
+        if addr:
+            luma_by_addr[norm(addr)] = j
+            luma_by_key[street_key(addr)] = j
 
     # Step 4: build response — group items, attach luma job if matched
     groups_out = {}
@@ -2776,15 +2849,19 @@ def api_monday_board():
         col_map = {cv['id']: cv for cv in item['column_values']}
 
         property_val = col_map.get(property_col_id, {}).get('text', '') if property_col_id else ''
+        # Fall back to item name if property column is empty
+        address_to_match = property_val or item['name']
         status_val   = col_map.get(status_col_id,   {}).get('text', '') if status_col_id   else ''
 
-        # Try to match Luma job by address
-        luma_job = luma_by_addr.get(norm(property_val))
+        # Try to match Luma job by address (property col or item name)
+        # Try full normalised match first, then street-number+name fallback
+        luma_job = (luma_by_addr.get(norm(address_to_match)) or
+                    luma_by_key.get(street_key(address_to_match)))
 
         row = {
             'monday_id':   item['id'],
             'name':        item['name'],
-            'property':    property_val,
+            'property':    address_to_match,
             'status':      status_val,
             'group_id':    gid,
             'group_title': gtitle,

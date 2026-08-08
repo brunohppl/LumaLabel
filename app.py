@@ -1695,13 +1695,15 @@ def api_damages_list():
 def api_damages_create():
     data = request.get_json()
     result = sb_post('damage_reports', {
-        'location':         data.get('location'),
-        'damage_type':      data.get('damage_type'),
-        'furniture':        data.get('furniture'),
-        'report_category':  data.get('report_category') or 'furniture',
-        'property_element': data.get('property_element'),
-        'photo_url':        data.get('photo_url') or None,
-        'notes':            data.get('notes') or None,
+        'location':          data.get('location'),
+        'damage_type':       data.get('damage_type'),
+        'furniture':         data.get('furniture'),
+        'report_category':   data.get('report_category') or 'furniture',
+        'property_element':  data.get('property_element'),
+        'job_id':            data.get('job_id') or None,
+        'job_ref_snapshot':  data.get('job_ref_snapshot') or None,
+        'photo_url':         data.get('photo_url') or None,
+        'notes':             data.get('notes') or None,
     })
     return jsonify({'success': bool(result), 'report': result[0] if result else None})
 
@@ -1714,6 +1716,8 @@ def api_damages_update(report_id):
     if 'furniture'        in data: payload['furniture']        = data['furniture'] or None
     if 'report_category'  in data: payload['report_category']  = data['report_category']
     if 'property_element' in data: payload['property_element'] = data['property_element'] or None
+    if 'job_id'           in data: payload['job_id']           = data['job_id'] or None
+    if 'job_ref_snapshot' in data: payload['job_ref_snapshot'] = data['job_ref_snapshot'] or None
     if 'photo_url'        in data: payload['photo_url']        = data['photo_url'] or None
     if 'notes'            in data: payload['notes']            = data['notes'] or None
     result = sb_patch('damage_reports', f'id=eq.{report_id}', payload)

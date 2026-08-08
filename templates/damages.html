@@ -143,10 +143,20 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       <div class="wizard-dot" id="dot-1"></div>
       <div class="wizard-dot" id="dot-2"></div>
       <div class="wizard-dot" id="dot-3"></div>
+      <div class="wizard-dot" id="dot-4"></div>
+    </div>
+
+    <!-- Step 0: Category -->
+    <div class="wizard-step active" id="step-cat">
+      <div class="wizard-q">What are you reporting?</div>
+      <div class="wizard-options">
+        <button class="wizard-opt" onclick="chooseCategory('furniture')"><span class="opt-icon">🛋️</span>Furniture Damage</button>
+        <button class="wizard-opt" onclick="chooseCategory('property')"><span class="opt-icon">🏠</span>Property Damage</button>
+      </div>
     </div>
 
     <!-- Step 1: Where -->
-    <div class="wizard-step active" id="step-0">
+    <div class="wizard-step" id="step-0">
       <div class="wizard-q">Where did it happen?</div>
       <div class="wizard-options">
         <button class="wizard-opt" onclick="choose(0,'location','pickup')"><span class="opt-icon">🚛</span>Pickup</button>
@@ -154,9 +164,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
         <button class="wizard-opt" onclick="choose(0,'location','transport')"><span class="opt-icon">🛣️</span>Transport</button>
         <button class="wizard-opt" onclick="choose(0,'location','warehouse')"><span class="opt-icon">🏭</span>Warehouse</button>
       </div>
+      <button class="wizard-back" onclick="goBackToCategory()">← Back</button>
     </div>
 
-    <!-- Step 2: Damage type -->
+    <!-- Step 2: Damage type (furniture) -->
     <div class="wizard-step" id="step-1">
       <div class="wizard-q">What type of damage?</div>
       <div class="wizard-options">
@@ -185,7 +196,38 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       <button class="wizard-back" onclick="goBack(2)">← Back</button>
     </div>
 
-    <!-- Step 4: Photos -->
+    <!-- Step 1b: Property damage type -->
+    <div class="wizard-step" id="step-prop-type">
+      <div class="wizard-q">What type of damage?</div>
+      <div class="wizard-options">
+        <button class="wizard-opt" onclick="choose(1,'damage_type','scratch')"><span class="opt-icon">〰️</span>Scratch</button>
+        <button class="wizard-opt" onclick="choose(1,'damage_type','dent')"><span class="opt-icon">💢</span>Dent</button>
+        <button class="wizard-opt" onclick="choose(1,'damage_type','hole')"><span class="opt-icon">⚫</span>Hole</button>
+        <button class="wizard-opt" onclick="choose(1,'damage_type','crack')"><span class="opt-icon">💥</span>Crack</button>
+        <button class="wizard-opt" onclick="choose(1,'damage_type','paint_chip')"><span class="opt-icon">🎨</span>Paint chip</button>
+        <button class="wizard-opt" onclick="choose(1,'damage_type','stain')"><span class="opt-icon">🟤</span>Stain</button>
+        <button class="wizard-opt" onclick="choose(1,'damage_type','broken')"><span class="opt-icon">💔</span>Broken</button>
+      </div>
+      <button class="wizard-back" onclick="goBack(1)">← Back</button>
+    </div>
+
+    <!-- Step 2b: Property element -->
+    <div class="wizard-step" id="step-prop-element">
+      <div class="wizard-q">Where on the property?</div>
+      <div class="wizard-options">
+        <button class="wizard-opt" onclick="choose(2,'property_element','wall')"><span class="opt-icon">🧱</span>Wall</button>
+        <button class="wizard-opt" onclick="choose(2,'property_element','floor')"><span class="opt-icon">◻️</span>Floor</button>
+        <button class="wizard-opt" onclick="choose(2,'property_element','stairway')"><span class="opt-icon">🪜</span>Stairway</button>
+        <button class="wizard-opt" onclick="choose(2,'property_element','door')"><span class="opt-icon">🚪</span>Door</button>
+        <button class="wizard-opt" onclick="choose(2,'property_element','doorframe')"><span class="opt-icon">🖼️</span>Door frame</button>
+        <button class="wizard-opt" onclick="choose(2,'property_element','ceiling')"><span class="opt-icon">⬜</span>Ceiling</button>
+        <button class="wizard-opt" onclick="choose(2,'property_element','skirting')"><span class="opt-icon">📏</span>Skirting board</button>
+        <button class="wizard-opt" onclick="choose(2,'property_element','other')"><span class="opt-icon">❓</span>Other</button>
+      </div>
+      <button class="wizard-back" onclick="goBack(2)">← Back</button>
+    </div>
+
+    <!-- Step 4: Photos + notes -->
     <div class="wizard-step" id="step-3">
       <div class="wizard-q">Add photos</div>
       <input type="file" accept="image/*" capture="environment" id="photo-cam" style="display:none;" onchange="handlePhoto(this)"/>
@@ -198,6 +240,11 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
         <button class="btn-photo" onclick="document.getElementById('photo-cam').click()">📷 Camera</button>
         <button class="btn-photo" onclick="document.getElementById('photo-lib').click()">🖼️ Library</button>
       </div>
+
+      <textarea id="wizard-notes" placeholder="Add notes (optional)…"
+        style="width:100%;min-height:64px;margin-top:12px;padding:10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.85rem;resize:vertical;"
+        oninput="_wizardData.notes=this.value"></textarea>
+
       <button class="btn-submit" onclick="submitReport()">Submit Report</button>
       <button class="btn-skip" onclick="submitReport(true)">Skip photos & submit</button>
       <button class="wizard-back" onclick="goBack(3)">← Back</button>
@@ -221,8 +268,9 @@ const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 
 const LABELS = {
   location:   {pickup:'Pickup',install:'Install',transport:'Transport',warehouse:'Warehouse'},
-  damage_type:{scratch:'Scratch',dent:'Dent',broken_leg:'Broken leg',broken_top:'Broken top',tear:'Tear',crack:'Crack'},
+  damage_type:{scratch:'Scratch',dent:'Dent',broken_leg:'Broken leg',broken_top:'Broken top',tear:'Tear',crack:'Crack',hole:'Hole',paint_chip:'Paint chip',stain:'Stain',broken:'Broken'},
   furniture:  {sofa:'Sofa',table:'Table',chair:'Chair',rug:'Rug',storage_unit:'Storage unit',bedhead:'Bedhead',accessories:'Accessories'},
+  property_element: {wall:'Wall',floor:'Floor',stairway:'Stairway',door:'Door',doorframe:'Door frame',ceiling:'Ceiling',skirting:'Skirting board',other:'Other'},
 };
 
 let reports = [];
@@ -256,16 +304,16 @@ function renderTable(){
       <th>Date</th>
       <th>Where</th>
       <th>Damage</th>
-      <th>Furniture</th>
+      <th>Item / Element</th>
       <th>Photo</th>
       <th></th>
     </tr></thead>
     <tbody>
       ${reports.map(r=>`<tr>
         <td style="white-space:nowrap;color:var(--muted);font-size:0.8rem;">${formatDate(r.created_at)}</td>
-        <td><span class="tag tag-location">${LABELS.location[r.location]||r.location}</span></td>
+        <td><span class="tag tag-location">${LABELS.location[r.location]||r.location}${r.report_category==='property'?' <span style="opacity:0.55;">🏠</span>':''}</span></td>
         <td><span class="tag tag-damage">${LABELS.damage_type[r.damage_type]||r.damage_type}</span></td>
-        <td><span class="tag tag-furniture">${LABELS.furniture[r.furniture]||r.furniture}</span></td>
+        <td><span class="tag tag-furniture">${r.report_category==='property' ? (LABELS.property_element[r.property_element]||r.property_element||'—') : (LABELS.furniture[r.furniture]||r.furniture)}</span></td>
         <td>${(() => {
           if(!r.photo_url) return '<span style="color:var(--border);font-size:0.8rem;">—</span>';
           let urls;
@@ -305,33 +353,55 @@ function openLightbox(url){
 function openWizard(){
   _wizardData={};_photos=[];_editingId=null;_existingPhotoUrl=null;
   renderPhotoStrip();
-  showStep(0);
+  const notesEl=document.getElementById('wizard-notes');
+  if(notesEl) notesEl.value='';
+  showStep('cat');
   document.getElementById('wizard-overlay').classList.add('open');
+}
+
+function chooseCategory(cat){
+  _wizardData.report_category=cat;
+  event.currentTarget.classList.add('selected');
+  setTimeout(()=>showStep(cat==='property'?'0':'0'), 220);
+}
+
+function goBackToCategory(){
+  showStep('cat');
 }
 
 function editReport(id){
   const r=reports.find(x=>x.id===id);
   if(!r) return;
   _editingId=id;
-  _wizardData={location:r.location, damage_type:r.damage_type, furniture:r.furniture};
+  _wizardData={
+    location:r.location, damage_type:r.damage_type, furniture:r.furniture,
+    report_category:r.report_category||'furniture', property_element:r.property_element,
+    notes:r.notes||''
+  };
   _photos=[];
   _existingPhotoUrl=r.photo_url||null;
-  // Highlight pre-selected options
-  showStep(0);
-  // Highlight the correct option buttons after a tick
+  showStep('0');
   setTimeout(()=>{
     document.querySelectorAll('#step-0 .wizard-opt').forEach(btn=>{
       btn.classList.toggle('selected', btn.getAttribute('onclick')?.includes(`'${r.location}'`));
     });
-    document.querySelectorAll('#step-1 .wizard-opt').forEach(btn=>{
+    const typeStepId = _wizardData.report_category==='property' ? '#step-prop-type' : '#step-1';
+    document.querySelectorAll(`${typeStepId} .wizard-opt`).forEach(btn=>{
       btn.classList.toggle('selected', btn.getAttribute('onclick')?.includes(`'${r.damage_type}'`));
     });
-    document.querySelectorAll('#step-2 .wizard-opt').forEach(btn=>{
-      btn.classList.toggle('selected', btn.getAttribute('onclick')?.includes(`'${r.furniture}'`));
-    });
+    if(_wizardData.report_category==='property'){
+      document.querySelectorAll('#step-prop-element .wizard-opt').forEach(btn=>{
+        btn.classList.toggle('selected', btn.getAttribute('onclick')?.includes(`'${r.property_element}'`));
+      });
+    } else {
+      document.querySelectorAll('#step-2 .wizard-opt').forEach(btn=>{
+        btn.classList.toggle('selected', btn.getAttribute('onclick')?.includes(`'${r.furniture}'`));
+      });
+    }
   },50);
-  // Show photo step directly
-  showStep(3);
+  showStep('3');
+  const notesEl=document.getElementById('wizard-notes');
+  if(notesEl) notesEl.value=r.notes||'';
   // Show existing photos as a note
   const strip=document.getElementById('photo-strip');
   if(strip && _existingPhotoUrl){
@@ -351,16 +421,31 @@ function closeWizard(){
   _editingId=null;_existingPhotoUrl=null;
 }
 
-function showStep(n){
-  document.querySelectorAll('.wizard-step').forEach((s,i)=>s.classList.toggle('active',i===n));
-  document.querySelectorAll('.wizard-dot').forEach((d,i)=>d.classList.toggle('done',i<=n));
+// Step names: 'cat', '0', '1' (or 'prop-type'), '2' (or 'prop-element'), '3'
+function showStep(name){
+  const isProperty = _wizardData.report_category==='property';
+  const stepIdMap = {
+    'cat':'step-cat',
+    '0':'step-0',
+    '1': isProperty ? 'step-prop-type' : 'step-1',
+    '2': isProperty ? 'step-prop-element' : 'step-2',
+    '3':'step-3',
+  };
+  const targetId = stepIdMap[name] || name;
+  document.querySelectorAll('.wizard-step').forEach(s=>s.classList.remove('active'));
+  const target=document.getElementById(targetId);
+  if(target) target.classList.add('active');
+  // Progress dots: cat=0, where=1, type=2, sub=3, photos=4
+  const order=['cat','0','1','2','3'];
+  const idx=order.indexOf(name);
+  document.querySelectorAll('.wizard-dot').forEach((d,i)=>d.classList.toggle('done',i<=idx));
 }
 
 function choose(step, key, value){
   _wizardData[key]=value;
-  // Highlight selection briefly then advance
   event.currentTarget.classList.add('selected');
-  setTimeout(()=>showStep(step+1), 220);
+  const nextStep = String(step+1);
+  setTimeout(()=>showStep(nextStep), 220);
 }
 
 function goBack(step){

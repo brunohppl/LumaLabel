@@ -384,7 +384,7 @@ function render(){
       tile.className=`rs-tile ${typeKey}`;
       tile.style.cssText=`top:0;left:calc(${left}% + 2px);width:calc(${width}% - 4px);height:${span*SLOT_H-4}px;cursor:pointer;position:absolute;`;
       tile.innerHTML=`<div class="rs-tile-label">${lbl}</div><div class="rs-tile-ref">${ref}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
-      tile.onclick=()=>openEntryPop(e.id,team.id,null);
+      tile.onclick=(ev)=>{ev.stopPropagation();openEntryPop(e.id,team.id,null);};
       cell.style.position='relative';
       cell.appendChild(tile);
     });

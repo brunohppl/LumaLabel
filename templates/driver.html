@@ -827,6 +827,10 @@ setInterval(async ()=>{
   try{
     const res=await fetch(`/api/jobs/${jobId}`);
     const data=await res.json();
+    const oldItemCount=items.length; // captured BEFORE reassigning below — the
+                                      // previous version compared this against
+                                      // itself after reassignment, so it could
+                                      // never detect an item being removed
     // Merge new items with existing checked state
     const checkedMap=new Map(items.map(i=>[i.id,{checked:i.checked,on_truck:i.on_truck}]));
     items=data.items.map(i=>({
@@ -834,13 +838,16 @@ setInterval(async ()=>{
       checked: checkedMap.has(i.id) ? checkedMap.get(i.id).checked : i.checked,
       on_truck: checkedMap.has(i.id) ? checkedMap.get(i.id).on_truck : i.on_truck,
     }));
-    // Only re-render if the item list changed (new items, bay locations, notes)
+    // Only re-render the room cards if something meaningful changed (new
+    // items, bay locations, notes) — but the progress bar total needs to
+    // reflect the live item count on every cycle regardless, since it's
+    // cheap to update and must never lag behind what the stylist has done.
     const newJob=data.job;
     const jobChanged=
       newJob.driver_notes!==job.driver_notes ||
       newJob.accessory_tubs!==job.accessory_tubs ||
       newJob.cushion_bags!==job.cushion_bags ||
-      data.items.length!==items.length ||
+      data.items.length!==oldItemCount ||
       data.items.some(ni=>{
         const oi=checkedMap.get(ni.id);
         return !oi || ni.bay_location!==(items.find(i=>i.id===ni.id)?.bay_location);
@@ -848,8 +855,10 @@ setInterval(async ()=>{
     if(jobChanged){
       job=newJob;
       renderRooms();
-      updateProgress();
     }
+    // Always refresh — guarantees the count shown never goes stale, even in
+    // edge cases the jobChanged heuristic above might still miss.
+    updateProgress();
   }catch(e){
     // Silently ignore refresh errors — driver keeps working
   }

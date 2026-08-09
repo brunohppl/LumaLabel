@@ -168,12 +168,23 @@ async function pullIntoLuma(){
 
   try{
     const res=await fetch('/api/monday/pull',{method:'POST'});
-    const data=await res.json();
-
-    if(!res.ok || !data.success){
+    let data;
+    try{
+      data=await res.json();
+    }catch(parseErr){
+      const raw=await res.text().catch(()=>'');
       resultBox.style.background='rgba(166,61,47,0.08)';
       resultBox.style.borderColor='var(--red)';
-      resultBox.innerHTML=`<strong>Pull failed</strong> — ${JSON.stringify(data.error||'Unknown error')}`;
+      resultBox.innerHTML=`<strong>Server error (HTTP ${res.status})</strong><pre style="font-size:0.75rem;text-align:left;overflow:auto;margin-top:8px;white-space:pre-wrap;">${(raw||'No details returned').slice(0,800)}</pre>`;
+      resultBox.style.display='block';
+      return;
+    }
+
+    if(!res.ok || !data.success){
+      const errText = typeof data.error==='string' ? data.error : JSON.stringify(data.error||'Unknown error');
+      resultBox.style.background='rgba(166,61,47,0.08)';
+      resultBox.style.borderColor='var(--red)';
+      resultBox.innerHTML=`<strong>Pull failed</strong> — ${errText}`;
       resultBox.style.display='block';
       return;
     }
@@ -183,7 +194,8 @@ async function pullIntoLuma(){
     resultBox.innerHTML=`<strong>Pull complete</strong> — ${data.jobs_updated} job date${data.jobs_updated!==1?'s':''} updated, `+
       `${data.scheduled_matched} matched item${data.scheduled_matched!==1?'s':''} added to the runsheet, `+
       `${data.scheduled_unmatched} unmatched address${data.scheduled_unmatched!==1?'es':''} placed as tray placeholders`+
-      (data.skipped_no_date?`, ${data.skipped_no_date} item${data.skipped_no_date!==1?'s':''} skipped (no install date set)`:'')+'.';
+      (data.skipped_no_date?`, ${data.skipped_no_date} item${data.skipped_no_date!==1?'s':''} skipped (no install date set)`:'')+
+      (data.skipped_errors?`, ${data.skipped_errors} item${data.skipped_errors!==1?'s':''} skipped due to an error`:'')+'.';
     resultBox.style.display='block';
 
     // Re-sync the display so the table reflects any newly-matched dates

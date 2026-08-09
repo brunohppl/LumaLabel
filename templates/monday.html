@@ -91,6 +91,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     </div>
     <div class="sync-bar">
       <span class="sync-status" id="sync-status"></span>
+      <button class="btn-sync" id="btn-pull" onclick="pullIntoLuma()" style="background:var(--accent);" title="Update install dates for matched jobs and add Quote Accepted / Ready to Pick items to the runsheet">
+        <div class="sync-spinner" id="pull-spinner"></div>
+        📥 Pull into Luma
+      </button>
       <button class="btn-sync" id="btn-sync" onclick="syncBoard()">
         <div class="sync-spinner" id="spinner"></div>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -99,7 +103,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     </div>
   </div>
 
+  <div id="pull-result" style="display:none;background:rgba(74,124,89,0.08);border:1px solid var(--green);border-radius:6px;padding:12px 16px;margin-bottom:20px;font-size:0.85rem;"></div>
+
   <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent);"></div> Quote Accepted / Ready to Pick — included in Pull into Luma</div>
     <div class="legend-item"><div class="legend-dot" style="background:var(--green);"></div> Matched to a Luma job</div>
     <div class="legend-item"><div class="legend-dot" style="background:var(--border);"></div> No matching Luma job found</div>
   </div>
@@ -146,6 +153,50 @@ function toggleGroup(groupId){
   const collapsed = body.style.display === 'none';
   body.style.display = collapsed ? '' : 'none';
   if(chev) chev.textContent = collapsed ? '▾' : '▸';
+}
+
+async function pullIntoLuma(){
+  const btn=document.getElementById('btn-pull');
+  const spinner=document.getElementById('pull-spinner');
+  const resultBox=document.getElementById('pull-result');
+
+  if(!confirm('This will:\n\n• Update install dates on matched Luma jobs\n• Add every item in "Quote Accepted" and "Ready to Pick" to the runsheet\'s unscheduled tray\n\nContinue?')) return;
+
+  btn.disabled=true;
+  spinner.style.display='block';
+  resultBox.style.display='none';
+
+  try{
+    const res=await fetch('/api/monday/pull',{method:'POST'});
+    const data=await res.json();
+
+    if(!res.ok || !data.success){
+      resultBox.style.background='rgba(166,61,47,0.08)';
+      resultBox.style.borderColor='var(--red)';
+      resultBox.innerHTML=`<strong>Pull failed</strong> — ${JSON.stringify(data.error||'Unknown error')}`;
+      resultBox.style.display='block';
+      return;
+    }
+
+    resultBox.style.background='rgba(74,124,89,0.08)';
+    resultBox.style.borderColor='var(--green)';
+    resultBox.innerHTML=`<strong>Pull complete</strong> — ${data.jobs_updated} job date${data.jobs_updated!==1?'s':''} updated, `+
+      `${data.scheduled_matched} matched item${data.scheduled_matched!==1?'s':''} added to the runsheet, `+
+      `${data.scheduled_unmatched} unmatched address${data.scheduled_unmatched!==1?'es':''} placed as tray placeholders`+
+      (data.skipped_no_date?`, ${data.skipped_no_date} item${data.skipped_no_date!==1?'s':''} skipped (no install date set)`:'')+'.';
+    resultBox.style.display='block';
+
+    // Re-sync the display so the table reflects any newly-matched dates
+    syncBoard();
+  }catch(e){
+    resultBox.style.background='rgba(166,61,47,0.08)';
+    resultBox.style.borderColor='var(--red)';
+    resultBox.innerHTML=`<strong>Network error</strong> — ${e.message}`;
+    resultBox.style.display='block';
+  }finally{
+    btn.disabled=false;
+    spinner.style.display='none';
+  }
 }
 
 async function syncBoard(){

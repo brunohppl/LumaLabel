@@ -258,6 +258,10 @@ alter table job_schedule add column if not exists monday_item_id text;
 alter table job_schedule add column if not exists monday_address text;
 create index if not exists job_schedule_monday_item_idx on job_schedule(monday_item_id);
 
+-- Property type & size, pulled from Monday's Install Type / Size columns
+alter table jobs add column if not exists property_type text;
+alter table jobs add column if not exists property_size text;
+
 -- Team templates
 create table if not exists team_templates (
   id       uuid primary key default gen_random_uuid(),

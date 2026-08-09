@@ -21,7 +21,7 @@ app = Flask(__name__)
 
 # ── Monday.com config ──
 MONDAY_TOKEN = os.environ.get('MONDAY_API_TOKEN', 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY5MDQ1MDg0OCwiYWFpIjoxMSwidWlkIjoxMDYyNjU1MjksImlhZCI6IjIwMjYtMDgtMDZUMTE6MjI6MTYuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjIxMjU3NDI4LCJyZ24iOiJhcHNlMiJ9.mAS-Mwi35B0avY5TcDMwzoXkN5NrSRlXfDaZcx8nOM8')
-MONDAY_BOARD_ID = '5030462035'
+MONDAY_BOARD_ID = '1853777501'
 MONDAY_API_URL  = 'https://api.monday.com/v2'
 
 def monday_query(query, variables=None):
@@ -2694,8 +2694,10 @@ def api_monday_debug():
 
 @app.route('/api/monday/board')
 def api_monday_board():
-    """Fetch board groups + items from Monday, match jobs by address (property column)."""
-    # Step 1: get board structure — groups and column IDs
+    """Fetch board groups + items from Monday, match jobs by address.
+    READ-ONLY — every call here is a GraphQL `query`, never a `mutation`.
+    Nothing in this route can write back to Monday under any circumstance."""
+    # Step 1: get board structure — groups and ALL column definitions
     structure_q = '''
     query($bid: ID!) {
       boards(ids: [$bid]) {
@@ -2711,17 +2713,39 @@ def api_monday_board():
     board      = structure['data']['boards'][0]
     groups_map = {g['id']: g['title'] for g in board['groups']}
     columns    = board['columns']
+    col_title_by_id = {c['id']: c['title'] for c in columns}
 
-    # Find the 'property' column id (case-insensitive)
-    property_col_id = next(
-        (c['id'] for c in columns if 'property' in c['title'].lower()), None
-    )
+    # Identify relevant columns by keyword in their title (case-insensitive).
+    # This board's exact column names weren't available to inspect directly,
+    # so we search rather than hardcode IDs — /api/monday/debug can be used
+    # to confirm the right columns are being picked up.
+    def find_col(*keywords, exclude=None):
+        exclude = exclude or []
+        for c in columns:
+            t = c['title'].lower()
+            if any(k in t for k in keywords) and not any(x in t for x in exclude):
+                return c['id']
+        return None
+
+    address_col_id  = find_col('property', 'address', 'project')
+    type_col_id     = find_col('type')
+    size_col_id     = find_col('size', 'sqm', 'sq m', 'm2')
+    install_date_id = find_col('install date', 'install')
+    end_date_id     = find_col('end date', 'de-install', 'deinstall', 'pickup date', 'finish')
+    # If "install" search grabbed a non-date column, fall back to any date column not already used
+    date_cols = [c['id'] for c in columns if c['type'] == 'date']
+    if install_date_id and col_title_by_id.get(install_date_id) and \
+       next((c for c in columns if c['id']==install_date_id), {}).get('type') != 'date':
+        install_date_id = None
+    if not install_date_id and date_cols:
+        install_date_id = date_cols[0]
+    if not end_date_id and len(date_cols) > 1:
+        end_date_id = next((d for d in date_cols if d != install_date_id), None)
     status_col_id = next(
         (c['id'] for c in columns if c['type'] == 'color' or 'status' in c['title'].lower()), None
     )
 
-    # Step 2: fetch all items with column values
-    # Use a single query without cursor for simplicity — handles up to 100 items
+    # Step 2: fetch all items with column values (single page, up to 100 items)
     items_q = '''
     query($bid: ID!) {
       boards(ids: [$bid]) {
@@ -2745,11 +2769,10 @@ def api_monday_board():
 
     # Step 3: load all Luma jobs for address matching
     luma_jobs = sb_get('jobs', 'order=created_at.desc') or []
-    # Build address index — normalise to lowercase stripped
+
     def norm(s):
         if not s: return ''
         s = s.lower().strip()
-        # Expand common street abbreviations
         abbrevs = [
             (r'\bst\b', 'street'), (r'\brd\b', 'road'), (r'\bave?\b', 'avenue'),
             (r'\bdr\b', 'drive'), (r'\bcr?\b', 'crescent'), (r'\bct\b', 'court'),
@@ -2758,19 +2781,16 @@ def api_monday_board():
         ]
         for pattern, replacement in abbrevs:
             s = re.sub(pattern, replacement, s)
-        # Remove punctuation and extra whitespace
         s = re.sub(r'[,\.\-/#]', ' ', s)
         s = re.sub(r'\s+', ' ', s).strip()
         return s
 
     def street_key(s):
-        # Extract just the street number + first word of street name
-        # e.g. "32 oak street paddington qld 4064" → "32 oak"
-        # This lets us match even when suburb/state/postcode differ
         parts = norm(s).split()
         if len(parts) >= 2:
             return ' '.join(parts[:2])
         return norm(s)
+
     luma_by_addr = {}
     luma_by_key  = {}
     for j in luma_jobs:
@@ -2786,23 +2806,37 @@ def api_monday_board():
         gtitle  = groups_map.get(gid, gid)
         col_map = {cv['id']: cv for cv in item['column_values']}
 
-        property_val = col_map.get(property_col_id, {}).get('text', '') if property_col_id else ''
-        # Fall back to item name if property column is empty
-        address_to_match = property_val or item['name']
-        status_val   = col_map.get(status_col_id,   {}).get('text', '') if status_col_id   else ''
+        def col_text(col_id):
+            return col_map.get(col_id, {}).get('text', '') if col_id else ''
 
-        # Try to match Luma job by address (property col or item name)
-        # Try full normalised match first, then street-number+name fallback
-        luma_job = (luma_by_addr.get(norm(address_to_match)) or
-                    luma_by_key.get(street_key(address_to_match)))
+        address_val = col_text(address_col_id) or item['name']
+        type_val    = col_text(type_col_id)
+        size_val    = col_text(size_col_id)
+        install_dt  = col_text(install_date_id)
+        end_dt      = col_text(end_date_id)
+        status_val  = col_text(status_col_id)
+
+        install_type_size = ' — '.join(v for v in [type_val, size_val] if v)
+
+        luma_job = (luma_by_addr.get(norm(address_val)) or
+                    luma_by_key.get(street_key(address_val)))
+
+        # All raw columns too, for cases where the keyword search missed a field —
+        # keeps the page useful even if a guess above was wrong.
+        raw_columns = {col_title_by_id.get(cid, cid): cv.get('text','')
+                       for cid, cv in col_map.items() if cv.get('text')}
 
         row = {
-            'monday_id':   item['id'],
-            'name':        item['name'],
-            'property':    address_to_match,
-            'status':      status_val,
-            'group_id':    gid,
-            'group_title': gtitle,
+            'monday_id':         item['id'],
+            'name':              item['name'],
+            'address':           address_val,
+            'install_type_size': install_type_size,
+            'install_date':      install_dt,
+            'end_date':          end_dt,
+            'status':            status_val,
+            'group_id':          gid,
+            'group_title':       gtitle,
+            'raw_columns':       raw_columns,
             'luma_job':    {
                 'id':           luma_job['id'],
                 'job_ref':      luma_job.get('job_ref',''),
@@ -2820,6 +2854,14 @@ def api_monday_board():
         'board_name': board['name'],
         'groups':     groups_out,
         'columns':    [{'id': c['id'], 'title': c['title'], 'type': c['type']} for c in columns],
+        'detected_columns': {
+            'address':  col_title_by_id.get(address_col_id),
+            'type':     col_title_by_id.get(type_col_id),
+            'size':     col_title_by_id.get(size_col_id),
+            'install_date': col_title_by_id.get(install_date_id),
+            'end_date': col_title_by_id.get(end_date_id),
+            'status':   col_title_by_id.get(status_col_id),
+        },
     })
 
 

@@ -2750,6 +2750,7 @@ def api_monday_board():
     query($bid: ID!) {
       boards(ids: [$bid]) {
         items_page(limit: 100) {
+          cursor
           items {
             id name
             group { id }
@@ -2758,12 +2759,39 @@ def api_monday_board():
         }
       }
     }'''
+    next_q = '''
+    query($cursor: String!) {
+      next_items_page(limit: 100, cursor: $cursor) {
+        cursor
+        items {
+          id name
+          group { id }
+          column_values { id text value }
+        }
+      }
+    }'''
     all_items = []
     try:
         result = monday_query(items_q, {'bid': MONDAY_BOARD_ID})
         if 'errors' in result:
             return jsonify({'error': result['errors']}), 500
-        all_items = result['data']['boards'][0]['items_page']['items']
+        page = result['data']['boards'][0]['items_page']
+        all_items += page['items']
+        cursor = page.get('cursor')
+
+        # Follow the cursor to fetch every remaining page — this is what was
+        # missing before: without it, boards with 100+ items silently lose
+        # whatever comes after the first page, which is exactly what caused
+        # a 16-item group to show only 5 (the rest were past the cut-off).
+        pages_fetched = 1
+        while cursor and pages_fetched < 10:  # safety cap: 1000 items max
+            next_result = monday_query(next_q, {'cursor': cursor})
+            if 'errors' in next_result:
+                break  # keep whatever we already have rather than failing the whole request
+            next_page = next_result['data']['next_items_page']
+            all_items += next_page['items']
+            cursor = next_page.get('cursor')
+            pages_fetched += 1
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -2816,8 +2844,6 @@ def api_monday_board():
         end_dt      = col_text(end_date_id)
         status_val  = col_text(status_col_id)
 
-        install_type_size = ' — '.join(v for v in [type_val, size_val] if v)
-
         luma_job = (luma_by_addr.get(norm(address_val)) or
                     luma_by_key.get(street_key(address_val)))
 
@@ -2830,7 +2856,8 @@ def api_monday_board():
             'monday_id':         item['id'],
             'name':              item['name'],
             'address':           address_val,
-            'install_type_size': install_type_size,
+            'install_type':      type_val,
+            'install_size':      size_val,
             'install_date':      install_dt,
             'end_date':          end_dt,
             'status':            status_val,

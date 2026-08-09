@@ -237,7 +237,11 @@ alter table day_teams enable row level security;
 create policy "Allow all" on day_teams for all using (true) with check (true);
 create index if not exists day_teams_date_idx on day_teams(date);
 
--- Runsheet stability fixes (August 2026) — prevent duplicate auto-seeded teams
+-- Runsheet stability fixes (August 2026)
+-- Unscheduled tray entries have no vehicle until the admin assigns a team
+alter table job_schedule alter column vehicle drop not null;
+
+-- Prevent duplicate auto-seeded teams
 delete from day_teams d using day_teams k
 where d.date = k.date and d.name = k.name and d.created_at > k.created_at;
 create unique index if not exists day_teams_date_name_uidx on day_teams(date, name);

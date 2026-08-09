@@ -2759,6 +2759,7 @@ def api_monday_debug():
     return jsonify({'monday_items': monday_props, 'luma_addresses': luma_addrs})
 
 
+@app.route('/api/monday/board')
 def api_monday_board():
     """Fetch board groups + items from Monday, match jobs by address (property column)."""
     # Step 1: get board structure — groups and column IDs

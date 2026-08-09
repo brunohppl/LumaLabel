@@ -84,6 +84,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     <div>
       <h1 class="page-title">Monday <span>Sync</span></h1>
       <div class="board-name" id="board-name">Loading board…</div>
+      <div id="detected-columns" style="font-size:0.68rem;color:var(--muted);margin-top:2px;"></div>
     </div>
     <div class="sync-bar">
       <span class="sync-status" id="sync-status"></span>
@@ -157,6 +158,17 @@ async function syncBoard(){
     }
 
     document.getElementById('board-name').textContent = data.board_name;
+    if(data.detected_columns){
+      const dc=data.detected_columns;
+      const parts=[
+        `Address: ${dc.address||'item name (fallback)'}`,
+        `Type: ${dc.type||'—'}`,
+        `Size: ${dc.size||'—'}`,
+        `Install date: ${dc.install_date||'—'}`,
+        `End date: ${dc.end_date||'—'}`,
+      ];
+      document.getElementById('detected-columns').textContent = 'Matched columns — ' + parts.join(' · ');
+    }
 
     const groups = data.groups;
     const groupNames = Object.keys(groups);
@@ -183,32 +195,32 @@ async function syncBoard(){
         <table class="sync-table">
           <thead>
             <tr>
-              <th>Item</th>
-              <th>Property (Monday)</th>
-              <th>Monday Status</th>
-              <th>Luma Job</th>
+              <th>Project / Address</th>
+              <th>Install Type &amp; Size</th>
               <th>Install Date</th>
+              <th>End Date</th>
+              <th>Luma Job</th>
               <th>Match</th>
             </tr>
           </thead>
           <tbody>`;
 
       items.forEach(item => {
-        const sc      = statusColour(item.status);
-        const sLabel  = item.status || '—';
-        const luma    = item.luma_job;
+        const luma = item.luma_job;
 
         html += `<tr>
-          <td style="font-weight:500;">${item.name||'—'}</td>
-          <td>${item.property||'<span style="color:var(--border);font-style:italic;">no address</span>'}</td>
-          <td><span class="monday-status" style="background:${sc};">${sLabel}</span></td>
+          <td style="font-weight:500;">${item.address||item.name||'—'}</td>
+          <td>${item.install_type_size || '<span style="color:var(--border);font-style:italic;">—</span>'}</td>
+          <td>${item.install_date
+            ? `<span style="color:var(--ink);">${item.install_date}</span>`
+            : '<span style="color:var(--border);">—</span>'}</td>
+          <td>${item.end_date
+            ? `<span style="color:var(--ink);">${item.end_date}</span>`
+            : '<span style="color:var(--border);">—</span>'}</td>
           <td>${luma
             ? `<div class="luma-ref">${luma.job_ref||luma.job_number||luma.id.slice(0,8)}</div>
                <div style="font-size:0.7rem;color:var(--muted);margin-top:1px;">${luma.address}</div>`
             : `<span class="luma-none">No match</span>`}</td>
-          <td>${luma?.runsheet_date
-            ? `<span style="color:var(--green);font-weight:600;">${formatDate(luma.runsheet_date)}</span>`
-            : '<span style="color:var(--border);">—</span>'}</td>
           <td><span class="status-badge ${luma?'matched':'unmatched'}">${luma?'✓ Matched':'—'}</span></td>
         </tr>`;
       });

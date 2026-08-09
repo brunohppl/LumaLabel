@@ -519,7 +519,7 @@ async function openEntryPop(entryId,teamId,slot){
   const tSel=document.getElementById('entry-time');
   tSel.innerHTML='<option value="">No time</option>'+SLOTS.map(s=>`<option value="${s}">${fmtSlot(s)}</option>`).join('');
   if(slot)tSel.value=slot;
-  document.getElementById('entry-dur').innerHTML='<option value="">—</option>'+DURS.map(d=>`<option value="${d}">${d>=60?d/60+'h'+(d%60?d%60+'m':''):d+'m'}</option>`).join('');
+  document.getElementById('entry-dur').innerHTML='<option value="">—</option>'+DURS.map(d=>`<option value="${d}">${d>=60?Math.floor(d/60)+'h'+(d%60?d%60+'m':''):d+'m'}</option>`).join('');
   document.querySelectorAll('#type-chips .chip').forEach((b,i)=>b.classList.toggle('selected',i===0));
   _type='install';
   if(entryId){

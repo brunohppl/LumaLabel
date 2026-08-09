@@ -419,14 +419,19 @@ function renderTray(){
   wrap.style.display='block';
   tray.innerHTML=unplaced.map(e=>{
     const job=jobById[e.job_id];
-    const ref=job?(job.job_ref||job.job_number):'—';
-    const addr=job?.address||'';
+    const hasJob=!!e.job_id;
+    const ref=job?(job.job_ref||job.job_number):null;
+    const addr=job?.address||e.monday_address||'';
     const typeCls=e.type||'install';
     const orphanFlag=(e.start_time && !resolvesToTeam(e))?' <span title="Had a time but no matching team — please reassign">⚠️</span>':'';
-    return `<div class="rs-tray-tile ${typeCls}" onclick="openEntryPop('${e.id}',null,null)">
+    const clickAttr=hasJob?`onclick="openEntryPop('${e.id}',null,null)"`:'';
+    const styleAttr=hasJob?'':'style="opacity:0.6;cursor:default;"';
+    const noJobHint=hasJob?'':'<div style="font-size:0.62rem;opacity:0.85;margin-top:2px;">Waiting for job — created automatically once uploaded</div>';
+    return `<div class="rs-tray-tile ${typeCls}" ${clickAttr} ${styleAttr} title="${hasJob?'':'From Monday — no matching Luma job yet'}">
       <div class="rs-tray-tile-type">${TYPE_LBL[e.type]||e.type}${orphanFlag}</div>
-      <div class="rs-tray-tile-ref">#${ref}</div>
+      <div class="rs-tray-tile-ref">${ref?'#'+ref:'No job number'}</div>
       ${addr?`<div class="rs-tray-tile-addr">${addr}</div>`:''}
+      ${noJobHint}
     </div>`;
   }).join('');
 }

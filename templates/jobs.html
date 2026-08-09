@@ -533,7 +533,7 @@ function jobCardHTML(job){
         </button>
         <div class="job-meta">
           ${job.runsheet_date
-            ? `<span class="tile-date tile-date-install" id="date-${job.id}" onclick="startEditDate('${job.id}')" title="Tap to edit install date" style="cursor:pointer;">${formatRunsheetBadgeDate(job.runsheet_date)}</span>`
+            ? `<span class="tile-date tile-date-install" id="date-${job.id}">${formatRunsheetBadgeDate(job.runsheet_date)}</span>`
             : job.stage_date
               ? `<span class="tile-date tile-date-load">${job.stage_date}</span>`
               : ''}
@@ -544,7 +544,7 @@ function jobCardHTML(job){
       </div>
     </div>
     <div class="job-card-actions">
-      <button class="job-action-btn job-action-runsheet" onclick="openRunsheetPopover('${job.id}')" title="Schedule job">
+      <button class="job-action-btn job-action-runsheet" onclick="openInstallDatePicker('${job.id}')" title="Set install date">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       </button>
       <button class="job-action-btn job-action-transfer" onclick="openTransferPopover('${job.id}', this)" title="Set up Transfer">
@@ -609,44 +609,40 @@ async function saveAddress(jobId, newAddr, div){
   div._saving=false;
 }
 
-function startEditDate(jobId){
-  const span=document.getElementById(`date-${jobId}`);
-  if(!span||span.querySelector('input')) return;
-  const job=lastFetchedJobs.find(j=>j.id===jobId);
-  const current=job?.runsheet_date||''; // YYYY-MM-DD
+function openInstallDatePicker(jobId){
+  const job=jobsById.get(jobId)||lastFetchedJobs.find(j=>j.id===jobId);
   const input=document.createElement('input');
   input.type='date';
-  input.value=current;
-  input.style.cssText='font-size:0.75rem;border:1px solid var(--green);border-radius:3px;padding:1px 4px;font-family:inherit;background:white;color:var(--ink);';
-  input.onclick=e=>e.stopPropagation();
-  input.onchange=()=>saveInstallDate(jobId,input.value,span);
-  input.onkeydown=e=>{
-    if(e.key==='Escape'){ span.textContent=formatRunsheetBadgeDate(current); }
-  };
-  input.onblur=()=>{ if(!span._saving) span.textContent=formatRunsheetBadgeDate(job?.runsheet_date||current); };
-  span.innerHTML='';
-  span.appendChild(input);
+  input.value=job?.runsheet_date||'';
+  input.style.cssText='position:fixed;opacity:0;pointer-events:none;left:-9999px;';
+  input.onchange=()=>{ if(input.value) saveInstallDate(jobId, input.value); input.remove(); };
+  input.onblur=()=>setTimeout(()=>input.remove(),200);
+  document.body.appendChild(input);
   input.focus();
-  input.showPicker?.();
+  input.showPicker?.() ?? input.click();
 }
 
-async function saveInstallDate(jobId, newDate, span){
-  if(span._saving) return;
-  span._saving=true;
-  const job=lastFetchedJobs.find(j=>j.id===jobId);
-  if(!newDate||newDate===job?.runsheet_date){
-    span.textContent=formatRunsheetBadgeDate(job?.runsheet_date||'');
-    span._saving=false;
+async function saveInstallDate(jobId, newDate){
+  const job=jobsById.get(jobId)||lastFetchedJobs.find(j=>j.id===jobId);
+  if(!newDate||newDate===job?.runsheet_date) return;
+
+  const badge=document.getElementById(`date-${jobId}`);
+  if(badge) badge.textContent='Saving…';
+
+  const res=await fetch(`/api/jobs/${jobId}/runsheet`,{
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({runsheet_date:newDate, runsheet_type:'install'})
+  });
+  const result=await res.json().catch(()=>({success:false}));
+
+  if(!result.success){
+    alert('Could not save install date: '+(result.error||'unknown error'));
+    if(badge) badge.textContent=job?.runsheet_date?formatRunsheetBadgeDate(job.runsheet_date):'';
     return;
   }
-  span.textContent='Saving…';
-  await fetch(`/api/jobs/${jobId}/notes`,{
-    method:'PATCH', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({runsheet_date:newDate})
-  });
+
   if(job) job.runsheet_date=newDate;
-  span.textContent=formatRunsheetBadgeDate(newDate);
-  span._saving=false;
+  renderJobs();
 }
 
 async function downloadLabels(jobId, jobRef){

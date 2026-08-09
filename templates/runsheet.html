@@ -55,6 +55,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .rs-tile-label{font-size:0.6rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;opacity:0.75;color:rgba(255,255,255,0.8);}
 .rs-tile-ref{font-size:0.78rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:white;}
 .rs-tile-addr{font-size:0.78rem;color:rgba(255,255,255,0.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rs-tile-prop{font-size:0.68rem;color:rgba(255,255,255,0.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:italic;}
 .rs-tile-note{font-size:0.65rem;color:rgba(255,255,255,0.7);font-style:italic;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rs-tile-gear{position:absolute;bottom:2px;right:3px;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.4);font-size:0.68rem;padding:2px;}
 .rs-tile.install{background:#5b9bd5;border-left-color:rgba(0,0,0,0.15);}
@@ -373,6 +374,7 @@ function render(){
       const job=isTask?null:jobById[e.job_id];
       const ref=isTask?(e.title||'Task'):(job?job.job_ref||job.job_number:'—');
       const addr=job?job.address?.split(',')[0]||'':'';
+      const propTag=job&&(job.property_type||job.property_size)?[job.property_type,job.property_size].filter(Boolean).join(' — '):'';
       const lbl=isTask?'Task':{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'';
 
       // Sub-column positioning
@@ -383,7 +385,7 @@ function render(){
       const tile=document.createElement('div');
       tile.className=`rs-tile ${typeKey}`;
       tile.style.cssText=`top:0;left:calc(${left}% + 2px);width:calc(${width}% - 4px);height:${span*SLOT_H-4}px;cursor:pointer;position:absolute;`;
-      tile.innerHTML=`<div class="rs-tile-label">${lbl}</div><div class="rs-tile-ref">${ref}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
+      tile.innerHTML=`<div class="rs-tile-label">${lbl}</div><div class="rs-tile-ref">${ref}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''}${propTag?`<div class="rs-tile-prop">${propTag}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
       tile.onclick=(ev)=>{ev.stopPropagation();openEntryPop(e.id,team.id,null);};
       cell.style.position='relative';
       cell.appendChild(tile);
@@ -422,6 +424,7 @@ function renderTray(){
     const hasJob=!!e.job_id;
     const ref=job?(job.job_ref||job.job_number):null;
     const addr=job?.address||e.monday_address||'';
+    const propTag=job&&(job.property_type||job.property_size)?[job.property_type,job.property_size].filter(Boolean).join(' — '):'';
     const typeCls=e.type||'install';
     const orphanFlag=(e.start_time && !resolvesToTeam(e))?' <span title="Had a time but no matching team — please reassign">⚠️</span>':'';
     const clickAttr=hasJob?`onclick="openEntryPop('${e.id}',null,null)"`:'';
@@ -431,6 +434,7 @@ function renderTray(){
       <div class="rs-tray-tile-type">${TYPE_LBL[e.type]||e.type}${orphanFlag}</div>
       <div class="rs-tray-tile-ref">${ref?'#'+ref:'No job number'}</div>
       ${addr?`<div class="rs-tray-tile-addr">${addr}</div>`:''}
+      ${propTag?`<div style="font-size:0.68rem;opacity:0.85;font-style:italic;">${propTag}</div>`:''}
       ${noJobHint}
     </div>`;
   }).join('');

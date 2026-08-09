@@ -180,6 +180,11 @@ def save_job_to_db(meta, items, colour_name, job_owner='', is_transfer=False,
         if install_date_iso:
             seed_two_day_schedule(job_id, install_date_iso, 'install', items=items)
 
+        # If a Monday "Pull into Luma" run previously created an address-only
+        # placeholder tile for this address, attach it to this job now that
+        # it exists — this is what makes the placeholder self-resolving.
+        link_placeholder_schedule_entries(job_id, meta['address'])
+
     except Exception as e:
         pass  # Never let DB failure break label generation
 
@@ -2654,6 +2659,320 @@ def api_delete_job(job_id):
 def monday_page():
     return open(os.path.join(app.template_folder, 'monday.html')).read()
 
+def norm_address(s):
+    """Normalise an address for matching: expand abbreviations, strip punctuation."""
+    if not s: return ''
+    s = s.lower().strip()
+    abbrevs = [
+        (r'\bst\b', 'street'), (r'\brd\b', 'road'), (r'\bave?\b', 'avenue'),
+        (r'\bdr\b', 'drive'), (r'\bcr?\b', 'crescent'), (r'\bct\b', 'court'),
+        (r'\bpl\b', 'place'), (r'\bblvd\b', 'boulevard'), (r'\bln\b', 'lane'),
+        (r'\bpde\b', 'parade'), (r'\bhwy\b', 'highway'), (r'\bmt\b', 'mount'),
+    ]
+    for pattern, replacement in abbrevs:
+        s = re.sub(pattern, replacement, s)
+    s = re.sub(r'[,\.\-/#]', ' ', s)
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+def address_street_key(s):
+    """Street number + first word only — for matching when suburb/state/postcode differ."""
+    parts = norm_address(s).split()
+    if len(parts) >= 2:
+        return ' '.join(parts[:2])
+    return norm_address(s)
+
+def link_placeholder_schedule_entries(job_id, job_address):
+    """Called after a job is created/updated — if any Monday-sourced schedule
+    placeholder (job_id null, monday_address set) matches this job's address,
+    attach it to the new job. This is what makes 'once it is a job, please
+    update it' automatic: no manual re-pull needed once the job exists."""
+    if not job_address:
+        return
+    placeholders = sb_get('job_schedule', 'job_id=is.null&monday_address=not.is.null') or []
+    target_norm = norm_address(job_address)
+    target_key  = address_street_key(job_address)
+    for p in placeholders:
+        p_addr = p.get('monday_address', '')
+        if norm_address(p_addr) == target_norm or address_street_key(p_addr) == target_key:
+            sb_patch('job_schedule', f'id=eq.{p["id"]}', {'job_id': job_id})
+
+
+def get_monday_board_data():
+    """Fetch board groups + items from Monday, match jobs by address.
+    READ-ONLY — every call here is a GraphQL `query`, never a `mutation`.
+    Nothing in this function can write back to Monday under any circumstance.
+    Returns a dict on success, or {'error': ...} on failure — callers check
+    for the 'error' key rather than exceptions."""
+    # Step 1: get board structure — groups and ALL column definitions
+    structure_q = '''
+    query($bid: ID!) {
+      boards(ids: [$bid]) {
+        name
+        groups { id title }
+        columns { id title type }
+      }
+    }'''
+    structure = monday_query(structure_q, {'bid': MONDAY_BOARD_ID})
+    if 'errors' in structure:
+        return {'error': structure['errors']}
+
+    board      = structure['data']['boards'][0]
+    groups_map = {g['id']: g['title'] for g in board['groups']}
+    columns    = board['columns']
+    col_title_by_id = {c['id']: c['title'] for c in columns}
+
+    # Identify relevant columns by keyword in their title (case-insensitive).
+    def find_col(*keywords, exclude=None):
+        exclude = exclude or []
+        for c in columns:
+            t = c['title'].lower()
+            if any(k in t for k in keywords) and not any(x in t for x in exclude):
+                return c['id']
+        return None
+
+    address_col_id  = find_col('property', 'address', 'project')
+    type_col_id     = find_col('type')
+    size_col_id     = find_col('size', 'sqm', 'sq m', 'm2')
+    install_date_id = find_col('install date', 'install')
+    end_date_id     = find_col('end date', 'de-install', 'deinstall', 'pickup date', 'finish')
+    date_cols = [c['id'] for c in columns if c['type'] == 'date']
+    if install_date_id and col_title_by_id.get(install_date_id) and \
+       next((c for c in columns if c['id']==install_date_id), {}).get('type') != 'date':
+        install_date_id = None
+    if not install_date_id and date_cols:
+        install_date_id = date_cols[0]
+    if not end_date_id and len(date_cols) > 1:
+        end_date_id = next((d for d in date_cols if d != install_date_id), None)
+    status_col_id = next(
+        (c['id'] for c in columns if c['type'] == 'color' or 'status' in c['title'].lower()), None
+    )
+
+    # Step 2: fetch all items with column values, following pagination fully
+    items_q = '''
+    query($bid: ID!) {
+      boards(ids: [$bid]) {
+        items_page(limit: 100) {
+          cursor
+          items {
+            id name
+            group { id }
+            column_values { id text value }
+          }
+        }
+      }
+    }'''
+    next_q = '''
+    query($cursor: String!) {
+      next_items_page(limit: 100, cursor: $cursor) {
+        cursor
+        items {
+          id name
+          group { id }
+          column_values { id text value }
+        }
+      }
+    }'''
+    all_items = []
+    try:
+        result = monday_query(items_q, {'bid': MONDAY_BOARD_ID})
+        if 'errors' in result:
+            return {'error': result['errors']}
+        page = result['data']['boards'][0]['items_page']
+        all_items += page['items']
+        cursor = page.get('cursor')
+
+        pages_fetched = 1
+        while cursor and pages_fetched < 10:  # safety cap: 1000 items max
+            next_result = monday_query(next_q, {'cursor': cursor})
+            if 'errors' in next_result:
+                break
+            next_page = next_result['data']['next_items_page']
+            all_items += next_page['items']
+            cursor = next_page.get('cursor')
+            pages_fetched += 1
+    except Exception as e:
+        return {'error': str(e)}
+
+    # Step 3: load all Luma jobs for address matching
+    luma_jobs = sb_get('jobs', 'order=created_at.desc') or []
+    luma_by_addr = {}
+    luma_by_key  = {}
+    for j in luma_jobs:
+        addr = j.get('address','')
+        if addr:
+            luma_by_addr[norm_address(addr)] = j
+            luma_by_key[address_street_key(addr)] = j
+
+    # Step 4: build response — group items, attach luma job if matched
+    groups_out = {}
+    for item in all_items:
+        gid     = item['group']['id']
+        gtitle  = groups_map.get(gid, gid)
+        col_map = {cv['id']: cv for cv in item['column_values']}
+
+        def col_text(col_id):
+            return col_map.get(col_id, {}).get('text', '') if col_id else ''
+
+        address_val = col_text(address_col_id) or item['name']
+        type_val    = col_text(type_col_id)
+        size_val    = col_text(size_col_id)
+        install_dt  = col_text(install_date_id)
+        end_dt      = col_text(end_date_id)
+        status_val  = col_text(status_col_id)
+
+        luma_job = (luma_by_addr.get(norm_address(address_val)) or
+                    luma_by_key.get(address_street_key(address_val)))
+
+        raw_columns = {col_title_by_id.get(cid, cid): cv.get('text','')
+                       for cid, cv in col_map.items() if cv.get('text')}
+
+        row = {
+            'monday_id':         item['id'],
+            'name':              item['name'],
+            'address':           address_val,
+            'install_type':      type_val,
+            'install_size':      size_val,
+            'install_date':      install_dt,
+            'end_date':          end_dt,
+            'status':            status_val,
+            'group_id':          gid,
+            'group_title':       gtitle,
+            'raw_columns':       raw_columns,
+            'luma_job':    {
+                'id':           luma_job['id'],
+                'job_ref':      luma_job.get('job_ref',''),
+                'job_number':   luma_job.get('job_number',''),
+                'runsheet_date':luma_job.get('runsheet_date',''),
+                'address':      luma_job.get('address',''),
+            } if luma_job else None,
+        }
+
+        if gtitle not in groups_out:
+            groups_out[gtitle] = []
+        groups_out[gtitle].append(row)
+
+    return {
+        'board_name': board['name'],
+        'groups':     groups_out,
+        'columns':    [{'id': c['id'], 'title': c['title'], 'type': c['type']} for c in columns],
+        'detected_columns': {
+            'address':  col_title_by_id.get(address_col_id),
+            'type':     col_title_by_id.get(type_col_id),
+            'size':     col_title_by_id.get(size_col_id),
+            'install_date': col_title_by_id.get(install_date_id),
+            'end_date': col_title_by_id.get(end_date_id),
+            'status':   col_title_by_id.get(status_col_id),
+        },
+    }
+
+
+@app.route('/api/monday/board')
+def api_monday_board():
+    data = get_monday_board_data()
+    if 'error' in data:
+        return jsonify(data), 500
+    return jsonify(data)
+
+
+# Groups that "Pull into Luma" acts on — matched case-insensitively, trimmed.
+MONDAY_PULL_GROUPS = {'quote accepted', 'ready to pick'}
+
+@app.route('/api/monday/pull', methods=['POST'])
+def api_monday_pull():
+    """Pull matched install dates into existing Luma jobs, and add every item
+    in the 'Quote Accepted' / 'Ready to Pick' groups to the runsheet's
+    unscheduled tray — matched items get their real job_id, unmatched items
+    get an address-only placeholder that link_placeholder_schedule_entries()
+    will attach automatically once a matching job is created.
+
+    WRITES to Supabase (jobs, job_schedule) only. Still never writes to
+    Monday — every Monday call underneath is a read-only query."""
+    data = get_monday_board_data()
+    if 'error' in data:
+        return jsonify({'success': False, 'error': data['error']}), 500
+
+    date_re = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+    jobs_updated = 0
+    scheduled_matched = 0
+    scheduled_unmatched = 0
+    skipped_no_date = 0
+
+    for gtitle, items in data['groups'].items():
+        if gtitle.strip().lower() not in MONDAY_PULL_GROUPS:
+            continue
+
+        for item in items:
+            install_date = item.get('install_date', '')
+            luma_job = item.get('luma_job')
+
+            if not (install_date and date_re.match(install_date)):
+                skipped_no_date += 1
+                continue
+
+            if luma_job:
+                job_id = luma_job['id']
+                # 1) Update the job's install date
+                sb_patch('jobs', f'id=eq.{job_id}', {
+                    'runsheet_date': install_date,
+                    'runsheet_type': 'install',
+                })
+                jobs_updated += 1
+
+                # 2) Upsert the tray entry — keyed by monday_id so repeat
+                # pulls update rather than duplicate
+                existing = sb_get('job_schedule', f'monday_item_id=eq.{item["monday_id"]}')
+                entry = {
+                    'job_id':          job_id,
+                    'monday_item_id':  item['monday_id'],
+                    'monday_address':  item['address'],
+                    'date':            install_date,
+                    'type':            'install',
+                    'vehicle':         None,
+                    'team_id':         None,
+                    'start_time':      None,
+                    'duration':        None,
+                    'notes':           None,
+                }
+                if existing:
+                    sb_patch('job_schedule', f'id=eq.{existing[0]["id"]}', entry)
+                else:
+                    sb_post('job_schedule', entry)
+                scheduled_matched += 1
+
+            else:
+                # No matching Luma job yet — address-only placeholder.
+                # link_placeholder_schedule_entries() attaches this to a
+                # job automatically the moment one is created with a
+                # matching address.
+                existing = sb_get('job_schedule', f'monday_item_id=eq.{item["monday_id"]}')
+                entry = {
+                    'job_id':          None,
+                    'monday_item_id':  item['monday_id'],
+                    'monday_address':  item['address'],
+                    'date':            install_date,
+                    'type':            'install',
+                    'vehicle':         None,
+                    'team_id':         None,
+                    'start_time':      None,
+                    'duration':        None,
+                    'notes':           None,
+                }
+                if existing:
+                    sb_patch('job_schedule', f'id=eq.{existing[0]["id"]}', entry)
+                else:
+                    sb_post('job_schedule', entry)
+                scheduled_unmatched += 1
+
+    return jsonify({
+        'success':             True,
+        'jobs_updated':        jobs_updated,
+        'scheduled_matched':   scheduled_matched,
+        'scheduled_unmatched': scheduled_unmatched,
+        'skipped_no_date':     skipped_no_date,
+    })
+
+
 @app.route('/api/monday/debug')
 def api_monday_debug():
     """Show raw Monday property values vs Luma addresses for matching diagnosis."""
@@ -2690,206 +3009,6 @@ def api_monday_debug():
     luma_addrs = [{'job_ref': j.get('job_ref',''), 'address': j.get('address','')} for j in luma_jobs if j.get('address')]
 
     return jsonify({'monday_items': monday_props, 'luma_addresses': luma_addrs})
-
-
-@app.route('/api/monday/board')
-def api_monday_board():
-    """Fetch board groups + items from Monday, match jobs by address.
-    READ-ONLY — every call here is a GraphQL `query`, never a `mutation`.
-    Nothing in this route can write back to Monday under any circumstance."""
-    # Step 1: get board structure — groups and ALL column definitions
-    structure_q = '''
-    query($bid: ID!) {
-      boards(ids: [$bid]) {
-        name
-        groups { id title }
-        columns { id title type }
-      }
-    }'''
-    structure = monday_query(structure_q, {'bid': MONDAY_BOARD_ID})
-    if 'errors' in structure:
-        return jsonify({'error': structure['errors']}), 500
-
-    board      = structure['data']['boards'][0]
-    groups_map = {g['id']: g['title'] for g in board['groups']}
-    columns    = board['columns']
-    col_title_by_id = {c['id']: c['title'] for c in columns}
-
-    # Identify relevant columns by keyword in their title (case-insensitive).
-    # This board's exact column names weren't available to inspect directly,
-    # so we search rather than hardcode IDs — /api/monday/debug can be used
-    # to confirm the right columns are being picked up.
-    def find_col(*keywords, exclude=None):
-        exclude = exclude or []
-        for c in columns:
-            t = c['title'].lower()
-            if any(k in t for k in keywords) and not any(x in t for x in exclude):
-                return c['id']
-        return None
-
-    address_col_id  = find_col('property', 'address', 'project')
-    type_col_id     = find_col('type')
-    size_col_id     = find_col('size', 'sqm', 'sq m', 'm2')
-    install_date_id = find_col('install date', 'install')
-    end_date_id     = find_col('end date', 'de-install', 'deinstall', 'pickup date', 'finish')
-    # If "install" search grabbed a non-date column, fall back to any date column not already used
-    date_cols = [c['id'] for c in columns if c['type'] == 'date']
-    if install_date_id and col_title_by_id.get(install_date_id) and \
-       next((c for c in columns if c['id']==install_date_id), {}).get('type') != 'date':
-        install_date_id = None
-    if not install_date_id and date_cols:
-        install_date_id = date_cols[0]
-    if not end_date_id and len(date_cols) > 1:
-        end_date_id = next((d for d in date_cols if d != install_date_id), None)
-    status_col_id = next(
-        (c['id'] for c in columns if c['type'] == 'color' or 'status' in c['title'].lower()), None
-    )
-
-    # Step 2: fetch all items with column values (single page, up to 100 items)
-    items_q = '''
-    query($bid: ID!) {
-      boards(ids: [$bid]) {
-        items_page(limit: 100) {
-          cursor
-          items {
-            id name
-            group { id }
-            column_values { id text value }
-          }
-        }
-      }
-    }'''
-    next_q = '''
-    query($cursor: String!) {
-      next_items_page(limit: 100, cursor: $cursor) {
-        cursor
-        items {
-          id name
-          group { id }
-          column_values { id text value }
-        }
-      }
-    }'''
-    all_items = []
-    try:
-        result = monday_query(items_q, {'bid': MONDAY_BOARD_ID})
-        if 'errors' in result:
-            return jsonify({'error': result['errors']}), 500
-        page = result['data']['boards'][0]['items_page']
-        all_items += page['items']
-        cursor = page.get('cursor')
-
-        # Follow the cursor to fetch every remaining page — this is what was
-        # missing before: without it, boards with 100+ items silently lose
-        # whatever comes after the first page, which is exactly what caused
-        # a 16-item group to show only 5 (the rest were past the cut-off).
-        pages_fetched = 1
-        while cursor and pages_fetched < 10:  # safety cap: 1000 items max
-            next_result = monday_query(next_q, {'cursor': cursor})
-            if 'errors' in next_result:
-                break  # keep whatever we already have rather than failing the whole request
-            next_page = next_result['data']['next_items_page']
-            all_items += next_page['items']
-            cursor = next_page.get('cursor')
-            pages_fetched += 1
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-    # Step 3: load all Luma jobs for address matching
-    luma_jobs = sb_get('jobs', 'order=created_at.desc') or []
-
-    def norm(s):
-        if not s: return ''
-        s = s.lower().strip()
-        abbrevs = [
-            (r'\bst\b', 'street'), (r'\brd\b', 'road'), (r'\bave?\b', 'avenue'),
-            (r'\bdr\b', 'drive'), (r'\bcr?\b', 'crescent'), (r'\bct\b', 'court'),
-            (r'\bpl\b', 'place'), (r'\bblvd\b', 'boulevard'), (r'\bln\b', 'lane'),
-            (r'\bpde\b', 'parade'), (r'\bhwy\b', 'highway'), (r'\bmt\b', 'mount'),
-        ]
-        for pattern, replacement in abbrevs:
-            s = re.sub(pattern, replacement, s)
-        s = re.sub(r'[,\.\-/#]', ' ', s)
-        s = re.sub(r'\s+', ' ', s).strip()
-        return s
-
-    def street_key(s):
-        parts = norm(s).split()
-        if len(parts) >= 2:
-            return ' '.join(parts[:2])
-        return norm(s)
-
-    luma_by_addr = {}
-    luma_by_key  = {}
-    for j in luma_jobs:
-        addr = j.get('address','')
-        if addr:
-            luma_by_addr[norm(addr)] = j
-            luma_by_key[street_key(addr)] = j
-
-    # Step 4: build response — group items, attach luma job if matched
-    groups_out = {}
-    for item in all_items:
-        gid     = item['group']['id']
-        gtitle  = groups_map.get(gid, gid)
-        col_map = {cv['id']: cv for cv in item['column_values']}
-
-        def col_text(col_id):
-            return col_map.get(col_id, {}).get('text', '') if col_id else ''
-
-        address_val = col_text(address_col_id) or item['name']
-        type_val    = col_text(type_col_id)
-        size_val    = col_text(size_col_id)
-        install_dt  = col_text(install_date_id)
-        end_dt      = col_text(end_date_id)
-        status_val  = col_text(status_col_id)
-
-        luma_job = (luma_by_addr.get(norm(address_val)) or
-                    luma_by_key.get(street_key(address_val)))
-
-        # All raw columns too, for cases where the keyword search missed a field —
-        # keeps the page useful even if a guess above was wrong.
-        raw_columns = {col_title_by_id.get(cid, cid): cv.get('text','')
-                       for cid, cv in col_map.items() if cv.get('text')}
-
-        row = {
-            'monday_id':         item['id'],
-            'name':              item['name'],
-            'address':           address_val,
-            'install_type':      type_val,
-            'install_size':      size_val,
-            'install_date':      install_dt,
-            'end_date':          end_dt,
-            'status':            status_val,
-            'group_id':          gid,
-            'group_title':       gtitle,
-            'raw_columns':       raw_columns,
-            'luma_job':    {
-                'id':           luma_job['id'],
-                'job_ref':      luma_job.get('job_ref',''),
-                'job_number':   luma_job.get('job_number',''),
-                'runsheet_date':luma_job.get('runsheet_date',''),
-                'address':      luma_job.get('address',''),
-            } if luma_job else None,
-        }
-
-        if gtitle not in groups_out:
-            groups_out[gtitle] = []
-        groups_out[gtitle].append(row)
-
-    return jsonify({
-        'board_name': board['name'],
-        'groups':     groups_out,
-        'columns':    [{'id': c['id'], 'title': c['title'], 'type': c['type']} for c in columns],
-        'detected_columns': {
-            'address':  col_title_by_id.get(address_col_id),
-            'type':     col_title_by_id.get(type_col_id),
-            'size':     col_title_by_id.get(size_col_id),
-            'install_date': col_title_by_id.get(install_date_id),
-            'end_date': col_title_by_id.get(end_date_id),
-            'status':   col_title_by_id.get(status_col_id),
-        },
-    })
 
 
 if __name__ == '__main__':

@@ -29,6 +29,16 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .date-label{font-size:1rem;font-weight:600;min-width:200px;text-align:center;}
 .btn-today{padding:6px 14px;background:var(--accent);color:white;border:none;border-radius:4px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;cursor:pointer;}
 .rs-wrap{overflow-x:auto;}
+.rs-tray-label{font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin:14px 0 6px;}
+.rs-tray{display:flex;flex-wrap:wrap;gap:8px;padding:10px;background:var(--warm);border:1px dashed var(--border);border-radius:6px;margin-bottom:14px;}
+.rs-tray-tile{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:5px;cursor:pointer;min-width:150px;color:white;font-size:0.78rem;transition:opacity 0.15s;}
+.rs-tray-tile:hover{opacity:0.85;}
+.rs-tray-tile.install{background:#5b9bd5;}
+.rs-tray-tile.to_load{background:#6abf7a;}
+.rs-tray-tile.pickup{background:#e07070;}
+.rs-tray-tile-type{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;opacity:0.85;font-weight:700;}
+.rs-tray-tile-ref{font-weight:600;}
+.rs-tray-tile-addr{font-size:0.72rem;opacity:0.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;}
 .rs-grid{display:grid;position:relative;}
 .rs-time{font-size:0.65rem;color:var(--muted);text-align:right;padding-right:8px;padding-top:4px;width:56px;}
 .rs-team-hdr{border-radius:8px 8px 0 0;padding:12px;margin:0 3px;cursor:pointer;transition:opacity 0.15s;}
@@ -109,6 +119,11 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     <button class="btn-today" onclick="goToday()">Today</button>
   </div>
 
+  <div id="rs-tray-wrap" style="display:none;">
+    <div class="rs-tray-label">Unscheduled — tap to assign team, time &amp; duration</div>
+    <div class="rs-tray" id="rs-tray"></div>
+  </div>
+
   <div class="rs-wrap">
     <div id="rs-grid"><div class="loading">Loading…</div></div>
   </div>
@@ -162,6 +177,12 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   <div class="pop-title" id="entry-pop-title">Add Entry</div>
   <input type="hidden" id="entry-id"/>
   <input type="hidden" id="entry-team-id"/>
+  <div id="entry-team-picker" style="display:none;margin-bottom:14px;">
+    <label class="fl">Team</label>
+    <select class="fi" id="entry-team-select" onchange="document.getElementById('entry-team-id').value=this.value;">
+      <option value="">Select a team…</option>
+    </select>
+  </div>
   <div style="display:flex;gap:8px;margin-bottom:14px;">
     <button class="fn-btn" id="mode-job"  onclick="setMode('job')"  style="flex:1;">🏠 Job</button>
     <button class="fn-btn" id="mode-task" onclick="setMode('task')" style="flex:1;">📝 Task</button>
@@ -207,9 +228,11 @@ const DURS=[30,60,90,120,150,180,210,240];
 const SLOT_H=46;
 const FN_COL={transport:'#2e5a8a',styling:'#6a3d8a',warehouse:'#b8935a'};
 const FN_LBL={transport:'🚛 Transport',styling:'🎨 Styling',warehouse:'🏭 Warehouse'};
+const TYPE_LBL={install:'Install',to_load:'Load',pickup:'Pickup'};
 
 let viewDate=new Date(),dayTeams=[],daySchedule=[],dayTasks=[],dayJobs=[],templates=[];
 let _fn='transport',_vehicle='',_mode='job',_type='install',_jobId=null,_jsTimer=null;
+let _loadSeq=0; // guards against out-of-order responses when navigating quickly
 
 function localDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function fmtDate(d){return d.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
@@ -219,16 +242,22 @@ function fmtSlot(t){if(!t)return'';const[h,m]=t.split(':').map(Number);return`${
 function slotIdx(t){if(!t)return 0;const[h,m]=t.split(':').map(Number);return Math.max(0,(h-7)*2+Math.floor(m/30));}
 
 async function load(){
+  const seq = ++_loadSeq; // this load's ticket — if a newer load starts before we finish, we discard our result
   document.getElementById('date-label').textContent=fmtDate(viewDate);
   document.getElementById('rs-grid').innerHTML='<div class="loading">Loading…</div>';
   const ds=localDate(viewDate);
   try{
     const[dr,tr]=await Promise.all([fetch(`/api/runsheet/${ds}`),fetch('/api/team-templates')]);
     const d=await dr.json();
+    if(seq!==_loadSeq) return; // a newer load has since started — abandon this one
     dayTeams=d.teams||[];daySchedule=d.schedule||[];dayTasks=d.tasks||[];dayJobs=d.jobs||[];
     templates=await tr.json();
+    if(seq!==_loadSeq) return;
 
-    // Auto-seed four default teams if none exist for this day
+    // Auto-seed four default teams if none exist for this day.
+    // Re-checked right before insert to reduce (not fully eliminate) the
+    // window for double-seeding when two loads race — the DB unique index
+    // on (date, name) is the real guard; this just avoids the common case.
     if(!dayTeams.length){
       const defaults=[
         {name:'Nemo Crew',   vehicle:'Nemo',   function:'transport', sort_order:0},
@@ -236,17 +265,27 @@ async function load(){
         {name:'Nigel Crew',  vehicle:'Nigel',  function:'transport', sort_order:2},
         {name:'Styling',     vehicle:'Marlin', function:'styling',   sort_order:3},
       ];
-      await Promise.all(defaults.map(t=>
-        fetch(`/api/teams/${ds}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(t)})
-      ));
-      // Re-fetch with the seeded teams
+      // Re-check immediately before seeding — closes most of the race window
+      const recheck=await fetch(`/api/teams/${ds}`);
+      const existing=await recheck.json();
+      if(seq!==_loadSeq) return;
+      if(!existing.length){
+        await Promise.all(defaults.map(t=>
+          fetch(`/api/teams/${ds}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(t)})
+        ));
+      }
+      // Re-fetch with the seeded teams (or whatever another tab just created)
       const dr2=await fetch(`/api/runsheet/${ds}`);
       const d2=await dr2.json();
+      if(seq!==_loadSeq) return;
       dayTeams=d2.teams||[];daySchedule=d2.schedule||[];dayTasks=d2.tasks||[];dayJobs=d2.jobs||[];
     }
 
     render();
-  }catch(e){document.getElementById('rs-grid').innerHTML='<div class="loading">Failed to load.</div>';}
+    renderTray();
+  }catch(e){
+    if(seq===_loadSeq) document.getElementById('rs-grid').innerHTML='<div class="loading">Failed to load.</div>';
+  }
 }
 
 function render(){
@@ -292,6 +331,10 @@ function render(){
   dayTeams.forEach(t=>{byTeam[t.id]=[];});
 
   daySchedule.forEach(e=>{
+    // team_id is the primary placement key. The vehicle-name fallback is kept
+    // only as a safety net for entries saved before this change; new saves
+    // always set team_id explicitly. Anything that resolves to neither is
+    // caught by renderTray()'s orphan check so it's never silently lost.
     const tid=e.team_id||(dayTeams.find(t=>t.vehicle===e.vehicle)?.id);
     if(tid&&byTeam[tid]) byTeam[tid].push({...e,_task:false});
   });
@@ -346,6 +389,46 @@ function render(){
       cell.appendChild(tile);
     });
   });
+}
+
+// Unscheduled tray — entries created by seed_two_day_schedule (day-only
+// placement) sit here until the admin assigns a team, time & duration.
+function renderTray(){
+  const jobById=Object.fromEntries(dayJobs.map(j=>[j.id,j]));
+  const teamIds=new Set(dayTeams.map(t=>t.id));
+  const resolvesToTeam=e=>{
+    if(e.team_id && teamIds.has(e.team_id)) return true;
+    if(!e.team_id && e.vehicle && dayTeams.some(t=>t.vehicle===e.vehicle)) return true;
+    return false;
+  };
+  // Two cases land in the tray: genuinely unplaced (no time yet), and
+  // orphaned (had a time/vehicle from before this change but no longer
+  // resolves to any existing team) — the latter should never happen going
+  // forward since saveEntry now requires a team whenever a time is set,
+  // but this catches any pre-existing data so nothing is silently lost.
+  const unplaced=daySchedule.filter(e=>!e.start_time || !resolvesToTeam(e));
+  const wrap=document.getElementById('rs-tray-wrap');
+  const tray=document.getElementById('rs-tray');
+
+  if(!unplaced.length){
+    wrap.style.display='none';
+    tray.innerHTML='';
+    return;
+  }
+
+  wrap.style.display='block';
+  tray.innerHTML=unplaced.map(e=>{
+    const job=jobById[e.job_id];
+    const ref=job?(job.job_ref||job.job_number):'—';
+    const addr=job?.address||'';
+    const typeCls=e.type||'install';
+    const orphanFlag=(e.start_time && !resolvesToTeam(e))?' <span title="Had a time but no matching team — please reassign">⚠️</span>':'';
+    return `<div class="rs-tray-tile ${typeCls}" onclick="openEntryPop('${e.id}',null,null)">
+      <div class="rs-tray-tile-type">${TYPE_LBL[e.type]||e.type}${orphanFlag}</div>
+      <div class="rs-tray-tile-ref">#${ref}</div>
+      ${addr?`<div class="rs-tray-tile-addr">${addr}</div>`:''}
+    </div>`;
+  }).join('');
 }
 
 // ── Team popover ──
@@ -420,6 +503,19 @@ async function openEntryPop(entryId,teamId,slot){
   document.getElementById('task-title').value='';
   document.getElementById('entry-notes').value='';
   _jobId=null;
+
+  // Team picker — only needed when opened without a column context (tray tiles)
+  const teamPicker=document.getElementById('entry-team-picker');
+  const teamSelect=document.getElementById('entry-team-select');
+  if(!teamId){
+    teamPicker.style.display='block';
+    teamSelect.innerHTML='<option value="">Select a team…</option>'+
+      dayTeams.map(t=>`<option value="${t.id}">${t.name||t.vehicle||'Team'} (${FN_LBL[t.function]||t.function})</option>`).join('');
+    teamSelect.value='';
+  }else{
+    teamPicker.style.display='none';
+  }
+
   const tSel=document.getElementById('entry-time');
   tSel.innerHTML='<option value="">No time</option>'+SLOTS.map(s=>`<option value="${s}">${fmtSlot(s)}</option>`).join('');
   if(slot)tSel.value=slot;
@@ -428,10 +524,6 @@ async function openEntryPop(entryId,teamId,slot){
   _type='install';
   if(entryId){
     const e=daySchedule.find(x=>x.id===entryId)||dayTasks.find(x=>x.id===entryId);
-    console.log('[openEntryPop] entryId:', entryId);
-    console.log('[openEntryPop] entry found:', e);
-    console.log('[openEntryPop] dayJobs count:', dayJobs.length);
-    if(e) console.log('[openEntryPop] job_id:', e.job_id, '| job in dayJobs:', !!dayJobs.find(j=>j.id===e.job_id));
     if(e){
       const isTask=dayTasks.some(x=>x.id===entryId);
       setMode(isTask?'task':'job');
@@ -495,6 +587,29 @@ function searchJobs(q){
 }
 function pickJob(id,ref,addr){_jobId=id;document.getElementById('job-results').style.display='none';document.getElementById('job-selected-label').textContent=`${ref} — ${addr}`;document.getElementById('job-selected').style.display='flex';document.getElementById('job-id').value=id;document.getElementById('job-search').value='';}
 function clearJob(){_jobId=null;document.getElementById('job-selected').style.display='none';document.getElementById('job-id').value='';}
+// Shared fetch wrapper — surfaces server errors instead of failing silently.
+// Returns {ok, data} — caller checks .ok before proceeding.
+async function apiFetch(url, opts){
+  let res, data;
+  try{
+    res = await fetch(url, opts);
+  }catch(networkErr){
+    alert('Network error — could not reach the server. Check your connection and try again.');
+    return {ok:false, data:null};
+  }
+  try{
+    data = await res.json();
+  }catch(parseErr){
+    data = null;
+  }
+  if(!res.ok || (data && data.success===false)){
+    const msg = (data && data.error) ? data.error : `Save failed (HTTP ${res.status}).`;
+    alert(`Could not save: ${msg}`);
+    return {ok:false, data};
+  }
+  return {ok:true, data};
+}
+
 async function saveEntry(){
   const eid=document.getElementById('entry-id').value;
   const tid=document.getElementById('entry-team-id').value;
@@ -503,20 +618,24 @@ async function saveEntry(){
   const notes=document.getElementById('entry-notes').value.trim()||null;
   const team=dayTeams.find(t=>t.id===tid);
   const ds=localDate(viewDate);
+  // A time without a team would vanish from both the grid and the tray —
+  // require a team the moment a time is set.
+  if(time && !tid){alert('Please select a team before setting a time.');return;}
   if(_mode==='job'){
     const jid=_jobId||document.getElementById('job-id').value;
     if(!jid){alert('Please select a job.');return;}
-    const p={job_id:jid,date:ds,team_id:tid,vehicle:team?.vehicle||null,type:_type,category:team?.function||'transport',start_time:time,duration:dur,notes};
-    if(eid){await fetch(`/api/schedule/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});}
-    else{
-      // Create directly in job_schedule
-      await fetch(`/api/schedule-entry`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
-    }
+    const p={job_id:jid,date:ds,team_id:tid||null,vehicle:team?.vehicle||null,type:_type,category:team?.function||'transport',start_time:time,duration:dur,notes};
+    const result = eid
+      ? await apiFetch(`/api/schedule/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)})
+      : await apiFetch(`/api/schedule-entry`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+    if(!result.ok) return; // keep popover open so the user can fix and retry
   }else{
     const title=document.getElementById('task-title').value.trim();
     if(!title){alert('Please enter a description.');return;}
-    if(eid){await fetch(`/api/tasks/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,start_time:time,duration:dur,notes,team_id:tid})});}
-    else{await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,date:ds,start_time:time,duration:dur,notes,team_id:tid,vehicle:team?.vehicle||'ALL',category:team?.function||'warehouse'})});}
+    const result = eid
+      ? await apiFetch(`/api/tasks/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,start_time:time,duration:dur,notes,team_id:tid})})
+      : await apiFetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,date:ds,start_time:time,duration:dur,notes,team_id:tid,vehicle:team?.vehicle||'ALL',category:team?.function||'warehouse'})});
+    if(!result.ok) return;
   }
   closeEntryPop();load();
 }
@@ -524,8 +643,10 @@ async function deleteEntry(){
   const eid=document.getElementById('entry-id').value;
   if(!eid||!confirm('Delete this entry?'))return;
   const isTask=dayTasks.some(t=>t.id===eid);
-  if(isTask)await fetch(`/api/tasks/${eid}`,{method:'DELETE'});
-  else await fetch(`/api/schedule/${eid}`,{method:'DELETE'});
+  const result = isTask
+    ? await apiFetch(`/api/tasks/${eid}`,{method:'DELETE'})
+    : await apiFetch(`/api/schedule/${eid}`,{method:'DELETE'});
+  if(!result.ok) return;
   closeEntryPop();load();
 }
 

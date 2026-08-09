@@ -196,7 +196,8 @@ async function syncBoard(){
           <thead>
             <tr>
               <th>Project / Address</th>
-              <th>Install Type &amp; Size</th>
+              <th>Install Type</th>
+              <th>Size</th>
               <th>Install Date</th>
               <th>End Date</th>
               <th>Luma Job</th>
@@ -210,7 +211,8 @@ async function syncBoard(){
 
         html += `<tr>
           <td style="font-weight:500;">${item.address||item.name||'—'}</td>
-          <td>${item.install_type_size || '<span style="color:var(--border);font-style:italic;">—</span>'}</td>
+          <td>${item.install_type || '<span style="color:var(--border);font-style:italic;">—</span>'}</td>
+          <td>${item.install_size || '<span style="color:var(--border);font-style:italic;">—</span>'}</td>
           <td>${item.install_date
             ? `<span style="color:var(--ink);">${item.install_date}</span>`
             : '<span style="color:var(--border);">—</span>'}</td>

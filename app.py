@@ -2960,8 +2960,10 @@ def _api_monday_pull_inner():
                 # Job dates differ per job, so this write can't be batched —
                 # still one PATCH per matched job, but only for matched ones.
                 sb_patch('jobs', f'id=eq.{job_id}', {
-                    'runsheet_date': install_date,
-                    'runsheet_type': 'install',
+                    'runsheet_date':  install_date,
+                    'runsheet_type':  'install',
+                    'property_type':  item.get('install_type') or None,
+                    'property_size':  item.get('install_size') or None,
                 })
                 jobs_updated += 1
 

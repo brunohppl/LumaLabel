@@ -348,7 +348,8 @@ def get_truck_eta(lat, lng, destination_address):
 # worker dropdown; keeping them separate lets the UI group them.
 TRANSPORT_VEHICLES = ['Bruce', 'Nigel', 'Nemo']
 STYLING_VEHICLES   = ['Marlin', 'VUG']
-RUNSHEET_VEHICLES  = TRANSPORT_VEHICLES + STYLING_VEHICLES
+OTHER_VEHICLES     = ['Own Car']  # team editor also offers this — must validate cleanly
+RUNSHEET_VEHICLES  = TRANSPORT_VEHICLES + STYLING_VEHICLES + OTHER_VEHICLES
 
 RUNSHEET_STYLISTS = ['Addy', 'Montie', 'Delphine', 'India', 'Hayley']
 RUNSHEET_DRIVERS  = ['Jo', 'Savio', 'Nick', 'Ayoub', 'Bruno', 'Phil', 'Tiago']
@@ -1896,18 +1897,23 @@ def vehicles_for_job(items):
 
 
 def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_vehicles=None):
-    """Seed the schedule for a job based on type:
+    """Seed the schedule for a job — DAY PLACEMENT ONLY (August 2026 simplification).
 
-    - pickup  → one tile: Pickup on main_date (10:30–12:30 window, 90 min)
-    - install → two tiles: Load day before (13:00–15:30 window, 60 min) + Install on main_date (07:30–10:30 window, 90 min)
-    - to_load → two tiles: Load on main_date (13:00–15:30 window, 60 min) + Install next business day (07:30–10:30 window, 90 min)
+    Creates unscheduled entries (no vehicle, no team, no time, no duration) that
+    appear in the runsheet's "Unscheduled" tray for the relevant day. The admin
+    then manually assigns team/time/duration/notes by clicking the tray tile.
 
-    For each vehicle, checks existing entries on that date and finds the first
-    non-conflicting slot within the allowed window. Falls back to the window
-    start if no slot fits (user can adjust manually).
+    - pickup  → one tile: PICKUP on main_date
+    - install → two tiles: LOAD the business day before + INSTALL on main_date
+    - to_load → two tiles: LOAD on main_date + INSTALL the next business day
 
-    Weekend-aware in both directions. Clears existing entries for this job first."""
-    from datetime import datetime as _dt, timedelta, time as _time
+    Weekend-aware in both directions. Clears existing entries for this job first
+    so re-saving a job's date doesn't leave orphaned duplicates.
+
+    `items` and `forced_vehicles` are accepted for backward compatibility with
+    existing call sites but are no longer used to guess vehicles — vehicle
+    assignment is always manual now."""
+    from datetime import datetime as _dt, timedelta
 
     sb_delete('job_schedule', f'job_id=eq.{job_id}')
 
@@ -1928,103 +1934,30 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_v
         if w == 5: return dt + timedelta(days=2)
         return dt + timedelta(days=1)
 
-    def parse_time(t_str):
-        """Parse 'HH:MM' to minutes-since-midnight."""
-        if not t_str: return None
-        try:
-            h, m = map(int, t_str.split(':'))
-            return h * 60 + m
-        except Exception:
-            return None
-
-    def fmt_time(mins):
-        """Format minutes-since-midnight to 'HH:MM'."""
-        return f'{mins // 60:02d}:{mins % 60:02d}'
-
-    def find_slot(vehicle, date_str, window_start_str, window_end_str, duration_min):
-        """Find first non-conflicting slot for this vehicle on this date within the window.
-        Returns the start time as 'HH:MM'. Falls back to window_start if no fit found."""
-        window_start = parse_time(window_start_str)
-        window_end   = parse_time(window_end_str)
-
-        if vehicle is None:
-            return window_start_str
-
-        # Fetch existing entries for this vehicle on this date
-        existing = sb_get('job_schedule',
-            f'vehicle=eq.{vehicle}&date=eq.{date_str}&order=start_time.asc') or []
-
-        # Build list of (start, end) occupied slots in minutes
-        occupied = []
-        for e in existing:
-            s = parse_time(e.get('start_time'))
-            d = e.get('duration') or 60
-            if s is not None:
-                occupied.append((s, s + d))
-
-        # Try every 30-min slot in the window
-        slot = window_start
-        while slot + duration_min <= window_end:
-            slot_end = slot + duration_min
-            conflict = any(not (slot_end <= occ_s or slot >= occ_e)
-                          for occ_s, occ_e in occupied)
-            if not conflict:
-                return fmt_time(slot)
-            slot += 30
-
-        # No gap found — return window start (user can adjust)
-        return window_start_str
-
-    vehicles = forced_vehicles if forced_vehicles is not None else \
-               (vehicles_for_job(items) if items else [])
-
-    def make_entry(date_str, etype, start_time, duration, vehicle=None):
+    def make_entry(date_str, etype):
         sb_post('job_schedule', {
             'job_id':     job_id,
             'date':       date_str,
-            'vehicle':    vehicle,
+            'vehicle':    None,
+            'team_id':    None,
             'type':       etype,
-            'start_time': start_time,
-            'duration':   duration,
+            'start_time': None,
+            'duration':   None,
             'notes':      None,
         })
 
     if main_type == 'pickup':
-        # Pickup only — single tile, 10:30–12:30 window, 90 min
-        if vehicles:
-            for v in vehicles:
-                t = find_slot(v, main_date_str, '10:30', '12:30', 90)
-                make_entry(main_date_str, 'pickup', t, 90, v)
-        else:
-            make_entry(main_date_str, 'pickup', '10:30', 90)
+        make_entry(main_date_str, 'pickup')
 
     elif main_type == 'install':
-        # Load the day before + Install on main_date
-        load_dt   = prev_business_day(main_dt)
-        load_date = load_dt.strftime('%Y-%m-%d')
-        if vehicles:
-            for v in vehicles:
-                tl = find_slot(v, load_date,      '13:00', '15:30', 60)
-                ti = find_slot(v, main_date_str,  '07:30', '10:30', 90)
-                make_entry(load_date,      'to_load', tl, 60,  v)
-                make_entry(main_date_str,  'install', ti, 90,  v)
-        else:
-            make_entry(load_date,     'to_load', '13:00', 60)
-            make_entry(main_date_str, 'install', '07:30', 90)
+        load_date = prev_business_day(main_dt).strftime('%Y-%m-%d')
+        make_entry(load_date,     'to_load')
+        make_entry(main_date_str, 'install')
 
     elif main_type == 'to_load':
-        # Load on main_date + Install next business day
-        install_dt   = next_business_day(main_dt)
-        install_date = install_dt.strftime('%Y-%m-%d')
-        if vehicles:
-            for v in vehicles:
-                tl = find_slot(v, main_date_str,  '13:00', '15:30', 60)
-                ti = find_slot(v, install_date,   '07:30', '10:30', 90)
-                make_entry(main_date_str,  'to_load', tl, 60,  v)
-                make_entry(install_date,   'install', ti, 90,  v)
-        else:
-            make_entry(main_date_str,  'to_load', '13:00', 60)
-            make_entry(install_date,   'install', '07:30', 90)
+        install_date = next_business_day(main_dt).strftime('%Y-%m-%d')
+        make_entry(main_date_str,  'to_load')
+        make_entry(install_date,   'install')
 
     # Keep jobs.runsheet_date on the main date for backward compat
     sb_patch('jobs', f'id=eq.{job_id}', {

@@ -80,6 +80,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .transfer-tag-link-out{color:var(--accent);}
 .job-address{font-size:1rem;color:var(--ink);margin-top:4px;cursor:pointer;border-radius:3px;padding:1px 3px;margin-left:-3px;transition:background 0.15s;}
 .job-address:hover{background:var(--sand);}
+.job-property-tag{font-size:0.72rem;color:var(--accent);font-weight:500;margin-top:2px;letter-spacing:0.02em;}
 .job-address-input{font-size:1rem;color:var(--ink);border:none;border-bottom:2px solid var(--accent);background:none;outline:none;width:100%;font-family:'Jost',sans-serif;padding:0;margin-top:4px;}
 .assignment-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
 .status-change-btn{display:inline-flex;align-items:center;gap:5px;background:none;border:none;padding:0;margin-top:9px;cursor:pointer;}
@@ -524,6 +525,7 @@ function jobCardHTML(job){
           <span class="pill ${pill}">${label}</span>
         </div>
         <div class="job-address" id="addr-${job.id}" onclick="startEditAddress('${job.id}')" title="Tap to edit address">${job.address||'<span style=\"color:var(--muted)\">No address</span>'}</div>
+        ${(job.property_type||job.property_size) ? `<div class="job-property-tag">${[job.property_type, job.property_size].filter(Boolean).join(' — ')}</div>` : ''}
         ${(ownerBadge||truckBadge||runsheetBadge)?`<div class="assignment-row">${ownerBadge}${truckBadge}${runsheetBadge}</div>`:''}
         <button class="status-change-btn" onclick="event.stopPropagation();openStatusPopover('${job.id}', this)">
           <span class="pill ${pill}">${label}</span>

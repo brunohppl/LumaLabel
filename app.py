@@ -2702,8 +2702,17 @@ def get_monday_board_data():
     """Fetch board groups + items from Monday, match jobs by address.
     READ-ONLY — every call here is a GraphQL `query`, never a `mutation`.
     Nothing in this function can write back to Monday under any circumstance.
-    Returns a dict on success, or {'error': ...} on failure — callers check
-    for the 'error' key rather than exceptions."""
+    Returns a dict on success, or {'error': ...} on failure — this outer
+    wrapper guarantees a dict is always returned, never a raw exception,
+    so callers (and Flask) can never end up serving an HTML error page
+    where JSON was expected."""
+    try:
+        return _get_monday_board_data_inner()
+    except Exception as e:
+        return {'error': f'{type(e).__name__}: {e}'}
+
+
+def _get_monday_board_data_inner():
     # Step 1: get board structure — groups and ALL column definitions
     structure_q = '''
     query($bid: ID!) {
@@ -2869,10 +2878,13 @@ def get_monday_board_data():
 
 @app.route('/api/monday/board')
 def api_monday_board():
-    data = get_monday_board_data()
-    if 'error' in data:
-        return jsonify(data), 500
-    return jsonify(data)
+    try:
+        data = get_monday_board_data()
+        if 'error' in data:
+            return jsonify(data), 500
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': f'{type(e).__name__}: {e}'}), 500
 
 
 # Groups that "Pull into Luma" acts on — matched case-insensitively, trimmed.
@@ -2888,6 +2900,13 @@ def api_monday_pull():
 
     WRITES to Supabase (jobs, job_schedule) only. Still never writes to
     Monday — every Monday call underneath is a read-only query."""
+    try:
+        return _api_monday_pull_inner()
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+def _api_monday_pull_inner():
     data = get_monday_board_data()
     if 'error' in data:
         return jsonify({'success': False, 'error': data['error']}), 500
@@ -2897,72 +2916,86 @@ def api_monday_pull():
     scheduled_matched = 0
     scheduled_unmatched = 0
     skipped_no_date = 0
+    skipped_errors = 0
 
+    # Collect every eligible item first, then do the writes in as few
+    # round trips as possible. The previous version made 2 Supabase calls
+    # per item sequentially — for a batch of 20-30 items that's 40-60+
+    # blocking requests, which was long enough to hit Render's request
+    # timeout even though every individual write had already succeeded
+    # (hence "the data was pulled" despite the error shown on screen).
+    eligible = []
     for gtitle, items in data['groups'].items():
         if gtitle.strip().lower() not in MONDAY_PULL_GROUPS:
             continue
-
         for item in items:
             install_date = item.get('install_date', '')
-            luma_job = item.get('luma_job')
-
             if not (install_date and date_re.match(install_date)):
                 skipped_no_date += 1
                 continue
+            eligible.append(item)
+
+    if not eligible:
+        return jsonify({
+            'success': True, 'jobs_updated': 0, 'scheduled_matched': 0,
+            'scheduled_unmatched': 0, 'skipped_no_date': skipped_no_date, 'skipped_errors': 0,
+        })
+
+    # One query for every existing job_schedule row we might need to update,
+    # instead of one query per item.
+    monday_ids = [item['monday_id'] for item in eligible]
+    ids_str = ','.join(monday_ids)  # Monday item IDs are plain numeric strings — no quoting needed for PostgREST in.()
+    existing_rows = sb_get('job_schedule', f'monday_item_id=in.({ids_str})') or []
+    existing_by_monday_id = {r['monday_item_id']: r for r in existing_rows if r.get('monday_item_id')}
+
+    to_insert = []  # batched into one bulk POST at the end
+
+    for item in eligible:
+        try:
+            install_date = item['install_date']
+            luma_job = item.get('luma_job')
+            job_id = luma_job['id'] if luma_job else None
 
             if luma_job:
-                job_id = luma_job['id']
-                # 1) Update the job's install date
+                # Job dates differ per job, so this write can't be batched —
+                # still one PATCH per matched job, but only for matched ones.
                 sb_patch('jobs', f'id=eq.{job_id}', {
                     'runsheet_date': install_date,
                     'runsheet_type': 'install',
                 })
                 jobs_updated += 1
 
-                # 2) Upsert the tray entry — keyed by monday_id so repeat
-                # pulls update rather than duplicate
-                existing = sb_get('job_schedule', f'monday_item_id=eq.{item["monday_id"]}')
-                entry = {
-                    'job_id':          job_id,
-                    'monday_item_id':  item['monday_id'],
-                    'monday_address':  item['address'],
-                    'date':            install_date,
-                    'type':            'install',
-                    'vehicle':         None,
-                    'team_id':         None,
-                    'start_time':      None,
-                    'duration':        None,
-                    'notes':           None,
-                }
-                if existing:
-                    sb_patch('job_schedule', f'id=eq.{existing[0]["id"]}', entry)
-                else:
-                    sb_post('job_schedule', entry)
-                scheduled_matched += 1
+            entry = {
+                'job_id':          job_id,
+                'monday_item_id':  item['monday_id'],
+                'monday_address':  item['address'],
+                'date':            install_date,
+                'type':            'install',
+                'vehicle':         None,
+                'team_id':         None,
+                'start_time':      None,
+                'duration':        None,
+                'notes':           None,
+            }
 
+            existing = existing_by_monday_id.get(item['monday_id'])
+            if existing:
+                sb_patch('job_schedule', f'id=eq.{existing["id"]}', entry)
             else:
-                # No matching Luma job yet — address-only placeholder.
-                # link_placeholder_schedule_entries() attaches this to a
-                # job automatically the moment one is created with a
-                # matching address.
-                existing = sb_get('job_schedule', f'monday_item_id=eq.{item["monday_id"]}')
-                entry = {
-                    'job_id':          None,
-                    'monday_item_id':  item['monday_id'],
-                    'monday_address':  item['address'],
-                    'date':            install_date,
-                    'type':            'install',
-                    'vehicle':         None,
-                    'team_id':         None,
-                    'start_time':      None,
-                    'duration':        None,
-                    'notes':           None,
-                }
-                if existing:
-                    sb_patch('job_schedule', f'id=eq.{existing[0]["id"]}', entry)
-                else:
-                    sb_post('job_schedule', entry)
+                to_insert.append(entry)
+
+            if luma_job:
+                scheduled_matched += 1
+            else:
                 scheduled_unmatched += 1
+        except Exception:
+            skipped_errors += 1
+            continue
+
+    # All brand-new entries go in as ONE bulk insert instead of one call each —
+    # this is the common case (first pull of a batch) and the biggest win.
+    if to_insert:
+        sb_post('job_schedule', to_insert)
 
     return jsonify({
         'success':             True,
@@ -2970,6 +3003,7 @@ def api_monday_pull():
         'scheduled_matched':   scheduled_matched,
         'scheduled_unmatched': scheduled_unmatched,
         'skipped_no_date':     skipped_no_date,
+        'skipped_errors':      skipped_errors,
     })
 
 

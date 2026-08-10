@@ -211,6 +211,13 @@ alter table damage_reports add column if not exists job_id uuid references jobs(
 alter table damage_reports add column if not exists job_ref_snapshot text;
 alter table damage_reports alter column furniture drop not null;
 
+-- Sequential, human-friendly report number (e.g. "DMG-0001")
+alter table damage_reports add column if not exists report_number integer;
+create sequence if not exists damage_reports_report_number_seq owned by damage_reports.report_number;
+alter table damage_reports alter column report_number set default nextval('damage_reports_report_number_seq');
+update damage_reports set report_number = nextval('damage_reports_report_number_seq') where report_number is null;
+create unique index if not exists damage_reports_report_number_uidx on damage_reports(report_number);
+
 -- Runsheet restructure: category and person fields
 alter table job_schedule add column if not exists category text default 'transport';
 alter table job_schedule add column if not exists person   text default null;

@@ -48,6 +48,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .guide-opt{font-size:0.72rem;padding:3px 9px;border-radius:10px;background:var(--sand);color:var(--muted);font-weight:500;}
 .guide-note{margin-top:16px;padding:12px 14px;background:rgba(184,147,90,0.07);border-radius:6px;font-size:0.82rem;color:var(--muted);line-height:1.5;border-left:3px solid var(--accent);}
 
+.damage-group{margin-bottom:24px;}
+.damage-group:last-child{margin-bottom:0;}
+.damage-group-title{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:500;color:var(--ink);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.damage-group-count{font-size:0.68rem;background:var(--warm);color:var(--muted);border-radius:10px;padding:2px 9px;font-weight:600;font-family:'Jost',sans-serif;}
 .damage-table{width:100%;border-collapse:collapse;background:white;border:1px solid var(--border);border-radius:3px;overflow:hidden;}
 .damage-table th{background:var(--ink);color:rgba(250,248,244,0.8);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:600;padding:10px 14px;text-align:left;}
 .damage-table td{padding:12px 14px;border-bottom:1px solid var(--sand);font-size:0.88rem;vertical-align:middle;}
@@ -328,37 +332,62 @@ function renderTable(){
     </div>`;
     return;
   }
-  wrap.innerHTML=`<table class="damage-table">
-    <thead><tr>
-      <th>Date</th>
-      <th>Where</th>
-      <th>Damage</th>
-      <th>Item / Element</th>
-      <th>Photo</th>
-      <th></th>
-    </tr></thead>
-    <tbody>
-      ${reports.map(r=>`<tr>
-        <td style="white-space:nowrap;color:var(--muted);font-size:0.8rem;">${formatDate(r.created_at)}</td>
-        <td><span class="tag tag-location">${LABELS.location[r.location]||r.location}${r.report_category==='property'?' <span style="opacity:0.55;">🏠</span>':''}</span></td>
-        <td><span class="tag tag-damage">${LABELS.damage_type[r.damage_type]||r.damage_type}</span></td>
-        <td><span class="tag tag-furniture">${r.report_category==='property' ? (LABELS.property_element[r.property_element]||r.property_element||'—') : (LABELS.furniture[r.furniture]||r.furniture)}</span>
-          ${r.report_category==='property' && r.job_ref_snapshot ? `<div style="font-size:0.7rem;color:var(--muted);margin-top:3px;">${r.job_ref_snapshot}</div>` : ''}
-        </td>
-        <td>${(() => {
-          if(!r.photo_url) return '<span style="color:var(--border);font-size:0.8rem;">—</span>';
-          let urls;
-          try{ urls=JSON.parse(r.photo_url); if(!Array.isArray(urls)) urls=[r.photo_url]; }
-          catch(e){ urls=[r.photo_url]; }
-          return urls.map(u=>`<img class="damage-thumb" src="${u}" onclick="openLightbox('${u}')" alt="damage photo" style="margin-right:4px;"/>`).join('');
-        })()}</td>
-        <td style="white-space:nowrap;">
-          <button class="del-btn" onclick="editReport('${r.id}')" title="Edit" style="color:var(--muted);margin-right:4px;">✎</button>
-          <button class="del-btn" onclick="deleteReport('${r.id}')" title="Delete">✕</button>
-        </td>
-      </tr>`).join('')}
-    </tbody>
-  </table>`;
+
+  const furnitureReports = reports.filter(r=>r.report_category!=='property');
+  const propertyReports  = reports.filter(r=>r.report_category==='property');
+
+  wrap.innerHTML =
+    reportGroupHTML('🛋️ Furniture Damage', furnitureReports, false) +
+    reportGroupHTML('🏠 Property Damage', propertyReports, true);
+}
+
+function reportId(r){
+  return r.report_number ? `DMG-${String(r.report_number).padStart(4,'0')}` : `#${(r.id||'').slice(0,8)}`;
+}
+
+function reportGroupHTML(title, list, isProperty){
+  if(!list.length){
+    return `<div class="damage-group">
+      <div class="damage-group-title">${title} <span class="damage-group-count">0</span></div>
+      <div class="empty" style="padding:20px;"><p style="font-size:0.82rem;color:var(--muted);margin:0;">No reports in this group yet.</p></div>
+    </div>`;
+  }
+  return `<div class="damage-group">
+    <div class="damage-group-title">${title} <span class="damage-group-count">${list.length}</span></div>
+    <table class="damage-table">
+      <thead><tr>
+        <th>Report</th>
+        <th>Date</th>
+        <th>Where</th>
+        <th>Damage</th>
+        <th>Item / Element</th>
+        <th>Photo</th>
+        <th></th>
+      </tr></thead>
+      <tbody>
+        ${list.map(r=>`<tr>
+          <td style="white-space:nowrap;font-family:monospace;font-size:0.78rem;color:var(--accent);font-weight:600;">${reportId(r)}</td>
+          <td style="white-space:nowrap;color:var(--muted);font-size:0.8rem;">${formatDate(r.created_at)}</td>
+          <td><span class="tag tag-location">${LABELS.location[r.location]||r.location}</span></td>
+          <td><span class="tag tag-damage">${LABELS.damage_type[r.damage_type]||r.damage_type}</span></td>
+          <td><span class="tag tag-furniture">${isProperty ? (LABELS.property_element[r.property_element]||r.property_element||'—') : (LABELS.furniture[r.furniture]||r.furniture)}</span>
+            ${isProperty && r.job_ref_snapshot ? `<div style="font-size:0.7rem;color:var(--muted);margin-top:3px;">${r.job_ref_snapshot}</div>` : ''}
+          </td>
+          <td>${(() => {
+            if(!r.photo_url) return '<span style="color:var(--border);font-size:0.8rem;">—</span>';
+            let urls;
+            try{ urls=JSON.parse(r.photo_url); if(!Array.isArray(urls)) urls=[r.photo_url]; }
+            catch(e){ urls=[r.photo_url]; }
+            return urls.map(u=>`<img class="damage-thumb" src="${u}" onclick="openLightbox('${u}')" alt="damage photo" style="margin-right:4px;"/>`).join('');
+          })()}</td>
+          <td style="white-space:nowrap;">
+            <button class="del-btn" onclick="editReport('${r.id}')" title="Edit" style="color:var(--muted);margin-right:4px;">✎</button>
+            <button class="del-btn" onclick="deleteReport('${r.id}')" title="Delete">✕</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
 }
 
 function formatDate(iso){

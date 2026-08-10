@@ -278,7 +278,7 @@ body.mobile-mode .mobile-only{display:block !important;}
         </div>
         <textarea id="styling-notes" class="styling-notes-input" rows="2"
           placeholder="Notes for other stylists…"
-          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+          oninput="autoGrow(this)"
           onblur="saveStylingNotes(this.value)"></textarea>
       </div>
       <div class="styling-notes-box driver-notes-box" style="margin-bottom:0;">
@@ -288,7 +288,7 @@ body.mobile-mode .mobile-only{display:block !important;}
         </div>
         <textarea id="driver-notes-tablet" class="styling-notes-input" rows="2"
           placeholder="Access, parking, transfers…"
-          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+          oninput="autoGrow(this)"
           onblur="saveDriverNotes(this.value)"></textarea>
       </div>
     </div>
@@ -317,7 +317,7 @@ body.mobile-mode .mobile-only{display:block !important;}
       </div>
       <textarea id="styling-notes-mobile" class="styling-notes-input" rows="2"
         placeholder="Notes for the other stylists picking this job…"
-        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+        oninput="autoGrow(this)"
         onblur="saveStylingNotes(this.value)"></textarea>
     </div>
     <div class="styling-notes-box driver-notes-box">
@@ -327,7 +327,7 @@ body.mobile-mode .mobile-only{display:block !important;}
       </div>
       <textarea id="driver-notes" class="styling-notes-input" rows="2"
         placeholder="Anything the driver needs to know — transfers, access, parking…"
-        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+        oninput="autoGrow(this)"
         onblur="saveDriverNotes(this.value)"></textarea>
     </div>
     <div id="accessory-tubs-section-mobile" style="margin-top:24px;padding:16px;background:var(--warm);border:1px solid var(--border);border-radius:3px;display:none;">
@@ -376,6 +376,26 @@ const SB_URL='https://aqgxojawmohhogkhcxdb.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxZ3hvamF3bW9oaG9na2hjeGRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NDc5ODYsImV4cCI6MjA5NDMyMzk4Nn0.-2UOdGY52jDEmCmBBtQA2XEy6dVT8ZPA_AIPcM7RFX4';
 
 const jobId = window.location.pathname.split('/').pop();
+
+// Composition-safe textarea auto-grow.
+// Firefox on Android aborts the keyboard's word-composition session (predictive
+// text / swipe typing) if the field's style is mutated mid-composition — which
+// the old inline handler did on every keystroke. Two guards fix it:
+//   1. skip entirely while a composition session is active (resize on end)
+//   2. only write style.height when the value actually changes
+// Behaviour on Chrome/Safari is unchanged: same resize, same look.
+let _composing=false;
+document.addEventListener('compositionstart',e=>{
+  if(e.target && e.target.tagName==='TEXTAREA') _composing=true;
+});
+document.addEventListener('compositionend',e=>{
+  if(e.target && e.target.tagName==='TEXTAREA'){ _composing=false; autoGrow(e.target); }
+});
+function autoGrow(el){
+  if(_composing) return;
+  const h=el.scrollHeight+'px';
+  if(el.style.height!==h){ el.style.height='auto'; el.style.height=el.scrollHeight+'px'; }
+}
 let currentJob=null, allItems=[], roomNotes={};
 let currentJobIsTransferSource=false; // true if another job names this one as its transfer source
 
@@ -1152,7 +1172,7 @@ function groupRow(grp){
     <button class="item-del" title="Delete item" onclick="deleteGroup('${ids}','${grp.count>1?`${grp.count} items (${serialTxt})`:serialTxt}')" style="margin-top:0;">${trashIcon}</button>
     <textarea class="item-notes" rows="1" placeholder="Add note for driver…"
       onblur="saveNote('${grp.items[0].id}',this.value)"
-      oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+      oninput="autoGrow(this)"
     >${grp.notes}</textarea>
     <div class="photo-strip" id="${stripId}" data-item-id="${firstItemId}"></div>
   </div>`;

@@ -786,7 +786,6 @@ function isTablet(){ return _tabletMode === true; }
 
 function setViewMode(mode){
   _tabletMode = (mode === 'tablet');
-  localStorage.setItem('luma_view_mode', mode);
   document.body.classList.toggle('tablet-mode', _tabletMode);
   document.body.classList.toggle('mobile-mode', !_tabletMode);
   // Update toggle button styles
@@ -804,13 +803,12 @@ function setViewMode(mode){
 
 function initViewMode(){
   const isWide = window.innerWidth >= TABLET_BREAKPOINT;
-  // Show toggle bar only on wide screens
+  // Show toggle bar only on wide screens (Paper is unusable on phones)
   const bar = document.getElementById('view-mode-toggle-bar');
   if(bar) bar.style.display = isWide ? 'flex' : 'none';
-  // Restore saved preference, or default to tablet on wide / mobile on narrow
-  const saved = localStorage.getItem('luma_view_mode');
-  const mode = saved || (isWide ? 'tablet' : 'mobile');
-  setViewMode(mode);
+  // ALWAYS load in Card mode on every device. Paper is an explicit,
+  // per-session choice via the toggle — never restored from storage.
+  setViewMode('mobile');
 }
 
 function paperItemRow(grp){

@@ -416,3 +416,64 @@ def api_deliveries_project_delete(project_id):
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@deliveries_bp.route('/api/deliveries/lines/<line_id>/check', methods=['POST'])
+def api_deliveries_line_check(line_id):
+    """Record stock arriving against one schedule line.
+
+    Accepts either {'delta': +1/-1} to nudge the count, or {'qty': n} to
+    set it outright (used by "receive all" / "clear"). Every change also
+    writes a delivery_checks row, so partial deliveries across several
+    days leave an audit trail rather than just a final number."""
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+
+        got = _sb('GET', 'delivery_lines', f'id=eq.{line_id}')
+        if not got:
+            return jsonify({'success': False, 'error': 'That line no longer exists.'}), 404
+        line = got[0]
+
+        if line.get('is_service'):
+            return jsonify({'success': False,
+                            'error': 'Budget lines aren\'t deliverable.'}), 400
+
+        expected = int(line.get('qty_expected') or 1)
+        current  = int(line.get('qty_received') or 0)
+
+        if 'qty' in payload:
+            new = int(payload['qty'])
+        elif 'delta' in payload:
+            new = current + int(payload['delta'])
+        else:
+            return jsonify({'success': False,
+                            'error': 'Nothing to change — send a delta or a qty.'}), 400
+
+        new = max(0, min(new, expected))   # never below zero or above expected
+        change = new - current
+        if change == 0:
+            return jsonify({'success': True, 'line': line, 'unchanged': True})
+
+        updated = _sb('PATCH', 'delivery_lines', f'id=eq.{line_id}',
+                      body={'qty_received': new})
+
+        # Log the event. A failure here shouldn't lose the count itself,
+        # so it's recorded separately and never rolls back the update.
+        try:
+            _sb('POST', 'delivery_checks', body={
+                'project_id': line.get('project_id'),
+                'line_id':    line_id,
+                'qty':        change,
+                'checked_by': (payload.get('checked_by') or '').strip() or None,
+                'condition':  payload.get('condition') or 'ok',
+                'note':       (payload.get('note') or '').strip() or None,
+            }, prefer='return=minimal')
+        except Exception:
+            pass
+
+        return jsonify({
+            'success': True,
+            'line': (updated[0] if updated else {**line, 'qty_received': new}),
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500

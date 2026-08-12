@@ -19,6 +19,16 @@ from reportlab.lib.colors import HexColor
 
 app = Flask(__name__)
 
+# ── Deliveries (separate department, isolated module) ──
+# Registered defensively: if deliveries.py has an import error or any other
+# problem, the warehouse app keeps running exactly as before — only the
+# /deliveries routes go missing. Nothing in this app depends on it.
+try:
+    from deliveries import deliveries_bp
+    app.register_blueprint(deliveries_bp)
+except Exception as _deliveries_err:
+    print(f'[deliveries] blueprint not loaded: {_deliveries_err}')
+
 # ── Monday.com config ──
 MONDAY_TOKEN = os.environ.get('MONDAY_API_TOKEN', 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY5MDQ1MDg0OCwiYWFpIjoxMSwidWlkIjoxMDYyNjU1MjksImlhZCI6IjIwMjYtMDgtMDZUMTE6MjI6MTYuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjIxMjU3NDI4LCJyZ24iOiJhcHNlMiJ9.mAS-Mwi35B0avY5TcDMwzoXkN5NrSRlXfDaZcx8nOM8')
 MONDAY_BOARD_ID = '1853777501'

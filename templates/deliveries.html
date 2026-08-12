@@ -75,6 +75,16 @@ tr.service{background:#fcfbf8;color:var(--muted);}
 .bar{height:5px;background:var(--sand);border-radius:3px;margin-top:11px;overflow:hidden;}
 .bar-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s;}
 .bar-fill.done{background:var(--green);}
+.recv{display:inline-flex;align-items:center;gap:4px;}
+.recv-btn{width:26px;height:26px;border:1px solid var(--border);background:white;border-radius:3px;cursor:pointer;font-family:inherit;font-size:0.9rem;line-height:1;color:var(--ink);padding:0;}
+.recv-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
+.recv-btn:disabled{opacity:0.3;cursor:not-allowed;}
+.recv-n{min-width:42px;text-align:center;font-weight:600;font-size:0.85rem;}
+.recv-all{border:1px solid var(--border);background:white;border-radius:3px;padding:4px 9px;font-family:inherit;font-size:0.7rem;cursor:pointer;color:var(--muted);white-space:nowrap;}
+.recv-all:hover{border-color:var(--green);color:var(--green);}
+tr.done{background:rgba(74,124,89,0.05);}
+tr.part{background:rgba(184,147,90,0.06);}
+.row-tick{color:var(--green);font-weight:600;}
 .empty{text-align:center;padding:30px;color:var(--muted);font-size:0.83rem;}
 .spinner{width:15px;height:15px;border:2px solid var(--sand);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:-2px;margin-right:7px;}
 @keyframes spin{to{transform:rotate(360deg);}}
@@ -140,8 +150,10 @@ tr.service{background:#fcfbf8;color:var(--muted);}
     <div class="stats" id="proj-stats"></div>
     <div class="toolbar">
       <input class="search" id="pq2" placeholder="Search by product name, SKU, brand or room…" oninput="renderProjectLines()"/>
-      <button class="chip on" id="chip2-items" onclick="toggleChip2(false)">Items only</button>
-      <button class="chip" id="chip2-all" onclick="toggleChip2(true)">Include budget lines</button>
+      <button class="chip on" id="f-all" onclick="setFilter('all')">All</button>
+      <button class="chip" id="f-out" onclick="setFilter('outstanding')">Outstanding</button>
+      <button class="chip" id="f-done" onclick="setFilter('received')">Received</button>
+      <button class="chip" id="chip2-all" onclick="toggleChip2(!showService2)">Budget lines</button>
       <span class="result-count" id="count2"></span>
     </div>
     <div id="proj-table"></div>
@@ -310,9 +322,77 @@ function toggleChip(on){
 }
 function toggleChip2(on){
   showService2 = on;
-  document.getElementById('chip2-items').classList.toggle('on', !on);
   document.getElementById('chip2-all').classList.toggle('on', on);
   renderProjectLines();
+}
+
+let statusFilter = 'all';
+function setFilter(f){
+  statusFilter = f;
+  ['all','out','done'].forEach(k=>{
+    const map = {all:'all', out:'outstanding', done:'received'};
+    document.getElementById('f-'+k).classList.toggle('on', map[k] === f);
+  });
+  renderProjectLines();
+}
+
+function rowClass(l){
+  const exp = l.qty_expected||0, got = l.qty_received||0;
+  if(exp && got >= exp) return 'done';
+  if(got > 0) return 'part';
+  return '';
+}
+
+// Inline receive control: − n / expected + , plus a one-tap "all"
+function receiveCell(l){
+  const exp = l.qty_expected||0, got = l.qty_received||0;
+  const full = exp && got >= exp;
+  return `<span class="recv">
+    <button class="recv-btn" ${got<=0?'disabled':''} title="Remove one"
+      onclick="checkLine('${l.id}',{delta:-1})">−</button>
+    <span class="recv-n ${full?'row-tick':''}">${full?'✓ ':''}${got}/${exp}</span>
+    <button class="recv-btn" ${full?'disabled':''} title="Receive one"
+      onclick="checkLine('${l.id}',{delta:1})">+</button>
+    ${exp>1 && !full ? `<button class="recv-all" onclick="checkLine('${l.id}',{qty:${exp}})">all</button>` : ''}
+    ${full ? `<button class="recv-all" onclick="checkLine('${l.id}',{qty:0})">undo</button>` : ''}
+  </span>`;
+}
+
+// Optimistic: update the number immediately, roll back visibly if the save fails
+async function checkLine(lineId, change){
+  const line = PROJ_LINES.find(l=>l.id===lineId);
+  if(!line) return;
+  const before = line.qty_received||0;
+  const exp = line.qty_expected||0;
+  const optimistic = ('qty' in change) ? change.qty : before + change.delta;
+  line.qty_received = Math.max(0, Math.min(optimistic, exp));
+  refreshProgress();
+  renderProjectLines();
+
+  const r = await api(`/api/deliveries/lines/${lineId}/check`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(change)
+  });
+
+  if(!r.ok){
+    line.qty_received = before;   // put it back
+    refreshProgress();
+    renderProjectLines();
+    alert('Could not save that — ' + r.error);
+    return;
+  }
+  if(r.data.line) line.qty_received = r.data.line.qty_received;
+  refreshProgress();
+}
+
+function refreshProgress(){
+  const items = PROJ_LINES.filter(l=>!l.is_service);
+  const exp = items.reduce((s,l)=>s+(l.qty_expected||0),0);
+  const got = items.reduce((s,l)=>s+(l.qty_received||0),0);
+  PROJ.units_expected = exp; PROJ.units_received = got;
+  const sub = document.getElementById('proj-sub');
+  if(sub) sub.textContent = `${items.length} items · ${got} of ${exp} units received`
+    + (exp && got>=exp ? ' · complete' : '');
 }
 
 function filterLines(all, q, withService){
@@ -346,7 +426,7 @@ function tableHTML(rows, q, showReceived){
       <th>Status</th>
     </tr></thead>
     <tbody>${rows.map(l=>`
-      <tr class="${l.is_service?'service':''}">
+      <tr class="${l.is_service?'service':rowClass(l)}" id="row-${l.id||''}">
         <td class="sec">${l.section||'—'}</td>
         <td>
           <div class="pname">${l.product_name||l.item_label||'—'}</div>
@@ -356,7 +436,7 @@ function tableHTML(rows, q, showReceived){
         <td>${l.sku?`<span class="sku">${l.sku}</span>`:'<span class="sku none">none</span>'}</td>
         <td>${l.brand||'—'}</td>
         <td class="qty">${l.is_service?'—':l.qty_expected}</td>
-        ${showReceived?`<td class="qty">${l.is_service?'—':(l.qty_received||0)}</td>`:''}
+        ${showReceived?`<td>${l.is_service?'<span class="qty">—</span>':receiveCell(l)}</td>`:''}
         <td>${l.is_service?'<span class="badge b-service">budget line</span>':statusBadge(l.programma_status)}</td>
       </tr>`).join('')}
     </tbody></table>`;
@@ -371,7 +451,14 @@ function renderLines(){
 
 function renderProjectLines(){
   const q = document.getElementById('pq2').value.trim().toLowerCase();
-  const rows = filterLines(PROJ_LINES, q, showService2);
+  let rows = filterLines(PROJ_LINES, q, showService2);
+  if(statusFilter !== 'all'){
+    rows = rows.filter(l=>{
+      if(l.is_service) return false;
+      const full = (l.qty_expected||0) && (l.qty_received||0) >= l.qty_expected;
+      return statusFilter === 'received' ? full : !full;
+    });
+  }
   document.getElementById('count2').textContent = `${rows.length} ${rows.length===1?'line':'lines'}${q?' matching':''}`;
   document.getElementById('proj-table').innerHTML = tableHTML(rows, q, true);
 }

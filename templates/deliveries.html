@@ -60,6 +60,21 @@ tr.service{background:#fcfbf8;color:var(--muted);}
 .b-paid{background:rgba(184,147,90,0.15);color:var(--accent);}
 .b-other{background:var(--sand);color:var(--muted);}
 .b-service{background:var(--sand);color:var(--muted);}
+.btn-primary{background:var(--ink);color:white;border:none;border-radius:3px;padding:10px 18px;font-family:'Jost',sans-serif;font-size:0.78rem;letter-spacing:0.07em;text-transform:uppercase;cursor:pointer;white-space:nowrap;}
+.btn-primary:hover{opacity:0.88;}
+.btn-primary:disabled{opacity:0.45;cursor:not-allowed;}
+.backlink{background:none;border:none;color:var(--muted);font-family:inherit;font-size:0.78rem;cursor:pointer;padding:0 0 10px;}
+.backlink:hover{color:var(--ink);}
+.fl{display:block;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);margin-bottom:4px;}
+.save-bar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;background:white;border:1px solid var(--border);border-radius:4px;padding:14px 16px;margin:14px 0;}
+.pcard{display:block;width:100%;text-align:left;background:white;border:1px solid var(--border);border-radius:4px;padding:16px 18px;margin-bottom:10px;cursor:pointer;font-family:inherit;transition:border-color .15s;}
+.pcard:hover{border-color:var(--accent);}
+.pcard-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;}
+.pcard-name{font-family:'Cormorant Garamond',serif;font-size:1.3rem;}
+.pcard-meta{font-size:0.75rem;color:var(--muted);}
+.bar{height:5px;background:var(--sand);border-radius:3px;margin-top:11px;overflow:hidden;}
+.bar-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s;}
+.bar-fill.done{background:var(--green);}
 .empty{text-align:center;padding:30px;color:var(--muted);font-size:0.83rem;}
 .spinner{width:15px;height:15px;border:2px solid var(--sand);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:-2px;margin-right:7px;}
 @keyframes spin{to{transform:rotate(360deg);}}
@@ -73,40 +88,169 @@ tr.service{background:#fcfbf8;color:var(--muted);}
 </header>
 
 <div class="page-wrap">
-  <h1 class="page-title">Deliveries<span>.</span></h1>
-  <div class="page-sub">Import a Programma schedule and check arriving stock against it.</div>
 
-  <div class="dropzone" id="drop" onclick="document.getElementById('file').click()">
-    <div class="dropzone-title">Drop a Programma export here</div>
-    <div class="dropzone-hint">or tap to choose a file — .xlsx schedule export</div>
-  </div>
-  <input type="file" id="file" accept=".xlsx" style="display:none;" onchange="upload(this.files[0])"/>
-
-  <div id="msg"></div>
-  <div id="results" style="display:none;">
-    <div class="stats" id="stats"></div>
+  <!-- ══ View: project list ══ -->
+  <div id="view-list">
+    <h1 class="page-title">Deliveries<span>.</span></h1>
+    <div class="page-sub">Import a Programma schedule, then check arriving stock against it.</div>
     <div class="toolbar">
-      <input class="search" id="q" placeholder="Search by product name, SKU, brand or room…" oninput="render()"/>
-      <button class="chip on" id="chip-items" onclick="toggleChip('items')">Items only</button>
-      <button class="chip" id="chip-all" onclick="toggleChip('all')">Include budget lines</button>
-      <span class="result-count" id="count"></span>
+      <input class="search" id="pq" placeholder="Search projects…" oninput="renderProjects()"/>
+      <button class="btn-primary" onclick="showImport()">+ New import</button>
     </div>
-    <div id="table-wrap"></div>
+    <div id="project-list"></div>
   </div>
+
+  <!-- ══ View: import ══ -->
+  <div id="view-import" style="display:none;">
+    <button class="backlink" onclick="showList()">← All projects</button>
+    <h1 class="page-title">New import<span>.</span></h1>
+    <div class="page-sub">Upload a Programma schedule export, check it looks right, then save it as a project.</div>
+
+    <div class="dropzone" id="drop" onclick="document.getElementById('file').click()">
+      <div class="dropzone-title">Drop a Programma export here</div>
+      <div class="dropzone-hint">or tap to choose a file — .xlsx schedule export</div>
+    </div>
+    <input type="file" id="file" accept=".xlsx" style="display:none;" onchange="upload(this.files[0])"/>
+    <div id="msg"></div>
+
+    <div id="preview" style="display:none;">
+      <div class="stats" id="stats"></div>
+      <div class="save-bar">
+        <div style="flex:1;min-width:220px;">
+          <label class="fl">Project name</label>
+          <input class="search" id="pname" style="width:100%;" placeholder="e.g. Somers Residence"/>
+        </div>
+        <button class="btn-primary" id="btn-save" onclick="saveProject()">Save project</button>
+      </div>
+      <div class="toolbar">
+        <input class="search" id="q" placeholder="Search by product name, SKU, brand or room…" oninput="renderLines()"/>
+        <button class="chip on" id="chip-items" onclick="toggleChip(false)">Items only</button>
+        <button class="chip" id="chip-all" onclick="toggleChip(true)">Include budget lines</button>
+        <span class="result-count" id="count"></span>
+      </div>
+      <div id="table-wrap"></div>
+    </div>
+  </div>
+
+  <!-- ══ View: one project ══ -->
+  <div id="view-project" style="display:none;">
+    <button class="backlink" onclick="showList()">← All projects</button>
+    <h1 class="page-title" id="proj-title"></h1>
+    <div class="page-sub" id="proj-sub"></div>
+    <div class="stats" id="proj-stats"></div>
+    <div class="toolbar">
+      <input class="search" id="pq2" placeholder="Search by product name, SKU, brand or room…" oninput="renderProjectLines()"/>
+      <button class="chip on" id="chip2-items" onclick="toggleChip2(false)">Items only</button>
+      <button class="chip" id="chip2-all" onclick="toggleChip2(true)">Include budget lines</button>
+      <span class="result-count" id="count2"></span>
+    </div>
+    <div id="proj-table"></div>
+  </div>
+
 </div>
 
 <script>
-let LINES = [];
-let showService = false;
+let LINES = [], PROJECTS = [], PROJ = null, PROJ_LINES = [];
+let showService = false, showService2 = false;
 
+// ───────────────── view switching ─────────────────
+function show(view){
+  ['list','import','project'].forEach(v=>{
+    document.getElementById('view-'+v).style.display = (v===view) ? 'block' : 'none';
+  });
+  window.scrollTo(0,0);
+}
+function showList(){ show('list'); loadProjects(); }
+function showImport(){
+  LINES=[]; msg('');
+  document.getElementById('preview').style.display='none';
+  document.getElementById('file').value='';
+  show('import');
+}
+
+function msg(html, cls){
+  document.getElementById('msg').innerHTML = html ? `<div class="notice ${cls||'info'}">${html}</div>` : '';
+}
+
+async function api(url, opts){
+  let res, data;
+  try{ res = await fetch(url, opts); }
+  catch(e){ return {ok:false, error:'Could not reach the server. Check your connection and try again.'}; }
+  try{ data = await res.json(); }
+  catch(e){
+    const raw = await res.text().catch(()=> '');
+    return {ok:false, error:`Server returned an unexpected response (HTTP ${res.status}). ${(raw||'').slice(0,300)}`};
+  }
+  if(!res.ok || !data.success) return {ok:false, error:data.error||`Request failed (HTTP ${res.status}).`};
+  return {ok:true, data};
+}
+
+// ───────────────── project list ─────────────────
+async function loadProjects(){
+  const el = document.getElementById('project-list');
+  el.innerHTML = '<div class="empty"><span class="spinner"></span>Loading projects…</div>';
+  const r = await api('/api/deliveries/projects');
+  if(!r.ok){ el.innerHTML = `<div class="notice err">${r.error}</div>`; return; }
+  PROJECTS = r.data.projects;
+  renderProjects();
+}
+
+function renderProjects(){
+  const el = document.getElementById('project-list');
+  const q = (document.getElementById('pq').value||'').trim().toLowerCase();
+  const list = q ? PROJECTS.filter(p=>(p.name||'').toLowerCase().includes(q)) : PROJECTS;
+
+  if(!PROJECTS.length){
+    el.innerHTML = `<div class="empty">No projects yet. Import a Programma schedule to get started.</div>`;
+    return;
+  }
+  if(!list.length){ el.innerHTML = `<div class="empty">No project matches “${q}”.</div>`; return; }
+
+  el.innerHTML = list.map(p=>`
+    <button class="pcard" onclick="openProject('${p.id}')">
+      <div class="pcard-top">
+        <span class="pcard-name">${p.name}</span>
+        <span class="pcard-meta">${p.units_received} of ${p.units_expected} units received</span>
+      </div>
+      <div class="pcard-meta">${p.item_count} items${p.source_filename?' · '+p.source_filename:''}</div>
+      <div class="bar"><div class="bar-fill ${p.complete?'done':''}" style="width:${p.pct}%;"></div></div>
+    </button>`).join('');
+}
+
+// ───────────────── open one project ─────────────────
+async function openProject(id){
+  show('project');
+  document.getElementById('proj-title').textContent = 'Loading…';
+  document.getElementById('proj-sub').textContent = '';
+  document.getElementById('proj-stats').innerHTML = '';
+  document.getElementById('proj-table').innerHTML = '';
+  const r = await api('/api/deliveries/projects/'+id);
+  if(!r.ok){
+    document.getElementById('proj-title').textContent = 'Deliveries';
+    document.getElementById('proj-table').innerHTML = `<div class="notice err">${r.error}</div>`;
+    return;
+  }
+  PROJ = r.data.project; PROJ_LINES = r.data.lines;
+  document.getElementById('proj-title').innerHTML = PROJ.name + '<span>.</span>';
+  document.getElementById('proj-sub').textContent =
+    `${PROJ.item_count} items · ${PROJ.units_received} of ${PROJ.units_expected} units received`;
+  document.getElementById('proj-stats').innerHTML = statsHTML({
+    deliverable: PROJ.item_count,
+    units: PROJ.units_expected,
+    sections: new Set(PROJ_LINES.filter(l=>l.section).map(l=>l.section)).size,
+    missing_sku: PROJ_LINES.filter(l=>!l.is_service && !l.sku).length,
+    service: PROJ_LINES.filter(l=>l.is_service).length,
+  });
+  renderProjectLines();
+}
+
+// ───────────────── import ─────────────────
 const drop = document.getElementById('drop');
 ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag');}));
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag');}));
 drop.addEventListener('drop',e=>{ if(e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); });
 
-function msg(html, cls){
-  document.getElementById('msg').innerHTML = html ? `<div class="notice ${cls||'info'}">${html}</div>` : '';
-}
+let LAST_FILE = null, LAST_META = null;
 
 async function upload(file){
   if(!file) return;
@@ -115,62 +259,64 @@ async function upload(file){
     return;
   }
   msg('<span class="spinner"></span>Reading ' + file.name + '…');
-  document.getElementById('results').style.display='none';
+  document.getElementById('preview').style.display='none';
 
-  const fd = new FormData();
-  fd.append('file', file);
-  let data;
-  try{
-    const res = await fetch('/api/deliveries/parse', {method:'POST', body:fd});
-    try{ data = await res.json(); }
-    catch(parseErr){
-      const raw = await res.text().catch(()=> '');
-      msg(`Server returned an unexpected response (HTTP ${res.status}).<pre style="white-space:pre-wrap;font-size:0.75rem;">${(raw||'No details').slice(0,600)}</pre>`,'err');
-      return;
-    }
-  }catch(netErr){
-    msg('Could not reach the server. Check your connection and try again.','err');
-    return;
-  }
+  const fd = new FormData(); fd.append('file', file);
+  const r = await api('/api/deliveries/parse', {method:'POST', body:fd});
+  if(!r.ok){ msg('Could not read that file — ' + r.error, 'err'); return; }
 
-  if(!data.success){
-    msg('Could not read that file — ' + data.error, 'err');
-    return;
-  }
-
-  LINES = data.lines;
+  const d = r.data;
+  LINES = d.lines; LAST_FILE = d.filename; LAST_META = d.meta;
   msg('');
-  document.getElementById('results').style.display='block';
+  document.getElementById('preview').style.display='block';
+  document.getElementById('stats').innerHTML = statsHTML(d.counts);
+  const nameEl = document.getElementById('pname');
+  if(!nameEl.value) nameEl.value = d.meta.project || file.name.replace(/\.xlsx$/i,'');
+  renderLines();
+}
 
-  const c = data.counts;
-  const m = data.meta;
-  document.getElementById('stats').innerHTML = `
+function statsHTML(c){
+  return `
     <div class="stat"><div class="stat-n">${c.deliverable}</div><div class="stat-l">Items</div></div>
     <div class="stat accent"><div class="stat-n">${c.units}</div><div class="stat-l">Units expected</div></div>
     <div class="stat"><div class="stat-n">${c.sections}</div><div class="stat-l">Rooms</div></div>
     <div class="stat"><div class="stat-n">${c.missing_sku}</div><div class="stat-l">Without SKU</div></div>
     <div class="stat"><div class="stat-n">${c.service}</div><div class="stat-l">Budget lines</div></div>`;
-  msg(`Read <strong>${m.project||'this schedule'}</strong> — nothing has been saved yet, this is a preview of what the importer found.`);
-  render();
 }
 
-function toggleChip(which){
-  showService = (which === 'all');
-  document.getElementById('chip-items').classList.toggle('on', !showService);
-  document.getElementById('chip-all').classList.toggle('on', showService);
-  render();
+async function saveProject(){
+  const name = document.getElementById('pname').value.trim();
+  if(!name){ msg('Give the project a name before saving.','err'); document.getElementById('pname').focus(); return; }
+  if(!LINES.length){ msg('There is nothing to save yet.','err'); return; }
+
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const r = await api('/api/deliveries/projects', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, filename:LAST_FILE, meta:LAST_META, lines:LINES})
+  });
+  btn.disabled = false; btn.textContent = 'Save project';
+
+  if(!r.ok){ msg('Could not save — ' + r.error, 'err'); return; }
+  openProject(r.data.project.id);
 }
 
-function statusBadge(s){
-  if(!s) return '<span class="badge b-other">—</span>';
-  const cls = s==='delivered' ? 'b-delivered' : (s==='paid' ? 'b-paid' : 'b-other');
-  return `<span class="badge ${cls}">${s.replace(/_/g,' ')}</span>`;
+// ───────────────── shared line rendering ─────────────────
+function toggleChip(on){
+  showService = on;
+  document.getElementById('chip-items').classList.toggle('on', !on);
+  document.getElementById('chip-all').classList.toggle('on', on);
+  renderLines();
+}
+function toggleChip2(on){
+  showService2 = on;
+  document.getElementById('chip2-items').classList.toggle('on', !on);
+  document.getElementById('chip2-all').classList.toggle('on', on);
+  renderProjectLines();
 }
 
-function render(){
-  const q = document.getElementById('q').value.trim().toLowerCase();
-  let rows = showService ? LINES : LINES.filter(l=>!l.is_service);
-
+function filterLines(all, q, withService){
+  let rows = withService ? all : all.filter(l=>!l.is_service);
   if(q){
     const terms = q.split(/\s+/);
     rows = rows.filter(l=>{
@@ -179,20 +325,25 @@ function render(){
       return terms.every(t=>hay.includes(t));
     });
   }
+  return rows;
+}
 
-  document.getElementById('count').textContent =
-    `${rows.length} ${rows.length===1?'line':'lines'}${q?' matching':''}`;
+function statusBadge(s){
+  if(!s) return '<span class="badge b-other">—</span>';
+  const cls = s==='delivered' ? 'b-delivered' : (s==='paid' ? 'b-paid' : 'b-other');
+  return `<span class="badge ${cls}">${s.replace(/_/g,' ')}</span>`;
+}
 
-  const wrap = document.getElementById('table-wrap');
+function tableHTML(rows, q, showReceived){
   if(!rows.length){
-    wrap.innerHTML = `<div class="empty">Nothing matches “${q}”. Try a shorter search — part of a product name, or the first few characters of a SKU.</div>`;
-    return;
+    return `<div class="empty">Nothing matches “${q}”. Try a shorter search — part of a product name, or the first few characters of a SKU.</div>`;
   }
-
-  wrap.innerHTML = `<table>
+  return `<table>
     <thead><tr>
       <th>Room</th><th>Item</th><th>SKU</th><th>Brand</th>
-      <th style="text-align:center;">Qty</th><th>Status</th>
+      <th style="text-align:center;">Qty</th>
+      ${showReceived?'<th style="text-align:center;">Received</th>':''}
+      <th>Status</th>
     </tr></thead>
     <tbody>${rows.map(l=>`
       <tr class="${l.is_service?'service':''}">
@@ -205,10 +356,27 @@ function render(){
         <td>${l.sku?`<span class="sku">${l.sku}</span>`:'<span class="sku none">none</span>'}</td>
         <td>${l.brand||'—'}</td>
         <td class="qty">${l.is_service?'—':l.qty_expected}</td>
+        ${showReceived?`<td class="qty">${l.is_service?'—':(l.qty_received||0)}</td>`:''}
         <td>${l.is_service?'<span class="badge b-service">budget line</span>':statusBadge(l.programma_status)}</td>
       </tr>`).join('')}
     </tbody></table>`;
 }
+
+function renderLines(){
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const rows = filterLines(LINES, q, showService);
+  document.getElementById('count').textContent = `${rows.length} ${rows.length===1?'line':'lines'}${q?' matching':''}`;
+  document.getElementById('table-wrap').innerHTML = tableHTML(rows, q, false);
+}
+
+function renderProjectLines(){
+  const q = document.getElementById('pq2').value.trim().toLowerCase();
+  const rows = filterLines(PROJ_LINES, q, showService2);
+  document.getElementById('count2').textContent = `${rows.length} ${rows.length===1?'line':'lines'}${q?' matching':''}`;
+  document.getElementById('proj-table').innerHTML = tableHTML(rows, q, true);
+}
+
+loadProjects();
 </script>
 </body>
 </html>

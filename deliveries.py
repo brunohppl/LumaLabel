@@ -265,3 +265,154 @@ def api_deliveries_parse():
     except Exception as e:
         return jsonify({'success': False,
                         'error': f'{type(e).__name__}: {e}'}), 500
+
+
+# ─────────────────────────── storage ───────────────────────────
+# Own Supabase helpers rather than importing from app.py, so this module
+# stays standalone. These RAISE on failure — the routes below turn that
+# into a JSON error. Silent failures have cost us too much elsewhere.
+
+import os
+import json as _json
+import urllib.request
+import urllib.error
+
+_SB_URL = os.environ.get('SUPABASE_URL', 'https://aqgxojawmohhogkhcxdb.supabase.co') + '/rest/v1'
+_SB_KEY = os.environ.get('SUPABASE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxZ3hvamF3bW9oaG9na2hjeGRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NDc5ODYsImV4cCI6MjA5NDMyMzk4Nn0.-2UOdGY52jDEmCmBBtQA2XEy6dVT8ZPA_AIPcM7RFX4')
+
+
+def _sb(method, table, params='', body=None, prefer='return=representation'):
+    url = f'{_SB_URL}/{table}' + (f'?{params}' if params else '')
+    headers = {
+        'apikey': _SB_KEY,
+        'Authorization': 'Bearer ' + _SB_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': prefer,
+    }
+    data = _json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            raw = r.read()
+            return _json.loads(raw) if raw else []
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode(errors='replace')[:400]
+        raise RuntimeError(f'Supabase {method} {table} failed ({e.code}): {detail}')
+    except Exception as e:
+        raise RuntimeError(f'Supabase {method} {table} failed: {e}')
+
+
+# Fields copied from a parsed line into delivery_lines
+_LINE_FIELDS = (
+    'section', 'item_label', 'product_name', 'brand', 'sku', 'doc_code',
+    'colour', 'finish', 'material', 'dimensions', 'lead_time',
+    'qty_expected', 'rrp', 'programma_status', 'supplier', 'url',
+    'important_info', 'notes', 'is_service',
+)
+
+
+def _project_summary(project, lines):
+    """Attach received/expected progress to a project record."""
+    items = [l for l in lines if not l.get('is_service')]
+    expected = sum(int(l.get('qty_expected') or 0) for l in items)
+    received = sum(int(l.get('qty_received') or 0) for l in items)
+    return {
+        **project,
+        'item_count':    len(items),
+        'units_expected': expected,
+        'units_received': received,
+        'pct':           round(received / expected * 100) if expected else 0,
+        'complete':      expected > 0 and received >= expected,
+    }
+
+
+@deliveries_bp.route('/api/deliveries/projects', methods=['GET'])
+def api_deliveries_projects():
+    """List saved projects with their receiving progress."""
+    try:
+        projects = _sb('GET', 'delivery_projects', 'order=created_at.desc')
+        if not projects:
+            return jsonify({'success': True, 'projects': []})
+        ids = ','.join(p['id'] for p in projects)
+        lines = _sb('GET', 'delivery_lines',
+                    f'project_id=in.({ids})'
+                    '&select=project_id,qty_expected,qty_received,is_service')
+        by_project = {}
+        for l in lines:
+            by_project.setdefault(l['project_id'], []).append(l)
+        return jsonify({
+            'success': True,
+            'projects': [_project_summary(p, by_project.get(p['id'], []))
+                         for p in projects],
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@deliveries_bp.route('/api/deliveries/projects', methods=['POST'])
+def api_deliveries_project_create():
+    """Save a parsed schedule as a new project."""
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        name = (payload.get('name') or '').strip()
+        lines = payload.get('lines') or []
+        if not name:
+            return jsonify({'success': False, 'error': 'Give the project a name before saving.'}), 400
+        if not lines:
+            return jsonify({'success': False, 'error': 'There are no lines to save.'}), 400
+
+        created = _sb('POST', 'delivery_projects', body={
+            'name':              name,
+            'source_filename':   payload.get('filename'),
+            'programma_project': (payload.get('meta') or {}).get('project'),
+        })
+        if not created:
+            raise RuntimeError('Project row was not returned after insert.')
+        project = created[0]
+
+        rows = []
+        for l in lines:
+            row = {f: l.get(f) for f in _LINE_FIELDS}
+            row['project_id'] = project['id']
+            row['qty_received'] = 0
+            rows.append(row)
+
+        # Insert in chunks so a large schedule can't time out the request
+        for i in range(0, len(rows), 200):
+            _sb('POST', 'delivery_lines', body=rows[i:i + 200],
+                prefer='return=minimal')
+
+        return jsonify({'success': True, 'project': project, 'saved': len(rows)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@deliveries_bp.route('/api/deliveries/projects/<project_id>', methods=['GET'])
+def api_deliveries_project(project_id):
+    """Fetch one project and all of its lines."""
+    try:
+        got = _sb('GET', 'delivery_projects', f'id=eq.{project_id}')
+        if not got:
+            return jsonify({'success': False, 'error': 'That project no longer exists.'}), 404
+        lines = _sb('GET', 'delivery_lines',
+                    f'project_id=eq.{project_id}&order=id.asc')
+        return jsonify({
+            'success': True,
+            'project': _project_summary(got[0], lines),
+            'lines':   lines,
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@deliveries_bp.route('/api/deliveries/projects/<project_id>', methods=['DELETE'])
+def api_deliveries_project_delete(project_id):
+    """Remove a project and its lines (useful while testing imports)."""
+    try:
+        _sb('DELETE', 'delivery_lines', f'project_id=eq.{project_id}',
+            prefer='return=minimal')
+        _sb('DELETE', 'delivery_projects', f'id=eq.{project_id}',
+            prefer='return=minimal')
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500

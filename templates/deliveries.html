@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Deliveries — LUMA</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --ink:#1A1714; --muted:#9A8F80; --border:#D8CFBF;
+  --warm:#F7F4EE; --sand:#EFE9DE; --accent:#B8935A;
+  --green:#4A7C59; --red:#A63D2F;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;font-size:0.9rem;}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:white;border-bottom:1px solid var(--border);}
+.logo{font-family:'Cormorant Garamond',serif;font-size:1.3rem;letter-spacing:0.12em;}
+.logo em{font-style:normal;color:var(--accent);}
+.dept-tag{font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);border:1px solid var(--border);border-radius:2px;padding:3px 8px;}
+.page-wrap{max-width:1400px;margin:0 auto;padding:24px 22px 60px;}
+.page-title{font-family:'Cormorant Garamond',serif;font-size:1.9rem;font-weight:400;margin:0 0 2px;}
+.page-title span{color:var(--accent);}
+.page-sub{font-size:0.8rem;color:var(--muted);margin-bottom:22px;}
+
+.dropzone{border:1px dashed var(--border);background:white;border-radius:4px;padding:34px 22px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;}
+.dropzone:hover,.dropzone.drag{border-color:var(--accent);background:#fffdf9;}
+.dropzone-title{font-family:'Cormorant Garamond',serif;font-size:1.25rem;margin-bottom:4px;}
+.dropzone-hint{font-size:0.78rem;color:var(--muted);}
+
+.notice{border-radius:4px;padding:12px 16px;font-size:0.83rem;margin-top:16px;}
+.notice.err{background:rgba(166,61,47,0.07);border:1px solid var(--red);color:var(--red);}
+.notice.info{background:white;border:1px solid var(--border);color:var(--muted);}
+
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 6px;}
+.stat{background:white;border:1px solid var(--border);border-radius:4px;padding:11px 16px;min-width:104px;}
+.stat-n{font-family:'Cormorant Garamond',serif;font-size:1.5rem;line-height:1.1;}
+.stat-l{font-size:0.62rem;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);margin-top:2px;}
+.stat.accent .stat-n{color:var(--accent);}
+
+.toolbar{display:flex;gap:10px;align-items:center;margin:18px 0 12px;flex-wrap:wrap;}
+.search{flex:1;min-width:240px;padding:10px 13px;border:1px solid var(--border);border-radius:3px;font-family:inherit;font-size:0.87rem;background:white;}
+.search:focus{outline:none;border-color:var(--accent);}
+.chip{border:1px solid var(--border);background:white;border-radius:14px;padding:6px 13px;font-size:0.74rem;cursor:pointer;font-family:inherit;color:var(--muted);}
+.chip.on{background:var(--ink);color:white;border-color:var(--ink);}
+.result-count{font-size:0.75rem;color:var(--muted);}
+
+table{width:100%;border-collapse:collapse;background:white;border:1px solid var(--border);border-radius:3px;overflow:hidden;}
+th{text-align:left;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);font-weight:600;padding:10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:10px;border-bottom:1px solid var(--sand);vertical-align:top;font-size:0.83rem;}
+tr:last-child td{border-bottom:none;}
+tr.service{background:#fcfbf8;color:var(--muted);}
+.sec{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);white-space:nowrap;}
+.pname{font-weight:500;}
+.pmeta{font-size:0.73rem;color:var(--muted);margin-top:2px;}
+.sku{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.76rem;color:var(--accent);}
+.sku.none{color:var(--border);font-family:inherit;font-style:italic;}
+.qty{font-weight:600;text-align:center;}
+.badge{display:inline-block;font-size:0.66rem;border-radius:10px;padding:2px 9px;letter-spacing:0.04em;white-space:nowrap;}
+.b-delivered{background:rgba(74,124,89,0.13);color:var(--green);}
+.b-paid{background:rgba(184,147,90,0.15);color:var(--accent);}
+.b-other{background:var(--sand);color:var(--muted);}
+.b-service{background:var(--sand);color:var(--muted);}
+.empty{text-align:center;padding:30px;color:var(--muted);font-size:0.83rem;}
+.spinner{width:15px;height:15px;border:2px solid var(--sand);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:-2px;margin-right:7px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">LU<em>MA</em></div>
+  <div class="dept-tag">Deliveries · testing</div>
+</header>
+
+<div class="page-wrap">
+  <h1 class="page-title">Deliveries<span>.</span></h1>
+  <div class="page-sub">Import a Programma schedule and check arriving stock against it.</div>
+
+  <div class="dropzone" id="drop" onclick="document.getElementById('file').click()">
+    <div class="dropzone-title">Drop a Programma export here</div>
+    <div class="dropzone-hint">or tap to choose a file — .xlsx schedule export</div>
+  </div>
+  <input type="file" id="file" accept=".xlsx" style="display:none;" onchange="upload(this.files[0])"/>
+
+  <div id="msg"></div>
+  <div id="results" style="display:none;">
+    <div class="stats" id="stats"></div>
+    <div class="toolbar">
+      <input class="search" id="q" placeholder="Search by product name, SKU, brand or room…" oninput="render()"/>
+      <button class="chip on" id="chip-items" onclick="toggleChip('items')">Items only</button>
+      <button class="chip" id="chip-all" onclick="toggleChip('all')">Include budget lines</button>
+      <span class="result-count" id="count"></span>
+    </div>
+    <div id="table-wrap"></div>
+  </div>
+</div>
+
+<script>
+let LINES = [];
+let showService = false;
+
+const drop = document.getElementById('drop');
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag');}));
+drop.addEventListener('drop',e=>{ if(e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); });
+
+function msg(html, cls){
+  document.getElementById('msg').innerHTML = html ? `<div class="notice ${cls||'info'}">${html}</div>` : '';
+}
+
+async function upload(file){
+  if(!file) return;
+  if(!file.name.toLowerCase().endsWith('.xlsx')){
+    msg('That file isn\'t an .xlsx. Export the schedule from Programma as Excel and try again.','err');
+    return;
+  }
+  msg('<span class="spinner"></span>Reading ' + file.name + '…');
+  document.getElementById('results').style.display='none';
+
+  const fd = new FormData();
+  fd.append('file', file);
+  let data;
+  try{
+    const res = await fetch('/api/deliveries/parse', {method:'POST', body:fd});
+    try{ data = await res.json(); }
+    catch(parseErr){
+      const raw = await res.text().catch(()=> '');
+      msg(`Server returned an unexpected response (HTTP ${res.status}).<pre style="white-space:pre-wrap;font-size:0.75rem;">${(raw||'No details').slice(0,600)}</pre>`,'err');
+      return;
+    }
+  }catch(netErr){
+    msg('Could not reach the server. Check your connection and try again.','err');
+    return;
+  }
+
+  if(!data.success){
+    msg('Could not read that file — ' + data.error, 'err');
+    return;
+  }
+
+  LINES = data.lines;
+  msg('');
+  document.getElementById('results').style.display='block';
+
+  const c = data.counts;
+  const m = data.meta;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-n">${c.deliverable}</div><div class="stat-l">Items</div></div>
+    <div class="stat accent"><div class="stat-n">${c.units}</div><div class="stat-l">Units expected</div></div>
+    <div class="stat"><div class="stat-n">${c.sections}</div><div class="stat-l">Rooms</div></div>
+    <div class="stat"><div class="stat-n">${c.missing_sku}</div><div class="stat-l">Without SKU</div></div>
+    <div class="stat"><div class="stat-n">${c.service}</div><div class="stat-l">Budget lines</div></div>`;
+  msg(`Read <strong>${m.project||'this schedule'}</strong> — nothing has been saved yet, this is a preview of what the importer found.`);
+  render();
+}
+
+function toggleChip(which){
+  showService = (which === 'all');
+  document.getElementById('chip-items').classList.toggle('on', !showService);
+  document.getElementById('chip-all').classList.toggle('on', showService);
+  render();
+}
+
+function statusBadge(s){
+  if(!s) return '<span class="badge b-other">—</span>';
+  const cls = s==='delivered' ? 'b-delivered' : (s==='paid' ? 'b-paid' : 'b-other');
+  return `<span class="badge ${cls}">${s.replace(/_/g,' ')}</span>`;
+}
+
+function render(){
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  let rows = showService ? LINES : LINES.filter(l=>!l.is_service);
+
+  if(q){
+    const terms = q.split(/\s+/);
+    rows = rows.filter(l=>{
+      const hay = [l.product_name,l.item_label,l.sku,l.brand,l.section,l.colour,l.supplier]
+        .filter(Boolean).join(' ').toLowerCase();
+      return terms.every(t=>hay.includes(t));
+    });
+  }
+
+  document.getElementById('count').textContent =
+    `${rows.length} ${rows.length===1?'line':'lines'}${q?' matching':''}`;
+
+  const wrap = document.getElementById('table-wrap');
+  if(!rows.length){
+    wrap.innerHTML = `<div class="empty">Nothing matches “${q}”. Try a shorter search — part of a product name, or the first few characters of a SKU.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = `<table>
+    <thead><tr>
+      <th>Room</th><th>Item</th><th>SKU</th><th>Brand</th>
+      <th style="text-align:center;">Qty</th><th>Status</th>
+    </tr></thead>
+    <tbody>${rows.map(l=>`
+      <tr class="${l.is_service?'service':''}">
+        <td class="sec">${l.section||'—'}</td>
+        <td>
+          <div class="pname">${l.product_name||l.item_label||'—'}</div>
+          ${l.product_name&&l.item_label?`<div class="pmeta">${l.item_label}</div>`:''}
+          ${l.colour?`<div class="pmeta">${l.colour}</div>`:''}
+        </td>
+        <td>${l.sku?`<span class="sku">${l.sku}</span>`:'<span class="sku none">none</span>'}</td>
+        <td>${l.brand||'—'}</td>
+        <td class="qty">${l.is_service?'—':l.qty_expected}</td>
+        <td>${l.is_service?'<span class="badge b-service">budget line</span>':statusBadge(l.programma_status)}</td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+</script>
+</body>
+</html>

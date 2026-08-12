@@ -149,6 +149,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       <div class="wizard-dot" id="dot-3"></div>
       <div class="wizard-dot" id="dot-4"></div>
       <div class="wizard-dot" id="dot-5"></div>
+      <div class="wizard-dot" id="dot-6"></div>
     </div>
 
     <!-- Step 0: Category -->
@@ -260,6 +261,17 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       <button class="wizard-back" onclick="goBack(2)">← Back</button>
     </div>
 
+    <!-- Step (property only): was this pre-existing or caused by us? -->
+    <div class="wizard-step" id="step-prop-fault">
+      <div class="wizard-q">Was this damage already there?</div>
+      <div class="wizard-options">
+        <button class="wizard-opt" onclick="choose(3,'damage_origin','existing')"><span class="opt-icon">📋</span>Pre-existing — already there</button>
+        <button class="wizard-opt" onclick="choose(3,'damage_origin','caused')"><span class="opt-icon">⚠️</span>Caused by us</button>
+        <button class="wizard-opt" onclick="choose(3,'damage_origin','unsure')"><span class="opt-icon">❓</span>Not sure</button>
+      </div>
+      <button class="wizard-back" onclick="showStep('2')">← Back</button>
+    </div>
+
     <!-- Step 4: Photos + notes -->
     <div class="wizard-step" id="step-3">
       <div class="wizard-q">Add photos</div>
@@ -280,7 +292,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 
       <button class="btn-submit" onclick="submitReport()">Submit Report</button>
       <button class="btn-skip" onclick="submitReport(true)">Skip photos & submit</button>
-      <button class="wizard-back" onclick="goBack(3)">← Back</button>
+      <button class="wizard-back" onclick="showStep(_wizardData.report_category==='property' ? '3' : '2')">← Back</button>
     </div>
   </div>
 </div>
@@ -304,6 +316,7 @@ const LABELS = {
   damage_type:{scratch:'Scratch',dent:'Dent',broken_leg:'Broken leg',broken_top:'Broken top',tear:'Tear',crack:'Crack',hole:'Hole',paint_chip:'Paint chip',stain:'Stain',broken:'Broken'},
   furniture:  {sofa:'Sofa',table:'Table',chair:'Chair',rug:'Rug',storage_unit:'Storage unit',bedhead:'Bedhead',accessories:'Accessories'},
   property_element: {wall:'Wall',floor:'Floor',stairway:'Stairway',door:'Door',doorframe:'Door frame',ceiling:'Ceiling',skirting:'Skirting board',other:'Other'},
+  damage_origin: {existing:'Pre-existing',caused:'Caused by us',unsure:'Not sure'},
 };
 
 let reports = [];
@@ -361,6 +374,7 @@ function reportGroupHTML(title, list, isProperty){
         <th>Where</th>
         <th>Damage</th>
         <th>Item / Element</th>
+        ${isProperty ? '<th>Origin</th>' : ''}
         <th>Photo</th>
         <th></th>
       </tr></thead>
@@ -373,6 +387,9 @@ function reportGroupHTML(title, list, isProperty){
           <td><span class="tag tag-furniture">${isProperty ? (LABELS.property_element[r.property_element]||r.property_element||'—') : (LABELS.furniture[r.furniture]||r.furniture)}</span>
             ${isProperty && r.job_ref_snapshot ? `<div style="font-size:0.7rem;color:var(--muted);margin-top:3px;">${r.job_ref_snapshot}</div>` : ''}
           </td>
+          ${isProperty ? `<td>${r.damage_origin
+            ? `<span class="tag" style="background:${r.damage_origin==='caused'?'rgba(232,92,71,0.12)':r.damage_origin==='existing'?'rgba(74,124,89,0.12)':'var(--warm)'};color:${r.damage_origin==='caused'?'var(--red)':r.damage_origin==='existing'?'var(--green)':'var(--muted)'};">${LABELS.damage_origin[r.damage_origin]||r.damage_origin}</span>`
+            : '<span style="color:var(--border);font-size:0.8rem;">—</span>'}</td>` : ''}
           <td>${(() => {
             if(!r.photo_url) return '<span style="color:var(--border);font-size:0.8rem;">—</span>';
             let urls;
@@ -513,6 +530,7 @@ function editReport(id){
   _wizardData={
     location:r.location, damage_type:r.damage_type, furniture:r.furniture,
     report_category:r.report_category||'furniture', property_element:r.property_element,
+    damage_origin:r.damage_origin||null,
     notes:r.notes||'', job_id:r.job_id||null, job_ref_snapshot:r.job_ref_snapshot||null
   };
   _photos=[];
@@ -537,13 +555,17 @@ function editReport(id){
       document.querySelectorAll('#step-prop-element .wizard-opt').forEach(btn=>{
         btn.classList.toggle('selected', btn.getAttribute('onclick')?.includes(`'${r.property_element}'`));
       });
+      document.querySelectorAll('#step-prop-fault .wizard-opt').forEach(btn=>{
+        btn.classList.toggle('selected', btn.getAttribute('onclick')?.includes(`'${r.damage_origin}'`));
+      });
     } else {
       document.querySelectorAll('#step-2 .wizard-opt').forEach(btn=>{
         btn.classList.toggle('selected', btn.getAttribute('onclick')?.includes(`'${r.furniture}'`));
       });
     }
   },50);
-  showStep('3');
+  // Photos is step '4' for property (after the fault step), '3' for furniture
+  showStep(_wizardData.report_category==='property' ? '4' : '3');
   const notesEl=document.getElementById('wizard-notes');
   if(notesEl) notesEl.value=r.notes||'';
   // Show existing photos as a note
@@ -565,7 +587,9 @@ function closeWizard(){
   _editingId=null;_existingPhotoUrl=null;
 }
 
-// Step names: 'cat', 'job-search', '0' (where), '1' (type), '2' (sub), '3' (photos)
+// Step names: 'cat', 'job-search', '0' (where), '1' (type), '2' (sub),
+// '3' (property only: pre-existing vs caused by us), '4' (photos).
+// Furniture skips step 3 entirely — '2' goes straight to photos.
 function showStep(name){
   const isProperty = _wizardData.report_category==='property';
   const stepIdMap = {
@@ -574,15 +598,21 @@ function showStep(name){
     '0': isProperty ? 'step-prop-where' : 'step-0',
     '1': isProperty ? 'step-prop-type' : 'step-1',
     '2': isProperty ? 'step-prop-element' : 'step-2',
-    '3':'step-3',
+    '3': isProperty ? 'step-prop-fault' : 'step-3',
+    '4':'step-3',
   };
   const targetId = stepIdMap[name] || name;
   document.querySelectorAll('.wizard-step').forEach(s=>s.classList.remove('active'));
   const target=document.getElementById(targetId);
   if(target) target.classList.add('active');
   // Progress dots
-  const order=['cat','job-search','0','1','2','3'];
+  const order = isProperty
+    ? ['cat','job-search','0','1','2','3','4']
+    : ['cat','job-search','0','1','2','3'];
   const idx=order.indexOf(String(name));
+  // Property has one extra step, so show the 7th dot only for property
+  const dot6=document.getElementById('dot-6');
+  if(dot6) dot6.style.display = isProperty ? '' : 'none';
   document.querySelectorAll('.wizard-dot').forEach((d,i)=>d.classList.toggle('done',i<=idx));
 }
 

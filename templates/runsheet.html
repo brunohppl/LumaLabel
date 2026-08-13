@@ -57,6 +57,14 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .rs-add-team-btn:hover{border-color:var(--accent);color:var(--accent);}
 .rs-cell{border-top:1px solid var(--border);cursor:pointer;transition:background 0.12s;position:relative;margin:0 3px;}
 .rs-cell:hover{background:rgba(184,147,90,0.05);}
+.rs-cell.drop-target{background:rgba(184,147,90,0.22);box-shadow:inset 0 0 0 2px var(--accent);}
+.rs-tile.dragging{opacity:0.4;}
+.rs-tile{ -webkit-user-select:none; user-select:none; }
+.rs-resize{position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize;border-radius:0 0 3px 3px;}
+.rs-resize:hover{background:rgba(255,255,255,0.35);}
+.rs-tile.resizing{opacity:0.85;box-shadow:0 0 0 2px var(--accent);}
+.rs-tray-tile[draggable="true"]{cursor:grab;}
+.rs-tray-tile.dragging{opacity:0.4;}
 .rs-tile{position:absolute;left:4px;right:4px;border-radius:5px;padding:5px 7px;overflow:hidden;cursor:pointer;z-index:2;border-left:3px solid transparent;transition:opacity 0.12s;}
 .rs-tile:hover{opacity:0.88;}
 .rs-tile-label{font-size:0.6rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;opacity:0.75;color:rgba(255,255,255,0.8);}
@@ -326,7 +334,7 @@ function render(){
     const showLbl=slot.endsWith(':00');
     g+=`<div class="rs-time" style="grid-column:1;grid-row:${row};">${showLbl?fmtSlot(slot):''}</div>`;
     dayTeams.forEach((_,i)=>{
-      g+=`<div class="rs-cell" style="grid-column:${i+2};grid-row:${row};" data-team="${i}" data-slot="${slot}" onclick="openEntryPop(null,'${dayTeams[i].id}','${slot}')"></div>`;
+      g+=`<div class="rs-cell" style="grid-column:${i+2};grid-row:${row};" data-team="${i}" data-slot="${slot}" onclick="if(!_suppressClick)openEntryPop(null,'${dayTeams[i].id}','${slot}')" ondragover="cellDragOver(event,this)" ondragleave="cellDragLeave(this)" ondrop="cellDrop(event,this)"></div>`;
     });
     g+=`<div style="grid-column:${n+2};grid-row:${row};border-top:1px solid var(--border);"></div>`;
   });
@@ -393,8 +401,22 @@ function render(){
       const tile=document.createElement('div');
       tile.className=`rs-tile ${typeKey}`;
       tile.style.cssText=`top:0;left:calc(${left}% + 2px);width:calc(${width}% - 4px);height:${span*SLOT_H-4}px;cursor:pointer;position:absolute;`;
-      tile.innerHTML=`<div class="rs-tile-label">${lbl}</div><div class="rs-tile-ref">${ref}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''}${propTag?`<div class="rs-tile-prop">${propTag}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
-      tile.onclick=(ev)=>{ev.stopPropagation();openEntryPop(e.id,team.id,null);};
+      tile.innerHTML=`<div class="rs-tile-label">${lbl}<span class="rs-tile-dur" style="float:right;opacity:0.8;">${fmtDuration(e.duration)}</span></div><div class="rs-tile-ref">${ref}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''}${propTag?`<div class="rs-tile-prop">${propTag}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
+      tile.onclick=(ev)=>{ev.stopPropagation();if(_suppressClick)return;openEntryPop(e.id,team.id,null);};
+
+      // Drag to move between teams / times
+      tile.draggable=true;
+      tile.addEventListener('dragstart',ev=>{ev.stopPropagation();beginDrag(ev,e.id,!!isTask,tile);});
+      tile.addEventListener('dragend',()=>endDrag(tile));
+
+      // Drag the bottom edge to change duration
+      const grip=document.createElement('div');
+      grip.className='rs-resize';
+      grip.title='Drag to change duration';
+      grip.addEventListener('mousedown',ev=>beginResize(ev,e,tile,si));
+      grip.addEventListener('dragstart',ev=>ev.preventDefault());
+      tile.appendChild(grip);
+
       cell.style.position='relative';
       cell.appendChild(tile);
     });
@@ -403,6 +425,144 @@ function render(){
 
 // Unscheduled tray — entries created by seed_two_day_schedule (day-only
 // placement) sit here until the admin assigns a team, time & duration.
+// ── Drag, drop & resize ───────────────────────────────────────
+// PC-browser only by design. Dropping a tile on a cell sets its team,
+// date and start time in one action; dragging the bottom edge sets the
+// duration in 30-minute steps. Both save through the same local-update
+// path as the popover, so nothing triggers a full reload.
+let _dragId = null;      // id of the entry being dragged
+let _dragIsTask = false;
+let _suppressClick = false;
+
+function findEntry(id){
+  return daySchedule.find(e=>e.id===id) || dayTasks.find(t=>t.id===id) || null;
+}
+
+function beginDrag(ev, id, isTask, el){
+  _dragId = id; _dragIsTask = isTask;
+  el.classList.add('dragging');
+  try{
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', id);  // Firefox needs payload set
+  }catch(e){}
+}
+
+function endDrag(el){
+  if(el) el.classList.remove('dragging');
+  document.querySelectorAll('.rs-cell.drop-target')
+          .forEach(c=>c.classList.remove('drop-target'));
+  _dragId = null;
+  // A drag that ends over a tile shouldn't also fire its click handler
+  _suppressClick = true;
+  setTimeout(()=>{ _suppressClick = false; }, 60);
+}
+
+function cellDragOver(ev, cell){
+  if(!_dragId) return;
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'move';
+  cell.classList.add('drop-target');
+}
+
+function cellDragLeave(cell){ cell.classList.remove('drop-target'); }
+
+async function cellDrop(ev, cell){
+  ev.preventDefault();
+  cell.classList.remove('drop-target');
+  const id = _dragId || (ev.dataTransfer && ev.dataTransfer.getData('text/plain'));
+  if(!id) return;
+
+  const teamIdx = parseInt(cell.getAttribute('data-team'));
+  const slot    = cell.getAttribute('data-slot');
+  const team    = dayTeams[teamIdx];
+  if(!team || !slot) return;
+
+  const entry = findEntry(id);
+  if(!entry) return;
+
+  // Nothing actually changed — don't write
+  if(entry.team_id === team.id && entry.start_time === slot) return;
+
+  // Keep a duration that fits inside the working day
+  const startIdx = SLOTS.indexOf(slot);
+  const maxSpan  = SLOTS.length - startIdx;
+  const span     = Math.max(1, Math.min(Math.round((entry.duration || 60) / 30), maxSpan));
+  const duration = span * 30;
+
+  await persistEntry(entry, {
+    team_id:    team.id,
+    vehicle:    team.vehicle || null,
+    category:   team.function || 'transport',
+    start_time: slot,
+    duration:   duration,
+  });
+}
+
+// Shared write path for drag/resize: update locally, save, roll back on failure
+async function persistEntry(entry, patch){
+  const isTask = dayTasks.some(t => t.id === entry.id);
+  const before = {...entry};
+  Object.assign(entry, patch);
+  render(); renderTray();
+  setSaveStatus('saving');
+
+  const url  = isTask ? `/api/tasks/${entry.id}` : `/api/schedule/${entry.id}`;
+  const body = isTask
+    ? {start_time:patch.start_time, duration:patch.duration, team_id:patch.team_id}
+    : {...patch, date: localDate(viewDate)};
+
+  const result = await apiFetch(url, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+
+  if(!result.ok){
+    Object.assign(entry, before);   // put it back exactly as it was
+    render(); renderTray();
+    return false;
+  }
+  setSaveStatus('saved');
+  return true;
+}
+
+// Bottom-edge resize. Mouse events rather than the drag API, which can't resize.
+function beginResize(ev, entry, tile, startIdx){
+  ev.preventDefault(); ev.stopPropagation();
+  const startY   = ev.clientY;
+  const startSpan= Math.max(1, Math.round((entry.duration || 60) / 30));
+  const maxSpan  = SLOTS.length - startIdx;
+  let span = startSpan;
+  tile.classList.add('resizing');
+
+  function onMove(e){
+    const deltaSlots = Math.round((e.clientY - startY) / SLOT_H);
+    const next = Math.max(1, Math.min(startSpan + deltaSlots, maxSpan));
+    if(next !== span){
+      span = next;
+      tile.style.height = (span * SLOT_H - 4) + 'px';
+      const durEl = tile.querySelector('.rs-tile-dur');
+      if(durEl) durEl.textContent = fmtDuration(span * 30);
+    }
+  }
+  async function onUp(){
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    tile.classList.remove('resizing');
+    _suppressClick = true;
+    setTimeout(()=>{ _suppressClick = false; }, 60);
+    if(span !== startSpan) await persistEntry(entry, {duration: span * 30});
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+function fmtDuration(mins){
+  if(!mins) return '';
+  return mins >= 60
+    ? Math.floor(mins/60) + 'h' + (mins % 60 ? (mins % 60) + 'm' : '')
+    : mins + 'm';
+}
+
 function renderTray(){
   const jobById=Object.fromEntries(dayJobs.map(j=>[j.id,j]));
   const teamIds=new Set(dayTeams.map(t=>t.id));
@@ -435,10 +595,11 @@ function renderTray(){
     const propTag=job&&(job.property_type||job.property_size)?[job.property_type,job.property_size].filter(Boolean).join(' — '):'';
     const typeCls=e.type||'install';
     const orphanFlag=(e.start_time && !resolvesToTeam(e))?' <span title="Had a time but no matching team — please reassign">⚠️</span>':'';
-    const clickAttr=hasJob?`onclick="openEntryPop('${e.id}',null,null)"`:'';
+    const clickAttr=hasJob?`onclick="if(!_suppressClick)openEntryPop('${e.id}',null,null)"`:'';
+    const dragAttr=hasJob?`draggable="true" ondragstart="beginDrag(event,'${e.id}',false,this)" ondragend="endDrag(this)"`:'';
     const styleAttr=hasJob?'':'style="opacity:0.6;cursor:default;"';
     const noJobHint=hasJob?'':'<div style="font-size:0.62rem;opacity:0.85;margin-top:2px;">Waiting for job — created automatically once uploaded</div>';
-    return `<div class="rs-tray-tile ${typeCls}" ${clickAttr} ${styleAttr} title="${hasJob?'':'From Monday — no matching Luma job yet'}">
+    return `<div class="rs-tray-tile ${typeCls}" ${clickAttr} ${dragAttr} ${styleAttr} title="${hasJob?'Drag onto the grid to schedule, or tap to edit':'From Monday — no matching Luma job yet'}">
       <div class="rs-tray-tile-type">${TYPE_LBL[e.type]||e.type}${orphanFlag}</div>
       <div class="rs-tray-tile-ref">${ref?'#'+ref:'No job number'}</div>
       ${addr?`<div class="rs-tray-tile-addr">${addr}</div>`:''}

@@ -65,6 +65,8 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .rs-tile.resizing{opacity:0.85;box-shadow:0 0 0 2px var(--accent);}
 .rs-tray-tile[draggable="true"]{cursor:grab;}
 .rs-tray-tile.dragging{opacity:0.4;}
+.rs-tray.drop-target{background:rgba(184,147,90,0.18);border-color:var(--accent);border-style:solid;}
+.rs-tray-placeholder{color:var(--muted);font-size:0.8rem;padding:10px 4px;font-style:italic;}
 .rs-tile{position:absolute;left:4px;right:4px;border-radius:5px;padding:5px 7px;overflow:hidden;cursor:pointer;z-index:2;border-left:3px solid transparent;transition:opacity 0.12s;}
 .rs-tile:hover{opacity:0.88;}
 .rs-tile-label{font-size:0.6rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;opacity:0.75;color:rgba(255,255,255,0.8);}
@@ -137,8 +139,9 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   </div>
 
   <div id="rs-tray-wrap" style="display:none;">
-    <div class="rs-tray-label">Unscheduled — tap to assign team, time &amp; duration</div>
-    <div class="rs-tray" id="rs-tray"></div>
+    <div class="rs-tray-label">Unscheduled — drag onto the grid, or tap to assign team, time &amp; duration</div>
+    <div class="rs-tray" id="rs-tray"
+      ondragover="trayDragOver(event)" ondragleave="trayDragLeave()" ondrop="trayDrop(event)"></div>
   </div>
 
   <div class="rs-wrap">
@@ -441,6 +444,7 @@ function findEntry(id){
 function beginDrag(ev, id, isTask, el){
   _dragId = id; _dragIsTask = isTask;
   el.classList.add('dragging');
+  if(!isTask) showTrayForDrop();
   try{
     ev.dataTransfer.effectAllowed = 'move';
     ev.dataTransfer.setData('text/plain', id);  // Firefox needs payload set
@@ -451,7 +455,9 @@ function endDrag(el){
   if(el) el.classList.remove('dragging');
   document.querySelectorAll('.rs-cell.drop-target')
           .forEach(c=>c.classList.remove('drop-target'));
+  trayDragLeave();
   _dragId = null;
+  renderTray();   // hides the tray again if nothing ended up unscheduled
   // A drag that ends over a tile shouldn't also fire its click handler
   _suppressClick = true;
   setTimeout(()=>{ _suppressClick = false; }, 60);
@@ -495,6 +501,53 @@ async function cellDrop(ev, cell){
     category:   team.function || 'transport',
     start_time: slot,
     duration:   duration,
+  });
+}
+
+// ── Dropping back onto the tray un-schedules an entry ──
+// The tray is hidden when empty, so reveal it while a drag is in flight —
+// otherwise there'd be nowhere to drop when everything is already placed.
+function showTrayForDrop(){
+  const wrap=document.getElementById('rs-tray-wrap');
+  const tray=document.getElementById('rs-tray');
+  if(!wrap||!tray) return;
+  if(wrap.style.display==='none'){
+    wrap.style.display='block';
+    if(!tray.children.length){
+      tray.innerHTML='<div class="rs-tray-placeholder">Drop here to un-schedule</div>';
+    }
+  }
+}
+
+function trayDragOver(ev){
+  if(!_dragId) return;
+  if(_dragIsTask) return;         // tasks don't live in the tray
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect='move';
+  document.getElementById('rs-tray').classList.add('drop-target');
+}
+
+function trayDragLeave(){
+  const t=document.getElementById('rs-tray');
+  if(t) t.classList.remove('drop-target');
+}
+
+async function trayDrop(ev){
+  ev.preventDefault();
+  const t=document.getElementById('rs-tray');
+  if(t) t.classList.remove('drop-target');
+  const id=_dragId||(ev.dataTransfer&&ev.dataTransfer.getData('text/plain'));
+  if(!id) return;
+  if(_dragIsTask){
+    setSaveStatus('error','Tasks can\'t be un-scheduled');
+    return;
+  }
+  const entry=findEntry(id);
+  if(!entry) return;
+  if(!entry.start_time && !entry.team_id) return;   // already in the tray
+
+  await persistEntry(entry, {
+    team_id:null, vehicle:null, start_time:null, duration:null,
   });
 }
 
@@ -840,9 +893,13 @@ async function saveEntry(){
     if(eid){
       const i=daySchedule.findIndex(x=>x.id===eid);
       if(i>-1) daySchedule[i]={...daySchedule[i],...p};
+    }else if(result.data && result.data.entry){
+      daySchedule.push(result.data.entry);
     }else{
-      const created=(result.data&&result.data.entry)?result.data.entry:{...p,id:'tmp-'+Date.now()};
-      daySchedule.push(created);
+      // Saved, but the server didn't return the row. Never invent an id —
+      // a made-up one makes every later edit PATCH a nonexistent entry and
+      // fail forever. Refetch instead: rare path, so the reload is fine.
+      setSaveStatus('saved'); closeEntryPop(); load(); return;
     }
   }else{
     const title=document.getElementById('task-title').value.trim();
@@ -856,10 +913,10 @@ async function saveEntry(){
     if(eid){
       const i=dayTasks.findIndex(x=>x.id===eid);
       if(i>-1) dayTasks[i]={...dayTasks[i],...tp};
+    }else if(result.data && result.data.task){
+      dayTasks.push(result.data.task);
     }else{
-      const created=(result.data&&result.data.task)?result.data.task
-        :{...tp,id:'tmp-'+Date.now(),date:ds,vehicle:team?.vehicle||'ALL',category:team?.function||'warehouse'};
-      dayTasks.push(created);
+      setSaveStatus('saved'); closeEntryPop(); load(); return;   // see note above
     }
   }
 

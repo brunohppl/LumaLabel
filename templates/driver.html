@@ -77,6 +77,8 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .ring-bg{fill:none;stroke:var(--border);stroke-width:4;}
 .ring-fill{fill:none;stroke:var(--green);stroke-width:4;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset 0.4s ease;}
 .ring-done .ring-fill{stroke:var(--green);}
+.ring-bay{fill:none;stroke:#F9A825;stroke-width:4;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset 0.4s ease;}
+.ring-badge{position:absolute;bottom:-3px;right:-5px;background:#F9A825;color:white;font-size:0.56rem;font-weight:700;border-radius:9px;min-width:16px;padding:1px 4px;line-height:1.45;text-align:center;border:1.5px solid white;}
 .ring-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:700;color:var(--ink);}
 .ring-done-icon{font-size:1.1rem;color:var(--green);}
 
@@ -498,6 +500,54 @@ function groupItems(list){
   return groups;
 }
 
+// ── Progress ring ──────────────────────────────────────────────
+// green = on truck, bay = ticked yellow (on bay, not yet loaded).
+// The yellow arc spans green+bay so the two read as one journey,
+// with the green portion painted over the top of it.
+const RING_R = 20, RING_C = 2 * Math.PI * 20;
+
+function bayCount(list){ return list.filter(i => i.checked && !i.on_truck).length; }
+
+function ringSVG(green, bay, total, done){
+  const gOff = RING_C * (1 - (total ? green / total : 0));
+  const bOff = RING_C * (1 - (total ? (green + bay) / total : 0));
+  return `<div class="ring-wrap">
+    <svg width="48" height="48" viewBox="0 0 48 48">
+      <circle class="ring-bg" cx="24" cy="24" r="${RING_R}"/>
+      <circle class="ring-bay" cx="24" cy="24" r="${RING_R}"
+        stroke-dasharray="${RING_C.toFixed(1)}" stroke-dashoffset="${bOff.toFixed(1)}"/>
+      <circle class="ring-fill${done?' ring-done':''}" cx="24" cy="24" r="${RING_R}"
+        stroke-dasharray="${RING_C.toFixed(1)}" stroke-dashoffset="${gOff.toFixed(1)}"/>
+    </svg>
+    <div class="ring-txt">${done?'<span class="ring-done-icon">✓</span>':`${green}/${total}`}</div>
+    ${bay>0?`<div class="ring-badge" title="${bay} on bay">${bay}</div>`:''}
+  </div>`;
+}
+
+function updateRing(card, green, bay, total, done){
+  const gOff = RING_C * (1 - (total ? green / total : 0));
+  const bOff = RING_C * (1 - (total ? (green + bay) / total : 0));
+  const wrap = card.querySelector('.ring-wrap');
+  const rf = card.querySelector('.ring-fill');
+  const rb = card.querySelector('.ring-bay');
+  const rt = card.querySelector('.ring-txt');
+  if(rf) rf.setAttribute('stroke-dashoffset', gOff.toFixed(1));
+  if(rb) rb.setAttribute('stroke-dashoffset', bOff.toFixed(1));
+  if(rt) rt.innerHTML = done?'<span class="ring-done-icon">✓</span>':`${green}/${total}`;
+  let badge = card.querySelector('.ring-badge');
+  if(bay > 0){
+    if(!badge && wrap){
+      badge = document.createElement('div');
+      badge.className = 'ring-badge';
+      wrap.appendChild(badge);
+    }
+    if(badge){ badge.textContent = bay; badge.title = bay + ' on bay'; badge.style.display = ''; }
+  } else if(badge){
+    badge.style.display = 'none';
+  }
+  card.classList.toggle('done', done);
+}
+
 function renderRooms(){
   const container=document.getElementById('items-container');
   const allGrouped=groupItems(items.filter(i=>!i.is_extra && !isSmallLamp(i.description) && !isCushionItem(i.description) && !isAccessoryItem(i.description)));
@@ -540,19 +590,12 @@ function renderRooms(){
   if(notTransferGroups.length){
     const ntItems=notTransferGroups.flatMap(g=>g.items);
     const checked=ntItems.filter(i=>i.on_truck).length;
+    const bay=bayCount(ntItems);
     const total=ntItems.length;
     const done=checked===total&&total>0;
-    const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
     html+=`<div class="room-card not-transferring-card${done?' done':''}" id="room-not_transferring">
       <div class="room-card-header" onclick="toggleRoomCard(this)">
-        <div class="ring-wrap">
-          <svg width="48" height="48" viewBox="0 0 48 48">
-            <circle class="ring-bg" cx="24" cy="24" r="${r}"/>
-            <circle class="ring-fill${done?' ring-done':''}" cx="24" cy="24" r="${r}"
-              stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
-          </svg>
-          <div class="ring-txt">${done?'<span class="ring-done-icon">✓</span>':`${checked}/${total}`}</div>
-        </div>
+        ${ringSVG(checked, bay, total, done)}
         <div class="room-card-info">
           <div class="room-card-name">Not Transferring</div>
           <div class="room-card-sub">${notTransferGroups.length} line${notTransferGroups.length!==1?'s':''} · ${total} item${total!==1?'s':''} — staying behind</div>
@@ -570,9 +613,9 @@ function renderRooms(){
     const catItems=groups.flatMap(g=>g.items);
     const loadable=catItems.filter(i=>!i.is_transfer_item);
     const checked=loadable.filter(i=>i.on_truck).length;
+    const bay=bayCount(loadable);
     const total=loadable.length;
     const done=checked===total&&total>0;
-    const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
     const key=cat.replace(/[^a-zA-Z0-9]/g,'_');
 
     // Cushion bags row — injected at the top of the Linen and Cushions category
@@ -587,14 +630,7 @@ function renderRooms(){
 
     html+=`<div class="room-card${done?' done':''}" id="room-${key}">
       <div class="room-card-header" onclick="toggleRoomCard(this)">
-        <div class="ring-wrap">
-          <svg width="48" height="48" viewBox="0 0 48 48">
-            <circle class="ring-bg" cx="24" cy="24" r="${r}"/>
-            <circle class="ring-fill${done?' ring-done':''}" cx="24" cy="24" r="${r}"
-              stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
-          </svg>
-          <div class="ring-txt">${done?'<span class="ring-done-icon">✓</span>':`${checked}/${total}`}</div>
-        </div>
+        ${ringSVG(checked, bay, total, done)}
         <div class="room-card-info">
           <div class="room-card-name">${cat}</div>
           <div class="room-card-sub">${groups.length} line${groups.length!==1?'s':''} · ${total} item${total!==1?'s':''}</div>
@@ -762,11 +798,7 @@ function rerenderRoomProgress(){
     if(card){
       const ntItems=notTransferGroups.flatMap(g=>g.items);
       const checked=ntItems.filter(i=>i.on_truck).length,total=ntItems.length,done=checked===total&&total>0;
-      const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
-      const rf=card.querySelector('.ring-fill'),rt=card.querySelector('.ring-txt');
-      if(rf)rf.setAttribute('stroke-dashoffset',offset.toFixed(1));
-      if(rt)rt.innerHTML=done?'<span class="ring-done-icon">✓</span>':`${checked}/${total}`;
-      if(done)card.classList.add('done');else card.classList.remove('done');
+      updateRing(card, checked, bayCount(ntItems), total, done);
     }
   }
 
@@ -779,11 +811,7 @@ function rerenderRoomProgress(){
     const catItems=groups.flatMap(g=>g.items);
     const loadable=catItems.filter(i=>!i.is_transfer_item);
     const checked=loadable.filter(i=>i.on_truck).length,total=loadable.length,done=checked===total&&total>0;
-    const r=20,circ=2*Math.PI*r,offset=circ*(1-(total?checked/total:0));
-    const rf=card.querySelector('.ring-fill'),rt=card.querySelector('.ring-txt');
-    if(rf)rf.setAttribute('stroke-dashoffset',offset.toFixed(1));
-    if(rt)rt.innerHTML=done?'<span class="ring-done-icon">✓</span>':`${checked}/${total}`;
-    if(done)card.classList.add('done');else card.classList.remove('done');
+    updateRing(card, checked, bayCount(loadable), total, done);
   }
 }
 

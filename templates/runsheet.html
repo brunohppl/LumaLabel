@@ -29,6 +29,13 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .date-label{font-size:1rem;font-weight:600;min-width:200px;text-align:center;}
 .btn-today{padding:6px 14px;background:var(--accent);color:white;border:none;border-radius:4px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;cursor:pointer;}
 .rs-wrap{overflow-x:auto;}
+.save-status{margin-left:10px;font-size:0.74rem;letter-spacing:0.03em;display:inline-flex;align-items:center;gap:6px;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;}
+.save-status.on{opacity:1;}
+.save-status.saving{color:var(--muted);}
+.save-status.saved{color:var(--green,#4A7C59);}
+.save-status.error{color:var(--red,#A63D2F);pointer-events:auto;}
+.save-dot{width:11px;height:11px;border:2px solid var(--border);border-top-color:var(--muted);border-radius:50%;animation:save-spin .7s linear infinite;}
+@keyframes save-spin{to{transform:rotate(360deg);}}
 .rs-tray-label{font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin:14px 0 6px;}
 .rs-tray{display:flex;flex-wrap:wrap;gap:8px;padding:10px;background:var(--warm);border:1px dashed var(--border);border-radius:6px;margin-bottom:14px;}
 .rs-tray-tile{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:5px;cursor:pointer;min-width:150px;color:white;font-size:0.78rem;transition:opacity 0.15s;}
@@ -118,6 +125,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     <div class="date-label" id="date-label"></div>
     <button class="date-nav-btn" onclick="shiftDate(1)">›</button>
     <button class="btn-today" onclick="goToday()">Today</button>
+    <span class="save-status" id="save-status"></span>
   </div>
 
   <div id="rs-tray-wrap" style="display:none;">
@@ -594,15 +602,37 @@ function searchJobs(q){
     res.style.display='block';
   },300);
 }
-function pickJob(id,ref,addr){_jobId=id;document.getElementById('job-results').style.display='none';document.getElementById('job-selected-label').textContent=`${ref} — ${addr}`;document.getElementById('job-selected').style.display='flex';document.getElementById('job-id').value=id;document.getElementById('job-search').value='';}
+function pickJob(id,ref,addr){_jobId=id;
+  // Keep a local record so a newly created tile can render its label
+  // immediately, without reloading the day to find the job.
+  if(!dayJobs.find(x=>x.id===id)) dayJobs.push({id,job_ref:ref,address:addr});
+  document.getElementById('job-results').style.display='none';document.getElementById('job-selected-label').textContent=`${ref} — ${addr}`;document.getElementById('job-selected').style.display='flex';document.getElementById('job-id').value=id;document.getElementById('job-search').value='';}
 function clearJob(){_jobId=null;document.getElementById('job-selected').style.display='none';document.getElementById('job-id').value='';}
 // Shared fetch wrapper — surfaces server errors instead of failing silently.
 // Returns {ok, data} — caller checks .ok before proceeding.
+// ── Save status pill ──────────────────────────────────────────
+// 'saving' while a write is in flight, 'saved' briefly on success,
+// 'error' stays put until the next action so it can't be missed.
+let _saveTimer=null;
+function setSaveStatus(state, text){
+  const el=document.getElementById('save-status');
+  if(!el) return;
+  clearTimeout(_saveTimer);
+  el.className='save-status on '+state;
+  if(state==='saving')      el.innerHTML='<span class="save-dot"></span>Saving…';
+  else if(state==='saved')  el.innerHTML='✓ Saved';
+  else if(state==='error')  el.innerHTML='⚠ '+(text||'Not saved');
+  if(state==='saved'){
+    _saveTimer=setTimeout(()=>{ el.className='save-status'; }, 2000);
+  }
+}
+
 async function apiFetch(url, opts){
   let res, data;
   try{
     res = await fetch(url, opts);
   }catch(networkErr){
+    setSaveStatus('error','Network error');
     alert('Network error — could not reach the server. Check your connection and try again.');
     return {ok:false, data:null};
   }
@@ -613,6 +643,7 @@ async function apiFetch(url, opts){
   }
   if(!res.ok || (data && data.success===false)){
     const msg = (data && data.error) ? data.error : `Save failed (HTTP ${res.status}).`;
+    setSaveStatus('error', msg);
     alert(`Could not save: ${msg}`);
     return {ok:false, data};
   }
@@ -630,33 +661,68 @@ async function saveEntry(){
   // A time without a team would vanish from both the grid and the tray —
   // require a team the moment a time is set.
   if(time && !tid){alert('Please select a team before setting a time.');return;}
+
+  setSaveStatus('saving');
+
   if(_mode==='job'){
     const jid=_jobId||document.getElementById('job-id').value;
-    if(!jid){alert('Please select a job.');return;}
+    if(!jid){setSaveStatus('error','No job selected');alert('Please select a job.');return;}
     const p={job_id:jid,date:ds,team_id:tid||null,vehicle:team?.vehicle||null,type:_type,category:team?.function||'transport',start_time:time,duration:dur,notes};
     const result = eid
       ? await apiFetch(`/api/schedule/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)})
       : await apiFetch(`/api/schedule-entry`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
     if(!result.ok) return; // keep popover open so the user can fix and retry
+
+    // Update our local copy instead of refetching the whole day. Edits are
+    // applied from the payload we just sent (the PATCH route returns only a
+    // success flag); creates use the row the server hands back.
+    if(eid){
+      const i=daySchedule.findIndex(x=>x.id===eid);
+      if(i>-1) daySchedule[i]={...daySchedule[i],...p};
+    }else{
+      const created=(result.data&&result.data.entry)?result.data.entry:{...p,id:'tmp-'+Date.now()};
+      daySchedule.push(created);
+    }
   }else{
     const title=document.getElementById('task-title').value.trim();
-    if(!title){alert('Please enter a description.');return;}
+    if(!title){setSaveStatus('error','Description required');alert('Please enter a description.');return;}
+    const tp={title,start_time:time,duration:dur,notes,team_id:tid};
     const result = eid
-      ? await apiFetch(`/api/tasks/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,start_time:time,duration:dur,notes,team_id:tid})})
-      : await apiFetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,date:ds,start_time:time,duration:dur,notes,team_id:tid,vehicle:team?.vehicle||'ALL',category:team?.function||'warehouse'})});
+      ? await apiFetch(`/api/tasks/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(tp)})
+      : await apiFetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...tp,date:ds,vehicle:team?.vehicle||'ALL',category:team?.function||'warehouse'})});
     if(!result.ok) return;
+
+    if(eid){
+      const i=dayTasks.findIndex(x=>x.id===eid);
+      if(i>-1) dayTasks[i]={...dayTasks[i],...tp};
+    }else{
+      const created=(result.data&&result.data.task)?result.data.task
+        :{...tp,id:'tmp-'+Date.now(),date:ds,vehicle:team?.vehicle||'ALL',category:team?.function||'warehouse'};
+      dayTasks.push(created);
+    }
   }
-  closeEntryPop();load();
+
+  setSaveStatus('saved');
+  closeEntryPop();
+  render(); renderTray();   // redraw from local state — no refetch, no flicker
 }
 async function deleteEntry(){
   const eid=document.getElementById('entry-id').value;
   if(!eid||!confirm('Delete this entry?'))return;
   const isTask=dayTasks.some(t=>t.id===eid);
+
+  setSaveStatus('saving');
   const result = isTask
     ? await apiFetch(`/api/tasks/${eid}`,{method:'DELETE'})
     : await apiFetch(`/api/schedule/${eid}`,{method:'DELETE'});
   if(!result.ok) return;
-  closeEntryPop();load();
+
+  if(isTask) dayTasks=dayTasks.filter(t=>t.id!==eid);
+  else       daySchedule=daySchedule.filter(e=>e.id!==eid);
+
+  setSaveStatus('saved');
+  closeEntryPop();
+  render(); renderTray();
 }
 
 load();

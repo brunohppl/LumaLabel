@@ -1932,6 +1932,19 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_v
     assignment is always manual now."""
     from datetime import datetime as _dt, timedelta
 
+    # Capture any Monday linkage before clearing, so re-seeding doesn't
+    # orphan the item and cause the next pull to create a duplicate tile.
+    monday_link = None
+    try:
+        prior = sb_get('job_schedule', f'job_id=eq.{job_id}') or []
+        for p in prior:
+            if p.get('monday_item_id'):
+                monday_link = {'monday_item_id': p['monday_item_id'],
+                               'monday_address': p.get('monday_address')}
+                break
+    except Exception:
+        monday_link = None
+
     sb_delete('job_schedule', f'job_id=eq.{job_id}')
 
     try:
@@ -1952,7 +1965,7 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_v
         return dt + timedelta(days=1)
 
     def make_entry(date_str, etype):
-        sb_post('job_schedule', {
+        row = {
             'job_id':     job_id,
             'date':       date_str,
             'vehicle':    None,
@@ -1961,7 +1974,12 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_v
             'start_time': None,
             'duration':   None,
             'notes':      None,
-        })
+        }
+        # Re-attach the Monday link to the INSTALL tile so future pulls
+        # update this entry rather than adding another one.
+        if monday_link and etype == 'install':
+            row.update(monday_link)
+        sb_post('job_schedule', row)
 
     if main_type == 'pickup':
         make_entry(main_date_str, 'pickup')
@@ -2949,6 +2967,21 @@ def api_monday_board():
 # Groups that "Pull into Luma" acts on — matched case-insensitively, trimmed.
 MONDAY_PULL_GROUPS = {'quote accepted', 'ready to pick'}
 
+# Groups whose dates we never sync back (historic / finished work)
+MONDAY_IGNORE_GROUPS = {'completed'}
+
+# Monday label meaning "the install is done, bring it back"
+MONDAY_COLLECT_LABEL = 'ready to collect'
+
+
+def monday_label_norm(s):
+    """Lowercase, strip punctuation, collapse spaces — so 'Ready To Collect',
+    'ready-to-collect' and 'Ready  to collect' all compare equal."""
+    if not s:
+        return ''
+    s = re.sub(r'[^a-z0-9]+', ' ', str(s).lower())
+    return re.sub(r'\s+', ' ', s).strip()
+
 @app.route('/api/monday/pull', methods=['POST'])
 def api_monday_pull():
     """Pull matched install dates into existing Luma jobs, and add every item
@@ -2971,63 +3004,88 @@ def _api_monday_pull_inner():
         return jsonify({'success': False, 'error': data['error']}), 500
 
     date_re = re.compile(r'^\d{4}-\d{2}-\d{2}$')
-    jobs_updated = 0
-    scheduled_matched = 0
+    dates_updated       = 0
+    statuses_updated    = 0
+    scheduled_matched   = 0
     scheduled_unmatched = 0
-    skipped_no_date = 0
-    skipped_errors = 0
+    skipped_no_date     = 0
+    skipped_errors      = 0
+    changes             = []   # human-readable log returned to the page
 
-    # Collect every eligible item first, then do the writes in as few
-    # round trips as possible. The previous version made 2 Supabase calls
-    # per item sequentially — for a batch of 20-30 items that's 40-60+
-    # blocking requests, which was long enough to hit Render's request
-    # timeout even though every individual write had already succeeded
-    # (hence "the data was pulled" despite the error shown on screen).
-    eligible = []
+    # Pass 1 — collect everything we might act on, in one sweep.
+    #   date sync   : every group except the ignored ones
+    #   tray tiles  : only the pull groups (quote accepted / ready to pick)
+    #   status move : items whose group OR status column says ready to collect
+    actionable = []
     for gtitle, items in data['groups'].items():
-        if gtitle.strip().lower() not in MONDAY_PULL_GROUPS:
+        gnorm = monday_label_norm(gtitle)
+        if gnorm in MONDAY_IGNORE_GROUPS:
             continue
         for item in items:
-            install_date = item.get('install_date', '')
-            if not (install_date and date_re.match(install_date)):
-                skipped_no_date += 1
-                continue
-            eligible.append(item)
+            actionable.append((gnorm, item))
 
-    if not eligible:
-        return jsonify({
-            'success': True, 'jobs_updated': 0, 'scheduled_matched': 0,
-            'scheduled_unmatched': 0, 'skipped_no_date': skipped_no_date, 'skipped_errors': 0,
-        })
+    if not actionable:
+        return jsonify({'success': True, 'dates_updated': 0, 'statuses_updated': 0,
+                        'scheduled_matched': 0, 'scheduled_unmatched': 0,
+                        'skipped_no_date': 0, 'skipped_errors': 0, 'changes': []})
 
-    # One query for every existing job_schedule row we might need to update,
-    # instead of one query per item.
-    monday_ids = [item['monday_id'] for item in eligible]
-    ids_str = ','.join(monday_ids)  # Monday item IDs are plain numeric strings — no quoting needed for PostgREST in.()
+    # One query for the schedule rows we may need to update, keyed by
+    # (monday_item_id, type) so LOAD and INSTALL rows don't collide.
+    monday_ids = [i['monday_id'] for _, i in actionable]
+    ids_str = ','.join(monday_ids)
     existing_rows = sb_get('job_schedule', f'monday_item_id=in.({ids_str})') or []
-    existing_by_monday_id = {r['monday_item_id']: r for r in existing_rows if r.get('monday_item_id')}
+    existing_by_key = {(r['monday_item_id'], r.get('type')): r
+                       for r in existing_rows if r.get('monday_item_id')}
 
-    to_insert = []  # batched into one bulk POST at the end
+    to_insert = []
 
-    for item in eligible:
+    for gnorm, item in actionable:
         try:
-            install_date = item['install_date']
-            luma_job = item.get('luma_job')
-            job_id = luma_job['id'] if luma_job else None
+            install_date = item.get('install_date', '')
+            has_date     = bool(install_date and date_re.match(install_date))
+            luma_job     = item.get('luma_job')
+            in_pull_group = gnorm in MONDAY_PULL_GROUPS
+
+            # Is Monday saying this one is ready to come back? The label may
+            # live in the group title or in the item's status column.
+            says_collect = (gnorm == monday_label_norm(MONDAY_COLLECT_LABEL)
+                            or monday_label_norm(item.get('status')) ==
+                               monday_label_norm(MONDAY_COLLECT_LABEL))
 
             if luma_job:
-                # Job dates differ per job, so this write can't be batched —
-                # still one PATCH per matched job, but only for matched ones.
-                sb_patch('jobs', f'id=eq.{job_id}', {
-                    'runsheet_date':  install_date,
-                    'runsheet_type':  'install',
-                    'property_type':  item.get('install_type') or None,
-                    'property_size':  item.get('install_size') or None,
-                })
-                jobs_updated += 1
+                job_id  = luma_job['id']
+                job_ref = luma_job.get('job_ref') or luma_job.get('job_number') or job_id[:8]
+                patch   = {}
+
+                # (a) Keep the install date current — only write when it differs
+                if has_date and luma_job.get('runsheet_date') != install_date:
+                    patch['runsheet_date'] = install_date
+                    patch['runsheet_type'] = 'install'
+
+                # (b) Installed jobs that Monday now lists as ready to collect.
+                #     Deliberately one-directional and narrow: this is the only
+                #     status transition the sync will ever make.
+                if says_collect and luma_job.get('status') == 'installed':
+                    patch['status'] = 'ready_to_collect'
+
+                if patch:
+                    sb_patch('jobs', f'id=eq.{job_id}', patch)
+                    if 'runsheet_date' in patch:
+                        dates_updated += 1
+                        changes.append(f'#{job_ref} install date set to {install_date}')
+                    if 'status' in patch:
+                        statuses_updated += 1
+                        changes.append(f'#{job_ref} marked Ready to Collect')
+
+            # (c) Tray tiles, still only for the two pull groups
+            if not in_pull_group:
+                continue
+            if not has_date:
+                skipped_no_date += 1
+                continue
 
             entry = {
-                'job_id':          job_id,
+                'job_id':          luma_job['id'] if luma_job else None,
                 'monday_item_id':  item['monday_id'],
                 'monday_address':  item['address'],
                 'date':            install_date,
@@ -3038,33 +3096,31 @@ def _api_monday_pull_inner():
                 'duration':        None,
                 'notes':           None,
             }
-
-            existing = existing_by_monday_id.get(item['monday_id'])
+            existing = existing_by_key.get((item['monday_id'], 'install'))
             if existing:
                 sb_patch('job_schedule', f'id=eq.{existing["id"]}', entry)
             else:
                 to_insert.append(entry)
 
-            if luma_job:
-                scheduled_matched += 1
-            else:
-                scheduled_unmatched += 1
+            if luma_job: scheduled_matched += 1
+            else:        scheduled_unmatched += 1
+
         except Exception:
             skipped_errors += 1
             continue
 
-    # All brand-new entries go in as ONE bulk insert instead of one call each —
-    # this is the common case (first pull of a batch) and the biggest win.
     if to_insert:
         sb_post('job_schedule', to_insert)
 
     return jsonify({
         'success':             True,
-        'jobs_updated':        jobs_updated,
+        'dates_updated':       dates_updated,
+        'statuses_updated':    statuses_updated,
         'scheduled_matched':   scheduled_matched,
         'scheduled_unmatched': scheduled_unmatched,
         'skipped_no_date':     skipped_no_date,
         'skipped_errors':      skipped_errors,
+        'changes':             changes[:60],
     })
 
 

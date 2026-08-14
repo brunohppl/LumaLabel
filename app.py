@@ -387,7 +387,9 @@ def _build_time_slots():
 RUNSHEET_TIME_SLOTS = _build_time_slots()
 
 # Duration options in minutes — 30-min steps from 30 min to 4 hrs.
-RUNSHEET_DURATIONS = list(range(30, 270, 30))  # [30, 60, 90, ..., 240]
+RUNSHEET_DURATIONS = list(range(30, 570, 30))  # [30, 60, ..., 540] — a full
+# working day. The old 240 cap silently rejected any tile stretched past
+# four hours, which looked like the resize simply not saving.
 
 
 # ── Colour cycle — 14 maximally distinct colours ──

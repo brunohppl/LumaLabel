@@ -2931,6 +2931,7 @@ def _get_monday_board_data_inner():
                 'job_number':   luma_job.get('job_number',''),
                 'runsheet_date':luma_job.get('runsheet_date',''),
                 'address':      luma_job.get('address',''),
+                'status':       luma_job.get('status',''),
             } if luma_job else None,
         }
 
@@ -2973,6 +2974,13 @@ MONDAY_IGNORE_GROUPS = {'completed'}
 # Monday label meaning "the install is done, bring it back"
 MONDAY_COLLECT_LABEL = 'ready to collect'
 
+# Each job update is its own request to Supabase, so an unbounded pull can
+# outrun the platform's request timeout — which shows up as a 500 with an
+# empty body, because the worker is killed before Flask can reply. Cap the
+# writes per run and report what's left; a second click finishes the job.
+# Once the backlog clears, normal pulls do almost no writes at all.
+MONDAY_MAX_JOB_WRITES = 25
+
 
 def monday_label_norm(s):
     """Lowercase, strip punctuation, collapse spaces — so 'Ready To Collect',
@@ -3010,6 +3018,7 @@ def _api_monday_pull_inner():
     scheduled_unmatched = 0
     skipped_no_date     = 0
     skipped_errors      = 0
+    writes_remaining    = 0
     changes             = []   # human-readable log returned to the page
 
     # Pass 1 — collect everything we might act on, in one sweep.
@@ -3031,11 +3040,13 @@ def _api_monday_pull_inner():
 
     # One query for the schedule rows we may need to update, keyed by
     # (monday_item_id, type) so LOAD and INSTALL rows don't collide.
-    monday_ids = [i['monday_id'] for _, i in actionable]
+    # Only pull-group items ever get a tray tile, so don't build a giant
+    # in.() filter out of the whole board.
+    monday_ids = [i['monday_id'] for g, i in actionable if g in MONDAY_PULL_GROUPS]
     ids_str = ','.join(monday_ids)
-    existing_rows = sb_get('job_schedule', f'monday_item_id=in.({ids_str})') or []
+    existing_rows = sb_get('job_schedule', f'monday_item_id=in.({ids_str})') if ids_str else []
     existing_by_key = {(r['monday_item_id'], r.get('type')): r
-                       for r in existing_rows if r.get('monday_item_id')}
+                       for r in (existing_rows or []) if r.get('monday_item_id')}
 
     to_insert = []
 
@@ -3068,6 +3079,9 @@ def _api_monday_pull_inner():
                 if says_collect and luma_job.get('status') == 'installed':
                     patch['status'] = 'ready_to_collect'
 
+                if patch and (dates_updated + statuses_updated) >= MONDAY_MAX_JOB_WRITES:
+                    writes_remaining += 1
+                    patch = {}          # defer to the next run
                 if patch:
                     sb_patch('jobs', f'id=eq.{job_id}', patch)
                     if 'runsheet_date' in patch:
@@ -3120,6 +3134,7 @@ def _api_monday_pull_inner():
         'scheduled_unmatched': scheduled_unmatched,
         'skipped_no_date':     skipped_no_date,
         'skipped_errors':      skipped_errors,
+        'writes_remaining':    writes_remaining,
         'changes':             changes[:60],
     })
 

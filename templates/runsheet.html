@@ -79,6 +79,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .rs-cell:hover{background:rgba(184,147,90,0.05);}
 .rs-cell.drop-target{background:rgba(184,147,90,0.22);box-shadow:inset 0 0 0 2px var(--accent);}
 .rs-tile.dragging{opacity:0.4;}
+.rs-tile.clash{box-shadow:0 0 0 2px var(--red,#A63D2F);}
+.rs-clash-flag{position:absolute;top:2px;right:4px;font-size:0.7rem;line-height:1;}
+.clash-note{font-size:0.72rem;color:var(--red,#A63D2F);margin:8px 0 0;display:none;}
+.clash-note.on{display:block;}
 .rs-tile{ -webkit-user-select:none; user-select:none; }
 .rs-resize{position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize;border-radius:0 0 3px 3px;}
 .rs-resize:hover{background:rgba(255,255,255,0.35);}
@@ -128,6 +132,21 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .loading{text-align:center;padding:40px;color:var(--muted);}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .template-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+
+/* Print: a clean paper runsheet of whichever view is on screen */
+@media print{
+  header, .dev-banner, .date-row, .view-toggle, .save-status,
+  .rs-tray-label, #rs-tray-wrap, .team-view-link, .btn-today,
+  .date-nav-btn, .rs-resize{ display:none !important; }
+  body{ background:white; }
+  .rs-wrap{ overflow:visible !important; }
+  .rs-grid, .wk-grid{ min-width:0 !important; }
+  .rs-tile, .wk-chip{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .page-wrap{ padding:0; }
+  .print-title{ display:block !important; font-family:'Cormorant Garamond',serif;
+                font-size:1.4rem; margin:0 0 10px; }
+}
+.print-title{ display:none; }
 </style>
 </head>
 <body>
@@ -161,6 +180,9 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     </span>
     <span class="save-status" id="save-status"></span>
   </div>
+
+  <div class="print-title" id="print-title"></div>
+  <p class="clash-note" id="clash-note"></p>
 
   <div id="rs-tray-wrap" style="display:none;">
     <div class="rs-tray-label">Unscheduled — drag onto the grid, or tap to assign team, time &amp; duration</div>
@@ -335,6 +357,7 @@ async function load(){
 
     render();
     renderTray();
+    syncPrintTitle();
   }catch(e){
     if(seq===_loadSeq) document.getElementById('rs-grid').innerHTML='<div class="loading">Failed to load.</div>';
   }
@@ -436,7 +459,8 @@ function render(){
       const tile=document.createElement('div');
       tile.className=`rs-tile ${typeKey}`;
       tile.style.cssText=`top:0;left:calc(${left}% + 2px);width:calc(${width}% - 4px);height:${span*SLOT_H-4}px;cursor:pointer;position:absolute;`;
-      tile.innerHTML=`<div class="rs-tile-label">${lbl}<span class="rs-tile-dur" style="float:right;opacity:0.8;">${fmtDuration(e.duration)}</span></div><div class="rs-tile-ref">${ref}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''}${propTag?`<div class="rs-tile-prop">${propTag}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
+      if(totalSubCols>1) tile.classList.add('clash');
+      tile.innerHTML=`${totalSubCols>1?'<span class="rs-clash-flag" title="Overlaps another job on this team">⚠</span>':''}<div class="rs-tile-label">${lbl}<span class="rs-tile-dur" style="float:right;opacity:0.8;">${fmtDuration(e.duration)}</span></div><div class="rs-tile-ref">${ref}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''}${propTag?`<div class="rs-tile-prop">${propTag}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
       tile.onclick=(ev)=>{ev.stopPropagation();if(_suppressClick)return;openEntryPop(e.id,team.id,null);};
 
       // Drag to move between teams / times
@@ -456,10 +480,41 @@ function render(){
       cell.appendChild(tile);
     });
   });
+
+  reportClashes();
+}
+
+// Count teams that have overlapping entries, so a double-booking is
+// visible without hunting for the red tiles.
+function reportClashes(){
+  const note=document.getElementById('clash-note');
+  if(!note) return;
+  const clashed=new Set();
+  document.querySelectorAll('.rs-tile.clash').forEach(t=>{
+    const cell=t.closest('.rs-cell');
+    if(cell) clashed.add(cell.getAttribute('data-team'));
+  });
+  const n=clashed.size;
+  if(n){
+    note.textContent=`⚠ ${n} team${n>1?'s have':' has'} overlapping jobs on this day — check the highlighted tiles.`;
+    note.classList.add('on');
+  }else{
+    note.textContent='';
+    note.classList.remove('on');
+  }
 }
 
 // Unscheduled tray — entries created by seed_two_day_schedule (day-only
 // placement) sit here until the admin assigns a team, time & duration.
+// Escape closes whichever popover is open
+document.addEventListener('keydown', ev=>{
+  if(ev.key!=='Escape') return;
+  const entry=document.getElementById('entry-pop');
+  const team =document.getElementById('team-pop');
+  if(entry && entry.classList.contains('open')) closeEntryPop();
+  else if(team && team.classList.contains('open')) closeTeamPop();
+});
+
 // ── Week view ─────────────────────────────────────────────────
 // Read-only overview: team names down the side, days across the top.
 // Answers "is Tuesday already full?" while you're scheduling Monday.
@@ -473,6 +528,12 @@ function mondayOf(d){
   const day=(dt.getDay()+6)%7;            // Mon=0 … Sun=6
   dt.setDate(dt.getDate()-day);
   return dt;
+}
+
+function syncPrintTitle(){
+  const t=document.getElementById('print-title');
+  const l=document.getElementById('date-label');
+  if(t&&l) t.textContent='LUMA Runsheet — '+l.textContent;
 }
 
 function setView(v){
@@ -495,7 +556,7 @@ async function loadWeek(){
     const d=await res.json();
     if(seq!==_weekSeq) return;                 // a newer load started
     if(!d.success) throw new Error(d.error||'Could not load the week.');
-    renderWeek(d);
+    renderWeek(d); syncPrintTitle();
   }catch(e){
     if(seq===_weekSeq)
       document.getElementById('wk-grid').innerHTML=
@@ -854,16 +915,54 @@ async function saveTeam(){
   const members=[...document.querySelectorAll('#member-chips .chip.selected')].map(b=>b.textContent);
   const name=document.getElementById('team-name').value.trim()||null;
   const p={name,vehicle:_vehicle||null,function:_fn,lead,members};
-  if(id){await fetch(`/api/teams/entry/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});}
-  else{const ds=localDate(viewDate);p.sort_order=dayTeams.length;await fetch(`/api/teams/${ds}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});}
-  if(document.getElementById('save-tmpl').checked&&name){await fetch('/api/team-templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,vehicle:_vehicle||null,function:_fn,lead,members})});}
-  closeTeamPop();load();
+
+  setSaveStatus('saving');
+  let result;
+  if(id){
+    result=await apiFetch(`/api/teams/entry/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+  }else{
+    const ds=localDate(viewDate);
+    p.sort_order=dayTeams.length;
+    result=await apiFetch(`/api/teams/${ds}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+  }
+  if(!result.ok) return;   // keep the popover open so it can be corrected
+
+  if(document.getElementById('save-tmpl').checked&&name){
+    await apiFetch('/api/team-templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,vehicle:_vehicle||null,function:_fn,lead,members})});
+    templates=await (await fetch('/api/team-templates')).json().catch(()=>templates);
+  }
+
+  // Update locally rather than reloading the day (as with entries)
+  if(id){
+    const i=dayTeams.findIndex(t=>t.id===id);
+    if(i>-1) dayTeams[i]={...dayTeams[i],...p};
+  }else if(result.data && result.data.team){
+    dayTeams.push(result.data.team);
+  }else{
+    setSaveStatus('saved'); closeTeamPop(); load(); return;  // no row back — refetch
+  }
+
+  setSaveStatus('saved');
+  closeTeamPop();
+  render(); renderTray();
 }
+
 async function deleteTeam(){
   const id=document.getElementById('team-id').value;
   if(!id||!confirm('Delete this team? Entries will be unlinked.'))return;
-  await fetch(`/api/teams/entry/${id}`,{method:'DELETE'});
-  closeTeamPop();load();
+  setSaveStatus('saving');
+  const result=await apiFetch(`/api/teams/entry/${id}`,{method:'DELETE'});
+  if(!result.ok) return;
+
+  dayTeams=dayTeams.filter(t=>t.id!==id);
+  // The server unlinks the entries; mirror that locally so they drop
+  // into the tray instead of pointing at a column that no longer exists.
+  daySchedule.forEach(e=>{ if(e.team_id===id){ e.team_id=null; e.start_time=null; e.duration=null; e.vehicle=null; } });
+  dayTasks.forEach(t=>{ if(t.team_id===id) t.team_id=null; });
+
+  setSaveStatus('saved');
+  closeTeamPop();
+  render(); renderTray();
 }
 
 // ── Entry popover ──

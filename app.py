@@ -187,13 +187,15 @@ def save_job_to_db(meta, items, colour_name, job_owner='', is_transfer=False,
         # Pass items so bedroom count can drive smart vehicle assignment.
         # On re-upload with a new date, this replaces any existing schedule.
         # On re-upload without a date, existing schedule is left untouched.
+        # Attach any Monday placeholder for this address FIRST, so that the
+        # seeding below absorbs it (seeding clears the job's entries before
+        # recreating them, carrying the Monday link onto the new tile). Doing
+        # this the other way round left the placeholder alongside the seeded
+        # tiles — a duplicate for the same job on the same day.
+        link_placeholder_schedule_entries(job_id, meta['address'])
+
         if install_date_iso:
             seed_two_day_schedule(job_id, install_date_iso, 'install', items=items)
-
-        # If a Monday "Pull into Luma" run previously created an address-only
-        # placeholder tile for this address, attach it to this job now that
-        # it exists — this is what makes the placeholder self-resolving.
-        link_placeholder_schedule_entries(job_id, meta['address'])
 
     except Exception as e:
         pass  # Never let DB failure break label generation
@@ -2982,6 +2984,18 @@ MONDAY_COLLECT_LABEL = 'ready to collect'
 MONDAY_MAX_JOB_WRITES = 25
 
 
+def monday_prev_business_day(date_str):
+    """Previous working day — LOAD happens the business day before INSTALL."""
+    from datetime import datetime as _dt, timedelta
+    try:
+        d = _dt.strptime(date_str, '%Y-%m-%d')
+    except ValueError:
+        return None
+    w = d.weekday()
+    d = d - timedelta(days=3 if w == 0 else 2 if w == 6 else 1)
+    return d.strftime('%Y-%m-%d')
+
+
 def monday_label_norm(s):
     """Lowercase, strip punctuation, collapse spaces — so 'Ready To Collect',
     'ready-to-collect' and 'Ready  to collect' all compare equal."""
@@ -3019,6 +3033,8 @@ def _api_monday_pull_inner():
     skipped_no_date     = 0
     skipped_errors      = 0
     writes_remaining    = 0
+    tiles_created       = 0
+    tiles_updated       = 0
     changes             = []   # human-readable log returned to the page
 
     # Pass 1 — collect everything we might act on, in one sweep.
@@ -3047,6 +3063,21 @@ def _api_monday_pull_inner():
     existing_rows = sb_get('job_schedule', f'monday_item_id=in.({ids_str})') if ids_str else []
     existing_by_key = {(r['monday_item_id'], r.get('type')): r
                        for r in (existing_rows or []) if r.get('monday_item_id')}
+
+    # Also look up UNSCHEDULED tiles by job, so a tile created by the label
+    # upload (which carries no monday_item_id) is recognised instead of
+    # being duplicated on every pull. Deliberately limited to tiles with no
+    # team and no time: a second tile that someone has actually placed on a
+    # vehicle is intentional and must never be touched.
+    job_ids = [i['luma_job']['id'] for g, i in actionable
+               if g in MONDAY_PULL_GROUPS and i.get('luma_job')]
+    unscheduled_by_job = {}
+    if job_ids:
+        rows = sb_get('job_schedule',
+                      f'job_id=in.({",".join(set(job_ids))})'
+                      '&team_id=is.null&start_time=is.null') or []
+        for r in rows:
+            unscheduled_by_job.setdefault((r['job_id'], r.get('type'), r.get('date')), r)
 
     to_insert = []
 
@@ -3098,23 +3129,44 @@ def _api_monday_pull_inner():
                 skipped_no_date += 1
                 continue
 
-            entry = {
-                'job_id':          luma_job['id'] if luma_job else None,
-                'monday_item_id':  item['monday_id'],
-                'monday_address':  item['address'],
-                'date':            install_date,
-                'type':            'install',
-                'vehicle':         None,
-                'team_id':         None,
-                'start_time':      None,
-                'duration':        None,
-                'notes':           None,
-            }
-            existing = existing_by_key.get((item['monday_id'], 'install'))
-            if existing:
-                sb_patch('job_schedule', f'id=eq.{existing["id"]}', entry)
-            else:
-                to_insert.append(entry)
+            # INSTALL on the date, plus LOAD the business day before —
+            # matching what the calendar/label path already seeds, so a
+            # Monday-sourced job isn't missing from the load day.
+            load_date = monday_prev_business_day(install_date)
+            wanted = [('install', install_date)]
+            if load_date:
+                wanted.append(('to_load', load_date))
+
+            for etype, edate in wanted:
+                entry = {
+                    'job_id':          luma_job['id'] if luma_job else None,
+                    'monday_item_id':  item['monday_id'],
+                    'monday_address':  item['address'],
+                    'date':            edate,
+                    'type':            etype,
+                    'vehicle':         None,
+                    'team_id':         None,
+                    'start_time':      None,
+                    'duration':        None,
+                    'notes':           None,
+                }
+
+                # Find an existing tile: first by Monday id, then — for tiles
+                # created by the label upload — by job/type/date.
+                existing = existing_by_key.get((item['monday_id'], etype))
+                if not existing and luma_job:
+                    existing = unscheduled_by_job.get((luma_job['id'], etype, edate))
+
+                if existing:
+                    # Only write if something actually differs, so repeat
+                    # pulls don't hammer the database for no reason.
+                    if any(existing.get(k) != v for k, v in entry.items()
+                           if k in ('job_id', 'monday_item_id', 'date', 'type')):
+                        sb_patch('job_schedule', f'id=eq.{existing["id"]}', entry)
+                        tiles_updated += 1
+                else:
+                    to_insert.append(entry)
+                    tiles_created += 1
 
             if luma_job: scheduled_matched += 1
             else:        scheduled_unmatched += 1
@@ -3135,6 +3187,8 @@ def _api_monday_pull_inner():
         'skipped_no_date':     skipped_no_date,
         'skipped_errors':      skipped_errors,
         'writes_remaining':    writes_remaining,
+        'tiles_created':       tiles_created,
+        'tiles_updated':       tiles_updated,
         'changes':             changes[:60],
     })
 

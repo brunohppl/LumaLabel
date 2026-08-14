@@ -80,6 +80,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .rs-cell.drop-target{background:rgba(184,147,90,0.22);box-shadow:inset 0 0 0 2px var(--accent);}
 .rs-tile.dragging{opacity:0.4;}
 .rs-tile.clash{box-shadow:0 0 0 2px var(--red,#A63D2F);}
+.rs-share{display:inline-block;font-size:0.6rem;margin-left:5px;padding:1px 5px;border-radius:8px;background:rgba(255,255,255,0.28);vertical-align:1px;white-space:nowrap;}
 .rs-clash-flag{position:absolute;top:2px;right:4px;font-size:0.7rem;line-height:1;}
 .clash-note{font-size:0.72rem;color:var(--red,#A63D2F);margin:8px 0 0;display:none;}
 .clash-note.on{display:block;}
@@ -283,6 +284,17 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   </div>
   <label class="fl">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
   <textarea class="fi" id="entry-notes" rows="2" placeholder="Access info, instructions…" style="resize:none;font-size:0.84rem;padding:8px 10px;"></textarea>
+  <div id="entry-also" style="display:none;border-top:1px solid var(--border);margin-top:14px;padding-top:12px;">
+    <label class="fl">Also assign this job to another team</label>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <select class="fi" id="entry-also-team" style="flex:1;"></select>
+      <button class="btn btn-outline" onclick="cloneEntryToTeam()" style="white-space:nowrap;">Add copy</button>
+    </div>
+    <div style="font-size:0.7rem;color:var(--muted);margin-top:5px;">
+      Same job, day, time and duration — for jobs run by more than one crew.
+    </div>
+  </div>
+
   <div class="pop-actions">
     <button class="btn btn-red" id="entry-del-btn" style="display:none;margin-right:auto;" onclick="deleteEntry()">Delete</button>
     <button class="btn btn-outline" onclick="closeEntryPop()">Cancel</button>
@@ -418,6 +430,21 @@ function render(){
     if(tid&&byTeam[tid]) byTeam[tid].push({...e,_task:true});
   });
 
+  // Jobs run by more than one crew today: number their tiles "1 of 3" so a
+  // repeated job reads as deliberate rather than as a duplicate. Ordered by
+  // team column so the numbering is stable between renders.
+  const teamOrder=Object.fromEntries(dayTeams.map((t,i)=>[t.id,i]));
+  const shareIdx={};
+  const byJob={};
+  daySchedule.forEach(e=>{ if(e.job_id&&e.team_id) (byJob[e.job_id]=byJob[e.job_id]||[]).push(e); });
+  Object.values(byJob).forEach(list=>{
+    if(list.length<2) return;
+    list.slice().sort((a,b)=>
+      (teamOrder[a.team_id]??99)-(teamOrder[b.team_id]??99) ||
+      String(a.start_time||'').localeCompare(String(b.start_time||''))
+    ).forEach((e,i)=>{ shareIdx[e.id]={n:i+1,of:list.length}; });
+  });
+
   const inner=document.getElementById('rs-inner');
   dayTeams.forEach((team,ti)=>{
     const entries=(byTeam[team.id]||[]).filter(e=>e.start_time);
@@ -460,7 +487,8 @@ function render(){
       tile.className=`rs-tile ${typeKey}`;
       tile.style.cssText=`top:0;left:calc(${left}% + 2px);width:calc(${width}% - 4px);height:${span*SLOT_H-4}px;cursor:pointer;position:absolute;`;
       if(totalSubCols>1) tile.classList.add('clash');
-      tile.innerHTML=`${totalSubCols>1?'<span class="rs-clash-flag" title="Overlaps another job on this team">⚠</span>':''}<div class="rs-tile-label">${lbl}<span class="rs-tile-dur" style="float:right;opacity:0.8;">${fmtDuration(e.duration)}</span></div><div class="rs-tile-ref">${ref}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''}${propTag?`<div class="rs-tile-prop">${propTag}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
+      const share=shareIdx[e.id];
+      tile.innerHTML=`${totalSubCols>1?'<span class="rs-clash-flag" title="Overlaps another job on this team">⚠</span>':''}<div class="rs-tile-label">${lbl}<span class="rs-tile-dur" style="float:right;opacity:0.8;">${fmtDuration(e.duration)}</span></div><div class="rs-tile-ref">${ref}${share?`<span class="rs-share">${share.n} of ${share.of} crews</span>`:''}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''}${propTag?`<div class="rs-tile-prop">${propTag}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
       tile.onclick=(ev)=>{ev.stopPropagation();if(_suppressClick)return;openEntryPop(e.id,team.id,null);};
 
       // Drag to move between teams / times
@@ -985,6 +1013,27 @@ async function openEntryPop(entryId,teamId,slot){
   document.getElementById('entry-notes').value='';
   _jobId=null;
 
+  // "Also assign to" — only meaningful for an existing job entry that's
+  // already on a team; a tray tile has nothing to copy yet.
+  const alsoBox=document.getElementById('entry-also');
+  const alsoSel=document.getElementById('entry-also-team');
+  const existingEntry=entryId?daySchedule.find(x=>x.id===entryId):null;
+  if(existingEntry && existingEntry.team_id){
+    const taken=daySchedule
+      .filter(x=>x.job_id===existingEntry.job_id && x.team_id)
+      .map(x=>x.team_id);
+    const options=dayTeams.filter(t=>!taken.includes(t.id));
+    if(options.length){
+      alsoSel.innerHTML=options.map(t=>
+        `<option value="${t.id}">${t.name||t.vehicle||'Team'} (${FN_LBL[t.function]||t.function})</option>`).join('');
+      alsoBox.style.display='block';
+    }else{
+      alsoBox.style.display='none';   // already on every team
+    }
+  }else{
+    alsoBox.style.display='none';
+  }
+
   // Team picker — only needed when opened without a column context (tray tiles)
   const teamPicker=document.getElementById('entry-team-picker');
   const teamSelect=document.getElementById('entry-team-select');
@@ -1112,6 +1161,42 @@ async function apiFetch(url, opts){
     return {ok:false, data};
   }
   return {ok:true, data};
+}
+
+// Copy the current entry onto another team — same job, day, time and
+// duration. Used when one job is run by more than one crew on the day.
+async function cloneEntryToTeam(){
+  const eid=document.getElementById('entry-id').value;
+  const src=daySchedule.find(x=>x.id===eid);
+  const tid=document.getElementById('entry-also-team').value;
+  const team=dayTeams.find(t=>t.id===tid);
+  if(!src||!team) return;
+
+  if(daySchedule.some(x=>x.job_id===src.job_id && x.team_id===tid)){
+    alert('That job is already on this team today.');
+    return;
+  }
+
+  const p={
+    job_id:src.job_id, date:localDate(viewDate), team_id:tid,
+    vehicle:team.vehicle||null, type:src.type,
+    category:team.function||'transport',
+    start_time:src.start_time, duration:src.duration, notes:src.notes||null,
+  };
+
+  setSaveStatus('saving');
+  const result=await apiFetch('/api/schedule-entry',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+  if(!result.ok) return;
+
+  if(result.data && result.data.entry){
+    daySchedule.push(result.data.entry);
+  }else{
+    setSaveStatus('saved'); closeEntryPop(); load(); return;
+  }
+  setSaveStatus('saved');
+  closeEntryPop();
+  render(); renderTray();
 }
 
 async function saveEntry(){

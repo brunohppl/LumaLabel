@@ -544,7 +544,7 @@ function jobCardHTML(job){
       </div>
     </div>
     <div class="job-card-actions">
-      <button class="job-action-btn job-action-runsheet" onclick="openInstallDatePicker('${job.id}')" title="Set install date">
+      <button class="job-action-btn job-action-runsheet" onclick="openInstallDatePicker('${job.id}', this)" title="Set install date">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       </button>
       <button class="job-action-btn job-action-transfer" onclick="openTransferPopover('${job.id}', this)" title="Set up Transfer">
@@ -609,17 +609,51 @@ async function saveAddress(jobId, newAddr, div){
   div._saving=false;
 }
 
-function openInstallDatePicker(jobId){
-  const job=jobsById.get(jobId)||lastFetchedJobs.find(j=>j.id===jobId);
-  const input=document.createElement('input');
-  input.type='date';
-  input.value=job?.runsheet_date||'';
-  input.style.cssText='position:fixed;opacity:0;pointer-events:none;left:-9999px;';
-  input.onchange=()=>{ if(input.value) saveInstallDate(jobId, input.value); input.remove(); };
-  input.onblur=()=>setTimeout(()=>input.remove(),200);
-  document.body.appendChild(input);
-  input.focus();
-  input.showPicker?.() ?? input.click();
+// One persistent, rendered date input reused for every tile.
+// It must stay in the DOM and stay visible enough for the browser to
+// accept showPicker() — the previous version removed it on blur, which
+// killed the picker the instant it opened.
+let _dateInput = null;
+let _dateJobId = null;
+
+function ensureDateInput(){
+  if(_dateInput) return _dateInput;
+  const el = document.createElement('input');
+  el.type = 'date';
+  el.id   = 'install-date-input';
+  // Visible to the browser, invisible to the eye. No pointer-events:none
+  // and no off-screen positioning: Chrome rejects showPicker() on inputs
+  // it considers unrendered.
+  el.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;border:0;padding:0;margin:0;z-index:-1;';
+  el.addEventListener('change', ()=>{
+    if(_dateJobId && el.value) saveInstallDate(_dateJobId, el.value);
+  });
+  document.body.appendChild(el);
+  _dateInput = el;
+  return el;
+}
+
+function openInstallDatePicker(jobId, btn){
+  const job = jobsById.get(jobId) || lastFetchedJobs.find(j=>j.id===jobId);
+  const el  = ensureDateInput();
+  _dateJobId = jobId;
+  el.value = job?.runsheet_date || '';
+
+  // Anchor it to the button so the picker opens beside the tile
+  if(btn && btn.getBoundingClientRect){
+    const r = btn.getBoundingClientRect();
+    el.style.left = r.left + 'px';
+    el.style.top  = (r.bottom - 1) + 'px';
+  }
+
+  // showPicker() returns undefined, so it can never be chained with ?? —
+  // doing that fired click() as well and double-triggered the control.
+  try{
+    if(typeof el.showPicker === 'function') el.showPicker();
+    else el.click();
+  }catch(err){
+    el.click();   // older browsers, or showPicker refused
+  }
 }
 
 async function saveInstallDate(jobId, newDate){

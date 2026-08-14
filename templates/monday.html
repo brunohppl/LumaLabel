@@ -160,7 +160,7 @@ async function pullIntoLuma(){
   const spinner=document.getElementById('pull-spinner');
   const resultBox=document.getElementById('pull-result');
 
-  if(!confirm('This will:\n\n• Update install dates on matched Luma jobs where Monday differs\n• Move Installed jobs to Ready to Collect where Monday says so\n• Add "Quote Accepted" and "Ready to Pick" items to the runsheet tray\n\nThe Completed group is ignored. Continue?')) return;
+  if(!confirm('This will:\n\n• Update install dates on matched Luma jobs where Monday differs\n• Move Installed jobs to Ready to Collect where Monday says so\n• Add "Quote Accepted" and "Ready to Pick" items to the runsheet tray, as a LOAD tile the day before plus an INSTALL tile on the day\n\nExisting unscheduled tiles are reused, not duplicated. The Completed group is ignored. Continue?')) return;
 
   btn.disabled=true;
   spinner.style.display='block';
@@ -200,7 +200,8 @@ async function pullIntoLuma(){
       : `<strong>Pull complete</strong> — `+
         `${dU} install date${dU!==1?'s':''} updated, `+
         `${sU} job${sU!==1?'s':''} moved to Ready to Collect, `+
-        `${data.scheduled_matched} matched item${data.scheduled_matched!==1?'s':''} on the runsheet, `+
+        `${data.scheduled_matched} matched item${data.scheduled_matched!==1?'s':''} on the runsheet `+
+        `(${data.tiles_created||0} tile${(data.tiles_created||0)!==1?'s':''} created, ${data.tiles_updated||0} updated), `+
         `${data.scheduled_unmatched} unmatched address${data.scheduled_unmatched!==1?'es':''} in the tray`+
         (data.skipped_no_date?`, ${data.skipped_no_date} skipped (no install date)`:'')+
         (data.skipped_errors?`, ${data.skipped_errors} skipped due to an error`:'')+'.';

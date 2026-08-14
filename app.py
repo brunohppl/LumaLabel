@@ -2043,6 +2043,53 @@ def api_runsheet_day(date_str):
     })
 
 
+@app.route('/api/runsheet/week/<start_date>', methods=['GET'])
+def api_runsheet_week(start_date):
+    """Read-only week overview starting at start_date (7 days).
+
+    Fetches the whole range in four queries rather than repeating the
+    per-day route seven times, which would be ~28 round trips."""
+    from datetime import datetime as _dt, timedelta
+    try:
+        start = _dt.strptime(start_date, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Invalid start date.'}), 400
+
+    days = [(start + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+    end  = days[-1]
+
+    teams    = sb_get('day_teams',
+                      f'date=gte.{start_date}&date=lte.{end}'
+                      '&order=sort_order.asc,created_at.asc') or []
+    schedule = sb_get('job_schedule',
+                      f'date=gte.{start_date}&date=lte.{end}'
+                      '&order=start_time.asc,created_at.asc') or []
+    tasks    = sb_get('runsheet_tasks',
+                      f'date=gte.{start_date}&date=lte.{end}'
+                      '&order=start_time.asc') or []
+
+    job_ids = list({e['job_id'] for e in schedule if e.get('job_id')})
+    jobs = []
+    if job_ids:
+        jobs = sb_get('jobs', f'id=in.({",".join(job_ids)})') or []
+
+    def by_date(rows):
+        out = {d: [] for d in days}
+        for r in rows:
+            if r.get('date') in out:
+                out[r['date']].append(r)
+        return out
+
+    return jsonify({
+        'success':  True,
+        'days':     days,
+        'teams':    by_date(teams),
+        'schedule': by_date(schedule),
+        'tasks':    by_date(tasks),
+        'jobs':     jobs,
+    })
+
+
 # ── Day teams CRUD ────────────────────────────────────────────────────────────
 
 @app.route('/api/schedule-entry', methods=['POST'])

@@ -294,7 +294,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 const VEHICLES=['Bruce','Nigel','Nemo','Marlin','VUG','Own Car'];
 const ALL_WORKERS=['Addy','Montie','Delphine','India','Hayley','Jo','Savio','Nick','Ayoub','Bruno','Phil','Tiago'];
 const SLOTS=[];for(let h=7;h<=15;h++)for(let m=0;m<60;m+=30){if(h===15&&m>30)break;SLOTS.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);}
-const DURS=[30,60,90,120,150,180,210,240];
+const DURS=[30,60,90,120,150,180,210,240,270,300,330,360,390,420,450,480,510,540];
 const SLOT_H=46;
 const FN_COL={transport:'#2e5a8a',styling:'#6a3d8a',warehouse:'#b8935a'};
 const FN_LBL={transport:'🚛 Transport',styling:'🎨 Styling',warehouse:'🏭 Warehouse'};
@@ -472,7 +472,12 @@ function render(){
       const grip=document.createElement('div');
       grip.className='rs-resize';
       grip.title='Drag to change duration';
-      grip.addEventListener('mousedown',ev=>beginResize(ev,e,tile,si));
+      // Disable dragging while resizing: the tile is draggable, and without
+      // this the browser starts an HTML5 drag as soon as the pointer moves,
+      // so mousemove/mouseup never complete and the new size is never saved.
+      // (Guarding dragstart on the grip doesn't work — dragstart fires on the
+      // draggable tile, not on the child that was pressed.)
+      grip.addEventListener('mousedown',ev=>{tile.draggable=false;beginResize(ev,e,tile,si);});
       grip.addEventListener('dragstart',ev=>ev.preventDefault());
       tile.appendChild(grip);
 
@@ -807,6 +812,7 @@ function beginResize(ev, entry, tile, startIdx){
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('mouseup', onUp);
     tile.classList.remove('resizing');
+    tile.draggable = true;          // restore dragging once the resize ends
     _suppressClick = true;
     setTimeout(()=>{ _suppressClick = false; }, 60);
     if(span !== startSpan) await persistEntry(entry, {duration: span * 30});

@@ -175,7 +175,9 @@ async function pullIntoLuma(){
       const raw=await res.text().catch(()=>'');
       resultBox.style.background='rgba(166,61,47,0.08)';
       resultBox.style.borderColor='var(--red)';
-      resultBox.innerHTML=`<strong>Server error (HTTP ${res.status})</strong><pre style="font-size:0.75rem;text-align:left;overflow:auto;margin-top:8px;white-space:pre-wrap;">${(raw||'No details returned').slice(0,800)}</pre>`;
+      resultBox.innerHTML = raw
+        ? `<strong>Server error (HTTP ${res.status})</strong><pre style="font-size:0.75rem;text-align:left;overflow:auto;margin-top:8px;white-space:pre-wrap;">${raw.slice(0,800)}</pre>`
+        : `<strong>The pull didn't finish in time (HTTP ${res.status})</strong><div style="font-size:0.8rem;margin-top:4px;">The server returned nothing, which usually means the request ran too long and was cut off. Some changes may already have been saved — click Pull into Luma again to continue where it stopped.</div>`;
       resultBox.style.display='block';
       return;
     }
@@ -202,6 +204,9 @@ async function pullIntoLuma(){
         `${data.scheduled_unmatched} unmatched address${data.scheduled_unmatched!==1?'es':''} in the tray`+
         (data.skipped_no_date?`, ${data.skipped_no_date} skipped (no install date)`:'')+
         (data.skipped_errors?`, ${data.skipped_errors} skipped due to an error`:'')+'.';
+    if(data.writes_remaining){
+      html += `<div style="margin-top:6px;color:var(--accent);font-weight:600;">${data.writes_remaining} more job${data.writes_remaining!==1?'s':''} still to update — click Pull into Luma again to continue.</div>`;
+    }
     if(data.changes && data.changes.length){
       html += `<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:0.8rem;color:var(--muted);">What changed (${data.changes.length})</summary>`+
         `<ul style="margin:6px 0 0;padding-left:18px;font-size:0.8rem;line-height:1.6;">`+

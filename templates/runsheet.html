@@ -29,6 +29,26 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .date-label{font-size:1rem;font-weight:600;min-width:200px;text-align:center;}
 .btn-today{padding:6px 14px;background:var(--accent);color:white;border:none;border-radius:4px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;cursor:pointer;}
 .rs-wrap{overflow-x:auto;}
+.view-toggle{display:inline-flex;margin-left:12px;border:1px solid var(--border);border-radius:3px;overflow:hidden;}
+.vt-btn{background:white;border:none;padding:6px 14px;font-family:inherit;font-size:0.75rem;letter-spacing:0.05em;cursor:pointer;color:var(--muted);}
+.vt-btn.on{background:var(--ink);color:white;}
+.wk-grid{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:3px;overflow:hidden;min-width:900px;}
+.wk-cell{background:white;padding:7px 8px;min-height:54px;}
+.wk-head{background:var(--warm);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);font-weight:600;padding:9px 8px;text-align:center;cursor:pointer;}
+.wk-head:hover{color:var(--ink);}
+.wk-head.today{background:var(--ink);color:white;}
+.wk-head-date{display:block;font-size:0.82rem;text-transform:none;letter-spacing:0;margin-top:2px;color:inherit;}
+.wk-team{background:var(--warm);font-size:0.78rem;font-weight:600;padding:9px 10px;display:flex;align-items:center;white-space:nowrap;}
+.wk-team-sub{font-size:0.66rem;color:var(--muted);font-weight:400;margin-left:5px;}
+.wk-chip{display:block;font-size:0.68rem;color:white;border-radius:3px;padding:2px 6px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+.wk-chip.install{background:#5b9bd5;}
+.wk-chip.to_load{background:#6abf7a;}
+.wk-chip.pickup{background:#e07070;}
+.wk-chip.task{background:#b8935a;}
+.wk-chip.unplaced{background:white;color:var(--muted);border:1px dashed var(--border);}
+.wk-empty{color:var(--border);font-size:0.72rem;}
+.wk-load{font-size:0.62rem;color:var(--muted);margin-top:3px;}
+.wk-load.heavy{color:var(--red,#A63D2F);font-weight:600;}
 .save-status{margin-left:10px;font-size:0.74rem;letter-spacing:0.03em;display:inline-flex;align-items:center;gap:6px;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;}
 .save-status.on{opacity:1;}
 .save-status.saving{color:var(--muted);}
@@ -135,6 +155,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     <div class="date-label" id="date-label"></div>
     <button class="date-nav-btn" onclick="shiftDate(1)">›</button>
     <button class="btn-today" onclick="goToday()">Today</button>
+    <span class="view-toggle">
+      <button class="vt-btn on" id="vt-day"  onclick="setView('day')">Day</button>
+      <button class="vt-btn"    id="vt-week" onclick="setView('week')">Week</button>
+    </span>
     <span class="save-status" id="save-status"></span>
   </div>
 
@@ -144,8 +168,12 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       ondragover="trayDragOver(event)" ondragleave="trayDragLeave()" ondrop="trayDrop(event)"></div>
   </div>
 
-  <div class="rs-wrap">
+  <div class="rs-wrap" id="day-view">
     <div id="rs-grid"><div class="loading">Loading…</div></div>
+  </div>
+
+  <div class="rs-wrap" id="week-view" style="display:none;">
+    <div id="wk-grid"><div class="loading">Loading…</div></div>
   </div>
 </div>
 
@@ -256,8 +284,12 @@ let _loadSeq=0; // guards against out-of-order responses when navigating quickly
 
 function localDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function fmtDate(d){return d.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
-function shiftDate(n){viewDate=new Date(viewDate);viewDate.setDate(viewDate.getDate()+n);load();}
-function goToday(){viewDate=new Date();load();}
+function shiftDate(n){
+  viewDate=new Date(viewDate);
+  viewDate.setDate(viewDate.getDate() + (_view==='week' ? n*7 : n));
+  if(_view==='week') loadWeek(); else load();
+}
+function goToday(){viewDate=new Date(); if(_view==='week') loadWeek(); else load();}
 function fmtSlot(t){if(!t)return'';const[h,m]=t.split(':').map(Number);return`${h%12||12}:${String(m).padStart(2,'0')}${h<12?'am':'pm'}`;}
 function slotIdx(t){if(!t)return 0;const[h,m]=t.split(':').map(Number);return Math.max(0,(h-7)*2+Math.floor(m/30));}
 
@@ -428,6 +460,119 @@ function render(){
 
 // Unscheduled tray — entries created by seed_two_day_schedule (day-only
 // placement) sit here until the admin assigns a team, time & duration.
+// ── Week view ─────────────────────────────────────────────────
+// Read-only overview: team names down the side, days across the top.
+// Answers "is Tuesday already full?" while you're scheduling Monday.
+// Rows are team NAMES rather than ids, because day_teams rows are
+// per-date — the same crew is a different record each day.
+let _view='day';
+let _weekSeq=0;
+
+function mondayOf(d){
+  const dt=new Date(d);
+  const day=(dt.getDay()+6)%7;            // Mon=0 … Sun=6
+  dt.setDate(dt.getDate()-day);
+  return dt;
+}
+
+function setView(v){
+  _view=v;
+  document.getElementById('vt-day').classList.toggle('on', v==='day');
+  document.getElementById('vt-week').classList.toggle('on', v==='week');
+  document.getElementById('day-view').style.display  = v==='day'  ? '' : 'none';
+  document.getElementById('week-view').style.display = v==='week' ? '' : 'none';
+  if(v==='week') loadWeek(); else load();
+}
+
+async function loadWeek(){
+  const seq=++_weekSeq;
+  const start=localDate(mondayOf(viewDate));
+  document.getElementById('date-label').textContent='Week of '+
+    mondayOf(viewDate).toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('wk-grid').innerHTML='<div class="loading">Loading…</div>';
+  try{
+    const res=await fetch(`/api/runsheet/week/${start}`);
+    const d=await res.json();
+    if(seq!==_weekSeq) return;                 // a newer load started
+    if(!d.success) throw new Error(d.error||'Could not load the week.');
+    renderWeek(d);
+  }catch(e){
+    if(seq===_weekSeq)
+      document.getElementById('wk-grid').innerHTML=
+        `<div class="loading">Could not load the week — ${e.message}</div>`;
+  }
+}
+
+function renderWeek(d){
+  const jobById=Object.fromEntries((d.jobs||[]).map(j=>[j.id,j]));
+  const todayStr=localDate(new Date());
+
+  // Union of team names across the week, keeping each day's sort order
+  const names=[];
+  d.days.forEach(day=>(d.teams[day]||[]).forEach(t=>{
+    const n=t.name||t.vehicle||'Team';
+    if(!names.includes(n)) names.push(n);
+  }));
+
+  const cols=`180px repeat(${d.days.length},1fr)`;
+  let g=`<div class="wk-grid" style="grid-template-columns:${cols};">`;
+  g+=`<div class="wk-head" style="cursor:default;"></div>`;
+  d.days.forEach(day=>{
+    const dt=new Date(day+'T00:00:00');
+    g+=`<div class="wk-head${day===todayStr?' today':''}" onclick="jumpToDay('${day}')" title="Open this day">
+      ${dt.toLocaleDateString('en-AU',{weekday:'short'})}
+      <span class="wk-head-date">${dt.getDate()}/${dt.getMonth()+1}</span>
+    </div>`;
+  });
+
+  const chip=(e,isTask)=>{
+    const job=isTask?null:jobById[e.job_id];
+    const ref=isTask?(e.title||'Task'):(job?(job.job_ref||job.job_number):(e.monday_address||'—'));
+    const t=isTask?'task':(e.type||'install');
+    const time=e.start_time?fmtSlot(e.start_time)+' ':'';
+    const cls=(!isTask && !e.start_time)?'unplaced':t;
+    return `<span class="wk-chip ${cls}" onclick="jumpToDay('${e.date}')" title="${time}${ref}">${time}${ref}</span>`;
+  };
+
+  names.forEach(name=>{
+    g+=`<div class="wk-team">${name}</div>`;
+    d.days.forEach(day=>{
+      const dayTeamIds=(d.teams[day]||[])
+        .filter(t=>(t.name||t.vehicle||'Team')===name).map(t=>t.id);
+      const entries=(d.schedule[day]||[]).filter(e=>dayTeamIds.includes(e.team_id));
+      const tks=(d.tasks[day]||[]).filter(t=>dayTeamIds.includes(t.team_id));
+      const mins=entries.reduce((s,e)=>s+(e.duration||0),0)
+                + tks.reduce((s,t)=>s+(t.duration||0),0);
+      const hrs=(mins/60);
+      g+=`<div class="wk-cell">
+        ${entries.map(e=>chip(e,false)).join('')}
+        ${tks.map(t=>chip(t,true)).join('')}
+        ${(!entries.length&&!tks.length)?'<span class="wk-empty">—</span>':''}
+        ${mins?`<div class="wk-load${hrs>=7?' heavy':''}">${hrs%1?hrs.toFixed(1):hrs}h booked</div>`:''}
+      </div>`;
+    });
+  });
+
+  // Anything not attached to a team that day
+  g+=`<div class="wk-team">Unscheduled<span class="wk-team-sub">tray</span></div>`;
+  d.days.forEach(day=>{
+    const ids=(d.teams[day]||[]).map(t=>t.id);
+    const loose=(d.schedule[day]||[]).filter(e=>!e.team_id||!ids.includes(e.team_id));
+    g+=`<div class="wk-cell">
+      ${loose.map(e=>chip(e,false)).join('')}
+      ${!loose.length?'<span class="wk-empty">—</span>':''}
+    </div>`;
+  });
+
+  g+=`</div>`;
+  document.getElementById('wk-grid').innerHTML=g;
+}
+
+function jumpToDay(dayStr){
+  viewDate=new Date(dayStr+'T00:00:00');
+  setView('day');
+}
+
 // ── Drag, drop & resize ───────────────────────────────────────
 // PC-browser only by design. Dropping a tile on a cell sets its team,
 // date and start time in one action; dragging the bottom edge sets the

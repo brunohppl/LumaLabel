@@ -160,7 +160,7 @@ async function pullIntoLuma(){
   const spinner=document.getElementById('pull-spinner');
   const resultBox=document.getElementById('pull-result');
 
-  if(!confirm('This will:\n\n• Update install dates on matched Luma jobs\n• Add every item in "Quote Accepted" and "Ready to Pick" to the runsheet\'s unscheduled tray\n\nContinue?')) return;
+  if(!confirm('This will:\n\n• Update install dates on matched Luma jobs where Monday differs\n• Move Installed jobs to Ready to Collect where Monday says so\n• Add "Quote Accepted" and "Ready to Pick" items to the runsheet tray\n\nThe Completed group is ignored. Continue?')) return;
 
   btn.disabled=true;
   spinner.style.display='block';
@@ -191,11 +191,23 @@ async function pullIntoLuma(){
 
     resultBox.style.background='rgba(74,124,89,0.08)';
     resultBox.style.borderColor='var(--green)';
-    resultBox.innerHTML=`<strong>Pull complete</strong> — ${data.jobs_updated} job date${data.jobs_updated!==1?'s':''} updated, `+
-      `${data.scheduled_matched} matched item${data.scheduled_matched!==1?'s':''} added to the runsheet, `+
-      `${data.scheduled_unmatched} unmatched address${data.scheduled_unmatched!==1?'es':''} placed as tray placeholders`+
-      (data.skipped_no_date?`, ${data.skipped_no_date} item${data.skipped_no_date!==1?'s':''} skipped (no install date set)`:'')+
-      (data.skipped_errors?`, ${data.skipped_errors} item${data.skipped_errors!==1?'s':''} skipped due to an error`:'')+'.';
+    const dU=data.dates_updated||0, sU=data.statuses_updated||0;
+    const nothing = !dU && !sU && !data.scheduled_matched && !data.scheduled_unmatched;
+    let html = nothing
+      ? '<strong>Pull complete</strong> — everything was already up to date.'
+      : `<strong>Pull complete</strong> — `+
+        `${dU} install date${dU!==1?'s':''} updated, `+
+        `${sU} job${sU!==1?'s':''} moved to Ready to Collect, `+
+        `${data.scheduled_matched} matched item${data.scheduled_matched!==1?'s':''} on the runsheet, `+
+        `${data.scheduled_unmatched} unmatched address${data.scheduled_unmatched!==1?'es':''} in the tray`+
+        (data.skipped_no_date?`, ${data.skipped_no_date} skipped (no install date)`:'')+
+        (data.skipped_errors?`, ${data.skipped_errors} skipped due to an error`:'')+'.';
+    if(data.changes && data.changes.length){
+      html += `<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:0.8rem;color:var(--muted);">What changed (${data.changes.length})</summary>`+
+        `<ul style="margin:6px 0 0;padding-left:18px;font-size:0.8rem;line-height:1.6;">`+
+        data.changes.map(c=>`<li>${c}</li>`).join('')+`</ul></details>`;
+    }
+    resultBox.innerHTML=html;
     resultBox.style.display='block';
 
     // Re-sync the display so the table reflects any newly-matched dates

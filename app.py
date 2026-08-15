@@ -1928,8 +1928,9 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_v
     - install → two tiles: LOAD the business day before + INSTALL on main_date
     - to_load → two tiles: LOAD on main_date + INSTALL the next business day
 
-    Weekend-aware in both directions. Clears existing entries for this job first
-    so re-saving a job's date doesn't leave orphaned duplicates.
+    Weekend-aware in both directions. Existing UNSCHEDULED tiles are cleared and
+    rebuilt; tiles that already have a crew or a time are moved to the new date
+    with their crew, time and duration intact.
 
     `items` and `forced_vehicles` are accepted for backward compatibility with
     existing call sites but are no longer used to guess vehicles — vehicle
@@ -1939,6 +1940,7 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_v
     # Capture any Monday linkage before clearing, so re-seeding doesn't
     # orphan the item and cause the next pull to create a duplicate tile.
     monday_link = None
+    prior = []
     try:
         prior = sb_get('job_schedule', f'job_id=eq.{job_id}') or []
         for p in prior:
@@ -1947,9 +1949,8 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_v
                                'monday_address': p.get('monday_address')}
                 break
     except Exception:
+        prior = []
         monday_link = None
-
-    sb_delete('job_schedule', f'job_id=eq.{job_id}')
 
     try:
         main_dt = _dt.strptime(main_date_str, '%Y-%m-%d')
@@ -1985,18 +1986,45 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_v
             row.update(monday_link)
         sb_post('job_schedule', row)
 
+    # What this job should have on the runsheet after this save.
     if main_type == 'pickup':
-        make_entry(main_date_str, 'pickup')
-
+        wanted = {'pickup': main_date_str}
     elif main_type == 'install':
-        load_date = prev_business_day(main_dt).strftime('%Y-%m-%d')
-        make_entry(load_date,     'to_load')
-        make_entry(main_date_str, 'install')
-
+        wanted = {'to_load': prev_business_day(main_dt).strftime('%Y-%m-%d'),
+                  'install': main_date_str}
     elif main_type == 'to_load':
-        install_date = next_business_day(main_dt).strftime('%Y-%m-%d')
-        make_entry(main_date_str,  'to_load')
-        make_entry(install_date,   'install')
+        wanted = {'to_load': main_date_str,
+                  'install': next_business_day(main_dt).strftime('%Y-%m-%d')}
+    else:
+        wanted = {}
+
+    # A tile that has a crew or a time on it represents real scheduling work —
+    # often several crews on one job. Changing the date MOVES those tiles to
+    # the new date instead of deleting them. Only untouched tray tiles are
+    # cleared and rebuilt. (This function used to delete every row for the job
+    # first, which silently wiped every crew assignment on a date change.)
+    def is_placed(r):
+        return bool(r.get('team_id') or r.get('start_time'))
+
+    kept_types = set()
+    moved      = 0
+    for p in prior:
+        etype = p.get('type')
+        if is_placed(p) and etype in wanted:
+            if p.get('date') != wanted[etype]:
+                sb_patch('job_schedule', f'id=eq.{p["id"]}', {'date': wanted[etype]})
+                moved += 1
+            kept_types.add(etype)          # crews already assigned — don't re-seed
+        elif not is_placed(p):
+            sb_delete('job_schedule', f'id=eq.{p["id"]}')
+        # A placed tile whose type is no longer wanted (e.g. the job changed
+        # from pickup to install) is deliberately left alone rather than
+        # deleted — losing assigned crew work is worse than a stale tile the
+        # admin can remove.
+
+    for etype, edate in wanted.items():
+        if etype not in kept_types:
+            make_entry(edate, etype)
 
     # Keep jobs.runsheet_date on the main date for backward compat
     sb_patch('jobs', f'id=eq.{job_id}', {

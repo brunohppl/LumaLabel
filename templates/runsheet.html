@@ -80,6 +80,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .rs-cell.drop-target{background:rgba(184,147,90,0.22);box-shadow:inset 0 0 0 2px var(--accent);}
 .rs-tile.dragging{opacity:0.4;}
 .rs-tile.clash{box-shadow:0 0 0 2px var(--red,#A63D2F);}
+.rs-tray-count{display:inline-block;font-size:0.6rem;margin-left:6px;padding:1px 6px;border-radius:8px;background:rgba(255,255,255,0.3);font-weight:600;}
 .rs-share{display:inline-block;font-size:0.6rem;margin-left:5px;padding:1px 5px;border-radius:8px;background:rgba(255,255,255,0.28);vertical-align:1px;white-space:nowrap;}
 .rs-clash-flag{position:absolute;top:2px;right:4px;font-size:0.7rem;line-height:1;}
 .clash-note{font-size:0.72rem;color:var(--red,#A63D2F);margin:8px 0 0;display:none;}
@@ -742,6 +743,18 @@ async function cellDrop(ev, cell){
   const span     = Math.max(1, Math.min(Math.round((entry.duration || 60) / 30), maxSpan));
   const duration = span * 30;
 
+  // From the tray: create a new tile and leave the source where it is, so
+  // the job can be dropped onto another crew straight afterwards.
+  if(!_dragIsTask && isSource(entry)){
+    const created=await spawnFromSource(entry, {
+      team_id: team.id, vehicle: team.vehicle||null,
+      category: team.function||'transport',
+      start_time: slot, duration: duration,
+    });
+    if(created){ render(); renderTray(); }
+    return;
+  }
+
   await persistEntry(entry, {
     team_id:    team.id,
     vehicle:    team.vehicle || null,
@@ -791,7 +804,25 @@ async function trayDrop(ev){
   }
   const entry=findEntry(id);
   if(!entry) return;
-  if(!entry.start_time && !entry.team_id) return;   // already in the tray
+  if(isSource(entry)) return;   // it's already the tray source
+
+  // The job keeps its tray source, so un-scheduling removes this crew's tile
+  // rather than blanking it — otherwise we'd end up with two sources for the
+  // same job. If no source exists (older data), demote this tile into one so
+  // the job can't disappear from the day.
+  const hasSource=daySchedule.some(e=>
+    e.job_id===entry.job_id && e.type===entry.type && e.date===entry.date && isSource(e));
+
+  if(hasSource){
+    setSaveStatus('saving');
+    const result=await apiFetch(`/api/schedule/${entry.id}`,{method:'DELETE'});
+    if(!result.ok) return;
+    const i=daySchedule.findIndex(x=>x.id===entry.id);
+    if(i>-1) daySchedule.splice(i,1);
+    setSaveStatus('saved');
+    render(); renderTray();
+    return;
+  }
 
   await persistEntry(entry, {
     team_id:null, vehicle:null, start_time:null, duration:null,
@@ -896,12 +927,16 @@ function renderTray(){
     const propTag=job&&(job.property_type||job.property_size)?[job.property_type,job.property_size].filter(Boolean).join(' — '):'';
     const typeCls=e.type||'install';
     const orphanFlag=(e.start_time && !resolvesToTeam(e))?' <span title="Had a time but no matching team — please reassign">⚠️</span>':'';
+    const placed=hasJob?placedCountFor(e):0;
+    const countBadge=placed
+      ? `<span class="rs-tray-count" title="${placed} crew tile${placed!==1?'s':''} scheduled from this job">${placed} scheduled</span>`
+      : '';
     const clickAttr=hasJob?`onclick="if(!_suppressClick)openEntryPop('${e.id}',null,null)"`:'';
     const dragAttr=hasJob?`draggable="true" ondragstart="beginDrag(event,'${e.id}',false,this)" ondragend="endDrag(this)"`:'';
     const styleAttr=hasJob?'':'style="opacity:0.6;cursor:default;"';
     const noJobHint=hasJob?'':'<div style="font-size:0.62rem;opacity:0.85;margin-top:2px;">Waiting for job — created automatically once uploaded</div>';
-    return `<div class="rs-tray-tile ${typeCls}" ${clickAttr} ${dragAttr} ${styleAttr} title="${hasJob?'Drag onto the grid to schedule, or tap to edit':'From Monday — no matching Luma job yet'}">
-      <div class="rs-tray-tile-type">${TYPE_LBL[e.type]||e.type}${orphanFlag}</div>
+    return `<div class="rs-tray-tile ${typeCls}" ${clickAttr} ${dragAttr} ${styleAttr} title="${hasJob?'Drag onto a crew to schedule it — stays here so you can add more crews':'From Monday — no matching Luma job yet'}">
+      <div class="rs-tray-tile-type">${TYPE_LBL[e.type]||e.type}${orphanFlag}${countBadge}</div>
       <div class="rs-tray-tile-ref">${ref?'#'+ref:'No job number'}</div>
       ${addr?`<div class="rs-tray-tile-addr">${addr}</div>`:''}
       ${propTag?`<div style="font-size:0.68rem;opacity:0.85;font-style:italic;">${propTag}</div>`:''}
@@ -1012,7 +1047,12 @@ async function openEntryPop(entryId,teamId,slot){
   document.getElementById('entry-pop-title').textContent=entryId?'Edit Entry':'Add Entry';
   document.getElementById('entry-id').value=entryId||'';
   document.getElementById('entry-team-id').value=teamId||'';
-  document.getElementById('entry-del-btn').style.display=entryId?'inline-flex':'none';
+  const _src=entryId?daySchedule.find(x=>x.id===entryId):null;
+  // Deleting a source removes the job from the day entirely, which is a
+  // different act from removing one crew's tile — label it accordingly.
+  const _delBtn=document.getElementById('entry-del-btn');
+  _delBtn.style.display=entryId?'inline-flex':'none';
+  _delBtn.textContent=(_src&&isSource(_src))?'Remove from day':'Delete';
   document.getElementById('job-search').value='';
   document.getElementById('job-results').style.display='none';
   document.getElementById('job-selected').style.display='none';
@@ -1202,6 +1242,44 @@ function populateTaskJobs(selected){
   sel.value=selected||'';
 }
 
+// ── Tray sources ──────────────────────────────────────────────
+// A tray tile is a REFERENCE to a job, not a tile waiting to be consumed.
+// Scheduling from it creates a new entry and leaves the source in place, so
+// one job can be given as many crews as the day needs — two transport plus a
+// styling crew is the normal case, not an exception.
+function isSource(e){ return !!e && !e.team_id && !e.start_time; }
+
+// How many placed tiles this source has produced for its job/type/date.
+function placedCountFor(src){
+  if(!src.job_id) return 0;
+  return daySchedule.filter(e=>
+    e.job_id===src.job_id && e.type===src.type && e.date===src.date && !isSource(e)
+  ).length;
+}
+
+// Create a tile from a source. Returns the new entry, or null on failure.
+async function spawnFromSource(src, patch){
+  const p={
+    job_id: src.job_id, date: src.date, type: src.type,
+    monday_item_id: src.monday_item_id || null,
+    monday_address: src.monday_address || null,
+    notes: src.notes || null,
+    team_id:null, vehicle:null, start_time:null, duration:null,
+    ...patch,
+  };
+  setSaveStatus('saving');
+  const result=await apiFetch('/api/schedule-entry',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+  if(!result.ok) return null;
+  if(result.data && result.data.entry){
+    daySchedule.push(result.data.entry);
+    setSaveStatus('saved');
+    return result.data.entry;
+  }
+  // Never invent an id — refetch instead.
+  setSaveStatus('saved'); load(); return null;
+}
+
 async function cloneEntryToTeam(){
   const eid=document.getElementById('entry-id').value;
   const src=daySchedule.find(x=>x.id===eid);
@@ -1254,6 +1332,23 @@ async function saveEntry(){
     const jid=_jobId||document.getElementById('job-id').value;
     if(!jid){setSaveStatus('error','No job selected');alert('Please select a job.');return;}
     const p={job_id:jid,date:ds,team_id:tid||null,vehicle:team?.vehicle||null,type:_type,category:team?.function||'transport',start_time:time,duration:dur,notes};
+
+    // Scheduling from a tray source creates a new tile and keeps the source,
+    // so the same job can be handed to the next crew straight away. Editing
+    // the source itself (no team assigned) still just updates it.
+    const src=eid?daySchedule.find(x=>x.id===eid):null;
+    if(src && isSource(src) && tid){
+      const created=await spawnFromSource(src, {
+        team_id:tid, vehicle:team?.vehicle||null,
+        category:team?.function||'transport',
+        start_time:time, duration:dur, notes,
+      });
+      if(!created) return;
+      closeEntryPop();
+      render(); renderTray();
+      return;
+    }
+
     const result = eid
       ? await apiFetch(`/api/schedule/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)})
       : await apiFetch(`/api/schedule-entry`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});

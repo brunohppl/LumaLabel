@@ -2302,6 +2302,7 @@ def api_task_create():
         return jsonify({'success': False, 'error': 'Invalid duration'}), 400
 
     result = sb_post('runsheet_tasks', {
+        'job_id': (data.get('job_id') or None),
         'vehicle': vehicle, 'date': date_str, 'title': title,
         'notes': notes, 'start_time': start_time, 'duration': duration,
     })
@@ -2313,6 +2314,8 @@ def api_task_update(task_id):
     """Edit a task. Body: any of {title, notes, vehicle, start_time, duration}"""
     data    = request.get_json()
     payload = {}
+    if 'job_id' in data:                       # nullable: tasks may stand alone
+        payload['job_id'] = data['job_id'] or None
     if 'title' in data:
         title = (data['title'] or '').strip()
         if not title:

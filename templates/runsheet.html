@@ -277,6 +277,11 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   <div id="task-fields" style="display:none;">
     <label class="fl">Description</label>
     <input type="text" class="fi" id="task-title" placeholder="e.g. Stage sofa at bay B3, pick up linen…"/>
+    <label class="fl" style="margin-top:10px;">For job <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+    <select class="fi" id="task-job"></select>
+    <div style="font-size:0.7rem;color:var(--muted);margin-top:4px;">
+      Links this task to a job so it shows up with that job's other work.
+    </div>
   </div>
   <div class="two-col" style="margin-top:12px;">
     <div><label class="fl">Start time</label><select class="fi" id="entry-time"></select></div>
@@ -472,11 +477,14 @@ function render(){
       if(!cell) return;
       const isTask=e._task;
       const typeKey=isTask?'task':(e.type||'install');
-      const job=isTask?null:jobById[e.job_id];
+      // A task can now belong to a job too, so look the job up either way and
+      // show its reference on the task tile.
+      const job=jobById[e.job_id];
       const ref=isTask?(e.title||'Task'):(job?job.job_ref||job.job_number:'—');
-      const addr=job?job.address?.split(',')[0]||'':'';
-      const propTag=job&&(job.property_type||job.property_size)?[job.property_type,job.property_size].filter(Boolean).join(' — '):'';
-      const lbl=isTask?'Task':{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'';
+      const addr=(!isTask&&job)?job.address?.split(',')[0]||'':'';
+      const taskJobRef=(isTask&&job)?(job.job_ref||('#'+String(job.job_number||'').slice(-3))):'';
+      const propTag=(!isTask&&job&&(job.property_type||job.property_size))?[job.property_type,job.property_size].filter(Boolean).join(' — '):'';
+      const lbl=isTask?(taskJobRef?`Task · ${taskJobRef}`:'Task'):{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'';
 
       // Sub-column positioning
       const pct=100/totalSubCols;
@@ -1010,6 +1018,7 @@ async function openEntryPop(entryId,teamId,slot){
   document.getElementById('job-selected').style.display='none';
   document.getElementById('job-id').value='';
   document.getElementById('task-title').value='';
+  populateTaskJobs('');
   document.getElementById('entry-notes').value='';
   _jobId=null;
 
@@ -1059,6 +1068,7 @@ async function openEntryPop(entryId,teamId,slot){
       setMode(isTask?'task':'job');
       if(isTask){
         document.getElementById('task-title').value=e.title||'';
+        populateTaskJobs(e.job_id||'');
       } else {
         _type=e.type||'install';
         document.querySelectorAll('#type-chips .chip').forEach(b=>{
@@ -1165,6 +1175,33 @@ async function apiFetch(url, opts){
 
 // Copy the current entry onto another team — same job, day, time and
 // duration. Used when one job is run by more than one crew on the day.
+// Jobs on the runsheet this day, offered as an optional parent for a task.
+// "No job" stays first: plenty of warehouse tasks stand alone.
+function populateTaskJobs(selected){
+  const sel=document.getElementById('task-job');
+  if(!sel) return;
+  const seen=new Map();
+  daySchedule.forEach(e=>{
+    if(!e.job_id) return;
+    const j=dayJobs.find(x=>x.id===e.job_id);
+    if(j && !seen.has(j.id)) seen.set(j.id,j);
+  });
+  let opts='<option value="">— No job —</option>';
+  seen.forEach(j=>{
+    const ref=j.job_number?('#'+String(j.job_number).slice(-3)):(j.job_ref||'Job');
+    const addr=(j.address||'').slice(0,40);
+    opts+=`<option value="${j.id}">${ref}${addr?' — '+addr:''}</option>`;
+  });
+  // A task may already point at a job that has no tile today — keep it listed
+  // so opening and saving the task doesn't silently drop the link.
+  if(selected && !seen.has(selected)){
+    const j=dayJobs.find(x=>x.id===selected);
+    opts+=`<option value="${selected}">${j?(j.job_ref||'Job'):'Linked job'}</option>`;
+  }
+  sel.innerHTML=opts;
+  sel.value=selected||'';
+}
+
 async function cloneEntryToTeam(){
   const eid=document.getElementById('entry-id').value;
   const src=daySchedule.find(x=>x.id===eid);
@@ -1239,7 +1276,7 @@ async function saveEntry(){
   }else{
     const title=document.getElementById('task-title').value.trim();
     if(!title){setSaveStatus('error','Description required');alert('Please enter a description.');return;}
-    const tp={title,start_time:time,duration:dur,notes,team_id:tid};
+    const tp={title,start_time:time,duration:dur,notes,team_id:tid,job_id:document.getElementById('task-job').value||null};
     const result = eid
       ? await apiFetch(`/api/tasks/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(tp)})
       : await apiFetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...tp,date:ds,vehicle:team?.vehicle||'ALL',category:team?.function||'warehouse'})});

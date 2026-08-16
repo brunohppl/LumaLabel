@@ -249,6 +249,14 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   <div class="pop-title" id="entry-pop-title">Add Entry</div>
   <input type="hidden" id="entry-id"/>
   <input type="hidden" id="entry-team-id"/>
+  <div id="entry-crews" style="display:none;">
+    <label class="fl">Crews on this job</label>
+    <div id="entry-crew-list" style="display:flex;flex-direction:column;gap:6px;max-height:230px;overflow:auto;"></div>
+    <div style="font-size:0.7rem;color:var(--muted);margin-top:6px;">
+      Tick every crew on this job. They all start at the same time; each one's
+      length defaults to its type and can be changed here or by dragging later.
+    </div>
+  </div>
   <div id="entry-team-picker" style="display:none;margin-bottom:14px;">
     <label class="fl">Team</label>
     <select class="fi" id="entry-team-select" onchange="document.getElementById('entry-team-id').value=this.value;">
@@ -316,6 +324,12 @@ const DURS=[30,60,90,120,150,180,210,240,270,300,330,360,390,420,450,480,510,540
 const SLOT_H=46;
 const FN_COL={transport:'#2e5a8a',styling:'#6a3d8a',warehouse:'#b8935a'};
 const FN_LBL={transport:'🚛 Transport',styling:'🎨 Styling',warehouse:'🏭 Warehouse'};
+// Crews arrive together and leave at different times: transport unloads and
+// goes, styling stays on for the layouts. These defaults mean the common case
+// needs no resizing at all.
+const DEFAULT_START='07:30';
+const FN_DURATION={transport:60,styling:180,warehouse:60};
+const fnDuration=fn=>FN_DURATION[fn]||60;
 const TYPE_LBL={install:'Install',to_load:'Load',pickup:'Pickup'};
 
 let viewDate=new Date(),dayTeams=[],daySchedule=[],dayTasks=[],dayJobs=[],templates=[];
@@ -346,7 +360,8 @@ async function load(){
     templates=await tr.json();
     if(seq!==_loadSeq) return;
 
-    // Auto-seed four default teams if none exist for this day.
+    // Auto-seed the standard columns if none exist for this day: three
+    // transport, two styling, one warehouse.
     // Re-checked right before insert to reduce (not fully eliminate) the
     // window for double-seeding when two loads race — the DB unique index
     // on (date, name) is the real guard; this just avoids the common case.
@@ -355,7 +370,9 @@ async function load(){
         {name:'Nemo Crew',   vehicle:'Nemo',   function:'transport', sort_order:0},
         {name:'Bruce Crew',  vehicle:'Bruce',  function:'transport', sort_order:1},
         {name:'Nigel Crew',  vehicle:'Nigel',  function:'transport', sort_order:2},
-        {name:'Styling',     vehicle:'Marlin', function:'styling',   sort_order:3},
+        {name:'Marlin Crew', vehicle:'Marlin', function:'styling',   sort_order:3},
+        {name:'VUG Crew',    vehicle:'VUG',    function:'styling',   sort_order:4},
+        {name:'Warehouse',   vehicle:null,     function:'warehouse', sort_order:5},
       ];
       // Re-check immediately before seeding — closes most of the race window
       const recheck=await fetch(`/api/teams/${ds}`);
@@ -1083,10 +1100,30 @@ async function openEntryPop(entryId,teamId,slot){
     alsoBox.style.display='none';
   }
 
+  // Scheduling a job from the tray: offer every crew at once. Most jobs run
+  // with two or three, all starting together, so ticking boxes beats three
+  // separate drags.
+  const crewBox=document.getElementById('entry-crews');
+  const isTraySource=_src && isSource(_src) && _src.job_id;
+  if(isTraySource){
+    document.getElementById('entry-crew-list').innerHTML=dayTeams.map(t=>`
+      <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;">
+        <input type="checkbox" class="crew-chk" data-team="${t.id}" data-fn="${t.function||'transport'}"/>
+        <span style="flex:1;">${t.name||t.vehicle||'Team'} <span style="opacity:0.7;">${FN_LBL[t.function]||t.function||''}</span></span>
+        <select class="fi crew-dur" data-team="${t.id}" style="width:96px;padding:4px 6px;font-size:0.75rem;">
+          ${DURS.map(d=>`<option value="${d}"${d===fnDuration(t.function)?' selected':''}>${fmtDuration(d)}</option>`).join('')}
+        </select>
+      </label>`).join('')
+      || '<div style="font-size:0.8rem;color:var(--muted);">No crews on this day yet.</div>';
+    crewBox.style.display='block';
+  }else{
+    crewBox.style.display='none';
+  }
+
   // Team picker — only needed when opened without a column context (tray tiles)
   const teamPicker=document.getElementById('entry-team-picker');
   const teamSelect=document.getElementById('entry-team-select');
-  if(!teamId){
+  if(!teamId && !isTraySource){
     teamPicker.style.display='block';
     teamSelect.innerHTML='<option value="">Select a team…</option>'+
       dayTeams.map(t=>`<option value="${t.id}">${t.name||t.vehicle||'Team'} (${FN_LBL[t.function]||t.function})</option>`).join('');
@@ -1098,6 +1135,7 @@ async function openEntryPop(entryId,teamId,slot){
   const tSel=document.getElementById('entry-time');
   tSel.innerHTML='<option value="">No time</option>'+SLOTS.map(s=>`<option value="${s}">${fmtSlot(s)}</option>`).join('');
   if(slot)tSel.value=slot;
+  else if(isTraySource && SLOTS.includes(DEFAULT_START)) tSel.value=DEFAULT_START;
   document.getElementById('entry-dur').innerHTML='<option value="">—</option>'+DURS.map(d=>`<option value="${d}">${d>=60?Math.floor(d/60)+'h'+(d%60?d%60+'m':''):d+'m'}</option>`).join('');
   document.querySelectorAll('#type-chips .chip').forEach((b,i)=>b.classList.toggle('selected',i===0));
   _type='install';
@@ -1337,6 +1375,35 @@ async function saveEntry(){
     // so the same job can be handed to the next crew straight away. Editing
     // the source itself (no team assigned) still just updates it.
     const src=eid?daySchedule.find(x=>x.id===eid):null;
+
+    // Multi-crew: one tile per ticked crew, all sharing the start time, each
+    // with its own duration. This is the normal way a job gets scheduled.
+    const checked=[...document.querySelectorAll('.crew-chk:checked')];
+    if(src && isSource(src) && checked.length){
+      if(!time){alert('Please choose a start time.');setSaveStatus('error','Start time required');return;}
+      let made=0, failed=0;
+      for(const box of checked){
+        const teamId=box.getAttribute('data-team');
+        const crew=dayTeams.find(t=>t.id===teamId);
+        if(!crew) continue;
+        if(daySchedule.some(e=>e.job_id===src.job_id && e.type===src.type &&
+                               e.date===src.date && e.team_id===teamId)) continue;  // already on
+        const durSel=document.querySelector(`.crew-dur[data-team="${teamId}"]`);
+        const created=await spawnFromSource(src, {
+          team_id:teamId, vehicle:crew.vehicle||null,
+          category:crew.function||'transport',
+          start_time:time,
+          duration:parseInt(durSel?.value)||fnDuration(crew.function),
+          notes,
+        });
+        created ? made++ : failed++;
+      }
+      setSaveStatus(failed?'error':'saved', failed?`${failed} crew${failed!==1?'s':''} failed to save`:'');
+      closeEntryPop();
+      render(); renderTray();
+      return;
+    }
+
     if(src && isSource(src) && tid){
       const created=await spawnFromSource(src, {
         team_id:tid, vehicle:team?.vehicle||null,

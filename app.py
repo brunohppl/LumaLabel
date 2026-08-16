@@ -68,6 +68,36 @@ SUPABASE_URL  = os.environ.get('SUPABASE_URL', 'https://aqgxojawmohhogkhcxdb.sup
 SUPABASE_KEY  = os.environ.get('SUPABASE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxZ3hvamF3bW9oaG9na2hjeGRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NDc5ODYsImV4cCI6MjA5NDMyMzk4Nn0.-2UOdGY52jDEmCmBBtQA2XEy6dVT8ZPA_AIPcM7RFX4')
 SUPABASE_REST = SUPABASE_URL + '/rest/v1'
 
+# Supabase write errors used to be swallowed by a bare `except: return None`,
+# so a constraint violation and a row that simply didn't match looked identical
+# from the browser: "Save failed" with no reason. Every failure now records
+# what actually went wrong, and the write endpoints pass it back.
+_SB_LAST_ERROR = None
+
+
+def _sb_note_error(e, table='', payload=None):
+    global _SB_LAST_ERROR
+    try:
+        if isinstance(e, urllib.error.HTTPError):
+            body = e.read().decode('utf-8', 'replace')[:400]
+            _SB_LAST_ERROR = f'{table}: HTTP {e.code} — {body}'
+        else:
+            _SB_LAST_ERROR = f'{table}: {type(e).__name__} — {str(e)[:300]}'
+    except Exception:
+        _SB_LAST_ERROR = f'{table}: {str(e)[:300]}'
+    print(f'[supabase] write failed — {_SB_LAST_ERROR} | payload={payload}', flush=True)
+    return None
+
+
+def sb_last_error():
+    return _SB_LAST_ERROR
+
+
+def _sb_clear_error():
+    global _SB_LAST_ERROR
+    _SB_LAST_ERROR = None
+
+
 def sb_headers():
     return {
         'apikey':        SUPABASE_KEY,
@@ -86,6 +116,7 @@ def sb_get(table, params=''):
         return []
 
 def sb_post(table, data):
+    _sb_clear_error()
     url     = f'{SUPABASE_REST}/{table}'
     payload = json.dumps(data).encode()
     req     = urllib.request.Request(url, data=payload, headers=sb_headers(), method='POST')
@@ -93,9 +124,10 @@ def sb_post(table, data):
         with urllib.request.urlopen(req, timeout=10) as r:
             return json.loads(r.read())
     except Exception as e:
-        return None
+        return _sb_note_error(e, table, data)
 
 def sb_patch(table, params, data):
+    _sb_clear_error()
     url     = f'{SUPABASE_REST}/{table}?{params}'
     payload = json.dumps(data).encode()
     hdrs    = {**sb_headers(), 'Prefer': 'return=representation'}
@@ -104,15 +136,17 @@ def sb_patch(table, params, data):
         with urllib.request.urlopen(req, timeout=10) as r:
             return json.loads(r.read())
     except Exception as e:
-        return None
+        return _sb_note_error(e, table, data)
 
 def sb_delete(table, params):
+    _sb_clear_error()
     url = f'{SUPABASE_REST}/{table}?{params}'
     req = urllib.request.Request(url, headers=sb_headers(), method='DELETE')
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             return True
     except Exception as e:
+        _sb_note_error(e, table)
         return False
 
 def save_job_to_db(meta, items, colour_name, job_owner='', is_transfer=False,
@@ -2160,7 +2194,10 @@ def api_schedule_entry_create():
         'lead':       data.get('lead') or None,
         'team':       data.get('team') or None,
     })
-    return jsonify({'success': bool(result), 'entry': result[0] if result else None})
+    if not result:
+        return jsonify({'success': False,
+                        'error': sb_last_error() or 'The database rejected the new entry.'}), 400
+    return jsonify({'success': True, 'entry': result[0]})
 
 @app.route('/api/teams/<date_str>', methods=['GET'])
 def api_teams_list(date_str):
@@ -2180,7 +2217,10 @@ def api_teams_create(date_str):
         'colour':     data.get('colour') or None,
         'sort_order': data.get('sort_order', 0),
     })
-    return jsonify({'success': bool(result), 'team': result[0] if result else None})
+    if not result:
+        return jsonify({'success': False,
+                        'error': sb_last_error() or 'The database rejected the column.'}), 400
+    return jsonify({'success': True, 'team': result[0]})
 
 @app.route('/api/teams/entry/<team_id>', methods=['PATCH'])
 def api_teams_update(team_id):
@@ -2306,7 +2346,10 @@ def api_task_create():
         'vehicle': vehicle, 'date': date_str, 'title': title,
         'notes': notes, 'start_time': start_time, 'duration': duration,
     })
-    return jsonify({'success': bool(result), 'task': result[0] if result else None})
+    if not result:
+        return jsonify({'success': False,
+                        'error': sb_last_error() or 'The database rejected the task.'}), 400
+    return jsonify({'success': True, 'task': result[0]})
 
 
 @app.route('/api/tasks/<task_id>', methods=['PATCH'])
@@ -2405,12 +2448,24 @@ def api_schedule_update(entry_id):
         payload['duration'] = dur
     if 'notes'    in data: payload['notes'] = data['notes'] or None
     result = sb_patch('job_schedule', f'id=eq.{entry_id}', payload)
-    return jsonify({'success': bool(result)})
+    if result:
+        return jsonify({'success': True, 'entry': result[0]})
+
+    # An empty result and a rejected write are different problems: one means
+    # the row is gone (the page is stale and should reload), the other means
+    # the database refused the change. Saying which saves a lot of guesswork.
+    err = sb_last_error()
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+    return jsonify({'success': False, 'stale': True,
+                    'error': 'That tile no longer exists — the page will refresh.'}), 409
 
 
 @app.route('/api/schedule/<entry_id>', methods=['DELETE'])
 def api_schedule_delete(entry_id):
     result = sb_delete('job_schedule', f'id=eq.{entry_id}')
+    if not result and sb_last_error():
+        return jsonify({'success': False, 'error': sb_last_error()}), 400
     return jsonify({'success': bool(result)})
 
 

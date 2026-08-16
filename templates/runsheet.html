@@ -1273,6 +1273,13 @@ async function apiFetch(url, opts){
   }
   if(!res.ok || (data && data.success===false)){
     const msg = (data && data.error) ? data.error : `Save failed (HTTP ${res.status}).`;
+    // A stale tile isn't a failure worth interrupting for — the row is gone,
+    // so just refresh the day and let the user carry on.
+    if(data && data.stale){
+      setSaveStatus('error','Out of date — refreshing');
+      load();
+      return {ok:false, data};
+    }
     setSaveStatus('error', msg);
     alert(`Could not save: ${msg}`);
     return {ok:false, data};

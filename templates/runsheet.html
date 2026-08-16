@@ -137,6 +137,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 
 /* Print: a clean paper runsheet of whichever view is on screen */
 @media print{
+  #hide-empty-btn,#std-cols-btn{display:none !important;}
   header, .dev-banner, .date-row, .view-toggle, .save-status,
   .rs-tray-label, #rs-tray-wrap, .team-view-link, .btn-today,
   .date-nav-btn, .rs-resize{ display:none !important; }
@@ -180,6 +181,8 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       <button class="vt-btn on" id="vt-day"  onclick="setView('day')">Day</button>
       <button class="vt-btn"    id="vt-week" onclick="setView('week')">Week</button>
     </span>
+    <button class="btn-today" id="hide-empty-btn" onclick="toggleHideEmpty()" title="Crews with nothing on today are hidden">Hiding empty</button>
+    <button class="btn-today" id="std-cols-btn" onclick="addStandardColumns()" title="Add any missing standard crew columns">+ Standard columns</button>
     <span class="save-status" id="save-status"></span>
   </div>
 
@@ -398,8 +401,34 @@ async function load(){
   }
 }
 
+// A crew with nothing on today is noise on screen and on the printout. It's a
+// toggle rather than a rule: an empty column can't be dragged onto if it isn't
+// drawn, so turning this off is how you place the first job on a quiet crew.
+// (The crew checklist in the job popover always lists every crew, so the fast
+// path works either way.)
+let hideEmptyCrews=true;
+
+function teamHasWork(teamId){
+  return daySchedule.some(e=>e.team_id===teamId) || dayTasks.some(t=>t.team_id===teamId);
+}
+
+function visibleTeams(){
+  if(!hideEmptyCrews) return dayTeams;
+  const shown=dayTeams.filter(t=>teamHasWork(t.id));
+  return shown.length?shown:dayTeams;   // never show an empty grid
+}
+
+function toggleHideEmpty(){
+  hideEmptyCrews=!hideEmptyCrews;
+  const b=document.getElementById('hide-empty-btn');
+  b.textContent=hideEmptyCrews?'Hiding empty':'Showing all';
+  b.classList.toggle('on',!hideEmptyCrews);
+  render();
+}
+
 function render(){
-  const n=dayTeams.length;
+  const teams=visibleTeams();
+  const n=teams.length;
   const timew=56,colw=Math.max(160,Math.floor((window.innerWidth-timew-40)/(n+1)));
   const cols=`${timew}px repeat(${n},${colw}px) ${Math.max(120,colw*0.7)}px`;
   const rows=`auto repeat(${SLOTS.length},${SLOT_H}px)`;
@@ -408,7 +437,7 @@ function render(){
 
   // Header
   g+=`<div style="grid-column:1;grid-row:1;"></div>`;
-  dayTeams.forEach((t,i)=>{
+  teams.forEach((t,i)=>{
     const col=FN_COL[t.function]||'#1a1714';
     const others=(t.members||[]).filter(m=>m!==t.lead).join(', ');
     g+=`<div class="rs-team-hdr" style="grid-column:${i+2};grid-row:1;background:${col};" onclick="openTeamPop('${t.id}')">
@@ -426,8 +455,8 @@ function render(){
     const row=si+2;
     const showLbl=slot.endsWith(':00');
     g+=`<div class="rs-time" style="grid-column:1;grid-row:${row};">${showLbl?fmtSlot(slot):''}</div>`;
-    dayTeams.forEach((_,i)=>{
-      g+=`<div class="rs-cell" style="grid-column:${i+2};grid-row:${row};" data-team="${i}" data-slot="${slot}" onclick="if(!_suppressClick)openEntryPop(null,'${dayTeams[i].id}','${slot}')" ondragover="cellDragOver(event,this)" ondragleave="cellDragLeave(this)" ondrop="cellDrop(event,this)"></div>`;
+    teams.forEach((_,i)=>{
+      g+=`<div class="rs-cell" style="grid-column:${i+2};grid-row:${row};" data-team="${i}" data-slot="${slot}" onclick="if(!_suppressClick)openEntryPop(null,'${teams[i].id}','${slot}')" ondragover="cellDragOver(event,this)" ondragleave="cellDragLeave(this)" ondrop="cellDrop(event,this)"></div>`;
     });
     g+=`<div style="grid-column:${n+2};grid-row:${row};border-top:1px solid var(--border);"></div>`;
   });
@@ -438,7 +467,7 @@ function render(){
   // Inject tiles
   const jobById=Object.fromEntries(dayJobs.map(j=>[j.id,j]));
   const byTeam={};
-  dayTeams.forEach(t=>{byTeam[t.id]=[];});
+  teams.forEach(t=>{byTeam[t.id]=[];});
 
   daySchedule.forEach(e=>{
     // team_id is the primary placement key. The vehicle-name fallback is kept
@@ -456,7 +485,7 @@ function render(){
   // Jobs run by more than one crew today: number their tiles "1 of 3" so a
   // repeated job reads as deliberate rather than as a duplicate. Ordered by
   // team column so the numbering is stable between renders.
-  const teamOrder=Object.fromEntries(dayTeams.map((t,i)=>[t.id,i]));
+  const teamOrder=Object.fromEntries(teams.map((t,i)=>[t.id,i]));
   const shareIdx={};
   const byJob={};
   daySchedule.forEach(e=>{ if(e.job_id&&e.team_id) (byJob[e.job_id]=byJob[e.job_id]||[]).push(e); });
@@ -469,7 +498,7 @@ function render(){
   });
 
   const inner=document.getElementById('rs-inner');
-  dayTeams.forEach((team,ti)=>{
+  teams.forEach((team,ti)=>{
     const entries=(byTeam[team.id]||[]).filter(e=>e.start_time);
 
     // Detect overlapping groups and assign sub-columns
@@ -1316,6 +1345,40 @@ async function spawnFromSource(src, patch){
   }
   // Never invent an id — refetch instead.
   setSaveStatus('saved'); load(); return null;
+}
+
+// The standard set of columns for a day. Adding is explicit rather than
+// automatic on every load: a default you can't delete isn't a default, and
+// removing the Warehouse column on a quiet day should stay removed.
+const STANDARD_COLUMNS=[
+  {name:'Nemo Crew',   vehicle:'Nemo',   function:'transport'},
+  {name:'Bruce Crew',  vehicle:'Bruce',  function:'transport'},
+  {name:'Nigel Crew',  vehicle:'Nigel',  function:'transport'},
+  {name:'Marlin Crew', vehicle:'Marlin', function:'styling'},
+  {name:'VUG Crew',    vehicle:'VUG',    function:'styling'},
+  {name:'Warehouse',   vehicle:null,     function:'warehouse'},
+];
+
+async function addStandardColumns(){
+  const have=new Set(dayTeams.map(t=>(t.name||'').toLowerCase()));
+  const missing=STANDARD_COLUMNS.filter(c=>!have.has(c.name.toLowerCase()));
+  if(!missing.length){
+    setSaveStatus('saved');
+    alert('All standard columns are already on this day.');
+    return;
+  }
+  const ds=localDate(viewDate);
+  setSaveStatus('saving');
+  let failed=0;
+  for(let i=0;i<missing.length;i++){
+    const r=await apiFetch(`/api/teams/${ds}`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({...missing[i],sort_order:dayTeams.length+i})});
+    if(!r.ok) failed++;
+  }
+  if(failed) setSaveStatus('error',`${failed} column${failed!==1?'s':''} failed`);
+  else       setSaveStatus('saved');
+  load();   // refetch so ids and ordering come from the server
 }
 
 async function cloneEntryToTeam(){

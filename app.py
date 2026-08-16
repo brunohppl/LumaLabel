@@ -115,7 +115,18 @@ def sb_get(table, params=''):
     except Exception as e:
         return []
 
-def sb_post(table, data):
+MISSING_COL_RE = re.compile(r"Could not find the '([^']+)' column")
+
+
+def _missing_column(err_text):
+    """PostgREST names the offending column when a payload key doesn't exist."""
+    if not err_text or 'PGRST204' not in err_text:
+        return None
+    m = MISSING_COL_RE.search(err_text)
+    return m.group(1) if m else None
+
+
+def sb_post(table, data, _depth=0):
     _sb_clear_error()
     url     = f'{SUPABASE_REST}/{table}'
     payload = json.dumps(data).encode()
@@ -124,9 +135,17 @@ def sb_post(table, data):
         with urllib.request.urlopen(req, timeout=10) as r:
             return json.loads(r.read())
     except Exception as e:
-        return _sb_note_error(e, table, data)
+        _sb_note_error(e, table, data)
+        # One unknown key used to sink the whole insert. Drop it and retry, so
+        # a single stale field name can't silently break every write. Bounded,
+        # and each drop is logged.
+        col = _missing_column(_SB_LAST_ERROR)
+        if col and _depth < 5 and isinstance(data, dict) and col in data:
+            print(f'[supabase] dropping unknown column {table}.{col} and retrying', flush=True)
+            return sb_post(table, {k: v for k, v in data.items() if k != col}, _depth + 1)
+        return None
 
-def sb_patch(table, params, data):
+def sb_patch(table, params, data, _depth=0):
     _sb_clear_error()
     url     = f'{SUPABASE_REST}/{table}?{params}'
     payload = json.dumps(data).encode()
@@ -136,7 +155,12 @@ def sb_patch(table, params, data):
         with urllib.request.urlopen(req, timeout=10) as r:
             return json.loads(r.read())
     except Exception as e:
-        return _sb_note_error(e, table, data)
+        _sb_note_error(e, table, data)
+        col = _missing_column(_SB_LAST_ERROR)
+        if col and _depth < 5 and isinstance(data, dict) and col in data:
+            print(f'[supabase] dropping unknown column {table}.{col} and retrying', flush=True)
+            return sb_patch(table, params, {k: v for k, v in data.items() if k != col}, _depth + 1)
+        return None
 
 def sb_delete(table, params):
     _sb_clear_error()
@@ -2185,14 +2209,16 @@ def api_schedule_entry_create():
         'date':       data.get('date'),
         'team_id':    data.get('team_id') or None,
         'vehicle':    data.get('vehicle') or None,
-        'person':     data.get('person') or None,
         'type':       data.get('type', 'install'),
         'category':   data.get('category', 'transport'),
         'start_time': data.get('start_time') or None,
         'duration':   data.get('duration') or None,
         'notes':      data.get('notes') or None,
-        'lead':       data.get('lead') or None,
-        'team':       data.get('team') or None,
+        # 'lead' / 'team' / 'person' were sent here but don't exist on
+        # job_schedule — PostgREST rejected the whole insert, so every create
+        # through this endpoint failed. Nothing ever set them anyway.
+        'monday_item_id': data.get('monday_item_id') or None,
+        'monday_address': data.get('monday_address') or None,
     })
     if not result:
         return jsonify({'success': False,

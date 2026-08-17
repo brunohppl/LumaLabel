@@ -378,6 +378,9 @@ async function load(){
         }finally{ _toppingUp=false; }
         return load();
       }
+      // Order is corrected in place — no reload needed, and nothing is written
+      // when the columns are already in the right order.
+      if(await reorderColumns()){ render(); }
     }
 
     // Auto-seed the standard columns if none exist for this day: three
@@ -1421,6 +1424,44 @@ function missingStandardColumns(){
        && vehicles.has(c.vehicle.toLowerCase())) return false;
     return true;
   });
+}
+
+// Which standard column (if any) an existing column corresponds to.
+function standardIndexOf(team){
+  const nm=(team.name||'').toLowerCase();
+  const vh=(team.vehicle||'').toLowerCase();
+  return STANDARD_COLUMNS.findIndex(c=>
+    c.name.toLowerCase()===nm ||
+    (c.vehicle && EXCLUSIVE_VEHICLES.includes(c.vehicle) && c.vehicle.toLowerCase()===vh));
+}
+
+// Standard columns should read in a fixed order — the three transport crews,
+// then the three styling crews together, then Warehouse on the far right.
+// Columns added later were simply appended, so a topped-up day ended up with
+// Styling Crew 3 sitting past the Warehouse column.
+function desiredColumnOrder(teams){
+  const standard=[], custom=[];
+  teams.forEach(t=>{
+    const i=standardIndexOf(t);
+    (i>=0?standard:custom).push({team:t,rank:i});
+  });
+  standard.sort((a,b)=>a.rank-b.rank);
+  return [...standard.map(x=>x.team), ...custom.map(x=>x.team)];
+}
+
+async function reorderColumns(){
+  const ordered=desiredColumnOrder(dayTeams);
+  const wrong=ordered.filter((t,i)=>t.sort_order!==i);
+  if(!wrong.length) return false;
+  for(let i=0;i<ordered.length;i++){
+    if(ordered[i].sort_order===i) continue;
+    ordered[i].sort_order=i;
+    await fetch(`/api/teams/entry/${ordered[i].id}`,{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sort_order:i})});
+  }
+  dayTeams=ordered;
+  return true;
 }
 
 async function addStandardColumns(){

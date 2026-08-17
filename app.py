@@ -80,7 +80,15 @@ def _sb_note_error(e, table='', payload=None):
     try:
         if isinstance(e, urllib.error.HTTPError):
             body = e.read().decode('utf-8', 'replace')[:400]
-            _SB_LAST_ERROR = f'{table}: HTTP {e.code} — {body}'
+            # Translate the two failures that actually reach users into plain
+            # English; the raw Postgres text is kept in the server log.
+            if 'duplicate key value' in body:
+                _SB_LAST_ERROR = ('That name is already used by another column on this day — '
+                                  'rename it or edit the existing column instead.')
+            elif 'violates foreign key' in body:
+                _SB_LAST_ERROR = 'That refers to something that no longer exists — try refreshing the page.'
+            else:
+                _SB_LAST_ERROR = f'{table}: HTTP {e.code} — {body}'
         else:
             _SB_LAST_ERROR = f'{table}: {type(e).__name__} — {str(e)[:300]}'
     except Exception:

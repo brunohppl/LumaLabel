@@ -1417,9 +1417,13 @@ async function saveEntry(){
   const notes=document.getElementById('entry-notes').value.trim()||null;
   const team=dayTeams.find(t=>t.id===tid);
   const ds=localDate(viewDate);
-  // A time without a team would vanish from both the grid and the tray —
+  // Crews ticked in the multi-crew list count as a team selection — without
+  // this, scheduling a job straight from the tray was rejected here, because
+  // a tray source has a default start time and no single team.
+  const crewsTicked=document.querySelectorAll('.crew-chk:checked').length;
+  // A time without any team would vanish from both the grid and the tray —
   // require a team the moment a time is set.
-  if(time && !tid){alert('Please select a team before setting a time.');return;}
+  if(time && !tid && !crewsTicked){alert('Please select a team before setting a time.');return;}
 
   setSaveStatus('saving');
 

@@ -336,6 +336,7 @@ const TYPE_LBL={install:'Install',to_load:'Load',pickup:'Pickup'};
 
 let viewDate=new Date(),dayTeams=[],daySchedule=[],dayTasks=[],dayJobs=[],templates=[];
 let _fn='transport',_vehicle='',_mode='job',_type='install',_jobId=null,_jsTimer=null;
+let _toppingUp=false;   // guards against a top-up/reload loop
 let _loadSeq=0; // guards against out-of-order responses when navigating quickly
 
 function localDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
@@ -362,8 +363,25 @@ async function load(){
     templates=await tr.json();
     if(seq!==_loadSeq) return;
 
+    // Top up any missing standard columns, not just on a blank day — the
+    // standard set should simply always be there. Runs once per load; the
+    // reload afterwards finds nothing missing and stops.
+    if(dayTeams.length && !_toppingUp){
+      const gaps=missingStandardColumns();
+      if(gaps.length){
+        _toppingUp=true;
+        try{
+          for(let i=0;i<gaps.length;i++){
+            await fetch(`/api/teams/${ds}`,{method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({...gaps[i],sort_order:dayTeams.length+i})});
+          }
+        }finally{ _toppingUp=false; }
+        return load();
+      }
+    }
+
     // Auto-seed the standard columns if none exist for this day: three
-    // transport, two styling, one warehouse.
+    // transport, three styling, one warehouse.
     // Re-checked right before insert to reduce (not fully eliminate) the
     // window for double-seeding when two loads race — the DB unique index
     // on (date, name) is the real guard; this just avoids the common case.
@@ -372,9 +390,10 @@ async function load(){
         {name:'Nemo Crew',   vehicle:'Nemo',   function:'transport', sort_order:0},
         {name:'Bruce Crew',  vehicle:'Bruce',  function:'transport', sort_order:1},
         {name:'Nigel Crew',  vehicle:'Nigel',  function:'transport', sort_order:2},
-        {name:'Marlin Crew', vehicle:'Marlin', function:'styling',   sort_order:3},
-        {name:'VUG Crew',    vehicle:'VUG',    function:'styling',   sort_order:4},
-        {name:'Warehouse',   vehicle:null,     function:'warehouse', sort_order:5},
+        {name:'Styling Crew 1', vehicle:'Marlin',  function:'styling',   sort_order:3},
+        {name:'Styling Crew 2', vehicle:'VUG',     function:'styling',   sort_order:4},
+        {name:'Styling Crew 3', vehicle:'Own Car', function:'styling',   sort_order:5},
+        {name:'Warehouse',      vehicle:null,      function:'warehouse', sort_order:6},
       ];
       // Re-check immediately before seeding — closes most of the race window
       const recheck=await fetch(`/api/teams/${ds}`);
@@ -1345,17 +1364,36 @@ async function spawnFromSource(src, patch){
 // automatic on every load: a default you can't delete isn't a default, and
 // removing the Warehouse column on a quiet day should stay removed.
 const STANDARD_COLUMNS=[
-  {name:'Nemo Crew',   vehicle:'Nemo',   function:'transport'},
-  {name:'Bruce Crew',  vehicle:'Bruce',  function:'transport'},
-  {name:'Nigel Crew',  vehicle:'Nigel',  function:'transport'},
-  {name:'Marlin Crew', vehicle:'Marlin', function:'styling'},
-  {name:'VUG Crew',    vehicle:'VUG',    function:'styling'},
-  {name:'Warehouse',   vehicle:null,     function:'warehouse'},
+  {name:'Nemo Crew',       vehicle:'Nemo',     function:'transport'},
+  {name:'Bruce Crew',      vehicle:'Bruce',    function:'transport'},
+  {name:'Nigel Crew',      vehicle:'Nigel',    function:'transport'},
+  {name:'Styling Crew 1',  vehicle:'Marlin',   function:'styling'},
+  {name:'Styling Crew 2',  vehicle:'VUG',      function:'styling'},
+  {name:'Styling Crew 3',  vehicle:'Own Car',  function:'styling'},
+  {name:'Warehouse',       vehicle:null,       function:'warehouse'},
 ];
 
+// Vehicles that identify a crew on their own. 'Own Car' doesn't — any number
+// of crews can travel in their own car, so a column using it must be matched
+// by name or a second Own Car crew could never be added.
+const EXCLUSIVE_VEHICLES=['Nemo','Bruce','Nigel','Marlin','VUG'];
+
+// A standard column already exists if something matches it by name OR by
+// vehicle. Matching on name alone added a second Marlin column to days that
+// already had one called "Styling" — one crew, one vehicle, two columns.
+function missingStandardColumns(){
+  const names=new Set(dayTeams.map(t=>(t.name||'').toLowerCase()));
+  const vehicles=new Set(dayTeams.map(t=>(t.vehicle||'').toLowerCase()).filter(Boolean));
+  return STANDARD_COLUMNS.filter(c=>{
+    if(names.has(c.name.toLowerCase())) return false;
+    if(c.vehicle && EXCLUSIVE_VEHICLES.includes(c.vehicle)
+       && vehicles.has(c.vehicle.toLowerCase())) return false;
+    return true;
+  });
+}
+
 async function addStandardColumns(){
-  const have=new Set(dayTeams.map(t=>(t.name||'').toLowerCase()));
-  const missing=STANDARD_COLUMNS.filter(c=>!have.has(c.name.toLowerCase()));
+  const missing=missingStandardColumns();
   if(!missing.length){
     setSaveStatus('saved');
     alert('All standard columns are already on this day.');

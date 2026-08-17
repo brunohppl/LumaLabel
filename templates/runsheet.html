@@ -1612,7 +1612,7 @@ async function saveEntry(){
     const tp={title,start_time:time,duration:dur,notes,team_id:tid,job_id:document.getElementById('task-job').value||null};
     const result = eid
       ? await apiFetch(`/api/tasks/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(tp)})
-      : await apiFetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...tp,date:ds,vehicle:team?.vehicle||'ALL',category:team?.function||'warehouse'})});
+      : await apiFetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...tp,date:ds,vehicle:team?.vehicle||null,category:team?.function||'warehouse'})});
     if(!result.ok) return;
 
     if(eid){

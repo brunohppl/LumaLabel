@@ -471,7 +471,20 @@ function render(){
     if(tid&&byTeam[tid]) byTeam[tid].push({...e,_task:false});
   });
   dayTasks.forEach(e=>{
-    const tid=e.team_id||(dayTeams.find(t=>t.vehicle===e.vehicle||e.vehicle==='ALL')?.id);
+    // Tasks now store their team, so this fallback only serves older rows.
+    // The 'ALL' test used to sit inside the find(), which made EVERY team a
+    // match as soon as the vehicle was 'ALL' — so the task landed on whichever
+    // column happened to be first. Vehicle-less columns like Warehouse always
+    // sent 'ALL', so their tasks all appeared under the first transport crew.
+    let tid=e.team_id;
+    if(!tid && e.vehicle && e.vehicle!=='ALL'){
+      tid=dayTeams.find(t=>t.vehicle===e.vehicle)?.id;
+    }
+    if(!tid && e.vehicle==='ALL'){
+      // A legacy whole-team task: keep it visible on the first column rather
+      // than dropping it, but only when it genuinely has no team of its own.
+      tid=dayTeams[0]?.id;
+    }
     if(tid&&byTeam[tid]) byTeam[tid].push({...e,_task:true});
   });
 

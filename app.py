@@ -2369,6 +2369,10 @@ def api_task_create():
 
     result = sb_post('runsheet_tasks', {
         'job_id': (data.get('job_id') or None),
+        # team_id was sent by the page but never saved, so every task came back
+        # with no column and had to be guessed at from its vehicle. A column
+        # with no vehicle (Warehouse) had nothing to guess from.
+        'team_id': (data.get('team_id') or None),
         'vehicle': vehicle, 'date': date_str, 'title': title,
         'notes': notes, 'start_time': start_time, 'duration': duration,
     })
@@ -2404,8 +2408,16 @@ def api_task_update(task_id):
         if v != 'ALL' and v not in RUNSHEET_VEHICLES:
             return jsonify({'success': False, 'error': f'Unknown vehicle: {v}'}), 400
         payload['vehicle'] = v
+    if 'team_id' in data:
+        payload['team_id'] = data['team_id'] or None
     result = sb_patch('runsheet_tasks', f'id=eq.{task_id}', payload)
-    return jsonify({'success': bool(result)})
+    if result:
+        return jsonify({'success': True, 'task': result[0]})
+    err = sb_last_error()
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+    return jsonify({'success': False, 'stale': True,
+                    'error': 'That task no longer exists — the page will refresh.'}), 409
 
 
 @app.route('/api/tasks/<task_id>', methods=['DELETE'])

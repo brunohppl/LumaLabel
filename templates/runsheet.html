@@ -1048,8 +1048,17 @@ function applyTmpl(id){
   _fn=t.function||'transport';setFn(_fn,true);
   _vehicle=t.vehicle||'';
   document.querySelectorAll('#vehicle-chips .chip').forEach(b=>{const v=b.getAttribute('onclick').match(/'([^']*)'/)[1];b.classList.toggle('selected',v===_vehicle);});
-  document.getElementById('team-lead').value=t.lead||'';
+  const leadSel=document.getElementById('team-lead');
+  leadSel.value=t.lead||'';
   document.querySelectorAll('#member-chips .chip').forEach(b=>b.classList.toggle('selected',(t.members||[]).includes(b.textContent)));
+
+  // A template saved before someone left still names them. Say so rather than
+  // quietly dropping them, so the crew isn't short a person without warning.
+  const gone=[t.lead,...(t.members||[])].filter(Boolean)
+    .filter(n=>!ALL_WORKERS.includes(n));
+  if(gone.length){
+    setSaveStatus('error',`Template lists ${gone.join(', ')} — no longer on the roster`);
+  }
 }
 async function saveTeam(){
   const id=document.getElementById('team-id').value;
@@ -1064,8 +1073,17 @@ async function saveTeam(){
     result=await apiFetch(`/api/teams/entry/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
   }else{
     const ds=localDate(viewDate);
-    p.sort_order=dayTeams.length;
-    result=await apiFetch(`/api/teams/${ds}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+    // A day can only have one column of a given name. Applying a template
+    // whose name matches a column already on the day (the standard columns
+    // are created automatically now, so this is the common case) updates that
+    // column instead of failing on the duplicate.
+    const clash=name?dayTeams.find(t=>(t.name||'').toLowerCase()===name.toLowerCase()):null;
+    if(clash){
+      result=await apiFetch(`/api/teams/entry/${clash.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+    }else{
+      p.sort_order=dayTeams.length;
+      result=await apiFetch(`/api/teams/${ds}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+    }
   }
   if(!result.ok) return;   // keep the popover open so it can be corrected
 

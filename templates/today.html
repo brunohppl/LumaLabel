@@ -133,6 +133,22 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 </div>
 
 <script>
+// A task belongs to exactly ONE team. It used to be matched inline, and the
+// 'ALL' test made a task with no team match every crew that had a vehicle —
+// so Warehouse tasks (saved as 'ALL', because that column has no vehicle)
+// appeared under every crew except Warehouse itself.
+function resolveTaskTeam(t, teams){
+  if(t.team_id) return t.team_id;
+  if(t.vehicle && t.vehicle!=='ALL'){
+    const m=teams.find(x=>x.vehicle===t.vehicle);
+    if(m) return m.id;
+  }
+  // Legacy whole-team task with nothing to place it by: show it once, on the
+  // first crew, rather than on all of them or on none.
+  if(t.vehicle==='ALL') return teams[0]?.id;
+  return null;
+}
+
 const ALL_WORKERS=['Addy','Montie','Delphine','India','Hayley','Jo','Savio','Nick','Ayoub','Bruno','Phil','Thiago','Max'];
 const SLOTS=[];for(let h=7;h<=15;h++)for(let m=0;m<60;m+=30){if(h===15&&m>30)break;SLOTS.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);}
 const SLOT_H=44;
@@ -194,7 +210,7 @@ function renderDay(){
       const others=(team.members||[]).filter(m=>m!==team.lead).join(', ');
       const teamEntries=[
         ...schedule.filter(e=>e.team_id===team.id||(!e.team_id&&team.vehicle&&e.vehicle===team.vehicle)).map(e=>({...e,_team:team,_isTask:false})),
-        ...tasks.filter(t=>t.team_id===team.id||(!t.team_id&&team.vehicle&&(t.vehicle===team.vehicle||t.vehicle==='ALL'))).map(t=>({...t,_team:team,_isTask:true})),
+        ...tasks.filter(t=>resolveTaskTeam(t,teams)===team.id).map(t=>({...t,_team:team,_isTask:true})),
       ].sort((a,b)=>(a.start_time||'99:99').localeCompare(b.start_time||'99:99'));
 
       html+=`<div class="team-col">
@@ -230,7 +246,7 @@ function renderDay(){
   const combined=[];
   myTeams.forEach(team=>{
     schedule.filter(e=>e.team_id===team.id||(!e.team_id&&team.vehicle&&e.vehicle===team.vehicle)).forEach(e=>{combined.push({...e,_team:team,_isTask:false});});
-    tasks.filter(t=>t.team_id===team.id||(!t.team_id&&team.vehicle&&(t.vehicle===team.vehicle||t.vehicle==='ALL'))).forEach(t=>{combined.push({...t,_team:team,_isTask:true});});
+    tasks.filter(t=>resolveTaskTeam(t,myTeams)===team.id).forEach(t=>{combined.push({...t,_team:team,_isTask:true});});
   });
   combined.sort((a,b)=>(a.start_time||'99:99').localeCompare(b.start_time||'99:99'));
 

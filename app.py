@@ -2368,7 +2368,10 @@ def api_task_create():
 
     if not title:
         return jsonify({'success': False, 'error': 'title is required'}), 400
-    if vehicle != 'ALL' and vehicle not in RUNSHEET_VEHICLES:
+    # A column may legitimately have no vehicle (Warehouse). Tasks carry their
+    # team now, so vehicle is optional — it used to be forced to 'ALL', which
+    # meant "every crew" elsewhere in the app.
+    if vehicle and vehicle != 'ALL' and vehicle not in RUNSHEET_VEHICLES:
         return jsonify({'success': False, 'error': f'Unknown vehicle: {vehicle}'}), 400
     if start_time is not None and start_time not in RUNSHEET_TIME_SLOTS:
         return jsonify({'success': False, 'error': 'Invalid start_time'}), 400
@@ -2413,9 +2416,9 @@ def api_task_update(task_id):
         payload['duration'] = data['duration']
     if 'vehicle'     in data:
         v = data['vehicle']
-        if v != 'ALL' and v not in RUNSHEET_VEHICLES:
+        if v and v != 'ALL' and v not in RUNSHEET_VEHICLES:
             return jsonify({'success': False, 'error': f'Unknown vehicle: {v}'}), 400
-        payload['vehicle'] = v
+        payload['vehicle'] = v or None
     if 'team_id' in data:
         payload['team_id'] = data['team_id'] or None
     result = sb_patch('runsheet_tasks', f'id=eq.{task_id}', payload)

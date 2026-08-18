@@ -891,7 +891,7 @@ def format_date(raw):
 
 def format_date_label(raw):
     """Parse a date string and return a prominent label-friendly format
-    like 'WED 7TH JULY' for printing on the physical label itself.
+    like 'WED 7th - JUL' for printing on the physical label itself.
     Ordinal suffix (ST/ND/RD/TH) makes the day number unambiguous at a glance."""
     if not raw: return '—'
     dt = None
@@ -905,29 +905,60 @@ def format_date_label(raw):
         # Fall back to the compact version if we can't parse it
         return format_date(raw)
     day = dt.day
-    suffix = 'TH' if 11 <= day <= 13 else {1:'ST', 2:'ND', 3:'RD'}.get(day % 10, 'TH')
-    return dt.strftime('%a').upper() + '-' + str(day) + suffix + ' ' + dt.strftime('%B').upper()
+    suffix = 'th' if 11 <= day <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
+    # Short form — 'WED 14th - SEP'. The abbreviated month keeps the line short
+    # so it can be set much larger on the label.
+    return f"{dt.strftime('%a').upper()} {day}{suffix} - {dt.strftime('%b').upper()}"
 
 
 # ════════════════════════════════════════════════
 # GENERATE LABELS PDF
 # ════════════════════════════════════════════════
-def generate_labels(meta, items, colour, label_format=18):
+# Label sheet geometry, keyed by labels per page. Kept as data so a new paper
+# stock is a table entry rather than edits scattered through the drawing code.
+#   size    — label width x height in mm
+#   grid    — columns x rows
+#   margin  — distance from the page edge to the first label (x, y) in mm
+#   gap     — space between labels (x, y) in mm
+LABEL_FORMATS = {
+    # 105 x 37 mm, 2 across x 8 down. Two columns of 105mm span the full 210mm
+    # width, so there is no side margin and no gap; 8 x 37 = 296mm leaves
+    # 0.5mm top and bottom.
+    16: {'size': (105.0, 37.0), 'grid': (2, 8), 'margin': (0.0, 0.5), 'gap': (0.0, 0.0)},
+
+    # Avery 62 x 42-R, 3 across x 6 down — the previous stock.
+    18: {'size': (62.0, 42.0),  'grid': (3, 6), 'margin': (6.0, 6.43), 'gap': (6.0, 6.43)},
+}
+DEFAULT_LABEL_FORMAT = 16
+
+
+AU_STATE_RE = re.compile(
+    r'[\s,]+(?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT)\b(?:[\s,]+\d{4})?[\s,]*$', re.I)
+AU_POSTCODE_RE = re.compile(r'[\s,]+\d{4}[\s,]*$')
+
+
+def label_address(addr):
+    """Street only — no suburb, state or postcode. The crew already knows the
+    job; what they need off the label is the street."""
+    if not addr:
+        return ''
+    out = AU_STATE_RE.sub('', addr.strip())
+    out = AU_POSTCODE_RE.sub('', out)      # a bare postcode with no state
+    out = out.split(',')[0]                # drop the suburb
+    return out.strip().rstrip(',').strip()
+
+
+def generate_labels(meta, items, colour, label_format=DEFAULT_LABEL_FORMAT):
     colour_hex  = colour['hex']
     date_txt    = format_date_label(meta['stage_date'])
 
     PAGE_W, PAGE_H = A4
 
-    # Avery 62x42-R — 18 per page, 3 cols x 6 rows
-    # Equal spacing throughout: 6mm horizontal, 6.43mm vertical
-    SX    = 6.00 * mm
-    SY    = 6.43 * mm
-    GX    = SX
-    GY    = SY
-    COLS  = 3
-    ROWS  = 6
-    LBL_W = 62 * mm
-    LBL_H = 42 * mm
+    fmt = LABEL_FORMATS.get(int(label_format or 0), LABEL_FORMATS[DEFAULT_LABEL_FORMAT])
+    LBL_W, LBL_H = (v * mm for v in fmt['size'])
+    COLS,  ROWS  = fmt['grid']
+    SX,    SY    = (v * mm for v in fmt['margin'])
+    GX,    GY    = (v * mm for v in fmt['gap'])
 
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -984,50 +1015,105 @@ def generate_labels(meta, items, colour, label_format=18):
         rxe = x + w - pad
         rw  = rxe - rx
 
-        # ── Layout (18pp): ITEM NUMBER (upper) → ROOM (bottom) → DATE (prominent) → ADDRESS (very bottom) ──
-        asz = 5.5   # address font
+        # ── Layout ───────────────────────────────────────────────
+        # Item number sits under a divider at the top; the date and address
+        # form one block, centred in the white space below it. Both are sized
+        # as large as the panel allows rather than to fixed points, so a short
+        # address on a wide label uses the space it has.
 
-        # Divider — near top, below where date used to be
+        # Divider and item number — fixed at the top
         div_y = y + h - pad - 10 * 1.2
         c.setStrokeColor(C_BORDER); c.setLineWidth(0.3)
         c.line(rx, div_y, rxe, div_y)
 
-        # DATE — large, bold, auto-sized to fill the available width between
-        # divider and address line. "WED 7TH JULY" needs to be prominent
-        # enough to read at a glance when labels are stacked.
-        addr = meta['address']
-        baseline_addr = y + pad
-        date_area_h = div_y - baseline_addr - asz * 1.6 - 3  # space between divider and address
-        # Auto-size: start large and shrink until it fits the panel width
-        date_sz = 14
-        while date_sz > 7 and c.stringWidth(date_txt, 'Helvetica-Bold', date_sz) > rw:
-            date_sz -= 0.5
-        date_y = baseline_addr + asz * 1.6 + 2  # sits just above the address line
-        c.setFillColor(C_INK)
-        c.setFont('Helvetica-Bold', date_sz)
-        c.drawString(rx, date_y, date_txt)
-
-        # Address — small, muted, at the very bottom
-        c.setFillColor(C_MUTED); c.setFont('Helvetica', asz)
-        addr_max_w = rw
-        addr_display = addr
-        while addr_display and c.stringWidth(addr_display, 'Helvetica', asz) > addr_max_w:
-            addr_display = addr_display[:-1]
-        if addr_display != addr:
-            addr_display = addr_display[:-1] + '…'
-        c.drawString(rx, baseline_addr, addr_display)
-
-        # ── Fixed label zones — all positions fixed in points from label edges ──
-        ROOM_FONT  = 7          # fixed font — no auto-sizing
-        ROOM_Y     = y + 4      # shifted down
-        ID_FONT    = 9
-        ID_Y       = div_y - ID_FONT * 1.4 - 2  # just below divider
-
-        # Item number
-        id_txt = f'#{item["serial"]}'
-        id_w   = c.stringWidth(id_txt, 'Helvetica-Bold', ID_FONT)
+        ID_FONT = 9
+        ID_Y    = div_y - ID_FONT * 1.4 - 2
+        id_txt  = f'#{item["serial"]}'
+        id_w    = c.stringWidth(id_txt, 'Helvetica-Bold', ID_FONT)
         c.setFillColor(C_MUTED); c.setFont('Helvetica-Bold', ID_FONT)
         c.drawString(rx + (rw - id_w) / 2, ID_Y, id_txt)
+
+        # The zone the date/address block is centred in: from the bottom pad up
+        # to just under the item number.
+        zone_bottom = y + pad
+        zone_top    = ID_Y - 3
+        zone_h      = zone_top - zone_bottom
+
+        addr = label_address(meta['address'])
+
+        def fit(text, font, start_sz, min_sz, max_w):
+            """Largest size at or below start_sz whose text fits max_w."""
+            sz = start_sz
+            while sz > min_sz and c.stringWidth(text, font, sz) > max_w:
+                sz -= 0.25
+            return sz
+
+        def wrap_to(text, font, sz, max_w, max_lines=2):
+            """Greedy wrap. Returns None if it can't fit in max_lines."""
+            words, lines, cur = text.split(), [], ''
+            for word in words:
+                trial = f'{cur} {word}'.strip()
+                if c.stringWidth(trial, font, sz) <= max_w:
+                    cur = trial
+                else:
+                    if cur:
+                        lines.append(cur)
+                    cur = word
+                    if c.stringWidth(cur, font, sz) > max_w:
+                        return None          # a single word too wide
+                    if len(lines) > max_lines:
+                        return None
+            if cur:
+                lines.append(cur)
+            return lines if len(lines) <= max_lines else None
+
+        date_sz = fit(date_txt, 'Helvetica-Bold', 40, 7, rw)
+
+        # Address: take the largest size that fits on one or two lines. Two
+        # large lines beat one small one on a label read at arm's length.
+        addr_lines, addr_sz = [], 0
+        if addr:
+            addr_sz = min(date_sz * 0.72, 20)
+            while addr_sz > 6:
+                got = wrap_to(addr, 'Helvetica', addr_sz, rw)
+                if got:
+                    addr_lines = got
+                    break
+                addr_sz -= 0.25
+            if not addr_lines:               # nothing fit — fall back to truncation
+                addr_sz = 6
+                trimmed = addr
+                while trimmed and c.stringWidth(trimmed, 'Helvetica', addr_sz) > rw:
+                    trimmed = trimmed[:-1]
+                addr_lines = [trimmed[:-1] + '…'] if trimmed != addr else [trimmed]
+
+        GAP = 3
+        def block_h(d, a, n):
+            return d * 1.05 + (GAP + n * a * 1.15 if n else 0)
+
+        # Shrink together if the block is taller than the space available
+        while block_h(date_sz, addr_sz, len(addr_lines)) > zone_h and date_sz > 7:
+            date_sz -= 0.25
+            if addr_lines:
+                addr_sz = min(addr_sz, date_sz * 0.72)
+                got = wrap_to(addr, 'Helvetica', addr_sz, rw)
+                if got:
+                    addr_lines = got
+
+        total_h = block_h(date_sz, addr_sz, len(addr_lines))
+        block_y = zone_bottom + (zone_h - total_h) / 2      # vertically centred
+
+        c.setFillColor(C_INK)
+        # Address lines sit at the bottom of the block, date above them
+        for i, line in enumerate(reversed(addr_lines)):
+            c.setFont('Helvetica', addr_sz)
+            lw = c.stringWidth(line, 'Helvetica', addr_sz)
+            c.drawString(rx + (rw - lw) / 2, block_y + i * addr_sz * 1.15, line)
+
+        date_y = block_y + (len(addr_lines) * addr_sz * 1.15 + GAP if addr_lines else 0)
+        c.setFont('Helvetica-Bold', date_sz)
+        date_w = c.stringWidth(date_txt, 'Helvetica-Bold', date_sz)
+        c.drawString(rx + (rw - date_w) / 2, date_y, date_txt)
 
         # Room name removed — left blank for stylist to write manually
 
@@ -1625,7 +1711,7 @@ def checklist():
         install_date    = data.get('installDate')
         install_address = data.get('installAddress', '').strip()
         job_owner       = data.get('jobOwner', '')
-        label_format    = int(data.get('labelFormat', 18))  # 9 or 18 per page
+        label_format    = int(data.get('labelFormat', DEFAULT_LABEL_FORMAT))  # 16 or 18 per page
         meta, items     = parse_packing_list(pdf_bytes)
         meta['job_owner'] = job_owner
         if install_address:
@@ -1672,7 +1758,7 @@ def generate():
         install_date    = data.get('installDate')
         install_address = data.get('installAddress', '').strip()
         job_owner       = data.get('jobOwner', '')
-        label_format    = int(data.get('labelFormat', 18))  # 9 or 18 per page
+        label_format    = int(data.get('labelFormat', DEFAULT_LABEL_FORMAT))  # 16 or 18 per page
         colour_name     = data.get('colourName')  # manual colour choice, or None for Auto
         is_transfer     = bool(data.get('isTransfer', False))
         transfer_from_job_id = data.get('transferFromJobId') or None
@@ -1876,7 +1962,12 @@ def api_job_labels_pdf(job_id):
     colour_name = job.get('colour', 'Teal')
     colour      = next((c for c in COLOURS if c['name']==colour_name), COLOURS[0])
 
-    pdf_bytes = generate_labels(meta, items, colour)
+    # Defaults to the current stock; ?format=18 still prints the old sheet.
+    try:
+        fmt = int(request.args.get('format', DEFAULT_LABEL_FORMAT))
+    except (TypeError, ValueError):
+        fmt = DEFAULT_LABEL_FORMAT
+    pdf_bytes = generate_labels(meta, items, colour, fmt)
     filename  = f'LUMA_Labels_{meta["job_number"]}_{format_date(meta["stage_date"]).replace(" ", "")}.pdf'
     return Response(
         pdf_bytes,

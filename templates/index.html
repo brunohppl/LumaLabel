@@ -580,6 +580,17 @@
 
     <div class="date-field colour-field">
       <div class="colour-field-top">
+        <label>Label Sheet</label>
+        <span class="date-hint" style="text-align:right;">Match this to the label paper in the printer</span>
+      </div>
+      <select id="label-format" style="width:100%;padding:10px 12px;border:1px solid var(--border,#D8CFBF);border-radius:8px;background:#fff;font-size:0.95rem;">
+        <option value="16" selected>16 per page — 105 × 37 mm, 2 columns</option>
+        <option value="18">18 per page — 62 × 42 mm, 3 columns</option>
+      </select>
+    </div>
+
+    <div class="date-field colour-field">
+      <div class="colour-field-top">
         <label>Label Colour</label>
         <span class="date-hint" style="text-align:right;">Pick a colour, or let Auto choose one that isn't already out at the warehouse</span>
       </div>
@@ -855,7 +866,7 @@ generateBtn.addEventListener('click', async () => {
         installDate: installDate || null,
         jobOwner:    document.getElementById('job-owner').value.trim() || '',
         installAddress: installAddress || '',
-        labelFormat: 18,
+        labelFormat: parseInt(document.getElementById('label-format').value, 10) || 16,
         colourName:  selectedColour,
         isTransfer:        isTransferJob,
         transferFromJobId: isTransferJob && selectedTransferJob ? selectedTransferJob.id : null

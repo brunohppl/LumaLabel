@@ -1941,6 +1941,25 @@ def api_job_room_notes(job_id):
         by_room.setdefault(n['room'], []).append(n['note'])
     return jsonify(by_room)
 
+@app.route('/api/jobs/<job_id>/access-notes', methods=['PATCH'])
+def api_job_access_notes(job_id):
+    """Property access notes — gate codes, lockbox, parking, where the key is.
+
+    Lives on the job so every crew tile for that property shows the same thing,
+    including the load crew the day before."""
+    data  = request.get_json(silent=True) or {}
+    notes = (data.get('access_notes') or '').strip() or None
+
+    result = sb_patch('jobs', f'id=eq.{job_id}', {'access_notes': notes})
+    if result:
+        return jsonify({'success': True, 'job': result[0]})
+    err = sb_last_error()
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+    return jsonify({'success': False, 'stale': True,
+                    'error': 'That job no longer exists — the page will refresh.'}), 409
+
+
 @app.route('/api/jobs/<job_id>/labels-pdf', methods=['GET'])
 def api_job_labels_pdf(job_id):
     """Re-generate the Avery labels PDF from stored job data.

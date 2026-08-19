@@ -80,6 +80,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .rs-cell.drop-target{background:rgba(184,147,90,0.22);box-shadow:inset 0 0 0 2px var(--accent);}
 .rs-tile.dragging{opacity:0.4;}
 .rs-tile.clash{box-shadow:0 0 0 2px var(--red,#A63D2F);}
+.rs-access{display:inline-block;margin-left:5px;font-size:0.8rem;cursor:help;}
 .rs-tray-count{display:inline-block;font-size:0.6rem;margin-left:6px;padding:1px 6px;border-radius:8px;background:rgba(255,255,255,0.3);font-weight:600;}
 .rs-share{display:inline-block;font-size:0.6rem;margin-left:5px;padding:1px 5px;border-radius:8px;background:rgba(255,255,255,0.28);vertical-align:1px;white-space:nowrap;}
 .rs-clash-flag{position:absolute;top:2px;right:4px;font-size:0.7rem;line-height:1;}
@@ -298,8 +299,15 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     <div><label class="fl">Start time</label><select class="fi" id="entry-time"></select></div>
     <div><label class="fl">Duration</label><select class="fi" id="entry-dur"></select></div>
   </div>
-  <label class="fl">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label>
-  <textarea class="fi" id="entry-notes" rows="2" placeholder="Access info, instructions…" style="resize:none;font-size:0.84rem;padding:8px 10px;"></textarea>
+  <div id="entry-access-wrap" style="display:none;">
+    <label class="fl">🔑 Property access <span style="font-weight:400;text-transform:none;">(all crews, both days)</span></label>
+    <textarea class="fi" id="entry-access" rows="2" placeholder="Gate code, lockbox, parking, where the key is…" style="resize:none;font-size:0.84rem;padding:8px 10px;"></textarea>
+    <div style="font-size:0.7rem;color:var(--muted);margin-top:4px;margin-bottom:10px;">
+      Saved against the property, so every crew on this job sees it — including the load crew the day before.
+    </div>
+  </div>
+  <label class="fl">Notes <span style="font-weight:400;text-transform:none;">(just this tile)</span></label>
+  <textarea class="fi" id="entry-notes" rows="2" placeholder="Anything specific to this crew…" style="resize:none;font-size:0.84rem;padding:8px 10px;"></textarea>
   <div id="entry-also" style="display:none;border-top:1px solid var(--border);margin-top:14px;padding-top:12px;">
     <label class="fl">Also assign this job to another team</label>
     <div style="display:flex;gap:8px;align-items:center;">
@@ -541,6 +549,7 @@ function render(){
       const taskJobRef=(isTask&&job)?(job.job_ref||('#'+String(job.job_number||'').slice(-3))):'';
       const propTag=(!isTask&&job&&(job.property_type||job.property_size))?[job.property_type,job.property_size].filter(Boolean).join(' — '):'';
       const lbl=isTask?(taskJobRef?`Task · ${taskJobRef}`:'Task'):{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'';
+      const accessTag=(!isTask&&job&&job.access_notes)?`<span class="rs-access" title="${String(job.access_notes).replace(/"/g,'&quot;')}">🔑</span>`:'';
 
       // Sub-column positioning
       const pct=100/totalSubCols;
@@ -552,7 +561,7 @@ function render(){
       tile.style.cssText=`top:0;left:calc(${left}% + 2px);width:calc(${width}% - 4px);height:${span*SLOT_H-4}px;cursor:pointer;position:absolute;`;
       if(totalSubCols>1) tile.classList.add('clash');
       const share=shareIdx[e.id];
-      tile.innerHTML=`${totalSubCols>1?'<span class="rs-clash-flag" title="Overlaps another job on this team">⚠</span>':''}<div class="rs-tile-label">${lbl}<span class="rs-tile-dur" style="float:right;opacity:0.8;">${fmtDuration(e.duration)}</span></div><div class="rs-tile-ref">${ref}${share?`<span class="rs-share">${share.n} of ${share.of} crews</span>`:''}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''}${propTag?`<div class="rs-tile-prop">${propTag}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
+      tile.innerHTML=`${totalSubCols>1?'<span class="rs-clash-flag" title="Overlaps another job on this team">⚠</span>':''}<div class="rs-tile-label">${lbl}<span class="rs-tile-dur" style="float:right;opacity:0.8;">${fmtDuration(e.duration)}</span></div><div class="rs-tile-ref">${ref}${accessTag}${share?`<span class="rs-share">${share.n} of ${share.of} crews</span>`:''}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''}${propTag?`<div class="rs-tile-prop">${propTag}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
       tile.onclick=(ev)=>{ev.stopPropagation();if(_suppressClick)return;openEntryPop(e.id,team.id,null);};
 
       // Drag to move between teams / times
@@ -1150,6 +1159,19 @@ async function openEntryPop(entryId,teamId,slot){
 
   // "Also assign to" — only meaningful for an existing job entry that's
   // already on a team; a tray tile has nothing to copy yet.
+  // Property access — only for job entries, and read from the job itself
+  const accessWrap=document.getElementById('entry-access-wrap');
+  const accessBox=document.getElementById('entry-access');
+  const _accJobId=(_src&&_src.job_id)||(entryId?null:jobId)||null;
+  const _accJob=_accJobId?dayJobs.find(j=>j.id===_accJobId):null;
+  if(_accJob){
+    accessBox.value=_accJob.access_notes||'';
+    accessWrap.style.display='block';
+  }else{
+    accessBox.value='';
+    accessWrap.style.display='none';
+  }
+
   const alsoBox=document.getElementById('entry-also');
   const alsoSel=document.getElementById('entry-also-team');
   const existingEntry=entryId?daySchedule.find(x=>x.id===entryId):null;
@@ -1485,6 +1507,25 @@ async function addStandardColumns(){
   load();   // refetch so ids and ordering come from the server
 }
 
+// Access notes belong to the property. Written straight to the job so every
+// tile for it — this day and the load day — reflects the change immediately.
+async function saveAccessNotes(jobId){
+  if(!jobId) return;
+  const box=document.getElementById('entry-access');
+  if(!box || document.getElementById('entry-access-wrap').style.display==='none') return;
+  const job=dayJobs.find(j=>j.id===jobId);
+  if(!job) return;
+  const val=box.value.trim();
+  if((job.access_notes||'')===val) return;    // unchanged — don't write
+
+  const prev=job.access_notes;
+  job.access_notes=val||null;                 // optimistic, so tiles update now
+  const r=await apiFetch(`/api/jobs/${jobId}/access-notes`,{
+    method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({access_notes:val})});
+  if(!r.ok){ job.access_notes=prev; }
+}
+
 async function cloneEntryToTeam(){
   const eid=document.getElementById('entry-id').value;
   const src=daySchedule.find(x=>x.id===eid);
@@ -1531,6 +1572,10 @@ async function saveEntry(){
   // this, scheduling a job straight from the tray was rejected here, because
   // a tray source has a default start time and no single team.
   const crewsTicked=document.querySelectorAll('.crew-chk:checked').length;
+
+  // Property access is saved against the job, so it happens once regardless of
+  // which of the save paths below runs.
+  await saveAccessNotes(jid);
   // A time without any team would vanish from both the grid and the tray —
   // require a team the moment a time is set.
   if(time && !tid && !crewsTicked){alert('Please select a team before setting a time.');return;}

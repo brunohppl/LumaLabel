@@ -3069,6 +3069,7 @@ def _get_monday_board_data_inner():
     address_col_id  = find_col('property', 'address', 'project')
     type_col_id     = find_col('type')
     size_col_id     = find_col('size', 'sqm', 'sq m', 'm2')
+    style_col_id    = find_col('style', 'styling', 'package', 'look', exclude=['stylist'])
     install_date_id = find_col('install date', 'install')
     end_date_id     = find_col('end date', 'de-install', 'deinstall', 'pickup date', 'finish')
     date_cols = [c['id'] for c in columns if c['type'] == 'date']
@@ -3152,6 +3153,7 @@ def _get_monday_board_data_inner():
         address_val = col_text(address_col_id) or item['name']
         type_val    = col_text(type_col_id)
         size_val    = col_text(size_col_id)
+        style_val   = col_text(style_col_id) if style_col_id else ''
         install_dt  = col_text(install_date_id)
         end_dt      = col_text(end_date_id)
         status_val  = col_text(status_col_id)
@@ -3168,6 +3170,7 @@ def _get_monday_board_data_inner():
             'address':           address_val,
             'install_type':      type_val,
             'install_size':      size_val,
+            'install_style':     style_val,
             'install_date':      install_dt,
             'end_date':          end_dt,
             'status':            status_val,
@@ -3181,6 +3184,9 @@ def _get_monday_board_data_inner():
                 'runsheet_date':luma_job.get('runsheet_date',''),
                 'address':      luma_job.get('address',''),
                 'status':       luma_job.get('status',''),
+                'property_type':  luma_job.get('property_type'),
+                'property_size':  luma_job.get('property_size'),
+                'property_style': luma_job.get('property_style'),
             } if luma_job else None,
         }
 
@@ -3196,6 +3202,7 @@ def _get_monday_board_data_inner():
             'address':  col_title_by_id.get(address_col_id),
             'type':     col_title_by_id.get(type_col_id),
             'size':     col_title_by_id.get(size_col_id),
+            'style':    col_title_by_id.get(style_col_id),
             'install_date': col_title_by_id.get(install_date_id),
             'end_date': col_title_by_id.get(end_date_id),
             'status':   col_title_by_id.get(status_col_id),
@@ -3280,6 +3287,7 @@ def _api_monday_pull_inner():
     skipped_no_date     = 0
     skipped_errors      = 0
     writes_remaining    = 0
+    details_updated     = 0
     tiles_created       = 0
     tiles_updated       = 0
     changes             = []   # human-readable log returned to the page
@@ -3357,6 +3365,17 @@ def _api_monday_pull_inner():
                 if says_collect and luma_job.get('status') == 'installed':
                     patch['status'] = 'ready_to_collect'
 
+                # (c) Property details. The jobs page and the runsheet tiles
+                #     already display these; nothing had ever written them.
+                #     Only set a field when Monday actually has a value, so a
+                #     blank column never wipes something entered by hand.
+                for field, value in (('property_type',  item.get('install_type')),
+                                     ('property_size',  item.get('install_size')),
+                                     ('property_style', item.get('install_style'))):
+                    val = (value or '').strip()
+                    if val and luma_job.get(field) != val:
+                        patch[field] = val
+
                 if patch and (dates_updated + statuses_updated) >= MONDAY_MAX_JOB_WRITES:
                     writes_remaining += 1
                     patch = {}          # defer to the next run
@@ -3367,6 +3386,11 @@ def _api_monday_pull_inner():
                         changes.append(f'#{job_ref} install date set to {install_date}')
                     if 'status' in patch:
                         statuses_updated += 1
+                    prop_fields = [f for f in ('property_type', 'property_size', 'property_style')
+                                   if f in patch]
+                    if prop_fields:
+                        details_updated += 1
+                        changes.append(f'#{job_ref} property details updated')
                         changes.append(f'#{job_ref} marked Ready to Collect')
 
             # (c) Tray tiles, still only for the two pull groups
@@ -3434,6 +3458,7 @@ def _api_monday_pull_inner():
         'skipped_no_date':     skipped_no_date,
         'skipped_errors':      skipped_errors,
         'writes_remaining':    writes_remaining,
+        'details_updated':     details_updated,
         'tiles_created':       tiles_created,
         'tiles_updated':       tiles_updated,
         'changes':             changes[:60],

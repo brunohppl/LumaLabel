@@ -525,7 +525,7 @@ function jobCardHTML(job){
           <span class="pill ${pill}">${label}</span>
         </div>
         <div class="job-address" id="addr-${job.id}" onclick="startEditAddress('${job.id}')" title="Tap to edit address">${job.address||'<span style=\"color:var(--muted)\">No address</span>'}</div>
-        ${(job.property_type||job.property_size) ? `<div class="job-property-tag">${[job.property_type, job.property_size].filter(Boolean).join(' — ')}</div>` : ''}
+        ${(job.property_type||job.property_size||job.property_style) ? `<div class="job-property-tag">${[job.property_type, job.property_size, job.property_style].filter(Boolean).join(' — ')}</div>` : ''}
         ${(ownerBadge||truckBadge||runsheetBadge)?`<div class="assignment-row">${ownerBadge}${truckBadge}${runsheetBadge}</div>`:''}
         <button class="status-change-btn" onclick="event.stopPropagation();openStatusPopover('${job.id}', this)">
           <span class="pill ${pill}">${label}</span>

@@ -200,6 +200,7 @@ async function pullIntoLuma(){
       : `<strong>Pull complete</strong> — `+
         `${dU} install date${dU!==1?'s':''} updated, `+
         `${sU} job${sU!==1?'s':''} moved to Ready to Collect, `+
+        `${data.details_updated||0} propert${(data.details_updated||0)!==1?'ies':'y'} detailed, `+
         `${data.scheduled_matched} matched item${data.scheduled_matched!==1?'s':''} on the runsheet `+
         `(${data.tiles_created||0} tile${(data.tiles_created||0)!==1?'s':''} created, ${data.tiles_updated||0} updated), `+
         `${data.scheduled_unmatched} unmatched address${data.scheduled_unmatched!==1?'es':''} in the tray`+

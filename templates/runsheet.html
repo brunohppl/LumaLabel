@@ -547,7 +547,7 @@ function render(){
       const ref=isTask?(e.title||'Task'):(job?job.job_ref||job.job_number:'—');
       const addr=(!isTask&&job)?job.address?.split(',')[0]||'':'';
       const taskJobRef=(isTask&&job)?(job.job_ref||('#'+String(job.job_number||'').slice(-3))):'';
-      const propTag=(!isTask&&job&&(job.property_type||job.property_size))?[job.property_type,job.property_size].filter(Boolean).join(' — '):'';
+      const propTag=(!isTask&&job&&(job.property_type||job.property_size||job.property_style))?[job.property_type,job.property_size,job.property_style].filter(Boolean).join(' — '):'';
       const lbl=isTask?(taskJobRef?`Task · ${taskJobRef}`:'Task'):{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'';
       const accessTag=(!isTask&&job&&job.access_notes)?`<span class="rs-access" title="${String(job.access_notes).replace(/"/g,'&quot;')}">🔑</span>`:'';
 
@@ -1001,7 +1001,7 @@ function renderTray(){
     const hasJob=!!e.job_id;
     const ref=job?(job.job_ref||job.job_number):null;
     const addr=job?.address||e.monday_address||'';
-    const propTag=job&&(job.property_type||job.property_size)?[job.property_type,job.property_size].filter(Boolean).join(' — '):'';
+    const propTag=job&&(job.property_type||job.property_size||job.property_style)?[job.property_type,job.property_size,job.property_style].filter(Boolean).join(' — '):'';
     const typeCls=e.type||'install';
     const orphanFlag=(e.start_time && !resolvesToTeam(e))?' <span title="Had a time but no matching team — please reassign">⚠️</span>':'';
     const placed=hasJob?placedCountFor(e):0;

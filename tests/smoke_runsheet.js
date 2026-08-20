@@ -154,6 +154,13 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   ok('a pickup never shows a loading tag ('+pickupTiles.length+' tiles)',
      pickupTiles.length>0 && !pickupTiles.some(t=>txt(t).includes('📦')));
 
+  // The tray tile — the thing you read before deciding which truck to use
+  const trayTiles=[...d.querySelectorAll('.rs-tray-tile')].map(x=>x.textContent);
+  ok('tray tile shows the loading truck ('+trayTiles.length+' tiles)',
+     trayTiles.some(t=>t.includes('#400') && t.includes('Nemo')));
+  ok('tray tile uses the plain tag, never a warning',
+     ![...d.querySelectorAll('.rs-tray-tile .rs-loaded.mismatch')].length);
+
   err=await call(w.openTeamPop);
   ok('team popover opens'+(err?' — '+err:''), !err || err.includes('not a function'));
 

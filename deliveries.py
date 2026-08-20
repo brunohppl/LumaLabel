@@ -426,7 +426,8 @@ def api_deliveries_line_update(line_id):
     quantity that changed after the order. Editing beats re-importing the
     whole project and losing the check-in history."""
     EDITABLE = ('section', 'product_name', 'item_label', 'brand', 'sku',
-                'colour', 'supplier', 'notes', 'qty_expected', 'is_service')
+                'colour', 'supplier', 'notes', 'qty_expected', 'is_service',
+                'programma_status')
     try:
         payload = request.get_json(force=True, silent=True) or {}
 
@@ -451,6 +452,12 @@ def api_deliveries_line_update(line_id):
                                     'error': 'Quantity must be at least 1.'}), 400
             elif field == 'is_service':
                 value = bool(value)
+            elif field == 'programma_status':
+                # Stored the way the export writes it — lower case with
+                # underscores — so it matches imported rows and the badge
+                # colours keep working. Not restricted to a fixed list:
+                # Programma can add a status we don't know about yet.
+                value = (str(value).strip().lower().replace(' ', '_') or None) if value else None
             else:
                 value = (str(value).strip() or None) if value is not None else None
             patch[field] = value

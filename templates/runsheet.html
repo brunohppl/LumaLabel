@@ -344,7 +344,11 @@ const TYPE_LBL={install:'Install',to_load:'Load',pickup:'Pickup'};
 
 let viewDate=new Date(),dayTeams=[],daySchedule=[],dayTasks=[],dayJobs=[],templates=[];
 let _fn='transport',_vehicle='',_mode='job',_type='install',_jobId=null,_jsTimer=null;
-let _toppingUp=false;   // guards against a top-up/reload loop
+let _toppingUp=false;              // guards against a top-up/reload loop
+// Dates already attempted this session. The top-up reloads the day afterwards,
+// and if the insert failed the reload would find the same gaps and try again —
+// an endless loop against the server. One attempt per date is enough.
+const _toppedUp=new Set();
 let _loadSeq=0; // guards against out-of-order responses when navigating quickly
 
 function localDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
@@ -374,10 +378,11 @@ async function load(){
     // Top up any missing standard columns, not just on a blank day — the
     // standard set should simply always be there. Runs once per load; the
     // reload afterwards finds nothing missing and stops.
-    if(dayTeams.length && !_toppingUp){
+    if(dayTeams.length && !_toppingUp && !_toppedUp.has(ds)){
       const gaps=missingStandardColumns();
       if(gaps.length){
         _toppingUp=true;
+        _toppedUp.add(ds);          // attempt once, whatever the outcome
         try{
           for(let i=0;i<gaps.length;i++){
             await fetch(`/api/teams/${ds}`,{method:'POST',headers:{'Content-Type':'application/json'},
@@ -1160,17 +1165,7 @@ async function openEntryPop(entryId,teamId,slot){
   // "Also assign to" — only meaningful for an existing job entry that's
   // already on a team; a tray tile has nothing to copy yet.
   // Property access — only for job entries, and read from the job itself
-  const accessWrap=document.getElementById('entry-access-wrap');
-  const accessBox=document.getElementById('entry-access');
-  const _accJobId=(_src&&_src.job_id)||(entryId?null:jobId)||null;
-  const _accJob=_accJobId?dayJobs.find(j=>j.id===_accJobId):null;
-  if(_accJob){
-    accessBox.value=_accJob.access_notes||'';
-    accessWrap.style.display='block';
-  }else{
-    accessBox.value='';
-    accessWrap.style.display='none';
-  }
+  refreshAccessField((_src && _src.job_id) || _jobId || null);
 
   const alsoBox=document.getElementById('entry-also');
   const alsoSel=document.getElementById('entry-also-team');
@@ -1297,12 +1292,12 @@ function searchJobs(q){
     res.style.display='block';
   },300);
 }
-function pickJob(id,ref,addr){_jobId=id;
+function pickJob(id,ref,addr){_jobId=id;refreshAccessField(id);
   // Keep a local record so a newly created tile can render its label
   // immediately, without reloading the day to find the job.
   if(!dayJobs.find(x=>x.id===id)) dayJobs.push({id,job_ref:ref,address:addr});
   document.getElementById('job-results').style.display='none';document.getElementById('job-selected-label').textContent=`${ref} — ${addr}`;document.getElementById('job-selected').style.display='flex';document.getElementById('job-id').value=id;document.getElementById('job-search').value='';}
-function clearJob(){_jobId=null;document.getElementById('job-selected').style.display='none';document.getElementById('job-id').value='';}
+function clearJob(){_jobId=null;refreshAccessField(null);document.getElementById('job-selected').style.display='none';document.getElementById('job-id').value='';}
 // Shared fetch wrapper — surfaces server errors instead of failing silently.
 // Returns {ok, data} — caller checks .ok before proceeding.
 // ── Save status pill ──────────────────────────────────────────
@@ -1512,6 +1507,24 @@ async function addStandardColumns(){
 
 // Access notes belong to the property. Written straight to the job so every
 // tile for it — this day and the load day — reflects the change immediately.
+// Show the property-access field for whichever job the popover is on, and
+// hide it when there isn't one yet. Called when the popover opens and again
+// when a job is picked or cleared, so a brand-new entry gets the field the
+// moment it has a job.
+function refreshAccessField(jobId){
+  const wrap=document.getElementById('entry-access-wrap');
+  const box=document.getElementById('entry-access');
+  if(!wrap||!box) return;
+  const job=jobId?dayJobs.find(j=>j.id===jobId):null;
+  if(job){
+    box.value=job.access_notes||'';
+    wrap.style.display='block';
+  }else{
+    box.value='';
+    wrap.style.display='none';
+  }
+}
+
 async function saveAccessNotes(jobId){
   if(!jobId) return;
   const box=document.getElementById('entry-access');

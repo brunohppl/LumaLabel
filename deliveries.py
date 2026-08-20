@@ -418,6 +418,79 @@ def api_deliveries_project_delete(project_id):
         return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
 
 
+@deliveries_bp.route('/api/deliveries/lines/<line_id>', methods=['PATCH'])
+def api_deliveries_line_update(line_id):
+    """Correct a schedule line.
+
+    Programma exports carry mistakes — a missing SKU, the wrong room, a
+    quantity that changed after the order. Editing beats re-importing the
+    whole project and losing the check-in history."""
+    EDITABLE = ('section', 'product_name', 'item_label', 'brand', 'sku',
+                'colour', 'supplier', 'notes', 'qty_expected', 'is_service')
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+
+        got = _sb('GET', 'delivery_lines', f'id=eq.{line_id}')
+        if not got:
+            return jsonify({'success': False, 'error': 'That line no longer exists.'}), 404
+        line = got[0]
+
+        patch = {}
+        for field in EDITABLE:
+            if field not in payload:
+                continue
+            value = payload[field]
+            if field == 'qty_expected':
+                try:
+                    value = int(value)
+                except (TypeError, ValueError):
+                    return jsonify({'success': False,
+                                    'error': 'Quantity must be a whole number.'}), 400
+                if value < 1:
+                    return jsonify({'success': False,
+                                    'error': 'Quantity must be at least 1.'}), 400
+            elif field == 'is_service':
+                value = bool(value)
+            else:
+                value = (str(value).strip() or None) if value is not None else None
+            patch[field] = value
+
+        if not patch:
+            return jsonify({'success': False, 'error': 'Nothing to change.'}), 400
+
+        # Lowering the expected quantity below what's already arrived would
+        # leave the line permanently over-received, so bring the count with it.
+        new_expected = patch.get('qty_expected', line.get('qty_expected'))
+        received = int(line.get('qty_received') or 0)
+        if new_expected is not None and received > int(new_expected):
+            patch['qty_received'] = int(new_expected)
+
+        # A line marked as a budget/service line isn't deliverable
+        if patch.get('is_service'):
+            patch['qty_received'] = 0
+
+        updated = _sb('PATCH', 'delivery_lines', f'id=eq.{line_id}', body=patch)
+        if not updated:
+            return jsonify({'success': False, 'error': 'The database rejected the change.'}), 400
+        return jsonify({'success': True, 'line': updated[0]})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@deliveries_bp.route('/api/deliveries/lines/<line_id>', methods=['DELETE'])
+def api_deliveries_line_delete(line_id):
+    """Remove a line the import shouldn't have created."""
+    try:
+        got = _sb('GET', 'delivery_lines', f'id=eq.{line_id}')
+        if not got:
+            return jsonify({'success': False, 'error': 'That line no longer exists.'}), 404
+        _sb('DELETE', 'delivery_checks', f'line_id=eq.{line_id}', prefer='return=minimal')
+        _sb('DELETE', 'delivery_lines', f'id=eq.{line_id}', prefer='return=minimal')
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
 @deliveries_bp.route('/api/deliveries/lines/<line_id>/check', methods=['POST'])
 def api_deliveries_line_check(line_id):
     """Record stock arriving against one schedule line.

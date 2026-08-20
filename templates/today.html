@@ -48,7 +48,8 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .card-body{flex:1;}
 .card-type{font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:3px;color:var(--muted);}
 .card-ref{font-size:1rem;font-weight:600;color:var(--ink);margin-bottom:2px;}
-.card-addr{font-size:0.85rem;color:var(--muted);margin-bottom:8px;}
+.card-addr{font-size:0.85rem;color:var(--muted);margin-bottom:2px;}
+.card-prop{font-size:0.78rem;color:var(--muted);font-style:italic;margin-bottom:8px;opacity:0.9;}
 .card-access{
   margin-top:8px;padding:8px 10px;border-radius:8px;
   background:rgba(201,162,39,0.14);border-left:3px solid #C9A227;
@@ -273,6 +274,12 @@ function renderDay(){
 }
 
 function cardHTML(e, jobById, showTeam){
+  // Property type / size / style, same as the jobs page and the scheduler tiles.
+  // Breaks and standalone tasks have no property, so nothing shows.
+  const _pj = jobById[e.job_id];
+  const propTag = (_pj && !(e.kind==='break'||e.title==='Lunch break'))
+    ? [_pj.property_type, _pj.property_size, _pj.property_style].filter(Boolean).join(' — ')
+    : '';
   const isTask=!!(e._isTask||(e.title&&!e.job_id));
   const typeKey=isTask?'task':(e.type||'install');
   const job=isTask?null:jobById[e.job_id];
@@ -293,6 +300,7 @@ function cardHTML(e, jobById, showTeam){
       <div class="card-type">${typeLabel}${dur}</div>
       <div class="card-ref">${ref}</div>
       ${street?`<div class="card-addr">${street}</div>`:''}
+      ${propTag?`<div class="card-prop">${propTag}</div>`:''}
       ${(e.kind==='break'||e.title==='Lunch break')?'':(job&&job.access_notes?`<div class="card-access">🔑 <strong>Access</strong> ${job.access_notes}</div>`:'')}
       ${e.notes?`<div class="card-note">📝 ${e.notes}</div>`:''}
       ${job?`<div class="card-btns">

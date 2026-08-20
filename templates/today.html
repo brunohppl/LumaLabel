@@ -20,10 +20,6 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .page{max-width:600px;margin:0 auto;padding:20px 16px 60px;}
 
 /* NAME PICKER */
-.who-card{background:white;border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:20px;}
-.who-label{font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
-.who-select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-family:'Jost',sans-serif;font-size:1rem;font-weight:500;color:var(--ink);background:white;outline:none;}
-.who-select:focus{border-color:var(--accent);}
 
 /* DATE NAV */
 .date-row{display:flex;align-items:center;gap:8px;margin-bottom:16px;}
@@ -119,14 +115,6 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 <div class="page">
   <a href="/scheduler" class="nav-back">⚙ Scheduler (Admin)</a>
 
-  <!-- Who am I -->
-  <div class="who-card">
-    <div class="who-label">Filter by name — or leave blank to see the full day</div>
-    <select class="who-select" id="who-select" onchange="saveName();renderDay()">
-      <option value="">— select your name —</option>
-    </select>
-  </div>
-
   <!-- Date nav -->
   <div class="date-row">
     <button class="date-nav" onclick="shiftDate(-1)">‹</button>
@@ -174,11 +162,7 @@ function localDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padSta
 function fmtDate(d){return d.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'});}
 function fmtTime(t){if(!t)return{h:'—',ampm:''};const[h,m]=t.split(':').map(Number);return{h:`${h%12||12}:${String(m).padStart(2,'0')}`,ampm:h<12?'am':'pm'};}
 
-// Populate name select
-const sel=document.getElementById('who-select');
-ALL_WORKERS.forEach(w=>{const o=document.createElement('option');o.value=w;o.textContent=w;sel.appendChild(o);});
-sel.value=localStorage.getItem('today-name')||'';
-function saveName(){localStorage.setItem('today-name',sel.value);}
+// The name filter was removed — this view always shows the whole day.
 
 function shiftDate(n){viewDate=new Date(viewDate);viewDate.setDate(viewDate.getDate()+n);load();}
 function goToday(){viewDate=new Date();load();}
@@ -196,7 +180,7 @@ async function load(){
 }
 
 function renderDay(){
-  const name=sel.value;
+  const name='';   // no per-person filter; the full day is always shown
   const content=document.getElementById('day-content');
 
   const teams=dayData.teams||[];

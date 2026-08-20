@@ -80,6 +80,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .rs-cell.drop-target{background:rgba(184,147,90,0.22);box-shadow:inset 0 0 0 2px var(--accent);}
 .rs-tile.dragging{opacity:0.4;}
 .rs-tile.clash{box-shadow:0 0 0 2px var(--red,#A63D2F);}
+.rs-tile.break{
+  background:repeating-linear-gradient(45deg,#8C8375,#8C8375 6px,#7E7568 6px,#7E7568 12px);
+  color:#fff;opacity:0.92;
+}
 .rs-access{display:inline-block;margin-left:5px;font-size:0.8rem;cursor:help;}
 .rs-tray-count{display:inline-block;font-size:0.6rem;margin-left:6px;padding:1px 6px;border-radius:8px;background:rgba(255,255,255,0.3);font-weight:600;}
 .rs-share{display:inline-block;font-size:0.6rem;margin-left:5px;padding:1px 5px;border-radius:8px;background:rgba(255,255,255,0.28);vertical-align:1px;white-space:nowrap;}
@@ -269,6 +273,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   <div style="display:flex;gap:8px;margin-bottom:14px;">
     <button class="fn-btn" id="mode-job"  onclick="setMode('job')"  style="flex:1;">🏠 Job</button>
     <button class="fn-btn" id="mode-task" onclick="setMode('task')" style="flex:1;">📝 Task</button>
+    <button class="fn-btn" id="mode-break" onclick="setMode('break')" style="flex:1;">🍽 Break</button>
   </div>
   <div id="job-fields">
     <label class="fl">Job</label>
@@ -298,6 +303,12 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   <div class="two-col" style="margin-top:12px;">
     <div><label class="fl">Start time</label><select class="fi" id="entry-time"></select></div>
     <div><label class="fl">Duration</label><select class="fi" id="entry-dur"></select></div>
+  </div>
+  <div id="break-fields" style="display:none;">
+    <div style="font-size:0.84rem;color:var(--muted);line-height:1.45;padding:4px 0 10px;">
+      Adds a 30-minute break for this crew at the selected time. Change the
+      duration below if it needs to be longer.
+    </div>
   </div>
   <div id="entry-access-wrap" style="display:none;">
     <label class="fl">🔑 Property access <span style="font-weight:400;text-transform:none;">(all crews, both days)</span></label>
@@ -545,7 +556,10 @@ function render(){
       const cell=inner.querySelector(`[data-team="${ti}"][data-slot="${SLOTS[si]}"]`);
       if(!cell) return;
       const isTask=e._task;
-      const typeKey=isTask?'task':(e.type||'install');
+      // Recognise a break by its marker, falling back to the title so it still
+      // shows correctly if the kind column hasn't been added yet.
+      const isBreak=isTask&&(e.kind==='break'||e.title==='Lunch break');
+      const typeKey=isBreak?'break':(isTask?'task':(e.type||'install'));
       // A task can now belong to a job too, so look the job up either way and
       // show its reference on the task tile.
       const job=jobById[e.job_id];
@@ -553,7 +567,7 @@ function render(){
       const addr=(!isTask&&job)?job.address?.split(',')[0]||'':'';
       const taskJobRef=(isTask&&job)?(job.job_ref||('#'+String(job.job_number||'').slice(-3))):'';
       const propTag=(!isTask&&job&&(job.property_type||job.property_size||job.property_style))?[job.property_type,job.property_size,job.property_style].filter(Boolean).join(' — '):'';
-      const lbl=isTask?(taskJobRef?`Task · ${taskJobRef}`:'Task'):{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'';
+      const lbl=isBreak?'🍽 Break':(isTask?(taskJobRef?`Task · ${taskJobRef}`:'Task'):{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'');
       const accessTag=(!isTask&&job&&job.access_notes)?`<span class="rs-access" title="${String(job.access_notes).replace(/"/g,'&quot;')}">🔑</span>`:'';
 
       // Sub-column positioning
@@ -1268,6 +1282,9 @@ async function openEntryPop(entryId,teamId,slot){
       document.getElementById('entry-notes').value=e.notes||'';
     }
   }else{setMode('job');}
+  // Reopening a break should land on the Break tab, not Task
+  const _openEntry=entryId?dayTasks.find(t=>t.id===entryId):null;
+  if(_openEntry&&(_openEntry.kind==='break'||_openEntry.title==='Lunch break')) setMode('break');
   document.getElementById('entry-overlay').classList.add('open');
   document.getElementById('entry-pop').classList.add('open');
 }
@@ -1276,8 +1293,16 @@ function setMode(m){
   _mode=m;
   document.getElementById('job-fields').style.display=m==='job'?'block':'none';
   document.getElementById('task-fields').style.display=m==='task'?'block':'none';
+  document.getElementById('break-fields').style.display=m==='break'?'block':'none';
   document.getElementById('mode-job').className='fn-btn'+(m==='job'?' active-transport':'');
   document.getElementById('mode-task').className='fn-btn'+(m==='task'?' active-transport':'');
+  document.getElementById('mode-break').className='fn-btn'+(m==='break'?' active-transport':'');
+  // A break is half an hour unless the scheduler says otherwise
+  if(m==='break'){
+    const dSel=document.getElementById('entry-dur');
+    if(dSel && !dSel.value) dSel.value='30';
+    document.getElementById('entry-access-wrap').style.display='none';
+  }
 }
 function pickType(btn,t){_type=t;document.querySelectorAll('#type-chips .chip').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');}
 function searchJobs(q){
@@ -1679,9 +1704,18 @@ async function saveEntry(){
       setSaveStatus('saved'); closeEntryPop(); load(); return;
     }
   }else{
-    const title=document.getElementById('task-title').value.trim();
+    // A break is stored as a task marked kind='break'. Reusing the task table
+    // keeps it on the crew's row and off the job entirely — a break belongs to
+    // people, not to a property.
+    const isBreak = _mode==='break';
+    const title = isBreak
+      ? 'Lunch break'
+      : document.getElementById('task-title').value.trim();
     if(!title){setSaveStatus('error','Description required');alert('Please enter a description.');return;}
-    const tp={title,start_time:time,duration:dur,notes,team_id:tid,job_id:document.getElementById('task-job').value||null};
+    if(isBreak && !tid){setSaveStatus('error','Pick a crew');alert('Please pick a crew for the break.');return;}
+    const tp = isBreak
+      ? {title, start_time:time, duration:dur||30, notes, team_id:tid, job_id:null, kind:'break'}
+      : {title,start_time:time,duration:dur,notes,team_id:tid,job_id:document.getElementById('task-job').value||null};
     const result = eid
       ? await apiFetch(`/api/tasks/${eid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(tp)})
       : await apiFetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...tp,date:ds,vehicle:team?.vehicle||null,category:team?.function||'warehouse'})});

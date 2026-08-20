@@ -2298,7 +2298,6 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_v
     })
 
 
-@app.route('/api/jobs/<job_id>/runsheet', methods=['PATCH'])
 def _set_job_runsheet_date(job_id, runsheet_date, runsheet_type):
     """Keep the job's own date in step with its schedule tiles.
 
@@ -2311,6 +2310,7 @@ def _set_job_runsheet_date(job_id, runsheet_date, runsheet_type):
     })
 
 
+@app.route('/api/jobs/<job_id>/runsheet', methods=['PATCH'])
 def api_job_runsheet(job_id):
     data          = request.get_json()
     runsheet_date = data.get('runsheet_date')

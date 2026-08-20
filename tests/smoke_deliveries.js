@@ -6,6 +6,8 @@ const PROJECT={id:'P1',name:'Somers Residence',line_count:3};
 const LINES=[
  {id:'L1',project_id:'P1',section:'Living',product_name:'Arc Sofa',brand:'Calibre',sku:'DT12137-BB',
   qty_expected:2,qty_received:0,is_service:false,programma_status:'paid'},
+ {id:'L4',project_id:'P1',section:'Bed 1',product_name:'Lamp',brand:'Cult',sku:'LM-1',
+  qty_expected:1,qty_received:0,is_service:false,programma_status:'awaiting_freight'},
  {id:'L2',project_id:'P1',section:'Living',product_name:'Side Table',brand:'Globe West',sku:null,
   qty_expected:1,qty_received:1,is_service:false,programma_status:'delivered'},
  {id:'L3',project_id:'P1',section:null,product_name:null,item_label:'Delivery fee',
@@ -47,8 +49,13 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   ok('fields pre-filled from the line', d.getElementById('e-product').value==='Arc Sofa');
   ok('quantity pre-filled', d.getElementById('e-qty').value==='2');
   ok('shows how many already arrived', /0 already received/.test(d.getElementById('e-received').textContent));
+  ok('status pre-selected from the line', d.getElementById('e-status').value==='paid');
+  ok('the usual statuses are offered',
+     ['draft','quoting','in_review','payment_due','paid','delivered']
+       .every(v=>[...d.getElementById('e-status').options].some(o=>o.value===v)));
 
   sent=[];
+  d.getElementById('e-status').value='delivered';
   d.getElementById('e-sku').value='CDT12137-BB';
   d.getElementById('e-section').value='Lounge';
   await w.saveEdit(); await sleep(80);
@@ -56,6 +63,15 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   ok('saves a PATCH', !!patch);
   ok('sends the corrected SKU', patch && patch.body.sku==='CDT12137-BB');
   ok('sends the corrected room', patch && patch.body.section==='Lounge');
+  ok('sends the new status', patch && patch.body.programma_status==='delivered');
+
+  // A status the export produced that isn't in our list must survive
+  w.openEdit('L4'); await sleep(40);
+  ok('unknown status kept and selected', d.getElementById('e-status').value==='awaiting_freight');
+  sent=[];
+  await w.saveEdit(); await sleep(60);
+  const p4=sent.find(s=>s.method==='PATCH');
+  ok('saving does not change it', p4 && p4.body.programma_status==='awaiting_freight');
   ok('editor closes after saving', !d.getElementById('edit-pop').classList.contains('open'));
   ok('table shows the new value', d.body.textContent.includes('CDT12137-BB'));
 

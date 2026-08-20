@@ -1,0 +1,32 @@
+// Loads the team view for real and checks it renders the whole day with no
+// name filter — and, importantly, throws nothing now the dropdown is gone.
+const fs=require('fs'); const {JSDOM}=require('jsdom');
+const html=fs.readFileSync('/mnt/user-data/outputs/today.html','utf8').replace(/\{\{[^}]*\}\}/g,'');
+const DATA={teams:[{id:'T1',name:'Nemo Crew',vehicle:'Nemo',function:'transport'},
+                   {id:'T4',name:'Styling Crew 1',vehicle:'Marlin',function:'styling'}],
+  schedule:[{id:'E1',job_id:'J400',team_id:'T1',type:'install',start_time:'07:30',duration:60},
+            {id:'E2',job_id:'J400',team_id:'T4',type:'install',start_time:'07:30',duration:180}],
+  tasks:[{id:'K1',team_id:'T1',title:'Lunch break',kind:'break',start_time:'12:00',duration:30}],
+  jobs:[{id:'J400',job_ref:'#400',address:'12 Somers St, Ascot',access_notes:'Gate 4823',
+         property_type:'Apartment',property_size:'3 bed'}]};
+let errs=[];
+const dom=new JSDOM(html,{runScripts:'dangerously',url:'http://localhost/today',beforeParse(w){
+  w.fetch=async()=>({ok:true,status:200,json:async()=>DATA});
+  w.alert=()=>{}; w.addEventListener('error',e=>errs.push(String(e.error||e.message)));
+}});
+const w=dom.window,d=w.document;
+let pass=0,fail=0; const ok=(l,c)=>{c?pass++:fail++;console.log((c?'✓ ':'✗ FAIL ')+l);};
+setTimeout(()=>{
+  ok('page loads with no script error'+(errs.length?' — '+errs[0]:''), errs.length===0);
+  ok('name dropdown is gone', !d.getElementById('who-select'));
+  ok('no leftover filter card', !d.querySelector('.who-card'));
+  const body=d.body.textContent;
+  ok('both crews shown without choosing a name',
+     body.includes('Nemo Crew') && body.includes('Styling Crew 1'));
+  ok('job reference shown', body.includes('#400'));
+  ok('property details shown', body.includes('Apartment'));
+  ok('access notes shown', body.includes('Gate 4823'));
+  ok('break shown', body.includes('Lunch break'));
+  console.log(`\n${pass} passed, ${fail} failed`);
+  process.exit(fail?1:0);
+},1200);

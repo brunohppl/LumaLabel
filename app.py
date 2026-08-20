@@ -480,26 +480,28 @@ COLOURS = [
     {'hex': '#0029A6', 'name': 'Indigo', 'text': 'white'},
     {'hex': '#0000D9', 'name': 'Blue', 'text': 'white'},
     {'hex': '#004359', 'name': 'Navy', 'text': 'white'},
-    {'hex': '#4F1659', 'name': 'Plum', 'text': 'white'},
+    {'hex': '#4F1659', 'name': 'Purple', 'text': 'white'},
     {'hex': '#D900C3', 'name': 'Magenta', 'text': 'black'},
     {'hex': '#D9006C', 'name': 'Cerise', 'text': 'white'},
     {'hex': '#D977A8', 'name': 'Pink', 'text': 'black'},
     {'hex': '#D99E77', 'name': 'Tan', 'text': 'black'},
     {'hex': '#592416', 'name': 'Brown', 'text': 'white'},
+    {'hex': '#757575', 'name': 'Grey', 'text': 'white'},
 ]
 
 # Colours retired from the picker. Kept only so a job labelled before the
 # palette changed still prints in the colour it was actually given — the crew
 # is holding that physical label. Never offered for a new job.
 LEGACY_COLOURS = [
+    # Older shades of names that are still in the picker — an existing job
+    # keeps the exact colour it was printed in.
+    {'hex': '#6A0DAD', 'name': 'Purple (old)', 'text': 'white'},
     {'hex': '#F9A825', 'name': 'Yellow (old)',  'text': 'black'},
-    {'hex': '#6A0DAD', 'name': 'Purple',        'text': 'white'},
     {'hex': '#00838F', 'name': 'Teal (old)',    'text': 'white'},
     {'hex': '#AD1457', 'name': 'Magenta (old)', 'text': 'white'},
     {'hex': '#558B2F', 'name': 'Olive (old)',   'text': 'white'},
     {'hex': '#00ACC1', 'name': 'Cyan (old)',    'text': 'black'},
     {'hex': '#F06292', 'name': 'Pink (old)',    'text': 'black'},
-    {'hex': '#757575', 'name': 'Grey',          'text': 'white'},
     {'hex': '#E65100', 'name': 'Orange (old)',  'text': 'white'},
     {'hex': '#1565C0', 'name': 'Blue (old)',    'text': 'white'},
     {'hex': '#2E7D32', 'name': 'Green (old)',   'text': 'white'},
@@ -1927,6 +1929,9 @@ def api_damages_list():
     rows = sb_get('damage_reports', 'order=created_at.desc')
     return jsonify(rows or [])
 
+DAMAGE_REPAIR_STATUSES = ['to_schedule', 'scheduled', 'fixed', 'discard']
+
+
 @app.route('/api/damages', methods=['POST'])
 def api_damages_create():
     data = request.get_json()
@@ -1937,6 +1942,10 @@ def api_damages_create():
         'report_category':   data.get('report_category') or 'furniture',
         'property_element':  data.get('property_element'),
         'damage_origin':     data.get('damage_origin'),
+        # Repair tracking: to_schedule / scheduled / fixed / discard.
+        # New reports start as "to be scheduled" — a damage nobody has
+        # triaged yet is exactly the thing that gets forgotten.
+        'repair_status':     data.get('repair_status') or 'to_schedule',
         'job_id':            data.get('job_id') or None,
         'job_ref_snapshot':  data.get('job_ref_snapshot') or None,
         'photo_url':         data.get('photo_url') or None,
@@ -1954,12 +1963,22 @@ def api_damages_update(report_id):
     if 'report_category'  in data: payload['report_category']  = data['report_category']
     if 'property_element' in data: payload['property_element'] = data['property_element'] or None
     if 'damage_origin'   in data: payload['damage_origin']    = data['damage_origin'] or None
+    if 'repair_status'    in data:
+        status = data['repair_status'] or 'to_schedule'
+        if status not in DAMAGE_REPAIR_STATUSES:
+            return jsonify({'success': False, 'error': f'Unknown status: {status}'}), 400
+        payload['repair_status'] = status
     if 'job_id'           in data: payload['job_id']           = data['job_id'] or None
     if 'job_ref_snapshot' in data: payload['job_ref_snapshot'] = data['job_ref_snapshot'] or None
     if 'photo_url'        in data: payload['photo_url']        = data['photo_url'] or None
     if 'notes'            in data: payload['notes']            = data['notes'] or None
     result = sb_patch('damage_reports', f'id=eq.{report_id}', payload)
-    return jsonify({'success': bool(result)})
+    if result:
+        return jsonify({'success': True, 'report': result[0]})
+    err = sb_last_error()
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+    return jsonify({'success': False, 'error': 'That report no longer exists.'}), 409
 
 @app.route('/api/damages/<report_id>', methods=['DELETE'])
 def api_damages_delete(report_id):
@@ -2042,8 +2061,14 @@ def api_job_labels_pdf(job_id):
         'job_owner':   job.get('job_owner', ''),
     }
 
-    colour_name = job.get('colour', 'Teal')
-    colour      = next((c for c in COLOURS if c['name']==colour_name), COLOURS[0])
+    colour_name = job.get('colour') or 'Teal'
+    colour      = find_colour(colour_name)
+    if not colour:
+        # Don't silently print the wrong colour — the crew matches labels to
+        # physical stock by colour, so a wrong one is worse than an odd one.
+        print(f'[labels] unknown colour {colour_name!r} for job {job_id} — '
+              f'falling back to {COLOURS[0]["name"]}', flush=True)
+        colour = COLOURS[0]
 
     # Defaults to the current stock; ?format=18 still prints the old sheet.
     try:

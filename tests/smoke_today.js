@@ -8,7 +8,7 @@ const DATA={teams:[{id:'T1',name:'Nemo Crew',vehicle:'Nemo',function:'transport'
             {id:'E2',job_id:'J400',team_id:'T4',type:'install',start_time:'07:30',duration:180}],
   tasks:[{id:'K1',team_id:'T1',title:'Lunch break',kind:'break',start_time:'12:00',duration:30}],
   jobs:[{id:'J400',job_ref:'#400',address:'12 Somers St, Ascot',access_notes:'Gate 4823',
-         property_type:'Apartment',property_size:'3 bed'}]};
+         property_type:'Apartment',property_size:'3 bed',is_transfer:true}]};
 let errs=[];
 const dom=new JSDOM(html,{runScripts:'dangerously',url:'http://localhost/today',beforeParse(w){
   w.fetch=async()=>({ok:true,status:200,json:async()=>DATA});
@@ -27,6 +27,8 @@ setTimeout(()=>{
   ok('property details shown', body.includes('Apartment'));
   ok('access notes shown', body.includes('Gate 4823'));
   ok('break shown', body.includes('Lunch break'));
+  ok('transfer is called out', /Transfer/i.test(body));
+  ok('and explained, not just labelled', body.includes('another job'));
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);
 },1200);

@@ -103,6 +103,8 @@ tr.part{background:rgba(184,147,90,0.06);}
 .edit-grid label.wide{grid-column:1/-1;}
 .edit-grid label.check{flex-direction:row;align-items:center;gap:8px;text-transform:none;
   letter-spacing:0;font-size:0.82rem;font-weight:500;color:var(--ink);}
+.edit-grid select{padding:8px 10px;border:1px solid var(--border);border-radius:6px;
+  font-family:inherit;font-size:0.9rem;color:var(--ink);background:#fff;}
 .edit-grid input[type=text],.edit-grid input[type=number]{padding:8px 10px;border:1px solid var(--border);
   border-radius:6px;font-family:inherit;font-size:0.9rem;color:var(--ink);}
 .edit-err{color:#C0392B;font-size:0.82rem;min-height:18px;margin-top:10px;}
@@ -505,6 +507,16 @@ function openEdit(id){
   f('e-colour', l.colour);
   f('e-supplier', l.supplier);
   f('e-notes', l.notes);
+  // Keep a status the export gave us even if it isn't one we list, so opening
+  // and saving a line can't quietly change it to something else.
+  const statusSel = document.getElementById('e-status');
+  const cur = l.programma_status || '';
+  if(cur && ![...statusSel.options].some(o=>o.value===cur)){
+    const o=document.createElement('option');
+    o.value=cur; o.textContent=cur.replace(/_/g,' ');
+    statusSel.appendChild(o);
+  }
+  statusSel.value = cur;
   document.getElementById('e-qty').value = l.qty_expected || 1;
   document.getElementById('e-service').checked = !!l.is_service;
   document.getElementById('e-received').textContent =
@@ -525,6 +537,7 @@ async function saveEdit(){
     section: v('e-section'), product_name: v('e-product'), item_label: v('e-label'),
     brand: v('e-brand'), sku: v('e-sku'), colour: v('e-colour'),
     supplier: v('e-supplier'), notes: v('e-notes'),
+    programma_status: document.getElementById('e-status').value,
     qty_expected: parseInt(document.getElementById('e-qty').value, 10),
     is_service: document.getElementById('e-service').checked,
   };
@@ -579,6 +592,17 @@ loadProjects();
       <label>Brand<input id="e-brand" type="text"></label>
       <label>SKU<input id="e-sku" type="text"></label>
       <label>Colour<input id="e-colour" type="text"></label>
+      <label>Programma status
+        <select id="e-status">
+          <option value="">—</option>
+          <option value="draft">draft</option>
+          <option value="quoting">quoting</option>
+          <option value="in_review">in review</option>
+          <option value="payment_due">payment due</option>
+          <option value="paid">paid</option>
+          <option value="delivered">delivered</option>
+        </select>
+      </label>
       <label>Supplier<input id="e-supplier" type="text"></label>
       <label class="wide">Notes<input id="e-notes" type="text"></label>
       <label class="wide check"><input id="e-service" type="checkbox"> Budget or service line (nothing to deliver)</label>

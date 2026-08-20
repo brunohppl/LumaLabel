@@ -2883,6 +2883,11 @@ def api_job_eta(job_id):
     role = data.get('role', 'truck')
     if lat is None or lng is None:
         return jsonify({'success': False, 'error': 'lat/lng required'}), 400
+    # 'team' was sent by the team view for a while and rejected here, so no
+    # ETA reached Slack from that page. Treat it as a transport run rather than
+    # failing, so an older cached page still works.
+    if role == 'team':
+        role = 'truck'
     if role not in ('truck', 'stylist'):
         return jsonify({'success': False, 'error': 'role must be "truck" or "stylist"'}), 400
 

@@ -135,16 +135,12 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   // J400 also sits on Styling Crew 1 (Marlin) -> that IS a mismatch
   // J400 is loaded on Nemo and one of its crews (T1) IS Nemo, so the other
   // crews on the job must NOT be warned — that's the normal multi-crew case.
-  const marks=[...d.querySelectorAll('.rs-loaded.mismatch')]
-    .map(m=>m.closest('.rs-tile').textContent);
-  // J400: loaded on Nemo, and crew T1 IS Nemo -> the styling and warehouse
-  // crews on the same job must NOT be warned. That's the normal arrangement.
-  ok('multi-crew job is not warned when one crew has the truck',
-     !marks.some(t=>t.includes('#400')));
-  // J402: loaded on Bruce, but its only crew is Warehouse (no vehicle) ->
-  // nobody is carrying it, which is worth flagging.
-  ok('warned when no crew on the job is in a loaded truck',
-     marks.some(t=>t.includes('#402')));
+  // The tag is informational only now — no warning state anywhere.
+  ok('no warning styling anywhere', !d.querySelector('.rs-loaded.mismatch'));
+  ok('no warning symbol in any tag',
+     ![...d.querySelectorAll('.rs-loaded')].some(x=>x.textContent.includes('⚠')));
+  ok('every loaded job still names its truck',
+     [...d.querySelectorAll('.rs-loaded')].every(x=>/Nemo|Bruce|Nigel|Marlin|VUG/.test(x.textContent)));
   ok('every crew on the job still shows the truck',
      j400.length>1 && j400.every(t=>txt(t).includes('Nemo')));
   // #401 is a PICKUP, and a pickup is never "loaded" — check the tag is absent
@@ -158,8 +154,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const trayTiles=[...d.querySelectorAll('.rs-tray-tile')].map(x=>x.textContent);
   ok('tray tile shows the loading truck ('+trayTiles.length+' tiles)',
      trayTiles.some(t=>t.includes('#400') && t.includes('Nemo')));
-  ok('tray tile uses the plain tag, never a warning',
-     ![...d.querySelectorAll('.rs-tray-tile .rs-loaded.mismatch')].length);
+  ok('tray tile uses the same plain tag',
+     [...d.querySelectorAll('.rs-tray-tile .rs-loaded')].every(x=>x.textContent.includes('📦')));
 
   err=await call(w.openTeamPop);
   ok('team popover opens'+(err?' — '+err:''), !err || err.includes('not a function'));

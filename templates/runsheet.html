@@ -1573,9 +1573,6 @@ async function saveEntry(){
   // a tray source has a default start time and no single team.
   const crewsTicked=document.querySelectorAll('.crew-chk:checked').length;
 
-  // Property access is saved against the job, so it happens once regardless of
-  // which of the save paths below runs.
-  await saveAccessNotes(jid);
   // A time without any team would vanish from both the grid and the tray —
   // require a team the moment a time is set.
   if(time && !tid && !crewsTicked){alert('Please select a team before setting a time.');return;}
@@ -1584,6 +1581,11 @@ async function saveEntry(){
 
   if(_mode==='job'){
     const jid=_jobId||document.getElementById('job-id').value;
+
+    // Property access is saved against the job, so it happens once here rather
+    // than in each of the save paths below. Wrapped so that a failure to save
+    // notes can never stop the entry itself from being saved.
+    try{ await saveAccessNotes(jid); }catch(err){ console.error('access notes', err); }
     if(!jid){setSaveStatus('error','No job selected');alert('Please select a job.');return;}
     const p={job_id:jid,date:ds,team_id:tid||null,vehicle:team?.vehicle||null,type:_type,category:team?.function||'transport',start_time:time,duration:dur,notes};
 

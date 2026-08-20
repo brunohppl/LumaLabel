@@ -45,6 +45,12 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .card-type{font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:3px;color:var(--muted);}
 .card-ref{font-size:1rem;font-weight:600;color:var(--ink);margin-bottom:2px;}
 .card-addr{font-size:0.85rem;color:var(--muted);margin-bottom:2px;}
+.card-transfer{
+  margin-top:6px;padding:7px 10px;border-radius:8px;
+  background:rgba(122,74,0,0.10);border-left:3px solid #B07A2A;
+  font-size:0.82rem;color:#5C4318;
+}
+.card-transfer strong{text-transform:uppercase;letter-spacing:0.04em;font-size:0.72rem;}
 .card-prop{font-size:0.78rem;color:var(--muted);font-style:italic;margin-bottom:8px;opacity:0.9;}
 .card-access{
   margin-top:8px;padding:8px 10px;border-radius:8px;
@@ -285,6 +291,7 @@ function cardHTML(e, jobById, showTeam){
       <div class="card-ref">${ref}</div>
       ${street?`<div class="card-addr">${street}</div>`:''}
       ${propTag?`<div class="card-prop">${propTag}</div>`:''}
+      ${(_pj&&_pj.is_transfer)?'<div class="card-transfer">⇄ <strong>Transfer</strong> — stock comes from another job, not the warehouse</div>':''}
       ${(e.kind==='break'||e.title==='Lunch break')?'':(job&&job.access_notes?`<div class="card-access">🔑 <strong>Access</strong> ${job.access_notes}</div>`:'')}
       ${e.notes?`<div class="card-note">📝 ${e.notes}</div>`:''}
       ${job?`<div class="card-btns">

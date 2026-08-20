@@ -2355,11 +2355,24 @@ def api_runsheet_day(date_str):
     # runsheet can only say "a transfer" without saying from or to where.
     jobs = _attach_transfer_partners(jobs, job_ids)
 
+    # Where each job was loaded. The load happens the day before, so it isn't
+    # in this day's schedule — without it the install tile can't say which
+    # truck is already carrying the stock.
+    loads = []
+    if job_ids:
+        try:
+            loads = sb_get('job_schedule',
+                           f"job_id=in.({','.join(job_ids)})&type=eq.to_load"
+                           "&vehicle=not.is.null") or []
+        except Exception:
+            loads = []
+
     return jsonify({
         'teams':    teams,
         'schedule': schedule,
         'tasks':    tasks,
         'jobs':     jobs,
+        'loads':    loads,
     })
 
 

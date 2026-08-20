@@ -2494,6 +2494,7 @@ def api_task_create():
         # with no column and had to be guessed at from its vehicle. A column
         # with no vehicle (Warehouse) had nothing to guess from.
         'team_id': (data.get('team_id') or None),
+        'kind': (data.get('kind') or None),      # 'break' marks time off, not work
         'vehicle': vehicle, 'date': date_str, 'title': title,
         'notes': notes, 'start_time': start_time, 'duration': duration,
     })

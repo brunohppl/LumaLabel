@@ -8,10 +8,16 @@ const html = fs.readFileSync('/mnt/user-data/outputs/runsheet.html','utf8').repl
 const TEAMS=[{id:'T1',name:'Nemo Crew',vehicle:'Nemo',function:'transport',sort_order:0},
              {id:'T4',name:'Styling Crew 1',vehicle:'Marlin',function:'styling',sort_order:3},
              {id:'T7',name:'Warehouse',vehicle:null,function:'warehouse',sort_order:6}];
-const JOBS=[{id:'J400',job_ref:'#400',job_number:'1400',address:'12 Somers St, Ascot',access_notes:'Gate 4823',is_transfer:true},
-            {id:'J401',job_ref:'#401',job_number:'1401',address:'9 Hale St',is_transfer:false}];
+// J400 receives stock FROM J401 (so J401 is the pickup being transferred out).
+// J402 is an ordinary job with no transfer at all.
+const JOBS=[{id:'J400',job_ref:'#400',job_number:'1400',address:'12 Somers St, Ascot',access_notes:'Gate 4823',
+             is_transfer:true,transfer_from_job_id:'J401'},
+            {id:'J401',job_ref:'#401',job_number:'1401',address:'9 Hale St',is_transfer:false},
+            {id:'J402',job_ref:'#402',job_number:'1402',address:'4 Oxford St',is_transfer:false}];
 const SCHEDULE=[{id:'SRC',job_id:'J400',type:'install',date:'2026-08-20',team_id:null,start_time:null,duration:null},
-                {id:'PLACED',job_id:'J400',type:'install',date:'2026-08-20',team_id:'T1',start_time:'08:00',duration:60}];
+                {id:'PLACED',job_id:'J400',type:'install',date:'2026-08-20',team_id:'T1',start_time:'08:00',duration:60},
+                {id:'PICKUP',job_id:'J401',type:'pickup',date:'2026-08-20',team_id:'T4',start_time:'10:00',duration:60},
+                {id:'PLAIN',job_id:'J402',type:'install',date:'2026-08-20',team_id:'T7',start_time:'13:00',duration:60}];
 let posted=[];
 const dom=new JSDOM(html,{runScripts:'dangerously',url:'http://localhost/runsheet',beforeParse(w){
   w.fetch=async(url,opts={})=>{
@@ -98,13 +104,22 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   }
 
   // Transfer marker on tiles
-  const marks=[...d.querySelectorAll('.rs-transfer')];
-  ok('transfer marked on the grid/tray ('+marks.length+')', marks.length>0);
-  ok('marker reads clearly', marks.length>0 && marks[0].textContent.trim()==='TRANSFER');
-  // every marker must belong to the transfer job, not the ordinary one
-  const tileText=[...d.querySelectorAll('.rs-tile,.rs-tray-tile')].map(x=>x.textContent);
-  ok('ordinary job is not marked as a transfer',
-     !tileText.some(x=>x.includes('#401') && x.includes('TRANSFER')));
+  const tiles=[...d.querySelectorAll('.rs-tile,.rs-tray-tile')].map(x=>x.textContent);
+  const forJob=r=>tiles.filter(t=>t.includes(r));
+  ok('receiving job says where stock comes FROM',
+     forJob('#400').some(t=>t.includes('TRANSFER FROM')));
+  ok('and names the other job', forJob('#400').some(t=>t.includes('#401')));
+  ok('the pickup says where stock goes TO',
+     forJob('#401').some(t=>t.includes('TRANSFER TO')));
+  ok('and names the other job', forJob('#401').some(t=>t.includes('#400')));
+  // Select by tile type: "#400" also appears inside "TRANSFER TO #400".
+  const installs=tiles.filter(t=>t.includes('Install'));
+  const pickups =tiles.filter(t=>t.includes('Pickup'));
+  ok('direction is never ambiguous',
+     installs.filter(t=>t.includes('#400')).every(t=>t.includes('TRANSFER FROM') && !t.includes('TRANSFER TO')) &&
+     pickups.every(t=>t.includes('TRANSFER TO') && !t.includes('TRANSFER FROM')));
+  ok('an ordinary job carries no transfer marker',
+     !forJob('#402').some(t=>t.includes('TRANSFER')));
 
   err=await call(w.openTeamPop);
   ok('team popover opens'+(err?' — '+err:''), !err || err.includes('not a function'));

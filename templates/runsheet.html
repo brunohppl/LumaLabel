@@ -1568,21 +1568,30 @@ function loadVehicles(jobId){
   return seen;
 }
 
-// Tag showing the truck already carrying this job's stock. Turns into a
-// warning when the crew doing the install isn't the crew that loaded it —
-// that's the case worth catching, since the stock is on the other truck.
+// Tag showing the truck already carrying this job's stock.
+//
+// A job normally runs with several crews — two transport plus a styling crew —
+// and only one of them is in the loading truck. Warning per-tile would fire on
+// nearly every job and quickly be ignored. So the warning fires only when NO
+// crew on the job that day is in a truck that was loaded: that's the case
+// where the furniture genuinely isn't going to arrive.
 function loadedTag(entry, job, team){
   if(!job || entry.type !== 'install') return '';
   const vehicles=loadVehicles(job.id);
   if(!vehicles.length) return '';
-  const here=team && team.vehicle;
-  const mismatch = here && !vehicles.includes(here);
   const label=vehicles.join(' + ');
-  const title = mismatch
-    ? `Loaded on ${label}, but this crew is in ${here}`
-    : `Loaded on ${label}`;
-  return `<span class="rs-loaded${mismatch?' mismatch':''}" title="${title}">`
-       + `${mismatch?'⚠ ':'📦 '}${label}</span>`;
+
+  const crewVehicles=daySchedule
+    .filter(e=>e.job_id===job.id && e.type==='install' && e.team_id)
+    .map(e=>{ const t=dayTeams.find(x=>x.id===e.team_id); return t && t.vehicle; })
+    .filter(Boolean);
+  const covered = crewVehicles.some(v=>vehicles.includes(v));
+
+  const title = covered
+    ? `Loaded on ${label}`
+    : `Loaded on ${label} — no crew on this job is in that vehicle today`;
+  return `<span class="rs-loaded${covered?'':' mismatch'}" title="${title}">`
+       + `${covered?'📦 ':'⚠ '}${label}</span>`;
 }
 
 function transferInfo(job){

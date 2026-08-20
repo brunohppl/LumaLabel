@@ -89,7 +89,6 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   background:rgba(255,255,255,0.9);color:#1F4B2C;
   font-size:0.58rem;font-weight:800;letter-spacing:0.04em;vertical-align:1px;
 }
-.rs-loaded.mismatch{background:#A63D2F;color:#fff;}
 .rs-transfer{
   display:inline-block;margin-left:5px;padding:1px 6px;border-radius:4px;
   background:rgba(255,255,255,0.9);color:#7A4A00;
@@ -584,7 +583,7 @@ function render(){
       // A transfer comes from another job rather than the warehouse, so the
       // crew needs to know before they start loading.
       const transferTag=(!isTask&&job)?transferBadge(job):'';
-      const loadTag=(!isTask&&job)?loadedTag(e, job, team):'';
+      const loadTag=(!isTask&&job)?loadedTag(e, job):'';
 
       // Sub-column positioning
       const pct=100/totalSubCols;
@@ -1041,12 +1040,10 @@ function renderTray(){
     const orphanFlag=(e.start_time && !resolvesToTeam(e))?' <span title="Had a time but no matching team — please reassign">⚠️</span>':'';
     const trayTransfer=job?transferBadge(job):'';
     // Which truck is already carrying this job's stock — the thing you need to
-    // know BEFORE placing it, so it lands on the right vehicle. Never warns
-    // here: an unplaced tile has no crew yet, so a warning would fire on
-    // everything and mean nothing.
+    // know BEFORE placing it, so it lands on the right vehicle.
     const trayVehicles=(job && e.type==='install')?loadVehicles(job.id):[];
     const trayLoad=trayVehicles.length
-      ? `<span class="rs-loaded" title="Loaded on ${trayVehicles.join(' + ')} — schedule this on that vehicle">📦 ${trayVehicles.join(' + ')}</span>`
+      ? `<span class="rs-loaded" title="Loaded on ${trayVehicles.join(' + ')}">📦 ${trayVehicles.join(' + ')}</span>`
       : '';
     const placed=hasJob?placedCountFor(e):0;
     const countBadge=placed
@@ -1576,30 +1573,15 @@ function loadVehicles(jobId){
   return seen;
 }
 
-// Tag showing the truck already carrying this job's stock.
-//
-// A job normally runs with several crews — two transport plus a styling crew —
-// and only one of them is in the loading truck. Warning per-tile would fire on
-// nearly every job and quickly be ignored. So the warning fires only when NO
-// crew on the job that day is in a truck that was loaded: that's the case
-// where the furniture genuinely isn't going to arrive.
-function loadedTag(entry, job, team){
+// Tag showing the truck already carrying this job's stock. Informational only:
+// a job normally runs with several crews and only one is in the loading truck,
+// so a warning would fire constantly and mean nothing.
+function loadedTag(entry, job){
   if(!job || entry.type !== 'install') return '';
   const vehicles=loadVehicles(job.id);
   if(!vehicles.length) return '';
   const label=vehicles.join(' + ');
-
-  const crewVehicles=daySchedule
-    .filter(e=>e.job_id===job.id && e.type==='install' && e.team_id)
-    .map(e=>{ const t=dayTeams.find(x=>x.id===e.team_id); return t && t.vehicle; })
-    .filter(Boolean);
-  const covered = crewVehicles.some(v=>vehicles.includes(v));
-
-  const title = covered
-    ? `Loaded on ${label}`
-    : `Loaded on ${label} — no crew on this job is in that vehicle today`;
-  return `<span class="rs-loaded${covered?'':' mismatch'}" title="${title}">`
-       + `${covered?'📦 ':'⚠ '}${label}</span>`;
+  return `<span class="rs-loaded" title="Loaded on ${label}">📦 ${label}</span>`;
 }
 
 function transferInfo(job){

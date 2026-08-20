@@ -84,6 +84,11 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   background:repeating-linear-gradient(45deg,#8C8375,#8C8375 6px,#7E7568 6px,#7E7568 12px);
   color:#fff;opacity:0.92;
 }
+.rs-transfer{
+  display:inline-block;margin-left:5px;padding:1px 6px;border-radius:4px;
+  background:rgba(255,255,255,0.9);color:#7A4A00;
+  font-size:0.58rem;font-weight:800;letter-spacing:0.06em;vertical-align:1px;
+}
 .rs-access{display:inline-block;margin-left:5px;font-size:0.8rem;cursor:help;}
 .rs-tray-count{display:inline-block;font-size:0.6rem;margin-left:6px;padding:1px 6px;border-radius:8px;background:rgba(255,255,255,0.3);font-weight:600;}
 .rs-share{display:inline-block;font-size:0.6rem;margin-left:5px;padding:1px 5px;border-radius:8px;background:rgba(255,255,255,0.28);vertical-align:1px;white-space:nowrap;}
@@ -569,6 +574,9 @@ function render(){
       const propTag=(!isTask&&job&&(job.property_type||job.property_size||job.property_style))?[job.property_type,job.property_size,job.property_style].filter(Boolean).join(' — '):'';
       const lbl=isBreak?'🍽 Break':(isTask?(taskJobRef?`Task · ${taskJobRef}`:'Task'):{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'');
       const accessTag=(!isTask&&job&&job.access_notes)?`<span class="rs-access" title="${String(job.access_notes).replace(/"/g,'&quot;')}">🔑</span>`:'';
+      // A transfer comes from another job rather than the warehouse, so the
+      // crew needs to know before they start loading.
+      const transferTag=(!isTask&&job&&job.is_transfer)?'<span class="rs-transfer">TRANSFER</span>':'';
 
       // Sub-column positioning
       const pct=100/totalSubCols;
@@ -580,7 +588,7 @@ function render(){
       tile.style.cssText=`top:0;left:calc(${left}% + 2px);width:calc(${width}% - 4px);height:${span*SLOT_H-4}px;cursor:pointer;position:absolute;`;
       if(totalSubCols>1) tile.classList.add('clash');
       const share=shareIdx[e.id];
-      tile.innerHTML=`${totalSubCols>1?'<span class="rs-clash-flag" title="Overlaps another job on this team">⚠</span>':''}<div class="rs-tile-label">${lbl}<span class="rs-tile-dur" style="float:right;opacity:0.8;">${fmtDuration(e.duration)}</span></div><div class="rs-tile-ref">${ref}${accessTag}${share?`<span class="rs-share">${share.n} of ${share.of} crews</span>`:''}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''}${propTag?`<div class="rs-tile-prop">${propTag}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
+      tile.innerHTML=`${totalSubCols>1?'<span class="rs-clash-flag" title="Overlaps another job on this team">⚠</span>':''}<div class="rs-tile-label">${lbl}<span class="rs-tile-dur" style="float:right;opacity:0.8;">${fmtDuration(e.duration)}</span></div><div class="rs-tile-ref">${ref}${transferTag}${accessTag}${share?`<span class="rs-share">${share.n} of ${share.of} crews</span>`:''}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''}${propTag?`<div class="rs-tile-prop">${propTag}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
       tile.onclick=(ev)=>{ev.stopPropagation();if(_suppressClick)return;openEntryPop(e.id,team.id,null);};
 
       // Drag to move between teams / times
@@ -1023,6 +1031,7 @@ function renderTray(){
     const propTag=job&&(job.property_type||job.property_size||job.property_style)?[job.property_type,job.property_size,job.property_style].filter(Boolean).join(' — '):'';
     const typeCls=e.type||'install';
     const orphanFlag=(e.start_time && !resolvesToTeam(e))?' <span title="Had a time but no matching team — please reassign">⚠️</span>':'';
+    const trayTransfer=(job&&job.is_transfer)?'<span class="rs-transfer">TRANSFER</span>':'';
     const placed=hasJob?placedCountFor(e):0;
     const countBadge=placed
       ? `<span class="rs-tray-count" title="${placed} crew tile${placed!==1?'s':''} scheduled from this job">${placed} scheduled</span>`
@@ -1035,6 +1044,7 @@ function renderTray(){
       <div class="rs-tray-tile-type">${TYPE_LBL[e.type]||e.type}${orphanFlag}${countBadge}</div>
       <div class="rs-tray-tile-ref">${ref?'#'+ref:'No job number'}</div>
       ${addr?`<div class="rs-tray-tile-addr">${addr}</div>`:''}
+      ${trayTransfer}
       ${propTag?`<div style="font-size:0.68rem;opacity:0.85;font-style:italic;">${propTag}</div>`:''}
       ${noJobHint}
     </div>`;

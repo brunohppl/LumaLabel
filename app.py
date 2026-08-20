@@ -3387,14 +3387,23 @@ def _api_monday_pull_inner():
     #   tray tiles  : only the pull groups (quote accepted / ready to pick)
     #   status move : items whose group OR status column says ready to collect
     actionable = []
+    details_only = []          # ignored groups: property details, nothing else
     for gtitle, items in data['groups'].items():
         gnorm = monday_label_norm(gtitle)
         if gnorm in MONDAY_IGNORE_GROUPS:
+            # Completed work still describes a real property, and a pickup is
+            # scheduled precisely when a job has finished — so its Monday item
+            # has usually moved to Completed. Skipping these entirely left
+            # pickup tiles with no type or size. Dates, tiles and status are
+            # still left alone for these; only the description is synced.
+            for item in items:
+                if item.get('luma_job'):
+                    details_only.append(item)
             continue
         for item in items:
             actionable.append((gnorm, item))
 
-    if not actionable:
+    if not actionable and not details_only:
         return jsonify({'success': True, 'dates_updated': 0, 'statuses_updated': 0,
                         'scheduled_matched': 0, 'scheduled_unmatched': 0,
                         'skipped_no_date': 0, 'skipped_errors': 0, 'changes': []})
@@ -3535,6 +3544,30 @@ def _api_monday_pull_inner():
         except Exception:
             skipped_errors += 1
             continue
+
+    # Property details for jobs whose Monday item sits in an ignored group.
+    # Same cap as everything else, so a big first run drains over a few clicks.
+    for item in details_only:
+        try:
+            luma_job = item['luma_job']
+            patch = {}
+            for field, value in (('property_type',  item.get('install_type')),
+                                 ('property_size',  item.get('install_size')),
+                                 ('property_style', item.get('install_style'))):
+                val = (value or '').strip()
+                if val and luma_job.get(field) != val:
+                    patch[field] = val
+            if not patch:
+                continue
+            if (dates_updated + statuses_updated + details_updated) >= MONDAY_MAX_JOB_WRITES:
+                writes_remaining += 1
+                continue
+            sb_patch('jobs', f"id=eq.{luma_job['id']}", patch)
+            details_updated += 1
+            changes.append(f"#{luma_job.get('job_ref') or luma_job.get('job_number')} "
+                           f"property details updated")
+        except Exception:
+            skipped_errors += 1
 
     if to_insert:
         sb_post('job_schedule', to_insert)

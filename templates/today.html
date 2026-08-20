@@ -265,18 +265,27 @@ function renderDay(){
 
 // Which way the stock is moving, and which job it pairs with. Only the
 // receiving job stores the link, so the sending job is found by reverse lookup.
+// 90 minutes reads as "1.5h", not "1.5h30m" — the old inline version divided
+// by 60 without flooring and then appended the remainder as well.
+function fmtDuration(mins){
+  if(!mins) return '';
+  if(mins < 60) return mins + 'm';
+  if(mins % 60 === 0) return (mins / 60) + 'h';
+  return (mins / 60).toFixed(1).replace(/\.0$/, '') + 'h';
+}
+
 function transferLine(job, jobById){
   if(!job) return '';
   const all=Object.values(jobById||{});
   const refOf=j=>j?(j.job_ref||('#'+String(j.job_number||'').slice(-3))):'';
   if(job.is_transfer && job.transfer_from_job_id){
     const src=jobById[job.transfer_from_job_id];
-    const who=src?` from ${refOf(src)}`:' from another job';
-    return `<div class="card-transfer">⇄ <strong>Transfer in</strong> — stock comes${who}, not the warehouse</div>`;
+    const who=src?` ${refOf(src)}`:' another job';
+    return `<div class="card-transfer">⇄ <strong>Transfer from</strong>${who}</div>`;
   }
   const dest=all.find(j=>j.is_transfer && j.transfer_from_job_id===job.id);
   if(dest){
-    return `<div class="card-transfer">⇄ <strong>Transfer out</strong> — stock goes to ${refOf(dest)}, not back to the warehouse</div>`;
+    return `<div class="card-transfer">⇄ <strong>Transfer to</strong> ${refOf(dest)}</div>`;
   }
   return '';
 }
@@ -295,7 +304,7 @@ function cardHTML(e, jobById, showTeam){
   const addr=job?job.address||'':'';
   const street=addr.split(',')[0];
   const{h,ampm}=fmtTime(e.start_time);
-  const dur=e.duration?` · ${e.duration>=60?e.duration/60+'h'+(e.duration%60?e.duration%60+'m':''):e.duration+'m'}`:'';
+  const dur=e.duration?` · ${fmtDuration(e.duration)}`:'';
   const typeLabel=TYPE_LBL[typeKey]||typeKey;
   const teamLabel=showTeam&&e._team?`<div style="font-size:0.68rem;color:var(--muted);margin-bottom:4px;">${e._team.name||e._team.vehicle||''}</div>`:'';
   return `<div class="card ${typeKey}">

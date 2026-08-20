@@ -293,7 +293,7 @@ function cardHTML(e, jobById, showTeam){
       <div class="card-type">${typeLabel}${dur}</div>
       <div class="card-ref">${ref}</div>
       ${street?`<div class="card-addr">${street}</div>`:''}
-      ${job&&job.access_notes?`<div class="card-access">🔑 <strong>Access</strong> ${job.access_notes}</div>`:''}
+      ${(e.kind==='break'||e.title==='Lunch break')?'':(job&&job.access_notes?`<div class="card-access">🔑 <strong>Access</strong> ${job.access_notes}</div>`:'')}
       ${e.notes?`<div class="card-note">📝 ${e.notes}</div>`:''}
       ${job?`<div class="card-btns">
         <button class="card-btn card-btn-nav" onclick="navigate('${job.id}','${addr.replace(/'/g,"\\'")}')">📍 Navigate</button>

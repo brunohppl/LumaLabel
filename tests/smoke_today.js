@@ -17,12 +17,19 @@ const DATA={teams:[{id:'T1',name:'Nemo Crew',vehicle:'Nemo',function:'transport'
         {id:'J401',job_ref:'#401',address:'9 Hale St'}]};
 let errs=[];
 const dom=new JSDOM(html,{runScripts:'dangerously',url:'http://localhost/today',beforeParse(w){
-  w.fetch=async()=>({ok:true,status:200,json:async()=>DATA});
+  w.__posts=[];
+  w.fetch=async(url,opts={})=>{
+    if((opts.method||'GET')!=='GET'){ w.__posts.push({url,body:JSON.parse(opts.body||'{}')}); return {ok:true,status:200,text:async()=>'',json:async()=>({success:true})}; }
+    return {ok:true,status:200,json:async()=>DATA};
+  };
+  w.open=()=>{};
+  w.navigator.geolocation={getCurrentPosition:(ok)=>ok({coords:{latitude:-27.4,longitude:153.0}})};
   w.alert=()=>{}; w.addEventListener('error',e=>errs.push(String(e.error||e.message)));
 }});
 const w=dom.window,d=w.document;
 let pass=0,fail=0; const ok=(l,c)=>{c?pass++:fail++;console.log((c?'✓ ':'✗ FAIL ')+l);};
-setTimeout(()=>{
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+setTimeout(async()=>{
   ok('page loads with no script error'+(errs.length?' — '+errs[0]:''), errs.length===0);
   ok('name dropdown is gone', !d.getElementById('who-select'));
   ok('no leftover filter card', !d.querySelector('.who-card'));
@@ -52,6 +59,22 @@ setTimeout(()=>{
      (body.match(/📦/g)||[]).length <= 2);
   ok('pickup gets no loading line',
      !/Pickup[\s\S]{0,80}📦/.test(body));
+  // Navigate -> the ETA post that feeds Slack
+  w.navigate('J400','12 Somers St','transport');
+  w.slackChoice('yes'); await sleep(80);
+  let post=w.__posts.find(p=>p.url.includes('/eta'));
+  ok('navigate posts an ETA', !!post);
+  ok('transport crew sends a role the server accepts',
+     post && ['truck','stylist'].includes(post.body.role));
+  ok('and never the rejected "team" value', post && post.body.role!=='team');
+
+  w.__posts.length=0;
+  w.navigate('J400','12 Somers St','styling');
+  w.slackChoice('yes'); await sleep(80);
+  post=w.__posts.find(p=>p.url.includes('/eta'));
+  ok('styling crew files as stylist', post && post.body.role==='stylist');
+  ok('coordinates included', post && typeof post.body.lat==='number');
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);
 },1200);

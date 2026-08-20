@@ -73,6 +73,29 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   ok('placed tile opens'+(err?' — '+err:''), !err);
   ok('placed tile keeps its own time', d.getElementById('entry-time').value==='08:00');
 
+  // Break: third mode, 30 minutes, on a crew, not tied to a job
+  posted=[];
+  err=await call(w.openEntryPop,null,'T1','12:00');
+  ok('empty cell opens for a break'+(err?' — '+err:''), !err);
+  err=await call(w.setMode,'break');
+  ok('break mode selectable'+(err?' — '+err:''), !err);
+  ok('break fields shown', d.getElementById('break-fields').style.display==='block');
+  ok('job and task fields hidden',
+     d.getElementById('job-fields').style.display==='none' && d.getElementById('task-fields').style.display==='none');
+  ok('duration defaults to 30', d.getElementById('entry-dur').value==='30');
+  err=await call(w.saveEntry); await sleep(120);
+  ok('saving a break does not throw'+(err?' — '+err:''), !err);
+  const breaks=posted.filter(p=>p.url.includes('/api/tasks'));
+  ok('break posted as a task ('+breaks.length+')', breaks.length===1);
+  if(breaks.length){
+    const b=JSON.parse(breaks[0].body);
+    ok('marked as a break', b.kind==='break');
+    ok('30 minutes', b.duration===30);
+    ok('on the crew', b.team_id==='T1');
+    ok('not attached to a job', !b.job_id);
+    ok('titled for the crew to read', b.title==='Lunch break');
+  }
+
   err=await call(w.openTeamPop);
   ok('team popover opens'+(err?' — '+err:''), !err || err.includes('not a function'));
 

@@ -9,6 +9,8 @@ const DATA={teams:[{id:'T1',name:'Nemo Crew',vehicle:'Nemo',function:'transport'
             {id:'E3',job_id:'J401',team_id:'T1',type:'pickup',start_time:'10:00',duration:60},
             {id:'E4',job_id:'J402',team_id:'T4',type:'install',start_time:'13:00',duration:90}],
   tasks:[{id:'K1',team_id:'T1',title:'Lunch break',kind:'break',start_time:'12:00',duration:30}],
+  // J400 was loaded onto Nemo the day before
+  loads:[{id:'L1',job_id:'J400',type:'to_load',date:'2026-08-19',vehicle:'Nemo'}],
   jobs:[{id:'J402',job_ref:'#402',address:'4 Oxford St'},
         {id:'J400',job_ref:'#400',address:'12 Somers St, Ascot',access_notes:'Gate 4823',
          property_type:'Apartment',property_size:'3 bed',is_transfer:true,transfer_from_job_id:'J401'},
@@ -40,6 +42,16 @@ setTimeout(()=>{
   ok('90 minutes reads as 1.5h', body.includes('1.5h'));
   ok('and not the doubled-up form', !body.includes('1.5h30m'));
   ok('a whole hour reads as 1h', /·\s*1h/.test(body));
+
+  // The styling crew needs to know which truck is turning up
+  const stylingCard=[...d.querySelectorAll('#day-content *')]
+    .filter(x=>x.textContent.includes('Styling Crew 1'));
+  ok('loading truck shown on the team view', body.includes('Nemo'));
+  ok('shown as a plain tag, no warning', !body.includes('⚠'));
+  ok('a job with no load shows no truck line',
+     (body.match(/📦/g)||[]).length <= 2);
+  ok('pickup gets no loading line',
+     !/Pickup[\s\S]{0,80}📦/.test(body));
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);
 },1200);

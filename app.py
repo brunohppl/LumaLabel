@@ -1522,232 +1522,279 @@ def generate_checklist(meta, items):
     return buffer.getvalue()
 
 
-def generate_job_summary(job, items, room_notes=None):
-    """Export a live snapshot of a job's current state from the stylist
-    page — picked status, per-item notes, transfer markings, room notes,
-    and job-level notes. Unlike generate_checklist() (which produces a
-    blank form from a freshly parsed packing slip, meant to be filled in
-    by hand), this reflects whatever has actually happened to the job so
-    far in the database: what's been picked, what notes have been added,
-    which items are tagged as transferring. Takes live Supabase rows
-    directly rather than parser output, since that's what the stylist
-    page itself is showing when someone asks to export it.
-    """
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER
+def _fetch_thumbnail(url, cache):
+    """Download an item photo for embedding, or return None.
 
-    room_notes = room_notes or {}
-    buffer = BytesIO()
+    Never raises: a missing or slow image must not stop the summary from
+    being produced — the stylist is usually standing in a house waiting
+    for it."""
+    if not url:
+        return None
+    if url in cache:
+        return cache[url]
+    data = None
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'LUMA/1.0'})
+        with urllib.request.urlopen(req, timeout=4) as r:
+            raw = r.read(3_000_000)          # ignore anything absurdly large
+        if raw:
+            data = BytesIO(raw)
+    except Exception:
+        data = None
+    cache[url] = data
+    return data
+
+
+def generate_job_summary(job, items, room_notes=None, photos_by_item=None):
+    """Export a live snapshot of a job from the stylist page.
+
+    Laid out to match the PACKING SLIP the job arrived as, so the crew is
+    reading a familiar document: same title block, same Description /
+    Quantity table, rooms in caps with their items beneath. What it adds
+    is everything the original can't carry — every note (job, room and
+    item), picked status, transfer markings, and a thumbnail of each item
+    that has a photo.
+    """
+    from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
+                                    Paragraph, Spacer, Image, KeepTogether)
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.utils import ImageReader
+
+    room_notes     = room_notes or {}
+    photos_by_item = photos_by_item or {}
+    cache          = {}
+    buffer         = BytesIO()
+
+    PAGE_W, PAGE_H = A4
+    L_MARGIN = 18 * mm
 
     doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        topMargin    = 1.2 * cm,
-        bottomMargin = 1.2 * cm,
-        leftMargin   = 1.2 * cm,
-        rightMargin  = 1.2 * cm,
+        buffer, pagesize=A4,
+        leftMargin=L_MARGIN, rightMargin=L_MARGIN,
+        topMargin=16 * mm, bottomMargin=16 * mm,
+        title=f"LUMA Job Summary {job.get('job_number') or ''}",
     )
 
-    C_INK    = HexColor('#1A1714')
-    C_MUTED  = HexColor('#9A8F80')
-    C_ACCENT = HexColor('#B8935A')
-    C_GREEN  = HexColor('#4A7C59')
-    C_BLUE   = HexColor('#4A7EB8')
-    C_LIGHT  = HexColor('#F5F0E8')
-    C_BORDER = HexColor('#D8CFBF')
+    INK    = HexColor('#1A1714')
+    MUTED  = HexColor('#6B625A')
+    RULE   = HexColor('#C9C2B8')
+    GREEN  = HexColor('#2E7D32')
 
-    title_style = ParagraphStyle('title', fontName='Helvetica-Bold', fontSize=20, textColor=C_INK, spaceAfter=2)
-    sub_style   = ParagraphStyle('sub', fontName='Helvetica', fontSize=11, textColor=C_MUTED, spaceAfter=2)
-    meta_style  = ParagraphStyle('meta', fontName='Helvetica-Bold', fontSize=10, textColor=C_INK, spaceAfter=0)
-    cell_style  = ParagraphStyle('cell', fontName='Helvetica', fontSize=10, textColor=C_INK, leading=13)
-    note_style  = ParagraphStyle('note', fontName='Helvetica-Oblique', fontSize=8.5, textColor=C_ACCENT, leading=11)
-    hdr_style   = ParagraphStyle('hdr', fontName='Helvetica-Bold', fontSize=10, textColor=colors.white, alignment=TA_CENTER)
-    room_section_style = ParagraphStyle('room_section', fontName='Helvetica-Bold', fontSize=11, textColor=colors.white)
+    title_style = ParagraphStyle('t', fontName='Helvetica', fontSize=22,
+                                 textColor=INK, leading=26)
+    lbl_style   = ParagraphStyle('l', fontName='Helvetica-Bold', fontSize=7.5,
+                                 textColor=INK, leading=10)
+    val_style   = ParagraphStyle('v', fontName='Helvetica', fontSize=8.5,
+                                 textColor=INK, leading=11)
+    addr_style  = ParagraphStyle('a', fontName='Helvetica', fontSize=8.5,
+                                 textColor=INK, leading=12)
+    room_style  = ParagraphStyle('r', fontName='Helvetica', fontSize=9.5,
+                                 textColor=INK, leading=13)
+    item_style  = ParagraphStyle('i', fontName='Helvetica', fontSize=8.5,
+                                 textColor=INK, leading=12)
+    note_style  = ParagraphStyle('n', fontName='Helvetica-Oblique', fontSize=7.5,
+                                 textColor=MUTED, leading=10, leftIndent=6)
+    qty_style   = ParagraphStyle('q', fontName='Helvetica', fontSize=8.5,
+                                 textColor=INK, leading=11, alignment=2)
+    head_style  = ParagraphStyle('h', fontName='Helvetica-Bold', fontSize=7.5,
+                                 textColor=INK, leading=10)
+    head_r      = ParagraphStyle('hr', parent=head_style, alignment=2)
 
     story = []
-    story.append(Paragraph('LUMA <font color="#B8935A">Design</font> Co', title_style))
-    story.append(Spacer(1, 14))
-    story.append(Paragraph('Job Summary — current state', sub_style))
-    story.append(Spacer(1, 8))
 
-    # ── Job meta block ──
-    pickable = [i for i in items if not i.get('is_extra')]
-    picked_count = len([i for i in pickable if i.get('picked')])
-    inv_suffix = re.sub(r'\D', '', job.get('job_number', '') or '')[-3:] or job.get('job_ref', '')
+    # ── Title block, mirroring the packing slip ──
+    logo_cell = ''
+    try:
+        logo_path = os.path.join(app.static_folder or 'static', 'luma-logo.png')
+        if os.path.exists(logo_path):
+            ir = ImageReader(logo_path)
+            iw, ih = ir.getSize()
+            # Fit the mark inside a small box — scaling by width alone made a
+            # tall logo fill a third of the page.
+            s = min(38 * mm / iw, 20 * mm / ih) if iw and ih else 1
+            logo_cell = Image(logo_path, width=iw * s, height=ih * s)
+            logo_cell.hAlign = 'RIGHT'
+    except Exception:
+        logo_cell = ''
 
-    meta_lines = [
-        [Paragraph(f'<b>Job Ref:</b> {inv_suffix}', meta_style)],
-        [Paragraph(f'<b>Address:</b> {job.get("address","")}', meta_style)],
-        [Paragraph(f'<b>Installation Date:</b> {job.get("stage_date","")}', meta_style)],
-        [Paragraph(f'<b>Job Owner:</b> {job.get("job_owner") or "—"}', meta_style)],
-        [Paragraph(f'<b>Status:</b> {(job.get("status") or "").replace("_"," ").title() or "—"}', meta_style)],
-        [Paragraph(f'<b>Picked:</b> {picked_count} / {len(pickable)} items', meta_style)],
+    story.append(Table(
+        [[Paragraph('JOB SUMMARY', title_style), logo_cell]],
+        colWidths=[105 * mm, 69 * mm],
+        style=TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                          ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                          ('RIGHTPADDING', (0, 0), (-1, -1), 0)])))
+    story.append(Spacer(1, 10 * mm))
+
+    address = job.get('address') or ''
+    meta_left = Table(
+        [[Paragraph(address, addr_style)]],
+        colWidths=[62 * mm],
+        style=TableStyle([('BOX', (0, 0), (-1, -1), 0.6, RULE),
+                          ('TOPPADDING', (0, 0), (-1, -1), 7),
+                          ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+                          ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                          ('RIGHTPADDING', (0, 0), (-1, -1), 8)]))
+
+    stage = job.get('runsheet_date') or job.get('stage_date') or ''
+    stage_txt = '—'
+    if stage:
+        stage_txt = stage
+        for fmt in ('%Y-%m-%d', '%d %B %Y', '%d %b %Y'):
+            try:
+                dt = datetime.strptime(str(stage).strip()[:10], fmt)
+                stage_txt = f"{dt.day} {dt.strftime('%B %Y')}"   # '7 May 2026'
+                break
+            except ValueError:
+                continue
+
+    meta_mid = [
+        [Paragraph('Install Date', lbl_style)],
+        [Paragraph(stage_txt, val_style)],
+        [Spacer(1, 5)],
+        [Paragraph('Invoice Number', lbl_style)],
+        [Paragraph(job.get('job_number') or '—', val_style)],
+        [Spacer(1, 5)],
+        [Paragraph('Reference', lbl_style)],
+        [Paragraph(job.get('job_ref') or '—', val_style)],
     ]
-    if job.get('is_transfer'):
-        meta_lines.append([Paragraph('<b>Transfer From:</b> another job', meta_style)])
-    meta_table = Table(meta_lines, colWidths=[18.5*cm])
-    meta_table.setStyle(TableStyle([
-        ('BACKGROUND',   (0,0), (-1,-1), C_LIGHT),
-        ('BOX',          (0,0), (-1,-1), 0.5, C_BORDER),
-        ('TOPPADDING',   (0,0), (-1,-1), 6),
-        ('BOTTOMPADDING',(0,0), (-1,-1), 6),
-        ('LEFTPADDING',  (0,0), (-1,-1), 10),
-        ('RIGHTPADDING', (0,0), (-1,-1), 10),
-    ]))
-    story.append(meta_table)
-    story.append(Spacer(1, 10))
-
-    # ── Job-level notes ──
-    if job.get('styling_notes'):
-        story.append(Paragraph(f'<b>Styling Notes:</b> {job["styling_notes"]}', cell_style))
-        story.append(Spacer(1, 4))
-    if job.get('driver_notes'):
-        story.append(Paragraph(f'<b>Notes for Driver:</b> {job["driver_notes"]}', cell_style))
-        story.append(Spacer(1, 4))
-    story.append(Spacer(1, 6))
-
-    # ── Table: # | Item | Status | Notes ──
-    col_widths = [2.4*cm, 8.5*cm, 2.5*cm, 5.1*cm]
-    headers = [
-        Paragraph('#', hdr_style),
-        Paragraph('Item', hdr_style),
-        Paragraph('Status', hdr_style),
-        Paragraph('Notes', hdr_style),
+    meta_right = [
+        [Paragraph('LUMA Design Co Pty Ltd', val_style)],
+        [Paragraph('Unit 2 23 Perivale St', val_style)],
+        [Paragraph('DARRA QLD 4076', val_style)],
+        [Paragraph('AUSTRALIA', val_style)],
+        [Spacer(1, 6)],
+        [Paragraph('ABN', lbl_style)],
+        [Paragraph('96 675 056 201', val_style)],
     ]
-    rows = [headers]
-    style_cmds = [
-        ('BACKGROUND',   (0,0), (-1,0), C_INK),
-        ('FONTNAME',     (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE',     (0,0), (-1,0), 10),
-        ('TOPPADDING',   (0,0), (-1,0), 9),
-        ('BOTTOMPADDING',(0,0), (-1,0), 9),
-        ('LEFTPADDING',  (0,0), (-1,-1), 6),
-        ('RIGHTPADDING', (0,0), (-1,-1), 6),
-        ('VALIGN',       (0,0), (-1,-1), 'MIDDLE'),
-        ('ALIGN',        (0,0), (0,-1), 'CENTER'),
-        ('ALIGN',        (2,0), (2,-1), 'CENTER'),
-        ('GRID',         (0,0), (-1,-1), 0.4, C_BORDER),
-        ('LINEBELOW',    (0,0), (-1,0), 1.0, C_INK),
+    inner = TableStyle([('LEFTPADDING', (0, 0), (-1, -1), 0),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                        ('TOPPADDING', (0, 0), (-1, -1), 0),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 1)])
+    story.append(Table(
+        [[meta_left,
+          Table(meta_mid, colWidths=[46 * mm], style=inner),
+          Table(meta_right, colWidths=[56 * mm], style=inner)]],
+        colWidths=[64 * mm, 50 * mm, 60 * mm],
+        style=TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                          ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                          ('RIGHTPADDING', (0, 0), (-1, -1), 0)])))
+    story.append(Spacer(1, 12 * mm))
+
+    # Job-level notes sit above the table, where they can't be missed
+    job_note = (job.get('notes') or '').strip()
+    if job_note:
+        story.append(Table(
+            [[Paragraph('<b>Job notes</b><br/>' + job_note.replace('\n', '<br/>'), item_style)]],
+            colWidths=[174 * mm],
+            style=TableStyle([('BOX', (0, 0), (-1, -1), 0.6, RULE),
+                              ('BACKGROUND', (0, 0), (-1, -1), HexColor('#F7F4EF')),
+                              ('TOPPADDING', (0, 0), (-1, -1), 8),
+                              ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                              ('LEFTPADDING', (0, 0), (-1, -1), 9),
+                              ('RIGHTPADDING', (0, 0), (-1, -1), 9)])))
+        story.append(Spacer(1, 7 * mm))
+
+    # ── Description / Quantity table ──
+    PHOTO_W  = 20 * mm
+    QTY_W    = 22 * mm
+    DESC_W   = 174 * mm - PHOTO_W - QTY_W
+    col_w    = [PHOTO_W, DESC_W, QTY_W]
+
+    rows   = [['', Paragraph('Description', head_style), Paragraph('Quantity', head_r)]]
+    styles = [
+        ('LINEBELOW', (0, 0), (-1, 0), 0.8, INK),
+        ('VALIGN',    (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING',  (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING',   (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING',(0, 0), (-1, -1), 5),
     ]
-    data_row_idx = 1
 
-    # Group live items by room, preserving the order rooms first appear in
-    rooms_in_order = []
-    by_room = {}
-    for item in pickable:
-        r = item.get('room') or ''
-        if r not in by_room:
-            by_room[r] = []
-            rooms_in_order.append(r)
-        by_room[r].append(item)
+    # Preserve the order rooms appear in, like the original document
+    room_order, by_room = [], {}
+    for it in items:
+        room = (it.get('room') or 'UNASSIGNED').strip() or 'UNASSIGNED'
+        if room not in by_room:
+            by_room[room] = []
+            room_order.append(room)
+        by_room[room].append(it)
 
-    for room in rooms_in_order:
+    for room in room_order:
         room_items = by_room[room]
+        r = len(rows)
+        rows.append([
+            '',
+            Paragraph(f'<b>{room.upper()}</b>', room_style),
+            Paragraph('%.2f' % 1, qty_style),
+        ])
+        styles.append(('LINEABOVE', (0, r), (-1, r), 0.5, RULE))
+        styles.append(('TOPPADDING', (0, r), (-1, r), 8))
 
-        section_cells = [Paragraph((room or 'Uncategorised').upper(), room_section_style), '', '', '']
-        notes_for_room = room_notes.get(room) or []
-        rows.append(section_cells)
-        style_cmds += [
-            ('BACKGROUND',   (0, data_row_idx), (-1, data_row_idx), C_ACCENT),
-            ('SPAN',         (0, data_row_idx), (-1, data_row_idx)),
-            ('TOPPADDING',   (0, data_row_idx), (-1, data_row_idx), 7),
-            ('BOTTOMPADDING',(0, data_row_idx), (-1, data_row_idx), 7),
-        ]
-        data_row_idx += 1
+        for note in room_notes.get(room, []):
+            if not note:
+                continue
+            rows.append(['', Paragraph('✎ ' + note, note_style), ''])
 
-        if notes_for_room:
-            rows.append([Paragraph(' · '.join(notes_for_room), note_style), '', '', ''])
-            style_cmds += [
-                ('BACKGROUND', (0, data_row_idx), (-1, data_row_idx), C_LIGHT),
-                ('SPAN',       (0, data_row_idx), (-1, data_row_idx)),
-                ('TOPPADDING', (0, data_row_idx), (-1, data_row_idx), 5),
-                ('BOTTOMPADDING', (0, data_row_idx), (-1, data_row_idx), 5),
-            ]
-            data_row_idx += 1
+        for it in room_items:
+            desc = (it.get('description') or '').strip() or '—'
+            marks = []
+            if it.get('picked'):
+                marks.append('<font color="#2E7D32">✓ picked</font>')
+            if it.get('is_transfer_item'):
+                marks.append('<font color="#7A4A00">transfer</font>')
+            if it.get('not_transferring'):
+                marks.append('<font color="#7A4A00">not transferring</font>')
+            serial = it.get('serial')
+            line = f'{desc}'
+            if serial:
+                line = f'<font color="#6B625A" size="7">#{serial}</font>  {line}'
+            if marks:
+                line += '  <font size="7">(' + ' · '.join(marks) + ')</font>'
 
-        # Group consecutive identical descriptions, same as the checklist —
-        # but split on transfer-status boundaries too, since merging a
-        # transferring item with a non-transferring one of the same
-        # description would hide which is which.
-        grouped = []
-        i = 0
-        while i < len(room_items):
-            item = room_items[i]
-            desc = item.get('description', '')
-            is_transfer_item = bool(item.get('is_transfer_item'))
-            not_transferring  = bool(item.get('not_transferring'))
-            j = i + 1
-            while (j < len(room_items)
-                   and room_items[j].get('description', '') == desc
-                   and bool(room_items[j].get('is_transfer_item')) == is_transfer_item
-                   and bool(room_items[j].get('not_transferring')) == not_transferring):
-                j += 1
-            chunk = room_items[i:j]
-            grouped.append({
-                'count': j - i,
-                'description': desc,
-                'first_serial': item['serial'],
-                'last_serial': room_items[j-1]['serial'],
-                'all_picked': all(x.get('picked') for x in chunk),
-                'any_picked': any(x.get('picked') for x in chunk),
-                'is_transfer_item': is_transfer_item,
-                'not_transferring': not_transferring,
-                'notes': item.get('notes') or '',
-            })
-            i = j
+            block = [Paragraph(line, item_style)]
+            note = (it.get('notes') or '').strip()
+            if note:
+                block.append(Paragraph(note.replace('\n', '<br/>'), note_style))
 
-        for i, grp in enumerate(grouped):
-            bg = colors.white if i % 2 == 0 else C_LIGHT
-            serial_txt = f'#{grp["first_serial"]}' if grp['count'] == 1 else f'#{grp["first_serial"]}–#{grp["last_serial"]}'
-            item_txt = f'{grp["count"]}×  {grp["description"]}' if grp['count'] > 1 else grp['description']
+            thumb = ''
+            urls = photos_by_item.get(it.get('id')) or []
+            if it.get('photo_url'):
+                urls = [it['photo_url']] + [u for u in urls if u != it['photo_url']]
+            for u in urls[:1]:
+                data = _fetch_thumbnail(u, cache)
+                if not data:
+                    continue
+                try:
+                    data.seek(0)
+                    iw, ih = ImageReader(data).getSize()
+                    # Fit inside the box without distorting: scale by whichever
+                    # side runs out of room first.
+                    box_w, box_h = 16 * mm, 18 * mm
+                    scale = min(box_w / iw, box_h / ih) if iw and ih else 1
+                    data.seek(0)
+                    thumb = Image(data, width=iw * scale, height=ih * scale)
+                    thumb.hAlign = 'LEFT'
+                except Exception:
+                    thumb = ''
 
-            if grp['is_transfer_item']:
-                status_txt, status_colour = 'Transfer', C_BLUE
-            elif grp['not_transferring']:
-                status_txt, status_colour = 'Not Transferring', C_ACCENT
-            elif grp['all_picked']:
-                status_txt, status_colour = 'Picked', C_GREEN
-            elif grp['any_picked']:
-                status_txt, status_colour = 'Partial', C_ACCENT
-            else:
-                status_txt, status_colour = 'Not Picked', C_MUTED
+            rows.append([thumb, block, ''])
 
-            serial_style = ParagraphStyle('num', fontName='Helvetica-Bold', fontSize=10, textColor=C_ACCENT, alignment=TA_CENTER)
-            status_style = ParagraphStyle('status', fontName='Helvetica-Bold', fontSize=8.5, textColor=status_colour, alignment=TA_CENTER)
+    story.append(Table(rows, colWidths=col_w, repeatRows=1, style=TableStyle(styles)))
 
-            rows.append([
-                Paragraph(serial_txt, serial_style),
-                Paragraph(item_txt, cell_style),
-                Paragraph(status_txt, status_style),
-                Paragraph(grp['notes'], note_style) if grp['notes'] else Paragraph('', cell_style),
-            ])
-            style_cmds += [
-                ('BACKGROUND',   (0, data_row_idx), (-1, data_row_idx), bg),
-                ('FONTNAME',     (0, data_row_idx), (-1, data_row_idx), 'Helvetica'),
-                ('FONTSIZE',     (0, data_row_idx), (-1, data_row_idx), 10),
-                ('TOPPADDING',   (0, data_row_idx), (-1, data_row_idx), 7),
-                ('BOTTOMPADDING',(0, data_row_idx), (-1, data_row_idx), 7),
-            ]
-            data_row_idx += 1
+    def _footer(canv, _doc):
+        canv.saveState()
+        canv.setFont('Helvetica', 7)
+        canv.setFillColor(MUTED)
+        ref = job.get('job_ref') or job.get('job_number') or ''
+        canv.drawString(L_MARGIN, 10 * mm, f'LUMA Design Co — {ref}')
+        canv.drawRightString(PAGE_W - L_MARGIN, 10 * mm, f'Page {canv.getPageNumber()}')
+        canv.restoreState()
 
-    table = Table(rows, colWidths=col_widths, repeatRows=1)
-    table.setStyle(TableStyle(style_cmds))
-    story.append(table)
-
-    story.append(Spacer(1, 16))
-    story.append(Paragraph(
-        f'Exported from LUMA Warehouse · {datetime.now().strftime("%-d %b %Y, %-I:%M%p")}',
-        ParagraphStyle('footer', fontName='Helvetica', fontSize=7, textColor=C_MUTED, alignment=TA_CENTER)
-    ))
-
-    doc.build(story)
+    doc.build(story, onFirstPage=_footer, onLaterPages=_footer)
     buffer.seek(0)
     return buffer.getvalue()
 
-# ════════════════════════════════════════════════
-# API ROUTES
-# ════════════════════════════════════════════════
+
 @app.route('/', methods=['GET'])
 def home():
     with open('templates/home.html', 'r') as f:
@@ -2101,7 +2148,20 @@ def api_job_summary_pdf(job_id):
     for n in notes:
         room_notes.setdefault(n['room'], []).append(n['note'])
 
-    pdf_bytes = generate_job_summary(job, items, room_notes)
+    # One query for every photo on the job rather than one per item
+    photos_by_item = {}
+    ids = [i['id'] for i in (items or []) if i.get('id')]
+    if ids:
+        try:
+            for p in sb_get('item_photos',
+                            f"item_id=in.({','.join(ids)})&order=created_at.asc") or []:
+                url = p.get('photo_url') or p.get('url')
+                if url:
+                    photos_by_item.setdefault(p['item_id'], []).append(url)
+        except Exception:
+            photos_by_item = {}
+
+    pdf_bytes = generate_job_summary(job, items, room_notes, photos_by_item)
     ref = job.get('job_ref') or job.get('job_number') or job_id
     filename = f'LUMA_Job_Summary_{ref}.pdf'
     return Response(

@@ -576,7 +576,7 @@ function render(){
       const accessTag=(!isTask&&job&&job.access_notes)?`<span class="rs-access" title="${String(job.access_notes).replace(/"/g,'&quot;')}">🔑</span>`:'';
       // A transfer comes from another job rather than the warehouse, so the
       // crew needs to know before they start loading.
-      const transferTag=(!isTask&&job&&job.is_transfer)?'<span class="rs-transfer">TRANSFER</span>':'';
+      const transferTag=(!isTask&&job)?transferBadge(job):'';
 
       // Sub-column positioning
       const pct=100/totalSubCols;
@@ -1031,7 +1031,7 @@ function renderTray(){
     const propTag=job&&(job.property_type||job.property_size||job.property_style)?[job.property_type,job.property_size,job.property_style].filter(Boolean).join(' — '):'';
     const typeCls=e.type||'install';
     const orphanFlag=(e.start_time && !resolvesToTeam(e))?' <span title="Had a time but no matching team — please reassign">⚠️</span>':'';
-    const trayTransfer=(job&&job.is_transfer)?'<span class="rs-transfer">TRANSFER</span>':'';
+    const trayTransfer=job?transferBadge(job):'';
     const placed=hasJob?placedCountFor(e):0;
     const countBadge=placed
       ? `<span class="rs-tray-count" title="${placed} crew tile${placed!==1?'s':''} scheduled from this job">${placed} scheduled</span>`
@@ -1546,6 +1546,27 @@ async function addStandardColumns(){
 // hide it when there isn't one yet. Called when the popover opens and again
 // when a job is picked or cleared, so a brand-new entry gets the field the
 // moment it has a job.
+// Transfers are stored on the receiving job only, so the sending job has to
+// be found by looking for whoever points at it. Returns null for an ordinary
+// job, otherwise {dir:'from'|'to', ref:'#401'}.
+function transferInfo(job){
+  if(!job) return null;
+  if(job.is_transfer && job.transfer_from_job_id){
+    const src=dayJobs.find(j=>j.id===job.transfer_from_job_id);
+    return {dir:'from', ref: src ? (src.job_ref||('#'+String(src.job_number||'').slice(-3))) : ''};
+  }
+  const dest=dayJobs.find(j=>j.is_transfer && j.transfer_from_job_id===job.id);
+  if(dest) return {dir:'to', ref: dest.job_ref||('#'+String(dest.job_number||'').slice(-3))};
+  return null;
+}
+
+function transferBadge(job){
+  const t=transferInfo(job);
+  if(!t) return '';
+  const label = t.dir==='from' ? 'TRANSFER FROM' : 'TRANSFER TO';
+  return `<span class="rs-transfer">${label}${t.ref?' '+t.ref:''}</span>`;
+}
+
 function refreshAccessField(jobId){
   const wrap=document.getElementById('entry-access-wrap');
   const box=document.getElementById('entry-access');

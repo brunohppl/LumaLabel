@@ -133,9 +133,20 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   ok('matching crew shows it plainly, no warning', !!onNemo);
   // J402 loaded on Bruce but installed by the Warehouse crew (no vehicle) -> no warning
   // J400 also sits on Styling Crew 1 (Marlin) -> that IS a mismatch
-  const marks=[...d.querySelectorAll('.rs-loaded.mismatch')];
-  ok('mismatch flagged when another crew does the install ('+marks.length+')', marks.length>0);
-  ok('mismatch still names the truck', marks.length>0 && marks[0].textContent.includes('Nemo'));
+  // J400 is loaded on Nemo and one of its crews (T1) IS Nemo, so the other
+  // crews on the job must NOT be warned — that's the normal multi-crew case.
+  const marks=[...d.querySelectorAll('.rs-loaded.mismatch')]
+    .map(m=>m.closest('.rs-tile').textContent);
+  // J400: loaded on Nemo, and crew T1 IS Nemo -> the styling and warehouse
+  // crews on the same job must NOT be warned. That's the normal arrangement.
+  ok('multi-crew job is not warned when one crew has the truck',
+     !marks.some(t=>t.includes('#400')));
+  // J402: loaded on Bruce, but its only crew is Warehouse (no vehicle) ->
+  // nobody is carrying it, which is worth flagging.
+  ok('warned when no crew on the job is in a loaded truck',
+     marks.some(t=>t.includes('#402')));
+  ok('every crew on the job still shows the truck',
+     j400.length>1 && j400.every(t=>txt(t).includes('Nemo')));
   // #401 is a PICKUP, and a pickup is never "loaded" — check the tag is absent
   // on its own tile rather than on any tile mentioning #401 (the install tiles
   // say "TRANSFER TO #400" and would match a naive text search).

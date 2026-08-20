@@ -2350,12 +2350,41 @@ def api_runsheet_day(date_str):
         ids_str = ','.join(job_ids)
         jobs = sb_get('jobs', f'id=in.({ids_str})') or []
 
+    # Transfers only store the link on the receiving job, so the other half of
+    # the pair usually isn't on this day. Fetch both directions, otherwise the
+    # runsheet can only say "a transfer" without saying from or to where.
+    jobs = _attach_transfer_partners(jobs, job_ids)
+
     return jsonify({
         'teams':    teams,
         'schedule': schedule,
         'tasks':    tasks,
         'jobs':     jobs,
     })
+
+
+def _attach_transfer_partners(jobs, job_ids):
+    """Add the jobs on the other end of any transfer, so both sides can be named."""
+    if not jobs:
+        return jobs
+    have = {j['id'] for j in jobs}
+    extra_ids = {j['transfer_from_job_id'] for j in jobs
+                 if j.get('is_transfer') and j.get('transfer_from_job_id')
+                 and j['transfer_from_job_id'] not in have}
+    extras = []
+    try:
+        if extra_ids:
+            extras += sb_get('jobs', f"id=in.({','.join(extra_ids)})") or []
+        if job_ids:
+            # Jobs receiving stock FROM one of today's jobs
+            extras += sb_get('jobs', f"transfer_from_job_id=in.({','.join(job_ids)})") or []
+    except Exception:
+        return jobs
+    for e in extras:
+        if e.get('id') and e['id'] not in have:
+            have.add(e['id'])
+            jobs.append(e)
+    return jobs
 
 
 @app.route('/api/runsheet/week/<start_date>', methods=['GET'])

@@ -1735,31 +1735,69 @@ def generate_job_summary(job, items, room_notes=None, photos_by_item=None):
                 continue
             rows.append(['', Paragraph('✎ ' + note, note_style), ''])
 
+        # Collapse repeats: eight identical dining chairs read as one line,
+        # "8 × Dining Chair", not eight. Transfer markings still split a group,
+        # since those genuinely describe different items.
+        groups, index = [], {}
         for it in room_items:
-            desc = (it.get('description') or '').strip() or '—'
+            key = ((it.get('description') or '').strip().lower(),
+                   bool(it.get('is_transfer_item')),
+                   bool(it.get('not_transferring')))
+            if key in index:
+                groups[index[key]].append(it)
+            else:
+                index[key] = len(groups)
+                groups.append([it])
+
+        for members in groups:
+            it    = members[0]
+            count = len(members)
+            desc  = (it.get('description') or '').strip() or '—'
+            if count > 1:
+                desc = f'{count} × {desc}'
+
             marks = []
-            if it.get('picked'):
+            picked_n = sum(1 for m in members if m.get('picked'))
+            if picked_n == count:
                 marks.append('<font color="#2E7D32">✓ picked</font>')
+            elif picked_n:
+                # Never imply the whole group is done when only part of it is
+                marks.append(f'<font color="#2E7D32">{picked_n} of {count} picked</font>')
             if it.get('is_transfer_item'):
                 marks.append('<font color="#7A4A00">transfer</font>')
             if it.get('not_transferring'):
                 marks.append('<font color="#7A4A00">not transferring</font>')
-            serial = it.get('serial')
-            line = f'{desc}'
-            if serial:
-                line = f'<font color="#6B625A" size="7">#{serial}</font>  {line}'
+
+            serials = [str(m.get('serial')) for m in members if m.get('serial')]
+            tag = ''
+            if serials:
+                if count > 1:
+                    tag = f'#{serials[0]}–{serials[-1]}' if count > 2 else f'#{serials[0]}, {serials[-1]}'
+                else:
+                    tag = f'#{serials[0]}'
+
+            line = desc
+            if tag:
+                line = f'<font color="#6B625A" size="7">{tag}</font>  {line}'
             if marks:
                 line += '  <font size="7">(' + ' · '.join(marks) + ')</font>'
 
             block = [Paragraph(line, item_style)]
-            note = (it.get('notes') or '').strip()
-            if note:
-                block.append(Paragraph(note.replace('\n', '<br/>'), note_style))
+            # Keep every note in the group, labelled when they differ
+            seen_notes = []
+            for m in members:
+                note = (m.get('notes') or '').strip()
+                if note and note not in seen_notes:
+                    seen_notes.append(note)
+                    prefix = f'#{m.get("serial")}: ' if count > 1 and m.get('serial') else ''
+                    block.append(Paragraph(prefix + note.replace('\n', '<br/>'), note_style))
 
             thumb = ''
-            urls = photos_by_item.get(it.get('id')) or []
-            if it.get('photo_url'):
-                urls = [it['photo_url']] + [u for u in urls if u != it['photo_url']]
+            urls = []
+            for m in members:
+                if m.get('photo_url'):
+                    urls.append(m['photo_url'])
+                urls += photos_by_item.get(m.get('id')) or []
             for u in urls[:1]:
                 data = _fetch_thumbnail(u, cache)
                 if not data:

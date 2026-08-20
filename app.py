@@ -2299,6 +2299,18 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_v
 
 
 @app.route('/api/jobs/<job_id>/runsheet', methods=['PATCH'])
+def _set_job_runsheet_date(job_id, runsheet_date, runsheet_type):
+    """Keep the job's own date in step with its schedule tiles.
+
+    The seeding branches moved the tiles but never wrote the date back to the
+    job, so the jobs page badge, the label PDF and the Monday comparison could
+    all disagree with what the runsheet actually showed."""
+    sb_patch('jobs', f'id=eq.{job_id}', {
+        'runsheet_date': runsheet_date,
+        'runsheet_type': runsheet_type,
+    })
+
+
 def api_job_runsheet(job_id):
     data          = request.get_json()
     runsheet_date = data.get('runsheet_date')
@@ -2323,9 +2335,11 @@ def api_job_runsheet(job_id):
                 return jsonify({'success': False, 'error': f'Unknown vehicles: {bad}'}), 400
             seed_two_day_schedule(job_id, runsheet_date, runsheet_type,
                                   forced_vehicles=vehicles)
+            _set_job_runsheet_date(job_id, runsheet_date, runsheet_type)
         else:
             items = sb_get('items', f'job_id=eq.{job_id}') or []
             seed_two_day_schedule(job_id, runsheet_date, runsheet_type, items=items)
+            _set_job_runsheet_date(job_id, runsheet_date, runsheet_type)
     else:
         sb_delete('job_schedule', f'job_id=eq.{job_id}')
         sb_patch('jobs', f'id=eq.{job_id}', {

@@ -1265,7 +1265,10 @@ async function openEntryPop(entryId,teamId,slot){
           }catch(err){}
         }
       }
-      tSel.value=e.start_time||'';
+      // Only overwrite the pre-filled default when the entry HAS a time. A tray
+      // source has none, and blanking it here left the field empty — so the
+      // multi-crew save then refused for want of a start time.
+      if(e.start_time) tSel.value=e.start_time;
       document.getElementById('entry-dur').value=e.duration||'';
       document.getElementById('entry-notes').value=e.notes||'';
     }
@@ -1598,7 +1601,8 @@ async function saveEntry(){
     // with its own duration. This is the normal way a job gets scheduled.
     const checked=[...document.querySelectorAll('.crew-chk:checked')];
     if(src && isSource(src) && checked.length){
-      if(!time){alert('Please choose a start time.');setSaveStatus('error','Start time required');return;}
+      // Crews start together at the standard time unless told otherwise
+      const startAt = time || DEFAULT_START;
       let made=0, failed=0;
       for(const box of checked){
         const teamId=box.getAttribute('data-team');
@@ -1610,13 +1614,21 @@ async function saveEntry(){
         const created=await spawnFromSource(src, {
           team_id:teamId, vehicle:crew.vehicle||null,
           category:crew.function||'transport',
-          start_time:time,
+          start_time:startAt,
           duration:parseInt(durSel?.value)||fnDuration(crew.function),
           notes,
         });
         created ? made++ : failed++;
       }
-      setSaveStatus(failed?'error':'saved', failed?`${failed} crew${failed!==1?'s':''} failed to save`:'');
+      if(failed){
+        setSaveStatus('error',`${failed} crew${failed!==1?'s':''} failed to save`);
+      }else if(!made){
+        setSaveStatus('error','Those crews already have this job');
+        alert('Every crew you ticked already has this job today.');
+        return;                       // keep the popover open so it can be changed
+      }else{
+        setSaveStatus('saved');
+      }
       closeEntryPop();
       render(); renderTray();
       return;

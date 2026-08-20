@@ -458,23 +458,69 @@ RUNSHEET_DURATIONS = list(range(30, 570, 30))  # [30, 60, ..., 540] — a full
 # four hours, which looked like the resize simply not saving.
 
 
-# ── Colour cycle — 14 maximally distinct colours ──
+# ── Colour cycle ────────────────────────────────────────────────
+# Chosen by maximising the smallest perceptual (CIE Lab) distance between any
+# two, so no two look alike on a printed label. The smallest gap here is
+# ΔE 36.7; the previous palette had pairs as close as ΔE 12 (Green vs Olive,
+# Teal vs Cyan) which were effectively the same colour on paper.
+#
+# 'text' is the colour to print ON the bar — pale colours need dark text.
 COLOURS = [
-    {'hex': '#D62828', 'name': 'Red'},
-    {'hex': '#1565C0', 'name': 'Blue'},
-    {'hex': '#2E7D32', 'name': 'Green'},
-    {'hex': '#F9A825', 'name': 'Yellow'},
-    {'hex': '#6A0DAD', 'name': 'Purple'},
-    {'hex': '#E65100', 'name': 'Orange'},
-    {'hex': '#00838F', 'name': 'Teal'},
-    {'hex': '#AD1457', 'name': 'Magenta'},
-    {'hex': '#4E342E', 'name': 'Brown'},
-    {'hex': '#558B2F', 'name': 'Olive'},
-    {'hex': '#283593', 'name': 'Indigo'},
-    {'hex': '#00ACC1', 'name': 'Cyan'},
-    {'hex': '#F06292', 'name': 'Pink'},
-    {'hex': '#757575', 'name': 'Grey'},
+    {'hex': '#C62828', 'name': 'Red', 'text': 'white'},
+    {'hex': '#D97700', 'name': 'Orange', 'text': 'black'},
+    {'hex': '#D9CE00', 'name': 'Yellow', 'text': 'black'},
+    {'hex': '#AABF69', 'name': 'Sage', 'text': 'black'},
+    {'hex': '#00D900', 'name': 'Bright Green', 'text': 'black'},
+    {'hex': '#008C0E', 'name': 'Green', 'text': 'black'},
+    {'hex': '#475900', 'name': 'Olive', 'text': 'white'},
+    {'hex': '#36D998', 'name': 'Mint', 'text': 'black'},
+    {'hex': '#0B7359', 'name': 'Teal', 'text': 'white'},
+    {'hex': '#00B8D9', 'name': 'Cyan', 'text': 'black'},
+    {'hex': '#0077D9', 'name': 'Sky', 'text': 'black'},
+    {'hex': '#0029A6', 'name': 'Indigo', 'text': 'white'},
+    {'hex': '#0000D9', 'name': 'Blue', 'text': 'white'},
+    {'hex': '#004359', 'name': 'Navy', 'text': 'white'},
+    {'hex': '#4F1659', 'name': 'Plum', 'text': 'white'},
+    {'hex': '#D900C3', 'name': 'Magenta', 'text': 'black'},
+    {'hex': '#D9006C', 'name': 'Cerise', 'text': 'white'},
+    {'hex': '#D977A8', 'name': 'Pink', 'text': 'black'},
+    {'hex': '#D99E77', 'name': 'Tan', 'text': 'black'},
+    {'hex': '#592416', 'name': 'Brown', 'text': 'white'},
 ]
+
+# Colours retired from the picker. Kept only so a job labelled before the
+# palette changed still prints in the colour it was actually given — the crew
+# is holding that physical label. Never offered for a new job.
+LEGACY_COLOURS = [
+    {'hex': '#F9A825', 'name': 'Yellow (old)',  'text': 'black'},
+    {'hex': '#6A0DAD', 'name': 'Purple',        'text': 'white'},
+    {'hex': '#00838F', 'name': 'Teal (old)',    'text': 'white'},
+    {'hex': '#AD1457', 'name': 'Magenta (old)', 'text': 'white'},
+    {'hex': '#558B2F', 'name': 'Olive (old)',   'text': 'white'},
+    {'hex': '#00ACC1', 'name': 'Cyan (old)',    'text': 'black'},
+    {'hex': '#F06292', 'name': 'Pink (old)',    'text': 'black'},
+    {'hex': '#757575', 'name': 'Grey',          'text': 'white'},
+    {'hex': '#E65100', 'name': 'Orange (old)',  'text': 'white'},
+    {'hex': '#1565C0', 'name': 'Blue (old)',    'text': 'white'},
+    {'hex': '#2E7D32', 'name': 'Green (old)',   'text': 'white'},
+    {'hex': '#283593', 'name': 'Indigo (old)',  'text': 'white'},
+    {'hex': '#D62828', 'name': 'Red (old)',     'text': 'white'},
+    {'hex': '#4E342E', 'name': 'Brown (old)',   'text': 'white'},
+]
+
+
+def find_colour(name):
+    """Resolve a stored colour name, including ones no longer offered."""
+    if not name:
+        return None
+    for c in COLOURS:
+        if c['name'] == name:
+            return c
+    for c in LEGACY_COLOURS:
+        if c['name'] == name or c['name'].replace(' (old)', '') == name:
+            return c
+    return None
+
 
 # Persistent colour index stored in a simple file
 COLOUR_INDEX_FILE = '/tmp/luma_colour_index.txt'
@@ -492,7 +538,7 @@ def get_next_colour(manual_name=None):
 
     # ── Manual selection takes priority ──
     if manual_name:
-        match = next((c for c in COLOURS if c['name'] == manual_name), None)
+        match = find_colour(manual_name)
         if match:
             return match
         # Unknown name — fall through to auto logic below
@@ -950,6 +996,23 @@ def label_address(addr):
 
 def generate_labels(meta, items, colour, label_format=DEFAULT_LABEL_FORMAT):
     colour_hex  = colour['hex']
+
+    # Pale colours need dark text on the bar. The palette says which to use;
+    # fall back to measuring the colour so a hand-set hex still works.
+    def _readable_on(hex_str):
+        try:
+            r, g, b = (int(hex_str[i:i+2], 16) / 255 for i in (1, 3, 5))
+        except (ValueError, IndexError):
+            return '#FFFFFF'
+        def lin(v):
+            return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+        lum = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+        return '#FFFFFF' if lum < 0.36 else '#1A1714'
+
+    bar_text = colour.get('text')
+    bar_text_hex = ('#FFFFFF' if bar_text == 'white'
+                    else '#1A1714' if bar_text == 'black'
+                    else _readable_on(colour_hex))
     date_txt    = format_date_label(meta['stage_date'])
 
     PAGE_W, PAGE_H = A4
@@ -963,7 +1026,8 @@ def generate_labels(meta, items, colour, label_format=DEFAULT_LABEL_FORMAT):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
 
-    C_INK    = HexColor('#1A1714')
+    C_INK     = HexColor('#1A1714')
+    C_BAR_TEXT = HexColor(bar_text_hex)
     C_MUTED  = HexColor('#9A8F80')
     C_BORDER = HexColor('#D8CFBF')
     C_ACCENT = HexColor(colour_hex)
@@ -1003,7 +1067,7 @@ def generate_labels(meta, items, colour, label_format=DEFAULT_LABEL_FORMAT):
             while c.stringWidth(inv_suffix, 'Helvetica-Bold', inv_size) * 0.6 > bar_w - 2 and inv_size > 8:
                 inv_size -= 1
             inv_w = c.stringWidth(inv_suffix, 'Helvetica-Bold', inv_size)
-            c.setFillColor(C_WHITE)
+            c.setFillColor(C_BAR_TEXT)
             c.saveState()
             c.translate(x + bar_w / 2, y + h / 2)
             c.rotate(-90)

@@ -87,6 +87,28 @@ tr.part{background:rgba(184,147,90,0.06);}
 .empty{text-align:center;padding:30px;color:var(--muted);font-size:0.83rem;}
 .spinner{width:15px;height:15px;border:2px solid var(--sand);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:-2px;margin-right:7px;}
 @keyframes spin{to{transform:rotate(360deg);}}
+.edit-btn{background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;
+  padding:3px 8px;font-size:0.85rem;color:var(--muted);}
+.edit-btn:hover{border-color:var(--accent);color:var(--ink);}
+.edit-pop{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.45);
+  z-index:200;align-items:center;justify-content:center;padding:20px;}
+.edit-pop.open{display:flex;}
+.edit-card{background:#fff;border-radius:12px;padding:22px;max-width:620px;width:100%;
+  max-height:88vh;overflow:auto;box-shadow:0 18px 50px rgba(0,0,0,0.28);}
+.edit-head{font-size:1.05rem;font-weight:600;margin-bottom:14px;}
+.edit-sub{font-size:0.78rem;font-weight:400;color:var(--muted);margin-left:8px;}
+.edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.edit-grid label{display:flex;flex-direction:column;font-size:0.7rem;font-weight:700;
+  letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);gap:5px;}
+.edit-grid label.wide{grid-column:1/-1;}
+.edit-grid label.check{flex-direction:row;align-items:center;gap:8px;text-transform:none;
+  letter-spacing:0;font-size:0.82rem;font-weight:500;color:var(--ink);}
+.edit-grid input[type=text],.edit-grid input[type=number]{padding:8px 10px;border:1px solid var(--border);
+  border-radius:6px;font-family:inherit;font-size:0.9rem;color:var(--ink);}
+.edit-err{color:#C0392B;font-size:0.82rem;min-height:18px;margin-top:10px;}
+.edit-actions{display:flex;gap:10px;align-items:center;margin-top:6px;}
+.btn-del{background:none;border:1px solid #C0392B;color:#C0392B;border-radius:6px;
+  padding:8px 14px;cursor:pointer;font-family:inherit;font-size:0.85rem;}
 </style>
 </head>
 <body>
@@ -423,6 +445,7 @@ function tableHTML(rows, q, showReceived){
       <th style="text-align:center;">Qty</th>
       ${showReceived?'<th style="text-align:center;">Received</th>':''}
       <th>Programma Status</th>
+      ${showReceived?'<th></th>':''}
     </tr></thead>
     <tbody>${rows.map(l=>`
       <tr class="${l.is_service?'service':rowClass(l)}" id="row-${l.id||''}">
@@ -437,6 +460,7 @@ function tableHTML(rows, q, showReceived){
         <td class="qty">${l.is_service?'—':l.qty_expected}</td>
         ${showReceived?`<td>${l.is_service?'<span class="qty">—</span>':receiveCell(l)}</td>`:''}
         <td>${l.is_service?'<span class="badge b-service">budget line</span>':statusBadge(l.programma_status)}</td>
+        ${showReceived?`<td><button class="edit-btn" onclick="openEdit('${l.id}')" title="Correct this line">✎</button></td>`:''}
       </tr>`).join('')}
     </tbody></table>`;
 }
@@ -462,7 +486,111 @@ function renderProjectLines(){
   document.getElementById('proj-table').innerHTML = tableHTML(rows, q, true);
 }
 
+// ── Editing a line ─────────────────────────────────────────────
+// Programma exports carry mistakes — a missing SKU, the wrong room, a
+// quantity that changed after ordering. Correcting the line beats
+// re-importing the project and losing the check-in history.
+let editingId = null;
+
+function openEdit(id){
+  const l = PROJ_LINES.find(x=>x.id===id);
+  if(!l) return;
+  editingId = id;
+  const f = (name, val) => document.getElementById(name).value = val || '';
+  f('e-section', l.section);
+  f('e-product', l.product_name);
+  f('e-label', l.item_label);
+  f('e-brand', l.brand);
+  f('e-sku', l.sku);
+  f('e-colour', l.colour);
+  f('e-supplier', l.supplier);
+  f('e-notes', l.notes);
+  document.getElementById('e-qty').value = l.qty_expected || 1;
+  document.getElementById('e-service').checked = !!l.is_service;
+  document.getElementById('e-received').textContent =
+    l.is_service ? '' : `${l.qty_received||0} already received`;
+  document.getElementById('edit-err').textContent = '';
+  document.getElementById('edit-pop').classList.add('open');
+}
+
+function closeEdit(){
+  editingId = null;
+  document.getElementById('edit-pop').classList.remove('open');
+}
+
+async function saveEdit(){
+  if(!editingId) return;
+  const v = id => document.getElementById(id).value.trim();
+  const body = {
+    section: v('e-section'), product_name: v('e-product'), item_label: v('e-label'),
+    brand: v('e-brand'), sku: v('e-sku'), colour: v('e-colour'),
+    supplier: v('e-supplier'), notes: v('e-notes'),
+    qty_expected: parseInt(document.getElementById('e-qty').value, 10),
+    is_service: document.getElementById('e-service').checked,
+  };
+  const err = document.getElementById('edit-err');
+  if(!(body.qty_expected >= 1)){ err.textContent = 'Quantity must be at least 1.'; return; }
+
+  const btn = document.getElementById('edit-save');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try{
+    const res = await fetch(`/api/deliveries/lines/${editingId}`,{
+      method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok || data.success===false) throw new Error(data.error||`HTTP ${res.status}`);
+    const i = PROJ_LINES.findIndex(x=>x.id===editingId);
+    if(i>-1 && data.line) PROJ_LINES[i] = data.line;
+    closeEdit();
+    renderProjectLines();
+  }catch(e){
+    err.textContent = e.message;
+  }finally{
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+}
+
+async function deleteLine(){
+  if(!editingId) return;
+  const l = PROJ_LINES.find(x=>x.id===editingId);
+  if(!confirm(`Remove "${(l&&(l.product_name||l.item_label))||'this line'}" from the schedule?\n\nIts check-in history goes too. This can't be undone.`)) return;
+  const err = document.getElementById('edit-err');
+  try{
+    const res = await fetch(`/api/deliveries/lines/${editingId}`,{method:'DELETE'});
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok || data.success===false) throw new Error(data.error||`HTTP ${res.status}`);
+    PROJ_LINES = PROJ_LINES.filter(x=>x.id!==editingId);
+    closeEdit();
+    renderProjectLines();
+  }catch(e){ err.textContent = e.message; }
+}
+
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeEdit(); });
+
 loadProjects();
 </script>
+<div id="edit-pop" class="edit-pop">
+  <div class="edit-card">
+    <div class="edit-head">Edit line <span id="e-received" class="edit-sub"></span></div>
+    <div class="edit-grid">
+      <label>Room<input id="e-section" type="text"></label>
+      <label>Quantity<input id="e-qty" type="number" min="1" step="1"></label>
+      <label class="wide">Product<input id="e-product" type="text"></label>
+      <label class="wide">Description<input id="e-label" type="text"></label>
+      <label>Brand<input id="e-brand" type="text"></label>
+      <label>SKU<input id="e-sku" type="text"></label>
+      <label>Colour<input id="e-colour" type="text"></label>
+      <label>Supplier<input id="e-supplier" type="text"></label>
+      <label class="wide">Notes<input id="e-notes" type="text"></label>
+      <label class="wide check"><input id="e-service" type="checkbox"> Budget or service line (nothing to deliver)</label>
+    </div>
+    <div id="edit-err" class="edit-err"></div>
+    <div class="edit-actions">
+      <button class="btn-del" onclick="deleteLine()">Delete line</button>
+      <span style="flex:1"></span>
+      <button class="btn-ghost" onclick="closeEdit()">Cancel</button>
+      <button class="btn-go" id="edit-save" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

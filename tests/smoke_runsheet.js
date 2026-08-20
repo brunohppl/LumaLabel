@@ -18,12 +18,15 @@ const SCHEDULE=[{id:'SRC',job_id:'J400',type:'install',date:'2026-08-20',team_id
                 {id:'PLACED',job_id:'J400',type:'install',date:'2026-08-20',team_id:'T1',start_time:'08:00',duration:60},
                 {id:'PICKUP',job_id:'J401',type:'pickup',date:'2026-08-20',team_id:'T4',start_time:'10:00',duration:60},
                 {id:'PLAIN',job_id:'J402',type:'install',date:'2026-08-20',team_id:'T7',start_time:'13:00',duration:60}];
+// J400 was loaded onto Nemo yesterday; J402 onto Bruce.
+const LOADS=[{id:'L1',job_id:'J400',type:'to_load',date:'2026-08-19',vehicle:'Nemo',team_id:'T1'},
+             {id:'L2',job_id:'J402',type:'to_load',date:'2026-08-19',vehicle:'Bruce',team_id:'TX'}];
 let posted=[];
 const dom=new JSDOM(html,{runScripts:'dangerously',url:'http://localhost/runsheet',beforeParse(w){
   w.fetch=async(url,opts={})=>{
     if(opts.method&&opts.method!=='GET') posted.push({url,method:opts.method,body:opts.body});
     let data;
-    if(url.includes('/api/runsheet/')) data={teams:TEAMS,schedule:SCHEDULE,tasks:[],jobs:JOBS};
+    if(url.includes('/api/runsheet/')) data={teams:TEAMS,schedule:SCHEDULE,tasks:[],jobs:JOBS,loads:LOADS};
     else if(url.includes('/api/team-templates')) data=[];
     else {
       // Echo the request back the way the real endpoint does — a fixed
@@ -120,6 +123,25 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
      pickups.every(t=>t.includes('TRANSFER TO') && !t.includes('TRANSFER FROM')));
   ok('an ordinary job carries no transfer marker',
      !forJob('#402').some(t=>t.includes('TRANSFER')));
+
+  // Loading vehicle carried onto the install tile
+  const allTiles=[...d.querySelectorAll('.rs-tile')];
+  const txt=t=>t.textContent;
+  const j400=allTiles.filter(t=>txt(t).includes('#400')&&txt(t).includes('Install'));
+  ok('install tile shows the loading truck', j400.some(t=>txt(t).includes('Nemo')));
+  const onNemo=j400.find(t=>txt(t).includes('📦'));
+  ok('matching crew shows it plainly, no warning', !!onNemo);
+  // J402 loaded on Bruce but installed by the Warehouse crew (no vehicle) -> no warning
+  // J400 also sits on Styling Crew 1 (Marlin) -> that IS a mismatch
+  const marks=[...d.querySelectorAll('.rs-loaded.mismatch')];
+  ok('mismatch flagged when another crew does the install ('+marks.length+')', marks.length>0);
+  ok('mismatch still names the truck', marks.length>0 && marks[0].textContent.includes('Nemo'));
+  // #401 is a PICKUP, and a pickup is never "loaded" — check the tag is absent
+  // on its own tile rather than on any tile mentioning #401 (the install tiles
+  // say "TRANSFER TO #400" and would match a naive text search).
+  const pickupTiles=allTiles.filter(t=>txt(t).includes('Pickup'));
+  ok('a pickup never shows a loading tag ('+pickupTiles.length+' tiles)',
+     pickupTiles.length>0 && !pickupTiles.some(t=>txt(t).includes('📦')));
 
   err=await call(w.openTeamPop);
   ok('team popover opens'+(err?' — '+err:''), !err || err.includes('not a function'));

@@ -75,6 +75,10 @@ setTimeout(async()=>{
   ok('styling crew files as stylist', post && post.body.role==='stylist');
   ok('coordinates included', post && typeof post.body.lat==='number');
 
+  const home=[...d.querySelectorAll('a')].find(a=>a.getAttribute('href')==='/');
+  ok('a home link is present', !!home);
+  ok('and reads as Home', home && /home/i.test(home.textContent));
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);
 },1200);

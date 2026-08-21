@@ -111,13 +111,19 @@ tr.part{background:rgba(184,147,90,0.06);}
 .edit-actions{display:flex;gap:10px;align-items:center;margin-top:6px;}
 .btn-del{background:none;border:1px solid #C0392B;color:#C0392B;border-radius:6px;
   padding:8px 14px;cursor:pointer;font-family:inherit;font-size:0.85rem;}
+.hdr-right{display:flex;align-items:center;gap:14px;}
+.hdr-home{color:var(--muted);text-decoration:none;font-size:0.8rem;letter-spacing:0.04em;}
+.hdr-home:hover{color:var(--ink);}
 </style>
 </head>
 <body>
 
 <header>
   <img class="logo-mark" src="/static/luma-logo.png" alt="LUMA"/>
-  <div class="dept-tag">Deliveries · testing</div>
+  <div class="hdr-right">
+    <div class="dept-tag">Deliveries · testing</div>
+    <a href="/" class="hdr-home">← Home</a>
+  </div>
 </header>
 
 <div class="page-wrap">

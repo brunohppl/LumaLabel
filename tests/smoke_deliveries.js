@@ -94,6 +94,10 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   ok('delete sends a DELETE', sent.some(s=>s.method==='DELETE'));
   ok('line removed from the table', !d.body.textContent.includes('Arc Sofa'));
 
+  const home=[...d.querySelectorAll('a')].find(a=>a.getAttribute('href')==='/');
+  ok('a home link is present', !!home);
+  ok('and reads as Home', home && /home/i.test(home.textContent));
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);
 })().catch(e=>{console.log('HARNESS ERROR: '+e.message);process.exit(2);});

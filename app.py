@@ -2949,6 +2949,39 @@ def api_job_transfer(job_id):
     })
     return jsonify({'success': bool(result)})
 
+@app.route('/api/schedule-entry/<entry_id>/actual', methods=['POST'])
+def api_entry_actual(entry_id):
+    """One-tap start/finish stamps from the crew on site.
+
+    which='start' is stamped by Navigate; which='done' by the Done button.
+    Only the first tap of each wins — repeat taps and page refreshes must
+    not move a time that's already been recorded."""
+    data  = request.get_json(silent=True) or {}
+    which = data.get('which')
+    if which not in ('start', 'done'):
+        return jsonify({'success': False, 'error': "which must be 'start' or 'done'"}), 400
+
+    got = sb_get('job_schedule', f'id=eq.{entry_id}')
+    if not got:
+        return jsonify({'success': False, 'error': 'That entry no longer exists.'}), 404
+    entry = got[0]
+
+    field = 'actual_start' if which == 'start' else 'actual_end'
+    if entry.get(field):
+        # Already stamped — idempotent, and the first tap is the honest one
+        return jsonify({'success': True, 'entry': entry, 'already': True})
+
+    now = datetime.utcnow().isoformat() + 'Z'
+    patch = {field: now}
+    # A crew that taps Done without ever tapping Navigate still gives us an
+    # end time; leave start empty rather than inventing one.
+    result = sb_patch('job_schedule', f'id=eq.{entry_id}', patch)
+    if result:
+        return jsonify({'success': True, 'entry': result[0]})
+    err = sb_last_error()
+    return jsonify({'success': False, 'error': err or 'Save failed'}), 400
+
+
 @app.route('/api/jobs/<job_id>/eta', methods=['POST'])
 def api_job_eta(job_id):
     """Calculate driving ETA from someone's current position (sent by

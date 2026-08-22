@@ -71,6 +71,9 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .card-btns{display:flex;gap:8px;flex-wrap:wrap;}
 .card-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:6px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;cursor:pointer;text-decoration:none;border:none;}
 .card-btn-nav{background:var(--accent);color:white;}
+.card-btn-done{background:var(--green,#4A7C59);color:white;}
+.card-done-mark{display:inline-flex;align-items:center;padding:8px 12px;border-radius:8px;
+  background:rgba(74,124,89,0.14);color:var(--green,#4A7C59);font-size:0.82rem;font-weight:600;}
 .card-btn-stylist{background:rgba(74,124,89,0.1);color:var(--green);}
 .card-btn-driver{background:rgba(46,90,138,0.1);color:var(--blue);}
 .empty{text-align:center;padding:48px 20px;}
@@ -277,6 +280,31 @@ function renderDay(){
 // receiving job stores the link, so the sending job is found by reverse lookup.
 // 90 minutes reads as "1.5h", not "1.5h30m" — the old inline version divided
 // by 60 without flooring and then appended the remainder as well.
+function fmtStamp(iso){
+  try{
+    const d=new Date(iso);
+    return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',hour12:false});
+  }catch(e){ return ''; }
+}
+
+// One tap when the crew walks out. The pair of stamps — Navigate on the way
+// in, Done on the way out — is what real job durations are built from.
+async function markDone(entryId, btn){
+  btn.disabled=true; btn.textContent='…';
+  try{
+    const res=await fetch(`/api/schedule-entry/${entryId}/actual`,{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({which:'done'})});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok || data.success===false) throw new Error(data.error||`HTTP ${res.status}`);
+    const e=(dayData.schedule||[]).find(x=>x.id===entryId);
+    if(e) e.actual_end=(data.entry&&data.entry.actual_end)||new Date().toISOString();
+    renderDay();          // the card flips to its done state
+  }catch(err){
+    btn.disabled=false; btn.textContent='✓ Done';
+    alert('Could not save: '+err.message);
+  }
+}
+
 function fmtDuration(mins){
   if(!mins) return '';
   if(mins < 60) return mins + 'm';
@@ -345,7 +373,10 @@ function cardHTML(e, jobById, showTeam){
       ${(e.kind==='break'||e.title==='Lunch break')?'':(job&&job.access_notes?`<div class="card-access">🔑 <strong>Access</strong> ${job.access_notes}</div>`:'')}
       ${e.notes?`<div class="card-note">📝 ${e.notes}</div>`:''}
       ${job?`<div class="card-btns">
-        <button class="card-btn card-btn-nav" onclick="navigate('${job.id}','${addr.replace(/'/g,"\\'")}','${e._team?.function||''}')">📍 Navigate</button>
+        <button class="card-btn card-btn-nav" onclick="navigate('${job.id}','${addr.replace(/'/g,"\\'")}','${e._team?.function||''}','${e.id}')">📍 Navigate</button>
+        ${e.actual_end
+          ? `<span class="card-done-mark">✓ Done ${fmtStamp(e.actual_end)}</span>`
+          : `<button class="card-btn card-btn-done" onclick="markDone('${e.id}',this)">✓ Done</button>`}
         ${e._team?.function==='styling'?`<a href="/stylist/${job.id}" target="_blank" class="card-btn card-btn-stylist">✎ Stylist</a>`:''}
         ${e._team?.function!=='styling'?`<a href="/driver/${job.id}" target="_blank" class="card-btn card-btn-driver">🚛 Driver</a>`:''}
       </div>`:''}
@@ -354,7 +385,13 @@ function cardHTML(e, jobById, showTeam){
 }
 
 // Navigate with Slack confirm
-function navigate(jobId, addr, teamFunction){
+function navigate(jobId, addr, teamFunction, entryId){
+  // First Navigate tap is the crew setting off — stamp it. Fire and forget:
+  // a failed stamp must never get in the way of directions.
+  if(entryId){
+    fetch(`/api/schedule-entry/${entryId}/actual`,{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({which:'start'})}).catch(()=>{});
+  }
   // The endpoint files the ETA against the truck or the stylist, and words the
   // Slack message accordingly. This page used to send role:'team', which isn't
   // a value it accepts — so the request was rejected and nothing reached Slack.

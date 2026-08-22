@@ -7,7 +7,9 @@ const DATA={teams:[{id:'T1',name:'Nemo Crew',vehicle:'Nemo',function:'transport'
   schedule:[{id:'E1',job_id:'J400',team_id:'T1',type:'install',start_time:'07:30',duration:60},
             {id:'E2',job_id:'J400',team_id:'T4',type:'install',start_time:'07:30',duration:180},
             {id:'E3',job_id:'J401',team_id:'T1',type:'pickup',start_time:'10:00',duration:60},
-            {id:'E4',job_id:'J402',team_id:'T4',type:'install',start_time:'13:00',duration:90}],
+            {id:'E4',job_id:'J402',team_id:'T4',type:'install',start_time:'13:00',duration:90},
+            {id:'E5',job_id:'J402',team_id:'T1',type:'install',start_time:'14:00',duration:60,
+             actual_end:'2026-08-20T04:05:00Z'}],
   tasks:[{id:'K1',team_id:'T1',title:'Lunch break',kind:'break',start_time:'12:00',duration:30}],
   // J400 was loaded onto Nemo the day before
   loads:[{id:'L1',job_id:'J400',type:'to_load',date:'2026-08-19',vehicle:'Nemo'}],
@@ -74,6 +76,27 @@ setTimeout(async()=>{
   post=w.__posts.find(p=>p.url.includes('/eta'));
   ok('styling crew files as stylist', post && post.body.role==='stylist');
   ok('coordinates included', post && typeof post.body.lat==='number');
+
+  // ── Done button ──
+  const doneBtns=[...d.querySelectorAll('.card-btn-done')];
+  ok('Done button on unfinished cards ('+doneBtns.length+')', doneBtns.length>0);
+  ok('already-finished card shows the time instead',
+     [...d.querySelectorAll('.card-done-mark')].some(x=>/Done \d{2}:\d{2}/.test(x.textContent)));
+
+  w.__posts.length=0;
+  await w.markDone('E1', doneBtns[0]); await sleep(80);
+  let stamp=w.__posts.find(p=>p.url.includes('/actual'));
+  ok('tapping Done posts the stamp', !!stamp);
+  ok('as a done stamp', stamp && stamp.body.which==='done');
+  ok('to the right entry', stamp && stamp.url.includes('E1'));
+  ok('card flips to done', [...d.querySelectorAll('.card-done-mark')].length>=2);
+
+  // Navigate stamps the start
+  w.__posts.length=0;
+  w.navigate('J400','12 Somers St','transport','E2');
+  await sleep(50);
+  stamp=w.__posts.find(p=>p.url.includes('/actual'));
+  ok('Navigate stamps the start', stamp && stamp.body.which==='start' && stamp.url.includes('E2'));
 
   const home=[...d.querySelectorAll('a')].find(a=>a.getAttribute('href')==='/');
   ok('a home link is present', !!home);

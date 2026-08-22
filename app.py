@@ -2738,7 +2738,12 @@ def api_task_create():
         # with no vehicle (Warehouse) had nothing to guess from.
         'team_id': (data.get('team_id') or None),
         'kind': (data.get('kind') or None),      # 'break' marks time off, not work
-        'vehicle': vehicle, 'date': date_str, 'title': title,
+        # The table still carries NOT NULL on vehicle from before columns
+        # could be vehicle-less (Warehouse) — and breaks never send one at
+        # all. An empty string satisfies the constraint and matches nothing,
+        # so task resolution stays on team_id where it belongs.
+        # drop_task_vehicle_notnull.sql relaxes the constraint properly.
+        'vehicle': vehicle or '', 'date': date_str, 'title': title,
         'notes': notes, 'start_time': start_time, 'duration': duration,
     })
     if not result:

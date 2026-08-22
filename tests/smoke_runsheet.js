@@ -21,13 +21,15 @@ const SCHEDULE=[{id:'SRC',job_id:'J400',type:'install',date:'2026-08-20',team_id
 // J400 was loaded onto Nemo yesterday; J402 onto Bruce.
 const LOADS=[{id:'L1',job_id:'J400',type:'to_load',date:'2026-08-19',vehicle:'Nemo',team_id:'T1'},
              {id:'L2',job_id:'J402',type:'to_load',date:'2026-08-19',vehicle:'Bruce',team_id:'TX'}];
+const ORPHAN={id:'K9',title:'Collect keys from agent',vehicle:'',team_id:null,date:'2026-08-20',start_time:'09:00',duration:30};
 let posted=[];
 const dom=new JSDOM(html,{runScripts:'dangerously',url:'http://localhost/runsheet',beforeParse(w){
   w.fetch=async(url,opts={})=>{
     if(opts.method&&opts.method!=='GET') posted.push({url,method:opts.method,body:opts.body});
     let data;
-    if(url.includes('/api/runsheet/')) data={teams:TEAMS,schedule:SCHEDULE,tasks:[],jobs:JOBS,loads:LOADS};
+    if(url.includes('/api/runsheet/')) data={teams:TEAMS,schedule:SCHEDULE,tasks:[ORPHAN],jobs:JOBS,loads:LOADS};
     else if(url.includes('/api/team-templates')) data=[];
+    else if(url.includes('/api/runsheet-orphan-case')) data={};
     else {
       // Echo the request back the way the real endpoint does — a fixed
       // response made the second crew look already-assigned.
@@ -156,6 +158,12 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
      trayTiles.some(t=>t.includes('#400') && t.includes('Nemo')));
   ok('tray tile uses the same plain tag',
      [...d.querySelectorAll('.rs-tray-tile .rs-loaded')].every(x=>x.textContent.includes('📦')));
+
+  // A task that resolves to no column must be VISIBLE, not silently gone
+  const trayTasks=[...d.querySelectorAll('.rs-tray-task')];
+  ok('orphaned task appears in the tray', trayTasks.length===1);
+  ok('named so it can be recognised', trayTasks[0] && trayTasks[0].textContent.includes('Collect keys'));
+  ok('flagged for reassignment', trayTasks[0] && trayTasks[0].textContent.includes('⚠️'));
 
   err=await call(w.openTeamPop);
   ok('team popover opens'+(err?' — '+err:''), !err || err.includes('not a function'));

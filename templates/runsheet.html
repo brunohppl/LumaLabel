@@ -95,6 +95,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   font-size:0.58rem;font-weight:800;letter-spacing:0.06em;vertical-align:1px;
 }
 .rs-access{display:inline-block;margin-left:5px;font-size:0.8rem;cursor:help;}
+.rs-tray-task{background:repeating-linear-gradient(45deg,#8C8375,#8C8375 6px,#7E7568 6px,#7E7568 12px);color:#fff;}
 .rs-tray-count{display:inline-block;font-size:0.6rem;margin-left:6px;padding:1px 6px;border-radius:8px;background:rgba(255,255,255,0.3);font-weight:600;}
 .rs-share{display:inline-block;font-size:0.6rem;margin-left:5px;padding:1px 5px;border-radius:8px;background:rgba(255,255,255,0.28);vertical-align:1px;white-space:nowrap;}
 .rs-clash-flag{position:absolute;top:2px;right:4px;font-size:0.7rem;line-height:1;}
@@ -1020,17 +1021,34 @@ function renderTray(){
   // forward since saveEntry now requires a team whenever a time is set,
   // but this catches any pre-existing data so nothing is silently lost.
   const unplaced=daySchedule.filter(e=>!e.start_time || !resolvesToTeam(e));
+  // Tasks that resolve to no column would otherwise disappear entirely —
+  // which is exactly what happened while runsheet_tasks lacked a team_id
+  // column: the save succeeded and the task rendered nowhere. Surface them
+  // here so a silent save can never be an invisible one.
+  const orphanTasks=dayTasks.filter(t=>{
+    if(t.team_id && dayTeams.some(x=>x.id===t.team_id)) return false;
+    if(!t.team_id && t.vehicle && t.vehicle!=='ALL'
+       && dayTeams.some(x=>x.vehicle===t.vehicle)) return false;
+    if(!t.team_id && t.vehicle==='ALL' && dayTeams.length) return false;
+    return true;
+  });
   const wrap=document.getElementById('rs-tray-wrap');
   const tray=document.getElementById('rs-tray');
 
-  if(!unplaced.length){
+  if(!unplaced.length && !orphanTasks.length){
     wrap.style.display='none';
     tray.innerHTML='';
     return;
   }
 
   wrap.style.display='block';
-  tray.innerHTML=unplaced.map(e=>{
+  tray.innerHTML=orphanTasks.map(t=>`
+      <div class="rs-tray-tile rs-tray-task" onclick="if(!_suppressClick)openEntryPop('${t.id}',null,null)">
+        <div class="rs-tray-tile-type">📝 Task <span title="Saved without a column — open it and pick a crew">⚠️</span></div>
+        <div class="rs-tray-tile-ref">${(t.title||'Task')}</div>
+        ${t.start_time?`<div style="font-size:0.68rem;opacity:0.8;">${t.start_time}</div>`:''}
+      </div>`).join('')
+    + unplaced.map(e=>{
     const job=jobById[e.job_id];
     const hasJob=!!e.job_id;
     const ref=job?(job.job_ref||job.job_number):null;

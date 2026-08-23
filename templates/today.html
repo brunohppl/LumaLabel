@@ -324,10 +324,20 @@ function loadedLine(job){
   return `<div class="card-loaded">📦 <strong>On</strong> ${seen.join(' + ')}</div>`;
 }
 
+// A transfer is only useful if you can tell WHICH job it is — reference
+// plus street name, e.g. "QU-1351 · 66 Hope St". Falls back gracefully when
+// either half is missing.
+function transferPartnerLabel(j){
+  if(!j) return '';
+  const ref=j.job_ref||(j.job_number?('#'+String(j.job_number).slice(-3)):'');
+  const street=(j.address||'').split(',')[0].trim();
+  return [ref,street].filter(Boolean).join(' · ') || 'another job';
+}
+
 function transferLine(job, jobById){
   if(!job) return '';
   const all=Object.values(jobById||{});
-  const refOf=j=>j?(j.job_ref||('#'+String(j.job_number||'').slice(-3))):'';
+  const refOf=transferPartnerLabel;
   if(job.is_transfer && job.transfer_from_job_id){
     const src=jobById[job.transfer_from_job_id];
     const who=src?` ${refOf(src)}`:' another job';

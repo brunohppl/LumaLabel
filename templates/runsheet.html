@@ -1606,11 +1606,21 @@ function transferInfo(job){
   if(!job) return null;
   if(job.is_transfer && job.transfer_from_job_id){
     const src=dayJobs.find(j=>j.id===job.transfer_from_job_id);
-    return {dir:'from', ref: src ? (src.job_ref||('#'+String(src.job_number||'').slice(-3))) : ''};
+    return {dir:'from', ref: transferPartnerLabel(src)};
   }
   const dest=dayJobs.find(j=>j.is_transfer && j.transfer_from_job_id===job.id);
-  if(dest) return {dir:'to', ref: dest.job_ref||('#'+String(dest.job_number||'').slice(-3))};
+  if(dest) return {dir:'to', ref: transferPartnerLabel(dest)};
   return null;
+}
+
+// A transfer is only useful if you can tell WHICH job it is — reference
+// plus street name, e.g. "QU-1351 · 66 Hope St". Falls back gracefully when
+// either half is missing.
+function transferPartnerLabel(j){
+  if(!j) return '';
+  const ref=j.job_ref||(j.job_number?('#'+String(j.job_number).slice(-3)):'');
+  const street=(j.address||'').split(',')[0].trim();
+  return [ref,street].filter(Boolean).join(' · ') || 'another job';
 }
 
 function transferBadge(job){

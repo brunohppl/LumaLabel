@@ -323,7 +323,7 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
   <textarea id="runsheet-popover-notes" class="runsheet-popover-input" placeholder="Access info, special instructions…" style="height:56px;resize:none;font-size:0.82rem;line-height:1.4;padding:7px 10px;"></textarea>
 
   <div class="runsheet-popover-actions" style="margin-top:18px;">
-    <button class="btn btn-outline" onclick="removeFromRunsheet()" id="runsheet-remove-btn" style="font-size:0.72rem;display:none;">Remove</button>
+    <button class="btn btn-outline" onclick="removeFromRunsheet()" id="runsheet-remove-btn" style="font-size:0.72rem;display:none;">Remove date — hold</button>
     <button class="btn btn-gold" onclick="saveRunsheetEntry()">Save</button>
   </div>
 </div>
@@ -1037,14 +1037,17 @@ async function openRunsheetPopover(jobId){
       .filter(Boolean).join(' — ');
   document.getElementById('runsheet-popover-date').value=job?.runsheet_date||'';
   document.getElementById('runsheet-popover-type').value=job?.runsheet_type||'install';
-  document.getElementById('runsheet-remove-btn').style.display=
-    job?.runsheet_date?'inline-block':'none';
+  const removeBtn=document.getElementById('runsheet-remove-btn');
+  removeBtn.style.display=job?.runsheet_date?'inline-block':'none';
 
   // Pre-fill vehicle chips and notes from existing schedule entries
   try{
     const res=await fetch(`/api/jobs/${jobId}/schedule`);
     const entries=await res.json();
     schedVehicleSelected=[...new Set(entries.map(e=>e.vehicle).filter(Boolean))];
+    // Tiles can exist even when the job record has no date — still offer
+    // the way out, or the schedule can't be cleared from here at all.
+    if(Array.isArray(entries) && entries.length) removeBtn.style.display='inline-block';
     const noteEntry=entries.find(e=>e.notes);
     const notesEl=document.getElementById('runsheet-popover-notes');
     if(notesEl) notesEl.value=noteEntry?.notes||'';

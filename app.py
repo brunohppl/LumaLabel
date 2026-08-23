@@ -201,7 +201,9 @@ def save_job_to_db(meta, items, colour_name, job_owner='', is_transfer=False,
             'address':     meta['address'],
             'stage_date':  meta['stage_date'],
             'colour':      colour_name,
-            'status':      'ready',
+            # A job with no install date isn't ready for anything yet — it's
+            # waiting for a date. Setting one later moves it back to 'ready'.
+            'status':      'ready' if install_date_iso else 'on_hold',
             'job_owner':   meta.get('job_owner', ''),
             'item_count':  len([i for i in items if not i.get('is_extra')]),
             'is_transfer': is_transfer,
@@ -801,9 +803,9 @@ def parse_packing_list(pdf_bytes):
                     break
 
     if not meta['address']: meta['address'] = 'Address not found'
-    if not meta['stage_date']:
-        import random
-        meta['stage_date'] = (datetime.now() + __import__('datetime').timedelta(days=random.randint(3,14))).strftime('%-d %B %Y')
+    # A slip without a date used to be given a RANDOM one 3-14 days out,
+    # which then printed on the labels as if it were real. A job without a
+    # date now stays dateless and goes on hold instead.
 
     current_room = None
     serial = 1
@@ -938,6 +940,8 @@ def format_date(raw):
 
 
 def format_date_label(raw):
+    if not raw or not str(raw).strip():
+        return 'DATE TBC'
     """Parse a date string and return a prominent label-friendly format
     like 'WED 7th - JUL' for printing on the physical label itself.
     Ordinal suffix (ST/ND/RD/TH) makes the day number unambiguous at a glance."""
@@ -2406,6 +2410,8 @@ def _set_job_runsheet_date(job_id, runsheet_date, runsheet_type):
         'runsheet_date': runsheet_date,
         'runsheet_type': runsheet_type,
     })
+    # A held job that just got a date is back in play
+    sb_patch('jobs', f'id=eq.{job_id}&status=eq.on_hold', {'status': 'ready'})
 
 
 @app.route('/api/jobs/<job_id>/runsheet', methods=['PATCH'])
@@ -2444,6 +2450,12 @@ def api_job_runsheet(job_id):
             'runsheet_date': None,
             'runsheet_type': None,
         })
+        # Postponed with no new date yet. Only pre-install stages move to
+        # on_hold — removing a date from an installed job shouldn't rewrite
+        # history, so those keep their status.
+        sb_patch('jobs',
+                 f'id=eq.{job_id}&status=in.(ready,ready_to_load,loaded)',
+                 {'status': 'on_hold'})
 
     return jsonify({'success': True})
 
@@ -3632,6 +3644,7 @@ def _api_monday_pull_inner():
 
     to_insert = []
 
+    held_ids = []
     for gnorm, item in actionable:
         try:
             install_date = item.get('install_date', '')
@@ -3654,6 +3667,21 @@ def _api_monday_pull_inner():
                 if has_date and luma_job.get('runsheet_date') != install_date:
                     patch['runsheet_date'] = install_date
                     patch['runsheet_type'] = 'install'
+                    # A date arriving for a held job releases the hold
+                    if luma_job.get('status') == 'on_hold':
+                        patch['status'] = 'ready'
+
+                # (a2) Monday's date was CLEARED — postponed with no new date.
+                # Deliberately narrow: only when the cell is genuinely blank,
+                # never when a value is present but unparseable. A parse
+                # failure or an API hiccup must not unschedule a real job.
+                date_blank = not (install_date or '').strip()
+                if (date_blank and luma_job.get('runsheet_date')
+                        and luma_job.get('status') in ('ready', 'ready_to_load', 'loaded')):
+                    patch['runsheet_date'] = None
+                    patch['runsheet_type'] = None
+                    patch['status'] = 'on_hold'
+                    held_ids.append(job_id)
 
                 # (b) Installed jobs that Monday now lists as ready to collect.
                 #     Deliberately one-directional and narrow: this is the only
@@ -3677,7 +3705,13 @@ def _api_monday_pull_inner():
                     patch = {}          # defer to the next run
                 if patch:
                     sb_patch('jobs', f'id=eq.{job_id}', patch)
-                    if 'runsheet_date' in patch:
+                    if job_id in held_ids:
+                        # Clear the scheduled tiles as well — the job is no
+                        # longer happening on that day.
+                        sb_delete('job_schedule', f'job_id=eq.{job_id}')
+                        dates_updated += 1
+                        changes.append(f'#{job_ref} date removed in Monday — on hold')
+                    elif 'runsheet_date' in patch:
                         dates_updated += 1
                         changes.append(f'#{job_ref} install date set to {install_date}')
                     if 'status' in patch:

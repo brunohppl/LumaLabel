@@ -32,6 +32,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 #search-clear:hover{background:var(--warm);color:var(--ink);}
 
 .pill{display:inline-block;padding:5px 14px;border-radius:1px;font-size:0.68rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;}
+.pill-hold{background:rgba(154,143,128,0.18);color:var(--muted);}
 .pill-ready{background:rgba(74,126,184,0.12);color:var(--blue);}
 .pill-picking{background:rgba(232,197,71,0.15);color:#B8972A;}
 .pill-readyload{background:rgba(184,147,90,0.15);color:var(--accent);}
@@ -441,8 +442,8 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
 <script>
 let showArchived=false;
 const COLOUR_MAP={Red:'#D62828',Blue:'#1565C0',Green:'#2E7D32',Yellow:'#F9A825',Purple:'#6A0DAD',Orange:'#E65100',Teal:'#00838F',Magenta:'#AD1457',Brown:'#4E342E',Olive:'#558B2F',Indigo:'#283593',Cyan:'#00ACC1',Pink:'#F06292',Grey:'#757575'};
-const STATUS_LABELS={ready:'Ready to Pick',ready_to_load:'Ready to Load',loaded:'Loaded',installed:'Installed',ready_to_collect:'Ready to Collect',returned:'Completed',archived:'Completed'};
-const STATUS_PILLS={ready:'pill-ready',ready_to_load:'pill-readyload',loaded:'pill-loaded',installed:'pill-installed',ready_to_collect:'pill-readycollect',returned:'pill-returned',archived:'pill-returned'};
+const STATUS_LABELS={on_hold:'On Hold',ready:'Ready to Pick',ready_to_load:'Ready to Load',loaded:'Loaded',installed:'Installed',ready_to_collect:'Ready to Collect',returned:'Completed',archived:'Completed'};
+const STATUS_PILLS={on_hold:'pill-hold',ready:'pill-ready',ready_to_load:'pill-readyload',loaded:'pill-loaded',installed:'pill-installed',ready_to_collect:'pill-readycollect',returned:'pill-returned',archived:'pill-returned'};
 
 function toggleArchived(){
   showArchived=!showArchived;
@@ -455,10 +456,11 @@ function toggleArchived(){
 
 // Status display order — strict order of execution, matching the
 // actual job lifecycle from start to finish.
-const STATUS_ORDER=['ready','ready_to_load','loaded','installed','ready_to_collect','returned'];
+const STATUS_ORDER=['on_hold','ready','ready_to_load','loaded','installed','ready_to_collect','returned'];
 // Note: "returned" is included so admin can manually mark a job completed
 // from the jobs page. The backend auto-converts it to "archived".
 const STATUS_SECTION_LABELS={
+  on_hold:'On Hold — awaiting a date',
   ready:'Ready to Pick', ready_to_load:'Ready to Load',
   loaded:'Loaded', installed:'Installed', ready_to_collect:'Ready to Collect',
   returned:'Completed', archived:'Completed'
@@ -1077,6 +1079,8 @@ async function saveRunsheetEntry(){
   });
   const d1=await r1.json();
   if(!d1.success){ alert('Failed to save: '+(d1.error||'unknown error')); return; }
+  const heldJob=jobsById.get(runsheetPopoverJobId);
+  if(heldJob && heldJob.status==='on_hold') heldJob.status='ready';
 
   // Apply notes to all seeded schedule entries if provided
   if(notes){
@@ -1096,13 +1100,18 @@ async function saveRunsheetEntry(){
 }
 
 async function removeFromRunsheet(){
-  if(!confirm('Remove this job from the runsheet and clear all vehicle assignments?')) return;
+  if(!confirm('Remove the date and put this job on hold?\n\nIts scheduled tiles and vehicle assignments will be cleared. The job stays in the list under "On Hold" until a new date is set.')) return;
   await fetch(`/api/jobs/${runsheetPopoverJobId}/runsheet`,{
     method:'PATCH', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({runsheet_date:null, runsheet_type:null})
   });
   const job=jobsById.get(runsheetPopoverJobId);
-  if(job){ job.runsheet_date=null; job.runsheet_type=null; }
+  if(job){
+    job.runsheet_date=null; job.runsheet_type=null;
+    // Mirror the server rule: only pre-install stages go on hold, so an
+    // installed job doesn't jump backwards in the list.
+    if(['ready','ready_to_load','loaded'].includes(job.status)) job.status='on_hold';
+  }
   closeRunsheetPopover();
   renderJobs();
   renderRunsheet();

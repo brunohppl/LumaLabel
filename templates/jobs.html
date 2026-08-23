@@ -32,6 +32,13 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 #search-clear:hover{background:var(--warm);color:var(--ink);}
 
 .pill{display:inline-block;padding:5px 14px;border-radius:1px;font-size:0.68rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;}
+.date-menu{display:none;position:fixed;z-index:300;background:white;border:1px solid var(--border);
+  border-radius:4px;box-shadow:0 8px 28px rgba(0,0,0,0.16);min-width:200px;overflow:hidden;}
+.date-menu.open{display:block;}
+.date-menu-item{display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;
+  font-family:'Jost',sans-serif;font-size:0.84rem;color:var(--ink);cursor:pointer;}
+.date-menu-item:hover{background:var(--cream,#F7F4EF);}
+.date-menu-danger{color:var(--red,#B3261E);border-top:1px solid var(--border);}
 .pill-hold{background:rgba(154,143,128,0.18);color:var(--muted);}
 .pill-ready{background:rgba(74,126,184,0.12);color:var(--blue);}
 .pill-picking{background:rgba(232,197,71,0.15);color:#B8972A;}
@@ -635,7 +642,72 @@ function ensureDateInput(){
   return el;
 }
 
+// The calendar icon opens the native date picker directly when there's no
+// date yet — that's the fast path and it stays one tap. When a date already
+// exists there are two things you might want, so a small menu offers both.
 function openInstallDatePicker(jobId, btn){
+  const job = jobsById.get(jobId) || lastFetchedJobs.find(j=>j.id===jobId);
+  if(job?.runsheet_date){ openDateMenu(jobId, btn); return; }
+  openNativeDatePicker(jobId, btn);
+}
+
+function ensureDateMenu(){
+  let m=document.getElementById('date-menu');
+  if(!m){
+    m=document.createElement('div');
+    m.id='date-menu';
+    m.className='date-menu';
+    document.body.appendChild(m);
+    document.addEventListener('click', ev=>{
+      if(m.classList.contains('open') && !m.contains(ev.target)) closeDateMenu();
+    });
+    document.addEventListener('keydown', ev=>{ if(ev.key==='Escape') closeDateMenu(); });
+  }
+  return m;
+}
+function closeDateMenu(){
+  const m=document.getElementById('date-menu');
+  if(m) m.classList.remove('open');
+}
+
+function openDateMenu(jobId, btn){
+  const m=ensureDateMenu();
+  m.innerHTML=`
+    <button class="date-menu-item" onclick="closeDateMenu();openNativeDatePicker('${jobId}',null)">Change date…</button>
+    <button class="date-menu-item date-menu-danger" onclick="removeDateAndHold('${jobId}')">Remove date — put on hold</button>`;
+  if(btn && btn.getBoundingClientRect){
+    const r=btn.getBoundingClientRect();
+    m.style.left=Math.min(r.left, window.innerWidth-210)+'px';
+    m.style.top=(r.bottom+4)+'px';
+  }
+  m.classList.add('open');
+  // Stop this same click from immediately closing it again
+  event && event.stopPropagation && event.stopPropagation();
+}
+
+async function removeDateAndHold(jobId){
+  if(!confirm('Remove the date and put this job on hold?\n\nIts scheduled tiles and vehicle assignments will be cleared. The job stays in the list under "On Hold" until a new date is set.')) return;
+  closeDateMenu();
+  const res=await fetch(`/api/jobs/${jobId}/runsheet`,{
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({runsheet_date:null, runsheet_type:null})
+  });
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok || data.success===false){
+    alert('Could not remove the date: '+(data.error||`HTTP ${res.status}`));
+    return;
+  }
+  const job=jobsById.get(jobId)||lastFetchedJobs.find(j=>j.id===jobId);
+  if(job){
+    job.runsheet_date=null; job.runsheet_type=null;
+    // Same rule as the server: only pre-install stages go on hold.
+    if(['ready','ready_to_load','loaded'].includes(job.status)) job.status='on_hold';
+  }
+  renderJobs();
+  if(typeof renderRunsheet==='function') renderRunsheet();
+}
+
+function openNativeDatePicker(jobId, btn){
   const job = jobsById.get(jobId) || lastFetchedJobs.find(j=>j.id===jobId);
   const el  = ensureDateInput();
   _dateJobId = jobId;

@@ -978,11 +978,11 @@ async function renderRunsheet(){
       let transferHtml='';
       if(job.is_transfer && job.transfer_from_job_id){
         const src=jobsById.get(job.transfer_from_job_id);
-        const srcRef=src?(src.job_ref||src.job_number):'?';
+        const srcRef=src?transferPartnerLabel(src):'?';
         transferHtml=`<div class="rs-job-transfer rs-job-transfer-from">↓ Transfer from ${srcRef}</div>`;
       } else if(transferringToMap.has(job.id)){
         const dest=transferringToMap.get(job.id);
-        const destRef=dest.job_ref||dest.job_number;
+        const destRef=transferPartnerLabel(dest);
         transferHtml=`<div class="rs-job-transfer rs-job-transfer-to">↑ Transferring to ${destRef}</div>`;
       }
 
@@ -1058,6 +1058,16 @@ async function renderRunsheet(){
   }
 
   content.innerHTML=html;
+}
+
+// A transfer is only useful if you can tell WHICH job it is — reference
+// plus street name, e.g. "QU-1351 · 66 Hope St". Falls back gracefully when
+// either half is missing.
+function transferPartnerLabel(j){
+  if(!j) return '';
+  const ref=j.job_ref||(j.job_number?('#'+String(j.job_number).slice(-3)):'');
+  const street=(j.address||'').split(',')[0].trim();
+  return [ref,street].filter(Boolean).join(' · ') || 'another job';
 }
 
 // JS-side street-only helper (mirrors street_only() in app.py)

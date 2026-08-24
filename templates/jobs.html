@@ -242,6 +242,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .sched-chip:hover{border-color:var(--accent);}
 .sched-chip.selected{border-color:var(--accent);background:rgba(184,147,90,0.1);color:var(--accent);font-weight:600;}
 .runsheet-popover-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.date-remove-row{display:block;width:100%;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);
+  border-left:0;border-right:0;border-bottom:0;border-radius:0;font-size:0.7rem;color:var(--muted);
+  justify-content:center;white-space:normal;}
+.date-remove-row:hover{color:var(--red,#B3261E);border-top-color:var(--border);}
 
 .job-meta{font-size:0.85rem;color:var(--muted);margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;line-height:1.7;}
 .tile-date-install{color:var(--green);font-weight:600;}
@@ -334,14 +338,15 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
   <div class="runsheet-popover-title" id="date-popover-title">Install Date</div>
   <label class="runsheet-popover-label">Date</label>
   <input type="date" id="date-popover-input" class="runsheet-popover-input"/>
-  <div class="runsheet-popover-actions" style="margin-top:16px;justify-content:space-between;">
-    <button class="btn btn-outline" id="date-popover-remove" onclick="removeDateAndHold()"
-            style="font-size:0.72rem;">Remove date — hold</button>
-    <div style="display:flex;gap:8px;">
-      <button class="btn btn-outline" onclick="closeDatePopover()" style="font-size:0.75rem;">Cancel</button>
-      <button class="btn btn-gold" onclick="saveDatePopover()">Save</button>
-    </div>
+  <!-- Two rows: three uppercase nowrap buttons cannot fit 256px of inner
+       width side by side, so they overflowed the box. -->
+  <div class="runsheet-popover-actions" style="margin-top:16px;justify-content:flex-end;">
+    <button class="btn btn-outline" onclick="closeDatePopover()" style="font-size:0.75rem;">Cancel</button>
+    <button class="btn btn-gold" onclick="saveDatePopover()">Save</button>
   </div>
+  <button class="btn btn-outline date-remove-row" id="date-popover-remove" onclick="removeDateAndHold()">
+    Remove date — put on hold
+  </button>
 </div>
 
 <!-- Crew popover: lead + offsiders for one vehicle on one day -->

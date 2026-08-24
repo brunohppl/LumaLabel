@@ -32,13 +32,6 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 #search-clear:hover{background:var(--warm);color:var(--ink);}
 
 .pill{display:inline-block;padding:5px 14px;border-radius:1px;font-size:0.68rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;white-space:nowrap;}
-.date-menu{display:none;position:fixed;z-index:300;background:white;border:1px solid var(--border);
-  border-radius:4px;box-shadow:0 8px 28px rgba(0,0,0,0.16);min-width:200px;overflow:hidden;}
-.date-menu.open{display:block;}
-.date-menu-item{display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;
-  font-family:'Jost',sans-serif;font-size:0.84rem;color:var(--ink);cursor:pointer;}
-.date-menu-item:hover{background:var(--cream,#F7F4EF);}
-.date-menu-danger{color:var(--red,#B3261E);border-top:1px solid var(--border);}
 .pill-hold{background:rgba(154,143,128,0.18);color:var(--muted);}
 .pill-ready{background:rgba(74,126,184,0.12);color:var(--blue);}
 .pill-picking{background:rgba(232,197,71,0.15);color:#B8972A;}
@@ -335,6 +328,22 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
   </div>
 </div>
 
+<!-- Install date popover: a visible date input, so no showPicker() hack -->
+<div class="runsheet-popover-overlay" id="date-popover-overlay" onclick="closeDatePopover()"></div>
+<div class="runsheet-popover" id="date-popover" style="width:300px;">
+  <div class="runsheet-popover-title" id="date-popover-title">Install Date</div>
+  <label class="runsheet-popover-label">Date</label>
+  <input type="date" id="date-popover-input" class="runsheet-popover-input"/>
+  <div class="runsheet-popover-actions" style="margin-top:16px;justify-content:space-between;">
+    <button class="btn btn-outline" id="date-popover-remove" onclick="removeDateAndHold()"
+            style="font-size:0.72rem;">Remove date — hold</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-outline" onclick="closeDatePopover()" style="font-size:0.75rem;">Cancel</button>
+      <button class="btn btn-gold" onclick="saveDatePopover()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Crew popover: lead + offsiders for one vehicle on one day -->
 <div class="runsheet-popover-overlay" id="crew-popover-overlay" onclick="closeCrewPopover()"></div>
 <div class="runsheet-popover" id="crew-popover" style="width:320px;">
@@ -618,81 +627,63 @@ async function saveAddress(jobId, newAddr, div){
   div._saving=false;
 }
 
-// One persistent, rendered date input reused for every tile.
-// It must stay in the DOM and stay visible enough for the browser to
-// accept showPicker() — the previous version removed it on blur, which
-// killed the picker the instant it opened.
-let _dateInput = null;
-let _dateJobId = null;
+let _datePopoverJobId = null;
 
-function ensureDateInput(){
-  if(_dateInput) return _dateInput;
-  const el = document.createElement('input');
-  el.type = 'date';
-  el.id   = 'install-date-input';
-  // Visible to the browser, invisible to the eye. No pointer-events:none
-  // and no off-screen positioning: Chrome rejects showPicker() on inputs
-  // it considers unrendered.
-  el.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;border:0;padding:0;margin:0;z-index:-1;';
-  el.addEventListener('change', ()=>{
-    if(_dateJobId && el.value) saveInstallDate(_dateJobId, el.value);
-  });
-  document.body.appendChild(el);
-  _dateInput = el;
-  return el;
-}
-
-// The calendar icon opens the native date picker directly when there's no
-// date yet — that's the fast path and it stays one tap. When a date already
-// exists there are two things you might want, so a small menu offers both.
+// The calendar icon opens a small popover with a real, visible date input.
+// The previous version drove a 1x1 invisible input through showPicker(),
+// which Chrome refuses on unrendered elements and which fell back to a
+// click() that does nothing — so the calendar simply failed to appear,
+// intermittently, on desktop only.
 function openInstallDatePicker(jobId, btn){
   const job = jobsById.get(jobId) || lastFetchedJobs.find(j=>j.id===jobId);
-  if(job?.runsheet_date){ openDateMenu(jobId, btn); return; }
-  openNativeDatePicker(jobId, btn);
+  _datePopoverJobId = jobId;
+
+  const input = document.getElementById('date-popover-input');
+  input.value = job?.runsheet_date || '';
+
+  document.getElementById('date-popover-title').textContent =
+    (job?.job_ref || job?.job_number || 'Job') + ' — Install Date';
+
+  // Nothing to remove when there's no date yet
+  document.getElementById('date-popover-remove').style.display =
+    job?.runsheet_date ? 'inline-block' : 'none';
+
+  document.getElementById('date-popover-overlay').classList.add('open');
+  document.getElementById('date-popover').classList.add('open');
+  setTimeout(()=>{ try{ input.focus(); }catch(e){} }, 50);
 }
 
-function ensureDateMenu(){
-  let m=document.getElementById('date-menu');
-  if(!m){
-    m=document.createElement('div');
-    m.id='date-menu';
-    m.className='date-menu';
-    document.body.appendChild(m);
-    document.addEventListener('click', ev=>{
-      if(m.classList.contains('open') && !m.contains(ev.target)) closeDateMenu();
-    });
-    document.addEventListener('keydown', ev=>{ if(ev.key==='Escape') closeDateMenu(); });
-  }
-  return m;
-}
-function closeDateMenu(){
-  const m=document.getElementById('date-menu');
-  if(m) m.classList.remove('open');
+function closeDatePopover(){
+  document.getElementById('date-popover-overlay').classList.remove('open');
+  document.getElementById('date-popover').classList.remove('open');
+  _datePopoverJobId = null;
 }
 
-function openDateMenu(jobId, btn){
-  const m=ensureDateMenu();
-  m.innerHTML=`
-    <button class="date-menu-item" onclick="closeDateMenu();openNativeDatePicker('${jobId}',null)">Change date…</button>
-    <button class="date-menu-item date-menu-danger" onclick="removeDateAndHold('${jobId}')">Remove date — put on hold</button>`;
-  if(btn && btn.getBoundingClientRect){
-    const r=btn.getBoundingClientRect();
-    m.style.left=Math.min(r.left, window.innerWidth-210)+'px';
-    m.style.top=(r.bottom+4)+'px';
-  }
-  m.classList.add('open');
-  // Stop this same click from immediately closing it again
-  event && event.stopPropagation && event.stopPropagation();
+async function saveDatePopover(){
+  const jobId = _datePopoverJobId;
+  const val   = document.getElementById('date-popover-input').value;
+  if(!jobId) return;
+  if(!val){ alert('Pick a date, or use “Remove date — hold”.'); return; }
+  closeDatePopover();
+  await saveInstallDate(jobId, val);
 }
 
 async function removeDateAndHold(jobId){
+  jobId = jobId || _datePopoverJobId;
+  if(!jobId) return;
   if(!confirm('Remove the date and put this job on hold?\n\nIts scheduled tiles and vehicle assignments will be cleared. The job stays in the list under "On Hold" until a new date is set.')) return;
-  closeDateMenu();
-  const res=await fetch(`/api/jobs/${jobId}/runsheet`,{
-    method:'PATCH', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({runsheet_date:null, runsheet_type:null})
-  });
-  const data=await res.json().catch(()=>({}));
+  closeDatePopover();
+  let res, data;
+  try{
+    res = await fetch(`/api/jobs/${jobId}/runsheet`,{
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({runsheet_date:null, runsheet_type:null})
+    });
+    data = await res.json().catch(()=>({}));
+  }catch(err){
+    alert('Could not remove the date: '+err.message);
+    return;
+  }
   if(!res.ok || data.success===false){
     alert('Could not remove the date: '+(data.error||`HTTP ${res.status}`));
     return;
@@ -705,29 +696,6 @@ async function removeDateAndHold(jobId){
   }
   renderJobs();
   if(typeof renderRunsheet==='function') renderRunsheet();
-}
-
-function openNativeDatePicker(jobId, btn){
-  const job = jobsById.get(jobId) || lastFetchedJobs.find(j=>j.id===jobId);
-  const el  = ensureDateInput();
-  _dateJobId = jobId;
-  el.value = job?.runsheet_date || '';
-
-  // Anchor it to the button so the picker opens beside the tile
-  if(btn && btn.getBoundingClientRect){
-    const r = btn.getBoundingClientRect();
-    el.style.left = r.left + 'px';
-    el.style.top  = (r.bottom - 1) + 'px';
-  }
-
-  // showPicker() returns undefined, so it can never be chained with ?? —
-  // doing that fired click() as well and double-triggered the control.
-  try{
-    if(typeof el.showPicker === 'function') el.showPicker();
-    else el.click();
-  }catch(err){
-    el.click();   // older browsers, or showPicker refused
-  }
 }
 
 async function saveInstallDate(jobId, newDate){

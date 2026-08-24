@@ -47,6 +47,13 @@ const input=()=>d.getElementById('date-popover-input');
   ok('pre-filled with the current date', input().value==='2026-09-01');
   ok('titled with the job reference', /QU-1/.test(d.getElementById('date-popover-title').textContent));
   ok('remove offered when a date exists', d.getElementById('date-popover-remove').style.display!=='none');
+  // Layout: three uppercase nowrap buttons overflowed a 300px box, so the
+  // destructive action gets its own row and is allowed to wrap.
+  const rm=d.getElementById('date-popover-remove');
+  ok('remove sits on its own row', rm.parentElement.id==='date-popover');
+  ok('and is not inside the Cancel/Save row',
+     !rm.closest('.runsheet-popover-actions'));
+  ok('and may wrap rather than overflow', /date-remove-row/.test(rm.className));
 
   // ── Saving a new date ──
   patched=null;

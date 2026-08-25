@@ -242,6 +242,15 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .sched-chip:hover{border-color:var(--accent);}
 .sched-chip.selected{border-color:var(--accent);background:rgba(184,147,90,0.1);color:var(--accent);font-weight:600;}
 .runsheet-popover-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.badge-btn{border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:inherit;}
+.badge-unassigned{background:transparent;border:1px dashed var(--border);color:var(--muted);}
+.badge-unassigned:hover{border-color:var(--accent);color:var(--accent);}
+.stylist-options{display:flex;flex-direction:column;gap:2px;max-height:320px;overflow-y:auto;}
+.stylist-opt{padding:10px 12px;background:none;border:none;text-align:left;cursor:pointer;
+  font-family:'Jost',sans-serif;font-size:0.86rem;color:var(--ink);border-radius:3px;}
+.stylist-opt:hover{background:var(--cream,#f7f4ef);}
+.stylist-opt.current{background:rgba(184,147,90,0.12);color:var(--accent);font-weight:600;}
+.stylist-opt.clear{color:var(--muted);border-top:1px solid var(--border);margin-top:4px;padding-top:12px;}
 .date-remove-row{display:block;width:100%;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);
   border-left:0;border-right:0;border-bottom:0;border-radius:0;font-size:0.7rem;color:var(--muted);
   justify-content:center;white-space:normal;}
@@ -330,6 +339,13 @@ footer{border-top:1px solid var(--border);padding:18px 32px;text-align:center;fo
     <button class="btn btn-outline" onclick="removeFromRunsheet()" id="runsheet-remove-btn" style="font-size:0.72rem;display:none;">Remove date — hold</button>
     <button class="btn btn-gold" onclick="saveRunsheetEntry()">Save</button>
   </div>
+</div>
+
+<!-- Stylist picker -->
+<div class="runsheet-popover-overlay" id="stylist-popover-overlay" onclick="closeStylistPicker()"></div>
+<div class="runsheet-popover" id="stylist-popover" style="width:280px;">
+  <div class="runsheet-popover-title" id="stylist-popover-title">Assign stylist</div>
+  <div id="stylist-options" class="stylist-options"></div>
 </div>
 
 <!-- Install date popover: a visible date input, so no showPicker() hack -->
@@ -506,7 +522,9 @@ function jobCardHTML(job){
   const pill=STATUS_PILLS[job.status]||'pill-ready',label=STATUS_LABELS[job.status]||job.status;
   const ownerIcon=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.71 4.04c.39-.39.39-1.05 0-1.44l-2.31-2.31a.996.996 0 0 0-1.41 0L15.13 2.16l3.71 3.71M3 17.25V21h3.75L20.81 6.94l-3.75-3.75z"/></svg>`;
   const truckIcon=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>`;
-  const ownerBadge=job.job_owner?`<span class="assignment-badge assignment-badge-owner">${ownerIcon}${job.job_owner}</span>`:'';
+  const ownerBadge=job.job_owner
+    ? `<button class="assignment-badge assignment-badge-owner badge-btn" onclick="event.stopPropagation();openStylistPicker('${job.id}',this)" title="Change stylist">${ownerIcon}${job.job_owner}</button>`
+    : `<button class="assignment-badge badge-btn badge-unassigned" onclick="event.stopPropagation();openStylistPicker('${job.id}',this)" title="Assign a stylist">${ownerIcon}Assign stylist</button>`;
   const truckBadge=job.truck?`<span class="assignment-badge assignment-badge-truck">${truckIcon}${job.truck}</span>`:'';
   const runsheetBadge=job.runsheet_date?`<span class="assignment-badge assignment-badge-runsheet">${formatRunsheetBadgeDate(job.runsheet_date)} — ${RUNSHEET_TYPE_LABELS[job.runsheet_type]||job.runsheet_type}</span>`:'';
   let transferTag='';
@@ -630,6 +648,68 @@ async function saveAddress(jobId, newAddr, div){
   if(job) job.address=newAddr;
   div.textContent=newAddr;
   div._saving=false;
+}
+
+let _stylistJobId = null;
+let _stylists = null;          // fetched once, from the same list the label screen uses
+
+async function openStylistPicker(jobId){
+  _stylistJobId = jobId;
+  const job = jobsById.get(jobId) || lastFetchedJobs.find(j=>j.id===jobId);
+  document.getElementById('stylist-popover-title').textContent =
+    (job?.job_ref || job?.job_number || 'Job') + ' — Stylist';
+
+  const box = document.getElementById('stylist-options');
+  box.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:0.8rem;">Loading…</div>';
+  document.getElementById('stylist-popover-overlay').classList.add('open');
+  document.getElementById('stylist-popover').classList.add('open');
+
+  if(!_stylists){
+    try{
+      const res = await fetch('/api/stylists');
+      const data = await res.json();
+      _stylists = data.stylists || [];
+    }catch(e){ _stylists = []; }
+  }
+  if(!_stylists.length){
+    box.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:0.8rem;">Could not load the stylist list.</div>';
+    return;
+  }
+  const cur = job?.job_owner || '';
+  box.innerHTML = _stylists.map(n=>
+      `<button class="stylist-opt ${n===cur?'current':''}" onclick="setStylist('${n.replace(/'/g,"\\'")}')">${n}</button>`
+    ).join('') +
+    (cur ? `<button class="stylist-opt clear" onclick="setStylist('')">Remove ${cur}</button>` : '');
+}
+
+function closeStylistPicker(){
+  document.getElementById('stylist-popover-overlay').classList.remove('open');
+  document.getElementById('stylist-popover').classList.remove('open');
+  _stylistJobId = null;
+}
+
+async function setStylist(name){
+  const jobId = _stylistJobId;
+  if(!jobId) return;
+  closeStylistPicker();
+  let res, data;
+  try{
+    res = await fetch(`/api/jobs/${jobId}/notes`,{
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({job_owner:name})
+    });
+    data = await res.json().catch(()=>({}));
+  }catch(err){
+    alert('Could not save the stylist: '+err.message);
+    return;
+  }
+  if(!res.ok || data.success===false){
+    alert('Could not save the stylist: '+(data.error||`HTTP ${res.status}`));
+    return;   // leave the card showing what's actually stored
+  }
+  const job = jobsById.get(jobId) || lastFetchedJobs.find(j=>j.id===jobId);
+  if(job) job.job_owner = name;
+  renderJobs();
 }
 
 let _datePopoverJobId = null;

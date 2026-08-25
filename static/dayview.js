@@ -12,7 +12,19 @@
   'use strict';
 
   var DAY_START = 7 * 60 + 30, DAY_END = 15 * 60 + 30;   // 07:30 – 15:30
-  var TYPE_LBL = { install: 'Install', collect: 'Collect', load: 'Load', task: 'Task', brk: 'Break' };
+  // These keys must match the card view (TYPE_LBL in today.html) and the
+  // values the backend writes: install / pickup / to_load / styling.
+  var TYPE_LBL = {
+    install: 'Install', pickup: 'Pickup', to_load: 'To Load',
+    styling: 'Styling', task: 'Task', brk: 'Break'
+  };
+  // Same colours as the card view's left border, so a type reads the same
+  // way in both tabs.
+  var TYPE_COL = {
+    install: 'var(--green,#4a7c59)',  pickup:  'var(--blue,#2e5a8a)',
+    to_load: 'var(--accent,#b8935a)', styling: 'var(--purple,#6a3d8a)',
+    task:    'var(--purple,#6a3d8a)'
+  };
 
   var CREWS = [], JOBS = {}, pxPerMin = 0.9, styled = false, built = false;
 
@@ -48,13 +60,15 @@
     '#dayview-root .tick{position:absolute;bottom:0;font-size:0.62rem;color:var(--muted,#9a8f80);transform:translateX(-50%);white-space:nowrap;}',
     '#dayview-root .gridline{position:absolute;top:0;bottom:0;width:1px;background:var(--border,#e0d8ce);opacity:0.55;}',
     '#dayview-root .gridline.hour{opacity:0.9;}',
-    '#dayview-root .blk{position:absolute;top:10px;bottom:10px;border-radius:3px;padding:4px 6px;overflow:hidden;cursor:pointer;color:#fff;font-size:0.7rem;line-height:1.25;}',
+    '#dayview-root .blk{position:absolute;top:10px;bottom:10px;border-radius:3px;padding:4px 6px;overflow:hidden;cursor:pointer;color:#fff;font-size:0.7rem;line-height:1.25;background:var(--muted,#9a8f80);}',
     '#dayview-root .blk-ref{font-weight:600;white-space:nowrap;}',
     '#dayview-root .blk-sub{opacity:0.86;font-size:0.64rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
     '#dayview-root .blk.install{background:var(--green,#4a7c59);}',
-    '#dayview-root .blk.collect{background:var(--blue,#2e5a8a);}',
-    '#dayview-root .blk.load{background:var(--accent,#b8935a);}',
+    '#dayview-root .blk.pickup{background:var(--blue,#2e5a8a);}',
+    '#dayview-root .blk.to_load{background:var(--accent,#b8935a);}',
+    '#dayview-root .blk.styling{background:var(--purple,#6a3d8a);}',
     '#dayview-root .blk.task{background:var(--purple,#6a3d8a);}',
+    '#dayview-root .blk-type{font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;opacity:0.9;}',
     '#dayview-root .blk.brk{background:repeating-linear-gradient(45deg,#8C8375,#8C8375 5px,#7E7568 5px,#7E7568 10px);}',
     '#dayview-root .blk.tight .blk-sub{display:none;}',
     '#dayview-root .idle{position:absolute;top:10px;bottom:10px;border-radius:3px;background:repeating-linear-gradient(135deg,rgba(232,92,71,0.10),rgba(232,92,71,0.10) 4px,transparent 4px,transparent 9px);border:1px dashed rgba(232,92,71,0.35);}',
@@ -95,9 +109,9 @@
     '<div class="scroller" id="dv-scroller"><div class="grid" id="dv-grid"></div></div>' +
     '<div class="dv-legend">' +
       '<span><i style="background:#4a7c59"></i>Install</span>' +
-      '<span><i style="background:#2e5a8a"></i>Collect</span>' +
-      '<span><i style="background:#b8935a"></i>Load</span>' +
-      '<span><i style="background:#6a3d8a"></i>Task</span>' +
+      '<span><i style="background:#2e5a8a"></i>Pickup</span>' +
+      '<span><i style="background:#b8935a"></i>To Load</span>' +
+      '<span><i style="background:#6a3d8a"></i>Styling / Task</span>' +
       '<span><i style="background:#8C8375"></i>Break</span>' +
       '<span><i style="background:rgba(232,92,71,0.25);border:1px dashed rgba(232,92,71,0.5)"></i>Idle</span>' +
     '</div>' +
@@ -224,8 +238,9 @@
         blocks += '<div class="blk ' + j.type + (bw < 64 ? ' tight' : '') +
           '" style="left:' + x(j.s) + 'px;width:' + Math.max(14, bw) + 'px"' +
           ' data-blk=\'' + esc(JSON.stringify({ s: j.s, d: j.d, type: j.type, ref: j.ref, addr: j.addr, crew: crew.name })) + '\'>' +
+          '<div class="blk-type">' + (bw < 46 ? '' : (TYPE_LBL[j.type] || j.type)) + '</div>' +
           '<div class="blk-ref">' + (bw < 34 ? '' : (j.type === 'brk' ? '🍽' : esc(j.ref))) + '</div>' +
-          '<div class="blk-sub">' + esc(j.addr || TYPE_LBL[j.type]) + ' · ' + dur(j.d) + '</div></div>';
+          '<div class="blk-sub">' + esc(j.addr) + (j.addr ? ' · ' : '') + dur(j.d) + '</div></div>';
         cursor = Math.max(cursor, j.s + j.d);
       });
 

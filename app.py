@@ -3587,6 +3587,7 @@ def _api_monday_pull_inner():
     skipped_errors      = 0
     writes_remaining    = 0
     details_updated     = 0
+    completed_updated   = 0
     tiles_created       = 0
     tiles_updated       = 0
     changes             = []   # human-readable log returned to the page
@@ -3596,7 +3597,7 @@ def _api_monday_pull_inner():
     #   tray tiles  : only the pull groups (quote accepted / ready to pick)
     #   status move : items whose group OR status column says ready to collect
     actionable = []
-    details_only = []          # ignored groups: property details, nothing else
+    details_only = []          # ignored groups: property details + completion
     for gtitle, items in data['groups'].items():
         gnorm = monday_label_norm(gtitle)
         if gnorm in MONDAY_IGNORE_GROUPS:
@@ -3788,15 +3789,32 @@ def _api_monday_pull_inner():
                 val = (value or '').strip()
                 if val and luma_job.get(field) != val:
                     patch[field] = val
+
+            # Monday says the work is finished. Only jobs the app already
+            # considers installed are moved on: a job still to pick or load
+            # is not completed just because its Monday item was filed away.
+            # 'archived' is what the app stores for Completed (see
+            # api_job_status), and archived jobs drop out of the default
+            # jobs list — so this is the narrowest rule that does the job.
+            completing = luma_job.get('status') == 'installed'
+            if completing:
+                patch['status'] = 'archived'
+
             if not patch:
                 continue
             if (dates_updated + statuses_updated + details_updated) >= MONDAY_MAX_JOB_WRITES:
                 writes_remaining += 1
                 continue
             sb_patch('jobs', f"id=eq.{luma_job['id']}", patch)
-            details_updated += 1
-            changes.append(f"#{luma_job.get('job_ref') or luma_job.get('job_number')} "
-                           f"property details updated")
+            ref = luma_job.get('job_ref') or luma_job.get('job_number')
+            if completing:
+                statuses_updated  += 1
+                completed_updated += 1
+                changes.append(f"#{ref} moved to Completed")
+            # any field beyond the status we just added counts as a details write
+            if len(patch) > (1 if completing else 0):
+                details_updated += 1
+                changes.append(f"#{ref} property details updated")
         except Exception:
             skipped_errors += 1
 
@@ -3813,6 +3831,7 @@ def _api_monday_pull_inner():
         'skipped_errors':      skipped_errors,
         'writes_remaining':    writes_remaining,
         'details_updated':     details_updated,
+        'completed_updated':   completed_updated,
         'tiles_created':       tiles_created,
         'tiles_updated':       tiles_updated,
         'changes':             changes[:60],

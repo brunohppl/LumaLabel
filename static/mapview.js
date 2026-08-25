@@ -111,6 +111,13 @@
     var el = document.getElementById('mv-map');
     if (!el) return;
 
+    // shell() rebuilds the container on each render, so a cached map would
+    // still be bound to the discarded element and draw nowhere.
+    if (map && map.getContainer && map.getContainer() !== el) {
+      try { map.remove(); } catch (e) { /* already gone */ }
+      map = null;
+      layer = null;
+    }
     if (!map) {
       map = L.map(el, { scrollWheelZoom: true });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -186,13 +193,16 @@
               msg('Map locations need the Google Maps key to be configured on the server.');
               return;
             }
-            if (!(data.points || []).length && !data.warehouse) {
-              shell(dateObj);
-              plot(data);
-              return;
-            }
             shell(dateObj);
             plot(data);
+            if (!(data.points || []).length) {
+              var note = document.getElementById('mv-note');
+              if (note) {
+                note.textContent = data.unmapped
+                  ? data.unmapped + ' stop(s) scheduled but no location resolved yet — reopen to continue'
+                  : 'Nothing scheduled for this day';
+              }
+            }
           })
           .catch(function () {
             msg('Could not load the day’s locations.<br>The Cards tab is unaffected.');

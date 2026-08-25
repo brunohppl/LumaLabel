@@ -2315,6 +2315,10 @@ def api_map_day(date_str):
     for e in entries:
         if (e.get('type') or 'install') not in MAP_TYPES:
             continue
+        # Only work actually given to a crew. An unassigned tray tile isn't
+        # somewhere anyone is going today, so it doesn't belong on the map.
+        if not e.get('team_id') and not e.get('vehicle'):
+            continue
         job = jobs_by_id.get(e.get('job_id'))
         if not job:
             continue
@@ -2375,6 +2379,7 @@ def api_map_day(date_str):
                       if wh else None),
         'unmapped': sum(1 for e in entries
                         if (e.get('type') or 'install') in MAP_TYPES
+                        and (e.get('team_id') or e.get('vehicle'))
                         and jobs_by_id.get(e.get('job_id'))
                         and jobs_by_id[e['job_id']].get('latitude') is None),
         'geocoding_available': bool(os.environ.get('GOOGLE_MAPS_API_KEY')),
@@ -2549,6 +2554,19 @@ def seed_two_day_schedule(job_id, main_date_str, main_type, items=None, forced_v
     for etype, edate in wanted.items():
         if etype not in kept_types:
             make_entry(edate, etype)
+
+    # Safety net: remove any UNPLACED tile for this job left on a date we no
+    # longer want. The loop above already deletes the ones it can see, but if
+    # that read failed (or a tile was created by another path), the job keeps
+    # showing in the old day's tray after its date moved. Only tiles with no
+    # crew and no time are touched, so assigned work is never lost this way.
+    try:
+        keep_dates = ','.join(sorted(set(wanted.values())))
+        sb_delete('job_schedule',
+                  f'job_id=eq.{job_id}&team_id=is.null&start_time=is.null'
+                  f'&date=not.in.({keep_dates})')
+    except Exception as e:
+        print(f'[SEED] stale tray sweep failed for {job_id}: {e}')
 
     # Keep jobs.runsheet_date on the main date for backward compat
     sb_patch('jobs', f'id=eq.{job_id}', {

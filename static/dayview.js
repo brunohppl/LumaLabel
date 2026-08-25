@@ -32,10 +32,6 @@
     '#dayview-root{padding-bottom:20px;}',
     '#dayview-root .daybar{padding:14px 16px;display:flex;align-items:baseline;gap:20px;flex-wrap:wrap;border-bottom:1px solid var(--border,#e0d8ce);background:#fff;}',
     '#dayview-root .day-date{font-family:"Cormorant Garamond",serif;font-size:1.3rem;}',
-    '#dayview-root .stat{display:flex;align-items:baseline;gap:6px;}',
-    '#dayview-root .stat-n{font-family:"Cormorant Garamond",serif;font-size:1.3rem;line-height:1;}',
-    '#dayview-root .stat-l{font-size:0.66rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted,#9a8f80);}',
-    '#dayview-root .stat-idle .stat-n{color:var(--red,#e85c47);}',
     '#dayview-root .dv-controls{padding:10px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border,#e0d8ce);}',
     '#dayview-root .zoom-presets{display:flex;border:1px solid var(--border,#e0d8ce);border-radius:3px;overflow:hidden;}',
     '#dayview-root .zoom-presets button{padding:6px 12px;background:#fff;border:none;border-right:1px solid var(--border,#e0d8ce);font-family:inherit;font-size:0.7rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted,#9a8f80);cursor:pointer;}',
@@ -96,13 +92,10 @@
   ].join('\n');
 
   var MARKUP =
-    '<div class="daybar">' +
-      '<div class="day-date" id="dv-date">—</div>' +
-      '<div class="stat"><span class="stat-n" id="dv-crews">–</span><span class="stat-l">crews</span></div>' +
-      '<div class="stat"><span class="stat-n" id="dv-stops">–</span><span class="stat-l">stops</span></div>' +
-      '<div class="stat"><span class="stat-n" id="dv-booked">–</span><span class="stat-l">on site</span></div>' +
-      '<div class="stat stat-idle"><span class="stat-n" id="dv-idle">–</span><span class="stat-l">idle</span></div>' +
-    '</div>' +
+    // Summary stats (crews / stops / on site / idle) removed: the figures
+    // came from scheduled durations, which are still flat defaults, so they
+    // read as fact while being guesswork. To return with real inputs.
+    '<div class="daybar"><div class="day-date" id="dv-date">—</div></div>' +
     '<div class="dv-controls">' +
       '<div class="zoom-presets" id="dv-presets">' +
         '<button data-z="0.9" class="on">Whole day</button>' +
@@ -210,9 +203,6 @@
 
     if (!CREWS.length) {
       grid.innerHTML = '<div class="dv-empty">No crews set up for this day yet.</div>';
-      ['dv-crews', 'dv-stops', 'dv-booked', 'dv-idle'].forEach(function (id) {
-        var el = document.getElementById(id); if (el) el.textContent = '–';
-      });
       return;
     }
 
@@ -227,7 +217,6 @@
     var html = '<div class="ruler"><div class="rowhead"></div>' +
       '<div class="ruler-lane" style="width:' + laneW + 'px">' + ticks + '</div></div>';
 
-    var totalBooked = 0, totalIdle = 0, stops = 0;
 
     CREWS.forEach(function (crew) {
       var list = JOBS[crew.name] || [];
@@ -236,12 +225,11 @@
       list.forEach(function (j) {
         if (j.s - cursor >= 10) {
           var mins = j.s - cursor, w = mins * pxPerMin;
-          totalIdle += mins;
           blocks += '<div class="idle" style="left:' + x(cursor) + 'px;width:' + w + 'px">' +
             (w > 52 ? '<span class="idle-lbl">' + dur(mins) + ' idle</span>' : '') + '</div>';
         }
         var bw = j.d * pxPerMin;
-        if (j.type !== 'brk') { booked += j.d; stops++; }
+        if (j.type !== 'brk') { booked += j.d; }
         blocks += '<div class="blk ' + j.type + (bw < 64 ? ' tight' : '') +
           '" style="left:' + x(j.s) + 'px;width:' + Math.max(14, bw) + 'px"' +
           ' data-blk=\'' + esc(JSON.stringify({ s: j.s, d: j.d, type: j.type, ref: j.ref, addr: j.addr, crew: crew.name })) + '\'>' +
@@ -253,11 +241,9 @@
 
       if (DAY_END - cursor >= 10) {
         var em = DAY_END - cursor;
-        totalIdle += em;
         blocks += '<div class="idle" style="left:' + x(cursor) + 'px;width:' + (em * pxPerMin) + 'px">' +
           (em * pxPerMin > 52 ? '<span class="idle-lbl">' + dur(em) + ' idle</span>' : '') + '</div>';
       }
-      totalBooked += booked;
 
       var pct = Math.round(booked / (DAY_END - DAY_START) * 100);
       html += '<div class="dv-row"><div class="rowhead">' +
@@ -281,10 +267,6 @@
       marker.style.left = (headW + padL + x(nowM)) + 'px';
       grid.appendChild(marker);
     }
-    document.getElementById('dv-crews').textContent = CREWS.length;
-    document.getElementById('dv-stops').textContent = stops;
-    document.getElementById('dv-booked').textContent = dur(totalBooked);
-    document.getElementById('dv-idle').textContent = dur(totalIdle);
   }
 
   function setZoom(z, fromX) {

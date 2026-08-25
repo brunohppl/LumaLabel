@@ -8,8 +8,7 @@ const DATA={teams:[{id:'T1',name:'Nemo Crew',vehicle:'Nemo',function:'transport'
             {id:'E2',job_id:'J400',team_id:'T4',type:'install',start_time:'07:30',duration:180},
             {id:'E3',job_id:'J401',team_id:'T1',type:'pickup',start_time:'10:00',duration:60},
             {id:'E4',job_id:'J402',team_id:'T4',type:'install',start_time:'13:00',duration:90},
-            {id:'E5',job_id:'J402',team_id:'T1',type:'install',start_time:'14:00',duration:60,
-             actual_end:'2026-08-20T04:05:00Z'}],
+            {id:'E5',job_id:'J402',team_id:'T1',type:'install',start_time:'14:00',duration:60}],
   tasks:[{id:'K1',team_id:'T1',title:'Lunch break',kind:'break',start_time:'12:00',duration:30}],
   // J400 was loaded onto Nemo the day before
   loads:[{id:'L1',job_id:'J400',type:'to_load',date:'2026-08-19',vehicle:'Nemo'}],
@@ -77,30 +76,35 @@ setTimeout(async()=>{
   ok('styling crew files as stylist', post && post.body.role==='stylist');
   ok('coordinates included', post && typeof post.body.lat==='number');
 
-  // ── Done button ──
-  const doneBtns=[...d.querySelectorAll('.card-btn-done')];
-  ok('Done button on unfinished cards ('+doneBtns.length+')', doneBtns.length>0);
-  ok('already-finished card shows the time instead',
-     [...d.querySelectorAll('.card-done-mark')].some(x=>/Done \d{2}:\d{2}/.test(x.textContent)));
-
-  w.__posts.length=0;
-  await w.markDone('E1', doneBtns[0]); await sleep(80);
-  let stamp=w.__posts.find(p=>p.url.includes('/actual'));
-  ok('tapping Done posts the stamp', !!stamp);
-  ok('as a done stamp', stamp && stamp.body.which==='done');
-  ok('to the right entry', stamp && stamp.url.includes('E1'));
-  ok('card flips to done', [...d.querySelectorAll('.card-done-mark')].length>=2);
-
-  // Navigate stamps the start
-  w.__posts.length=0;
-  w.navigate('J400','12 Somers St','transport','E2');
-  await sleep(50);
-  stamp=w.__posts.find(p=>p.url.includes('/actual'));
-  ok('Navigate stamps the start', stamp && stamp.body.which==='start' && stamp.url.includes('E2'));
-
   const home=[...d.querySelectorAll('a')].find(a=>a.getAttribute('href')==='/');
   ok('a home link is present', !!home);
   ok('and reads as Home', home && /home/i.test(home.textContent));
+
+  // ── Done button must be gone ──
+  ok('no Done buttons remain', d.querySelectorAll('.card-btn-done').length===0);
+  ok('no done markers remain', d.querySelectorAll('.card-done-mark').length===0);
+  ok('Navigate no longer stamps actuals',
+     !w.__posts.some(p=>p.url.includes('/actual')));
+
+  // ── Day view tab: present, not default, and isolated ──
+  ok('both tabs exist', !!d.getElementById('tab-cards') && !!d.getElementById('tab-day'));
+  ok('Cards is the default tab', d.getElementById('tab-cards').classList.contains('active'));
+  ok('cards are visible on load', d.getElementById('day-content').style.display!=='none');
+  ok('day view hidden on load', d.getElementById('dayview-root').style.display==='none');
+
+  // DayView is a separate file, absent in this harness — the tab must
+  // degrade rather than throw, and the cards must survive it.
+  const cardsBefore=d.querySelectorAll('.card').length;
+  w.showTab('day');
+  await sleep(30);
+  ok('switching does not throw with DayView missing', true);
+  ok('day tab now active', d.getElementById('tab-day').classList.contains('active'));
+  ok('shows a fallback message', /Could not draw|unaffected/.test(d.getElementById('dayview-root').innerHTML));
+  ok('swipe hint hidden on the day tab', d.getElementById('scroll-hint').style.display==='none');
+  w.showTab('cards');
+  await sleep(30);
+  ok('cards come back intact', d.querySelectorAll('.card').length===cardsBefore);
+  ok('and Navigate still works', typeof w.navigate==='function');
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);

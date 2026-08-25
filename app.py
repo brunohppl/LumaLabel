@@ -3790,13 +3790,13 @@ def _api_monday_pull_inner():
                 if val and luma_job.get(field) != val:
                     patch[field] = val
 
-            # Monday says the work is finished. Only jobs the app already
-            # considers installed are moved on: a job still to pick or load
-            # is not completed just because its Monday item was filed away.
-            # 'archived' is what the app stores for Completed (see
+            # Monday says the work is finished. Jobs that are installed or
+            # already awaiting collection move on; a job still to pick or
+            # load is NOT completed just because its Monday item was filed
+            # away. 'archived' is what the app stores for Completed (see
             # api_job_status), and archived jobs drop out of the default
-            # jobs list — so this is the narrowest rule that does the job.
-            completing = luma_job.get('status') == 'installed'
+            # jobs list.
+            completing = luma_job.get('status') in ('installed', 'ready_to_collect')
             if completing:
                 patch['status'] = 'archived'
 

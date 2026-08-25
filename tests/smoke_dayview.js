@@ -9,11 +9,12 @@ const DATA={
   teams:[{id:'T1',name:'Nemo',vehicle:'Nemo',function:'transport',lead:'Savio',members:['Savio','Nick']},
          {id:'T2',name:'Marlin',vehicle:'Marlin',function:'styling',lead:'Addy',members:['Addy','Montie']},
          {id:'T3',name:'Warehouse',vehicle:null,function:'warehouse',lead:'Jo',members:['Jo']}],
-  schedule:[{id:'E1',job_id:'J1',team_id:'T1',type:'load',start_time:'07:30',duration:60},
+  schedule:[{id:'E1',job_id:'J1',team_id:'T1',type:'to_load',start_time:'07:30',duration:60},
             {id:'E2',job_id:'J2',team_id:'T1',type:'install',start_time:'09:00',duration:90},
-            {id:'E3',job_id:'J2',team_id:'T2',type:'install',start_time:'09:00',duration:180},
-            {id:'E4',job_id:'J3',vehicle:'Nemo',type:'collect',start_time:'13:00',duration:45}, // legacy, no team_id
-            {id:'E5',job_id:'J4',team_id:'T1',type:'install',start_time:null,duration:60}],     // unplaced
+            {id:'E3',job_id:'J2',team_id:'T2',type:'styling',start_time:'09:00',duration:180},
+            {id:'E4',job_id:'J3',vehicle:'Nemo',type:'pickup',start_time:'13:00',duration:45}, // legacy, no team_id
+            {id:'E5',job_id:'J4',team_id:'T1',type:'install',start_time:null,duration:60},      // unplaced
+            {id:'E6',job_id:'J3',team_id:'T2',type:'weird_new_type',start_time:'14:00',duration:30}],
   tasks:[{id:'K1',team_id:'T3',title:'Pick QU-1370',start_time:'08:00',duration:90},
          {id:'K2',team_id:'T1',kind:'break',title:'Lunch',start_time:'11:00',duration:30}],
   jobs:[{id:'J1',job_ref:'QU-1351',address:'66 Hope St, South Brisbane'},
@@ -44,12 +45,21 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   ok('crew members listed', /Savio/.test(root.innerHTML));
 
   const blocks=[...root.querySelectorAll('.blk')];
-  ok('blocks drawn for scheduled work ('+blocks.length+')', blocks.length===6);
+  ok('blocks drawn for scheduled work ('+blocks.length+')', blocks.length===7);
+  // The reported bug: pickups and to-load tiles were missing entirely
+  ok('to_load blocks appear', root.querySelectorAll('.blk.to_load').length===1);
+  ok('pickup blocks appear', root.querySelectorAll('.blk.pickup').length===1);
+  ok('styling blocks appear', root.querySelectorAll('.blk.styling').length===1);
+  // Every block says what kind of work it is
+  ok('blocks are labelled with their type', /TO LOAD|To Load/.test(root.innerHTML));
+  ok('pickup labelled', /Pickup/.test(root.innerHTML));
+  ok('install labelled', /Install/.test(root.innerHTML));
+  ok('an unknown type still renders', /weird_new_type/.test(root.innerHTML));
   ok('unplaced entries are excluded', !/QU-1399/.test(root.innerHTML));
   ok('legacy vehicle-only entry still placed', /QU-1330/.test(root.innerHTML));
   ok('tasks appear', /Pick QU-1370/.test(root.innerHTML));
   ok('breaks styled separately', root.querySelectorAll('.blk.brk').length===1);
-  ok('breaks not counted as stops', d.getElementById('dv-stops').textContent==='5');
+  ok('breaks not counted as stops', d.getElementById('dv-stops').textContent==='6');
   ok('idle time surfaced', root.querySelectorAll('.idle').length>0);
   ok('idle total shown', /[hm]/.test(d.getElementById('dv-idle').textContent));
 

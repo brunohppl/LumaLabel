@@ -13,14 +13,9 @@
   var LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
   var LEAFLET_JS  = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
 
-  var TYPE_COL = {
-    install: '#4a7c59', pickup: '#2e5a8a', to_load: '#b8935a',
-    styling: '#6a3d8a', task: '#6a3d8a'
-  };
-  var TYPE_LBL = {
-    install: 'Install', pickup: 'Pickup', to_load: 'To Load',
-    styling: 'Styling', task: 'Task'
-  };
+  // Installs and pickups only — the map shows where crews go to a property.
+  var TYPE_COL = { install: '#4a7c59', pickup: '#2e5a8a' };
+  var TYPE_LBL = { install: 'Install', pickup: 'Pickup' };
 
   var map = null, layer = null, styled = false, loading = false;
 
@@ -34,7 +29,12 @@
     '#mapview-root .mv-map{height:62vh;min-height:340px;margin:0 16px;border:1px solid var(--border,#e0d8ce);border-radius:6px;}',
     '@media(min-width:1100px){#mapview-root .mv-map{height:70vh;}}',
     '#mapview-root .mv-msg{padding:36px 20px;text-align:center;color:var(--muted,#9a8f80);font-size:0.85rem;line-height:1.6;}',
-    '#mapview-root .mv-pin{border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4);}',
+    '#mapview-root .mv-icon{background:none;border:none;}',
+    '#mapview-root .mv-label{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:1px;',
+    '  background:rgba(255,255,255,0.94);border:1px solid rgba(0,0,0,0.12);border-radius:3px;',
+    '  padding:1px 5px;font-family:Jost,sans-serif;font-size:10px;font-weight:600;color:#1a1714;',
+    '  white-space:nowrap;pointer-events:none;}',
+    '#mapview-root .mv-label-wh{font-weight:600;}',
     '#mapview-root .mv-pop-ref{font-weight:600;font-size:0.9rem;}',
     '#mapview-root .mv-pop-row{font-size:0.78rem;color:#555;margin-top:2px;}'
   ].join('\n');
@@ -88,21 +88,51 @@
           { weekday: 'long', day: 'numeric', month: 'long' })) : '') +
       '</div><div class="mv-note" id="mv-note"></div></div>' +
       '<div class="mv-legend">' +
-        '<span><i style="background:#4a7c59"></i>Install</span>' +
-        '<span><i style="background:#2e5a8a"></i>Pickup</span>' +
-        '<span><i style="background:#b8935a"></i>To Load</span>' +
+        '<span><i style="background:#4a7c59"></i>Install (I)</span>' +
+        '<span><i style="background:#2e5a8a"></i>Pickup (P)</span>' +
         '<span><i style="background:#1a1714"></i>Warehouse</span>' +
+        '<span>Label under each pin is the crew</span>' +
       '</div>' +
       '<div class="mv-map" id="mv-map"></div>';
   }
 
-  function dot(colour, size) {
+  /* A teardrop pin, coloured by type, with the crew name on a small label
+     beneath it — so the map answers "which truck is where" at a glance
+     without tapping anything. */
+  function jobIcon(type, crew) {
+    var colour = TYPE_COL[type] || '#9a8f80';
+    var letter = type === 'pickup' ? 'P' : 'I';
+    var label = crew
+      ? '<div class="mv-label">' + esc(crew) + '</div>'
+      : '';
     return window.L.divIcon({
-      className: '',
-      html: '<div class="mv-pin" style="width:' + size + 'px;height:' + size +
-            'px;background:' + colour + ';"></div>',
-      iconSize: [size, size],
-      iconAnchor: [size / 2, size / 2]
+      className: 'mv-icon',
+      html:
+        '<svg width="26" height="34" viewBox="0 0 26 34">' +
+          '<path d="M13 33C13 33 24 20.5 24 13A11 11 0 1 0 2 13C2 20.5 13 33 13 33Z" ' +
+            'fill="' + colour + '" stroke="#fff" stroke-width="2"/>' +
+          '<text x="13" y="17" text-anchor="middle" font-family="Jost,sans-serif" ' +
+            'font-size="11" font-weight="600" fill="#fff">' + letter + '</text>' +
+        '</svg>' + label,
+      iconSize: [26, 34],
+      iconAnchor: [13, 33],
+      popupAnchor: [0, -30]
+    });
+  }
+
+  /* The warehouse is a place, not a job — a house, visually distinct. */
+  function warehouseIcon() {
+    return window.L.divIcon({
+      className: 'mv-icon',
+      html:
+        '<svg width="32" height="32" viewBox="0 0 32 32">' +
+          '<circle cx="16" cy="16" r="14" fill="#1a1714" stroke="#fff" stroke-width="2"/>' +
+          '<path d="M9 16.5L16 10l7 6.5V23a1 1 0 0 1-1 1h-4v-5h-4v5h-4a1 1 0 0 1-1-1z" ' +
+            'fill="#fff"/>' +
+        '</svg><div class="mv-label mv-label-wh">Warehouse</div>',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+      popupAnchor: [0, -16]
     });
   }
 
@@ -133,7 +163,7 @@
     var bounds = [];
 
     if (data.warehouse) {
-      L.marker([data.warehouse.lat, data.warehouse.lng], { icon: dot('#1a1714', 16) })
+      L.marker([data.warehouse.lat, data.warehouse.lng], { icon: warehouseIcon() })
         .bindPopup('<div class="mv-pop-ref">Warehouse</div>' +
                    '<div class="mv-pop-row">' + esc(data.warehouse.address) + '</div>')
         .addTo(layer);
@@ -141,8 +171,7 @@
     }
 
     (data.points || []).forEach(function (p) {
-      var colour = TYPE_COL[p.type] || '#9a8f80';
-      L.marker([p.lat, p.lng], { icon: dot(colour, 14) })
+      L.marker([p.lat, p.lng], { icon: jobIcon(p.type, p.crew) })
         .bindPopup(
           '<div class="mv-pop-ref">' + esc(p.ref) + '</div>' +
           '<div class="mv-pop-row">' + esc(p.address) + '</div>' +

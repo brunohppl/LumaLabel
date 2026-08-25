@@ -87,10 +87,11 @@ setTimeout(async()=>{
      !w.__posts.some(p=>p.url.includes('/actual')));
 
   // ── Day view tab: present, not default, and isolated ──
-  ok('both tabs exist', !!d.getElementById('tab-cards') && !!d.getElementById('tab-day'));
+  ok('all three tabs exist', !!d.getElementById('tab-cards') && !!d.getElementById('tab-day') && !!d.getElementById('tab-map'));
   ok('Cards is the default tab', d.getElementById('tab-cards').classList.contains('active'));
   ok('cards are visible on load', d.getElementById('day-content').style.display!=='none');
   ok('day view hidden on load', d.getElementById('dayview-root').style.display==='none');
+  ok('map hidden on load', d.getElementById('mapview-root').style.display==='none');
 
   // DayView is a separate file, absent in this harness — the tab must
   // degrade rather than throw, and the cards must survive it.
@@ -101,6 +102,13 @@ setTimeout(async()=>{
   ok('day tab now active', d.getElementById('tab-day').classList.contains('active'));
   ok('shows a fallback message', /Could not draw|unaffected/.test(d.getElementById('dayview-root').innerHTML));
   ok('swipe hint hidden on the day tab', d.getElementById('scroll-hint').style.display==='none');
+  // Map tab: MapView absent here too — must degrade, not throw
+  w.showTab('map');
+  await sleep(30);
+  ok('map tab activates', d.getElementById('tab-map').classList.contains('active'));
+  ok('map degrades without its script', /Could not load the map|unaffected/.test(d.getElementById('mapview-root').innerHTML));
+  ok('swipe hint hidden on the map tab', d.getElementById('scroll-hint').style.display==='none');
+
   w.showTab('cards');
   await sleep(30);
   ok('cards come back intact', d.querySelectorAll('.card').length===cardsBefore);

@@ -2239,17 +2239,24 @@ def api_job_status(job_id):
 WAREHOUSE_ADDRESS = '63 Westgate St, Wacol QLD'
 
 
-def geocode_address(address):
-    """Address -> (lat, lng), or None.
+# Only these mean "this address will never resolve". Everything else —
+# REQUEST_DENIED, OVER_QUERY_LIMIT, a timeout — is a problem with the setup
+# or the moment, not the address, and must NOT blacklist the job.
+GEOCODE_PERMANENT_FAILURES = {'ZERO_RESULTS', 'INVALID_REQUEST'}
 
-    Uses the same GOOGLE_MAPS_API_KEY as the ETA lookups, but the Geocoding
-    API is a separate product that must be enabled on the project AND
-    allowed on the key. Returns None rather than raising: a map with fewer
-    pins is better than a page that fails to load.
+
+def geocode_address(address):
+    """Address -> (coords, status).
+
+    coords is (lat, lng) or None; status is Google's status string (or a
+    local marker) so the caller can tell a bad address from a bad key.
+    Never raises: a map with fewer pins beats a page that won't load.
     """
     api_key = os.environ.get('GOOGLE_MAPS_API_KEY')
-    if not api_key or not (address or '').strip():
-        return None
+    if not api_key:
+        return None, 'NO_API_KEY'
+    if not (address or '').strip():
+        return None, 'NO_ADDRESS'
     try:
         params = urllib.parse.urlencode({
             'address': address,
@@ -2262,12 +2269,12 @@ def geocode_address(address):
         status = result.get('status')
         if status != 'OK' or not result.get('results'):
             print(f'[GEO] {status} for {address!r} — {result.get("error_message", "")}')
-            return None
+            return None, status or 'UNKNOWN'
         loc = result['results'][0]['geometry']['location']
-        return float(loc['lat']), float(loc['lng'])
+        return (float(loc['lat']), float(loc['lng'])), 'OK'
     except Exception as e:
         print(f'[GEO] failed for {address!r}: {e}')
-        return None
+        return None, 'EXCEPTION'
 
 
 # Geocoding runs inside a page load, so cap it: a first open of a busy day
@@ -2296,6 +2303,7 @@ def api_map_day(date_str):
     team_by_id = {t['id']: t for t in teams}
 
     geocoded_now = 0
+    last_error = None
     points = []
     seen = set()
 
@@ -2312,8 +2320,10 @@ def api_map_day(date_str):
         lat, lng = job.get('latitude'), job.get('longitude')
         if (lat is None or lng is None) and not job.get('geocode_failed') \
                 and geocoded_now < GEOCODE_MAX_PER_REQUEST:
-            coords = geocode_address(job.get('address'))
+            coords, status = geocode_address(job.get('address'))
             geocoded_now += 1
+            if status != 'OK':
+                last_error = status
             now = datetime.utcnow().isoformat() + 'Z'
             if coords:
                 lat, lng = coords
@@ -2321,9 +2331,12 @@ def api_map_day(date_str):
                          {'latitude': lat, 'longitude': lng, 'geocoded_at': now,
                           'geocode_failed': False})
                 job['latitude'], job['longitude'] = lat, lng
-            else:
+            elif status in GEOCODE_PERMANENT_FAILURES:
+                # Genuinely unresolvable — stop retrying it every open.
                 sb_patch('jobs', f"id=eq.{job['id']}",
                          {'geocode_failed': True, 'geocoded_at': now})
+            # Any other status (bad key, quota, network) is left alone so it
+            # retries once the underlying problem is fixed.
 
         if lat is None or lng is None:
             continue
@@ -2341,9 +2354,13 @@ def api_map_day(date_str):
         })
 
     # The warehouse is a fixed point; resolve it once per process.
-    if 'coords' not in _warehouse_cache:
-        _warehouse_cache['coords'] = geocode_address(WAREHOUSE_ADDRESS)
-    wh = _warehouse_cache['coords']
+    if not _warehouse_cache.get('coords'):
+        wh_coords, wh_status = geocode_address(WAREHOUSE_ADDRESS)
+        if wh_coords:
+            _warehouse_cache['coords'] = wh_coords
+        elif wh_status != 'OK':
+            last_error = last_error or wh_status
+    wh = _warehouse_cache.get('coords')
 
     return jsonify({
         'points': points,
@@ -2353,6 +2370,8 @@ def api_map_day(date_str):
                         if jobs_by_id.get(e.get('job_id'))
                         and jobs_by_id[e['job_id']].get('latitude') is None),
         'geocoding_available': bool(os.environ.get('GOOGLE_MAPS_API_KEY')),
+        # Surfaced so a blank map can be diagnosed without server log access
+        'geocode_error': last_error,
     })
 
 

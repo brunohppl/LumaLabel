@@ -85,7 +85,14 @@
     '#dayview-root .p-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border,#e0d8ce);font-size:0.78rem;}',
     '#dayview-root .p-row span:first-child{color:var(--muted,#9a8f80);}',
     '#dayview-root .p-close{position:absolute;top:12px;right:14px;background:none;border:none;font-size:1.2rem;color:var(--muted,#9a8f80);cursor:pointer;}',
-    '@media(max-width:640px){#dayview-root .rowhead{width:92px;flex:0 0 92px;}#dayview-root .hint{display:none;}}'
+    '@media(max-width:640px){#dayview-root .rowhead{width:92px;flex:0 0 92px;}#dayview-root .hint{display:none;}}',
+    /* More room on bigger screens: a wider crew column and taller rows,
+       so more of the day is legible without zooming. */
+    '@media(min-width:1100px){#dayview-root .rowhead{width:170px;flex:0 0 170px;}',
+    '#dayview-root .crew-name{font-size:0.9rem;}',
+    '#dayview-root .lane{padding:14px 0;}',
+    '#dayview-root .blk{top:14px;bottom:14px;}',
+    '#dayview-root .idle{top:14px;bottom:14px;}}'
   ].join('\n');
 
   var MARKUP =
@@ -260,12 +267,20 @@
         '</div><div class="lane" style="width:' + laneW + 'px">' + lines + blocks + '</div></div>';
     });
 
+    grid.innerHTML = html;
+
+    // The "now" line has to clear the crew column, whose width changes with
+    // the breakpoint — so measure it rather than assuming a fixed offset.
     var now = new Date(), nowM = now.getHours() * 60 + now.getMinutes();
     if (nowM > DAY_START && nowM < DAY_END) {
-      html += '<div class="now" style="left:' + (124 + 16 + x(nowM)) + 'px"></div>';
+      var head = grid.querySelector('.rowhead');
+      var headW = (head && head.getBoundingClientRect().width) || 124;
+      var padL = parseFloat(getComputedStyle(grid).paddingLeft) || 16;
+      var marker = document.createElement('div');
+      marker.className = 'now';
+      marker.style.left = (headW + padL + x(nowM)) + 'px';
+      grid.appendChild(marker);
     }
-
-    grid.innerHTML = html;
     document.getElementById('dv-crews').textContent = CREWS.length;
     document.getElementById('dv-stops').textContent = stops;
     document.getElementById('dv-booked').textContent = dur(totalBooked);

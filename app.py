@@ -2307,7 +2307,14 @@ def api_map_day(date_str):
     points = []
     seen = set()
 
+    # Only where crews actually go to a property. A To Load tile is
+    # warehouse work the day BEFORE an install, so mapping it put jobs on
+    # days they don't belong to.
+    MAP_TYPES = ('install', 'pickup')
+
     for e in entries:
+        if (e.get('type') or 'install') not in MAP_TYPES:
+            continue
         job = jobs_by_id.get(e.get('job_id'))
         if not job:
             continue
@@ -2367,7 +2374,8 @@ def api_map_day(date_str):
         'warehouse': ({'address': WAREHOUSE_ADDRESS, 'lat': wh[0], 'lng': wh[1]}
                       if wh else None),
         'unmapped': sum(1 for e in entries
-                        if jobs_by_id.get(e.get('job_id'))
+                        if (e.get('type') or 'install') in MAP_TYPES
+                        and jobs_by_id.get(e.get('job_id'))
                         and jobs_by_id[e['job_id']].get('latitude') is None),
         'geocoding_available': bool(os.environ.get('GOOGLE_MAPS_API_KEY')),
         # Surfaced so a blank map can be diagnosed without server log access

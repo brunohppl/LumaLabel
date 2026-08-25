@@ -149,6 +149,7 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
   <div class="hero-tabs">
     <button class="hero-tab active" id="tab-cards" onclick="showTab('cards')">Cards</button>
     <button class="hero-tab" id="tab-day" onclick="showTab('day')">Day view</button>
+    <button class="hero-tab" id="tab-map" onclick="showTab('map')">Map</button>
   </div>
 </div>
 
@@ -179,6 +180,7 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 
   <div class="scroll-hint" id="scroll-hint" style="display:none;">← swipe to see more teams →</div>
   <div id="dayview-root" style="display:none;"></div>
+  <div id="mapview-root" style="display:none;"></div>
 <div id="day-content"><div class="loading">Loading…</div></div>
 </div>
 
@@ -241,12 +243,15 @@ function showTab(which){
   activeTab = which;
   document.getElementById('tab-cards').classList.toggle('active', which==='cards');
   document.getElementById('tab-day').classList.toggle('active', which==='day');
+  document.getElementById('tab-map').classList.toggle('active', which==='map');
   document.getElementById('day-content').style.display   = which==='cards' ? '' : 'none';
   document.getElementById('dayview-root').style.display  = which==='day'   ? '' : 'none';
+  document.getElementById('mapview-root').style.display  = which==='map'   ? '' : 'none';
   // The swipe hint belongs to the card columns; the timeline scrolls its own way.
   const hint=document.getElementById('scroll-hint');
-  if(hint && which==='day') hint.style.display='none';
-  if(which==='day') drawDayView();
+  if(hint && which!=='cards') hint.style.display='none';
+  if(which==='day')      drawDayView();
+  else if(which==='map') drawMapView();
   else renderDay();          // re-evaluates whether the swipe hint applies
 }
 
@@ -260,6 +265,18 @@ function drawDayView(){
   }catch(err){
     root.innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:0.85rem;">'+
       'Could not draw the timeline. The Cards tab is unaffected.</div>';
+  }
+}
+
+// Same guard as the day view: a failure shows inside the map tab only.
+function drawMapView(){
+  const root=document.getElementById('mapview-root');
+  try{
+    if(!window.MapView) throw new Error('Map view is still loading.');
+    window.MapView.render(localDate(viewDate), viewDate);
+  }catch(err){
+    root.innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:0.85rem;">'+
+      'Could not load the map. The Cards tab is unaffected.</div>';
   }
 }
 
@@ -470,5 +487,6 @@ load();
 <!-- Day view: separate file on purpose, so a fault in it cannot break the
      card view that crews use on site. -->
 <script src="/static/dayview.js"></script>
+<script src="/static/mapview.js"></script>
 </body>
 </html>

@@ -8,7 +8,8 @@ const ok=(l,c)=>{ c?(pass++,console.log('✓ '+l)):(fail++,console.log('✗ FAIL
 const DATA={
   teams:[{id:'T1',name:'Nemo',vehicle:'Nemo',function:'transport',lead:'Savio',members:['Savio','Nick']},
          {id:'T2',name:'Marlin',vehicle:'Marlin',function:'styling',lead:'Addy',members:['Addy','Montie']},
-         {id:'T3',name:'Warehouse',vehicle:null,function:'warehouse',lead:'Jo',members:['Jo']}],
+         {id:'T3',name:'Warehouse',vehicle:null,function:'warehouse',lead:'Jo',members:['Jo']},
+         {id:'T4',name:'Bruce',vehicle:'Bruce',lead:'Ayoub',members:['Ayoub']}],
   schedule:[{id:'E1',job_id:'J1',team_id:'T1',type:'to_load',start_time:'07:30',duration:60},
             {id:'E2',job_id:'J2',team_id:'T1',type:'install',start_time:'09:00',duration:90},
             {id:'E3',job_id:'J2',team_id:'T2',type:'styling',start_time:'09:00',duration:180},
@@ -40,8 +41,16 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   await sleep(80);
 
   const root=d.getElementById('dayview-root');
-  ok('timeline renders', root.querySelectorAll('.dv-row').length===3);
-  ok('one row per crew', root.querySelectorAll('.rowhead .crew-name').length===3);
+  ok('timeline renders', root.querySelectorAll('.dv-row').length===4);
+  ok('one row per crew', root.querySelectorAll('.rowhead .crew-name').length===4);
+  // Utilisation bar: trucks only
+  const rows=[...root.querySelectorAll('.dv-row')];
+  const barFor=n=>{ const r=rows.find(x=>x.querySelector('.crew-name').textContent===n);
+                    return r && r.querySelector('.crew-util'); };
+  ok('Nemo (transport) has a utilisation bar', !!barFor('Nemo'));
+  ok('Bruce keeps it without a function set', !!barFor('Bruce'));
+  ok('Marlin (styling) has none', !barFor('Marlin'));
+  ok('Warehouse has none', !barFor('Warehouse'));
   ok('crew members listed', /Savio/.test(root.innerHTML));
 
   const blocks=[...root.querySelectorAll('.blk')];

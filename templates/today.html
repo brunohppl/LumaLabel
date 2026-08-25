@@ -243,7 +243,11 @@ function showTab(which){
   document.getElementById('tab-day').classList.toggle('active', which==='day');
   document.getElementById('day-content').style.display   = which==='cards' ? '' : 'none';
   document.getElementById('dayview-root').style.display  = which==='day'   ? '' : 'none';
+  // The swipe hint belongs to the card columns; the timeline scrolls its own way.
+  const hint=document.getElementById('scroll-hint');
+  if(hint && which==='day') hint.style.display='none';
   if(which==='day') drawDayView();
+  else renderDay();          // re-evaluates whether the swipe hint applies
 }
 
 // The day view is optional. A failure in it shows a message inside its own

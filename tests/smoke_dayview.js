@@ -59,9 +59,12 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   ok('legacy vehicle-only entry still placed', /QU-1330/.test(root.innerHTML));
   ok('tasks appear', /Pick QU-1370/.test(root.innerHTML));
   ok('breaks styled separately', root.querySelectorAll('.blk.brk').length===1);
-  ok('breaks not counted as stops', d.getElementById('dv-stops').textContent==='6');
-  ok('idle time surfaced', root.querySelectorAll('.idle').length>0);
-  ok('idle total shown', /[hm]/.test(d.getElementById('dv-idle').textContent));
+  ok('idle bands still drawn in the lanes', root.querySelectorAll('.idle').length>0);
+  // Summary stats removed until the underlying durations are real
+  ok('no summary stats rendered', root.querySelectorAll('.stat').length===0);
+  ok('no idle counter', !d.getElementById('dv-idle'));
+  ok('no stops counter', !d.getElementById('dv-stops'));
+  ok('the date still shows', !!d.getElementById('dv-date'));
 
   // zoom
   const w1=root.querySelector('.lane').style.width;

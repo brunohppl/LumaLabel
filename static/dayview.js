@@ -27,6 +27,7 @@
   };
 
   var CREWS = [], JOBS = {}, pxPerMin = 0.9, styled = false, built = false;
+  var TRUCKS = ['nemo', 'bruce', 'nigel'];
 
   var CSS = [
     '#dayview-root{padding-bottom:20px;}',
@@ -160,7 +161,9 @@
       return {
         id: t.id,
         name: t.name || t.vehicle || 'Team',
-        people: [t.lead].concat(others).filter(Boolean).join(', ')
+        people: [t.lead].concat(others).filter(Boolean).join(', '),
+        fn: t.function || '',
+        vehicle: t.vehicle || ''
       };
     });
 
@@ -245,11 +248,19 @@
           (em * pxPerMin > 52 ? '<span class="idle-lbl">' + dur(em) + ' idle</span>' : '') + '</div>';
       }
 
+      // Only the trucks carry a utilisation bar — for styling crews and the
+      // warehouse, hours booked against a 07:30-15:30 day says little.
+      var isTruck = crew.fn === 'transport' ||
+        TRUCKS.indexOf((crew.vehicle || crew.name).toLowerCase()) !== -1;
       var pct = Math.round(booked / (DAY_END - DAY_START) * 100);
+      var utilBar = isTruck
+        ? '<div class="crew-util ' + (pct < 55 ? 'low' : '') + '" title="' +
+          dur(booked) + ' booked of an 8h day"><span style="width:' + pct + '%"></span></div>'
+        : '';
       html += '<div class="dv-row"><div class="rowhead">' +
         '<div class="crew-name">' + esc(crew.name) + '</div>' +
         '<div class="crew-people">' + esc(crew.people) + '</div>' +
-        '<div class="crew-util ' + (pct < 55 ? 'low' : '') + '"><span style="width:' + pct + '%"></span></div>' +
+        utilBar +
         '</div><div class="lane" style="width:' + laneW + 'px">' + lines + blocks + '</div></div>';
     });
 

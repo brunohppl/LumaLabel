@@ -10,7 +10,7 @@ const MAPDATA={
   points:[
     {job_id:'J1',ref:'QU-1351',address:'66 Hope St, South Brisbane',type:'install',time:'09:00',crew:'Nemo',lat:-27.48,lng:153.01},
     {job_id:'J2',ref:'QU-1330',address:'5 Kent Rd, Wooloowin',type:'pickup',time:'13:00',crew:'Bruce',lat:-27.42,lng:153.04},
-    {job_id:'J3',ref:'QU-1362',address:'9 Vine St',type:'to_load',time:'07:30',crew:'Nigel',lat:-27.55,lng:152.93}],
+    {job_id:'J3',ref:'QU-1399',address:'9 Vine St',type:'install',time:'07:30',crew:'Nigel',lat:-27.55,lng:152.93}],
   warehouse:{address:'63 Westgate St, Wacol QLD',lat:-27.58,lng:152.93},
   unmapped:1, geocoding_available:true
 };
@@ -53,6 +53,12 @@ w.L={
   ok('warehouse address shown', drawn.markers.some(m=>/63 Westgate St/.test(m.html)));
   ok('installs plotted', drawn.markers.some(m=>/QU-1351/.test(m.html)));
   ok('pickups plotted', drawn.markers.some(m=>/QU-1330/.test(m.html)));
+  // Icons must be readable without tapping
+  const icons=drawn.markers.map(m=>(m.icon&&m.icon.html)||'').join('');
+  ok('crew names labelled on the pins', /Nemo/.test(icons)&&/Bruce/.test(icons));
+  ok('installs marked I', />I</.test(icons));
+  ok('pickups marked P', />P</.test(icons));
+  ok('warehouse uses a house icon, not a job pin', /Warehouse<\/div>/.test(icons));
   ok('popups carry crew and time', drawn.markers.some(m=>/Nemo/.test(m.html)&&/09:00/.test(m.html)));
   ok('the view fits all the points', Array.isArray(drawn.bounds)&&drawn.bounds.length===4);
   ok('unmapped jobs are reported', /without a location/.test(d.getElementById('mv-note').textContent));

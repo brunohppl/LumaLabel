@@ -2236,6 +2236,126 @@ def api_job_status(job_id):
     result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})
 
+WAREHOUSE_ADDRESS = '63 Westgate St, Wacol QLD'
+
+
+def geocode_address(address):
+    """Address -> (lat, lng), or None.
+
+    Uses the same GOOGLE_MAPS_API_KEY as the ETA lookups, but the Geocoding
+    API is a separate product that must be enabled on the project AND
+    allowed on the key. Returns None rather than raising: a map with fewer
+    pins is better than a page that fails to load.
+    """
+    api_key = os.environ.get('GOOGLE_MAPS_API_KEY')
+    if not api_key or not (address or '').strip():
+        return None
+    try:
+        params = urllib.parse.urlencode({
+            'address': address,
+            'region':  'au',          # bias to Australia: "Kent Rd" is ambiguous worldwide
+            'key':     api_key,
+        })
+        url = f'https://maps.googleapis.com/maps/api/geocode/json?{params}'
+        with urllib.request.urlopen(urllib.request.Request(url), timeout=8) as r:
+            result = json.loads(r.read())
+        status = result.get('status')
+        if status != 'OK' or not result.get('results'):
+            print(f'[GEO] {status} for {address!r} — {result.get("error_message", "")}')
+            return None
+        loc = result['results'][0]['geometry']['location']
+        return float(loc['lat']), float(loc['lng'])
+    except Exception as e:
+        print(f'[GEO] failed for {address!r}: {e}')
+        return None
+
+
+# Geocoding runs inside a page load, so cap it: a first open of a busy day
+# geocodes a handful, the rest resolve on the next open. Cached forever after.
+GEOCODE_MAX_PER_REQUEST = 12
+
+_warehouse_cache = {}
+
+
+@app.route('/api/map/<date_str>', methods=['GET'])
+def api_map_day(date_str):
+    """Points for the map tab: the day's jobs plus the warehouse.
+
+    Coordinates are cached on the job row, so Google is only called for
+    addresses never resolved before.
+    """
+    entries = sb_get('job_schedule', f'date=eq.{date_str}') or []
+    job_ids = list({e['job_id'] for e in entries if e.get('job_id')})
+
+    jobs = []
+    if job_ids:
+        jobs = sb_get('jobs', f"id=in.({','.join(job_ids)})") or []
+    jobs_by_id = {j['id']: j for j in jobs}
+
+    teams = sb_get('day_teams', f'date=eq.{date_str}') or []
+    team_by_id = {t['id']: t for t in teams}
+
+    geocoded_now = 0
+    points = []
+    seen = set()
+
+    for e in entries:
+        job = jobs_by_id.get(e.get('job_id'))
+        if not job:
+            continue
+        # one pin per job per type, even if several crews attend
+        key = (job['id'], e.get('type'))
+        if key in seen:
+            continue
+        seen.add(key)
+
+        lat, lng = job.get('latitude'), job.get('longitude')
+        if (lat is None or lng is None) and not job.get('geocode_failed') \
+                and geocoded_now < GEOCODE_MAX_PER_REQUEST:
+            coords = geocode_address(job.get('address'))
+            geocoded_now += 1
+            now = datetime.utcnow().isoformat() + 'Z'
+            if coords:
+                lat, lng = coords
+                sb_patch('jobs', f"id=eq.{job['id']}",
+                         {'latitude': lat, 'longitude': lng, 'geocoded_at': now,
+                          'geocode_failed': False})
+                job['latitude'], job['longitude'] = lat, lng
+            else:
+                sb_patch('jobs', f"id=eq.{job['id']}",
+                         {'geocode_failed': True, 'geocoded_at': now})
+
+        if lat is None or lng is None:
+            continue
+
+        team = team_by_id.get(e.get('team_id')) or {}
+        points.append({
+            'job_id':  job['id'],
+            'ref':     job.get('job_ref') or job.get('job_number') or '—',
+            'address': job.get('address') or '',
+            'type':    e.get('type') or 'install',
+            'time':    e.get('start_time'),
+            'crew':    team.get('name') or team.get('vehicle') or '',
+            'lat':     lat,
+            'lng':     lng,
+        })
+
+    # The warehouse is a fixed point; resolve it once per process.
+    if 'coords' not in _warehouse_cache:
+        _warehouse_cache['coords'] = geocode_address(WAREHOUSE_ADDRESS)
+    wh = _warehouse_cache['coords']
+
+    return jsonify({
+        'points': points,
+        'warehouse': ({'address': WAREHOUSE_ADDRESS, 'lat': wh[0], 'lng': wh[1]}
+                      if wh else None),
+        'unmapped': sum(1 for e in entries
+                        if jobs_by_id.get(e.get('job_id'))
+                        and jobs_by_id[e['job_id']].get('latitude') is None),
+        'geocoding_available': bool(os.environ.get('GOOGLE_MAPS_API_KEY')),
+    })
+
+
 @app.route('/api/stylists', methods=['GET'])
 def api_stylists():
     """The stylist roster, so the jobs page picker and the label screen

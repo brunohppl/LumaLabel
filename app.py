@@ -2236,6 +2236,13 @@ def api_job_status(job_id):
     result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})
 
+@app.route('/api/stylists', methods=['GET'])
+def api_stylists():
+    """The stylist roster, so the jobs page picker and the label screen
+    can't drift apart."""
+    return jsonify({'stylists': RUNSHEET_STYLISTS})
+
+
 @app.route('/api/jobs/<job_id>/notes', methods=['PATCH'])
 def api_job_notes(job_id):
     data    = request.get_json()
@@ -2243,6 +2250,9 @@ def api_job_notes(job_id):
     if 'styling_notes'  in data: payload['styling_notes']  = data['styling_notes']
     if 'driver_notes'   in data: payload['driver_notes']   = data['driver_notes']
     if 'address'        in data: payload['address']        = data['address'] or None
+    # Stylist can be (re)assigned from the jobs page, not just at creation.
+    # Empty string clears it, which is how the badge disappears again.
+    if 'job_owner'      in data: payload['job_owner']      = (data['job_owner'] or '').strip()
     if 'accessory_tubs' in data:
         v = data['accessory_tubs']
         payload['accessory_tubs'] = int(v) if v not in (None, '', 0) else None

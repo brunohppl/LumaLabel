@@ -99,6 +99,35 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .team-col-cards{background:rgba(0,0,0,0.03);border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;padding:10px;flex:1;}
 .scroll-hint{text-align:center;font-size:0.75rem;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:6px;}
 @media(min-width:640px){.scroll-hint{display:none;}}
+
+/* ── Wider screens ──────────────────────────────────────────────
+   Everything below is inside min-width queries on purpose: phones
+   never evaluate these rules, so the mobile layout is untouched.
+   On a phone the crews are a snap-scroller you swipe through; from
+   tablet up there's room to show them side by side, and on a desktop
+   they stop scrolling sideways altogether and wrap as a grid. */
+@media(min-width:640px){
+  .page{max-width:1100px;}
+}
+@media(min-width:1100px){
+  .page{max-width:1400px;}
+  /* No longer a scroller: every crew visible at once. */
+  .team-cols{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    gap:16px;
+    overflow-x:visible;
+    scroll-snap-type:none;
+    margin:0;
+    padding-left:0;
+    padding-right:0;
+  }
+  .team-col{flex:initial;max-width:none;width:auto;}
+}
+@media(min-width:1700px){
+  .page{max-width:1800px;}
+  .team-cols{grid-template-columns:repeat(auto-fill,minmax(320px,1fr));}
+}
 .slack-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.55);z-index:400;align-items:center;justify-content:center;padding:24px;}
 .slack-overlay.open{display:flex;}
 .slack-sheet{background:white;border-radius:10px;padding:24px;max-width:320px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2);}

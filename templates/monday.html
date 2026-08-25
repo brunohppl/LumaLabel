@@ -194,12 +194,16 @@ async function pullIntoLuma(){
     resultBox.style.background='rgba(74,124,89,0.08)';
     resultBox.style.borderColor='var(--green)';
     const dU=data.dates_updated||0, sU=data.statuses_updated||0;
+    // statuses_updated covers two different moves; report them separately
+    // rather than labelling completions as "Ready to Collect".
+    const cU=data.completed_updated||0, rc=Math.max(0, sU-cU);
     const nothing = !dU && !sU && !data.scheduled_matched && !data.scheduled_unmatched;
     let html = nothing
       ? '<strong>Pull complete</strong> — everything was already up to date.'
       : `<strong>Pull complete</strong> — `+
         `${dU} install date${dU!==1?'s':''} updated, `+
-        `${sU} job${sU!==1?'s':''} moved to Ready to Collect, `+
+        `${rc} job${rc!==1?'s':''} moved to Ready to Collect, `+
+        (cU?`${cU} job${cU!==1?'s':''} moved to Completed, `:'')+
         `${data.details_updated||0} propert${(data.details_updated||0)!==1?'ies':'y'} detailed, `+
         `${data.scheduled_matched} matched item${data.scheduled_matched!==1?'s':''} on the runsheet `+
         `(${data.tiles_created||0} tile${(data.tiles_created||0)!==1?'s':''} created, ${data.tiles_updated||0} updated), `+

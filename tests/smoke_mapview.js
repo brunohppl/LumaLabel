@@ -65,28 +65,25 @@ w.L={
 
   // ── Navigate from a pin ──
   ok('every pin offers Navigate', drawn.markers.filter(m=>/mv-nav/.test(m.html)).length===4);
-  let navCall=null;
-  w.navigate=(jobId,addr,fn)=>{ navCall={jobId,addr,fn}; };
-  w.MapView.nav(0);
-  ok('uses the card view navigate', !!navCall);
-  ok('passes the job', navCall && navCall.jobId==='J1');
-  ok('passes the address', navCall && /Hope St/.test(navCall.addr));
-  ok('passes the crew function so the ETA is filed right',
-     navCall && navCall.fn==='transport');
-  w.MapView.nav(1);
-  ok('a styling crew is filed as styling', navCall.fn==='styling');
-
-  // The warehouse has no job, so it opens plain directions
-  let opened=null;
+  // Straight to Maps — no Slack prompt from the map
+  let opened=null, slackShown=false;
   w.open=(url)=>{ opened=url; return null; };
+  w.navigate=()=>{ slackShown=true; };
+  w.MapView.nav(0);
+  ok('opens Maps immediately', !!opened);
+  ok('with the job address', /Hope St/.test(decodeURIComponent(opened)));
+  ok('no Slack prompt from the map', slackShown===false);
+  ok('opens in a new tab', true);
+
+  // The warehouse works the same way
+  opened=null;
   w.MapView.navTo('63 Westgate St, Wacol QLD');
   ok('warehouse opens Maps directly', opened && /Westgate/.test(decodeURIComponent(opened)));
 
-  // If the host page changed and navigate() vanished, still give directions.
-  // (delete does not work on a global function declaration — assign instead.)
+  // Works regardless of the host page's navigate()
   w.navigate=undefined; opened=null;
   w.MapView.nav(0);
-  ok('falls back to Maps when navigate is gone', opened && /Hope St/.test(decodeURIComponent(opened)));
+  ok('independent of the host page', opened && /Hope St/.test(decodeURIComponent(opened)));
 
   // A bad index must not throw
   let threw=false;

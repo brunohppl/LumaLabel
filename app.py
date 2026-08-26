@@ -2360,6 +2360,8 @@ def api_map_day(date_str):
             'type':    e.get('type') or 'install',
             'time':    e.get('start_time'),
             'crew':    team.get('name') or team.get('vehicle') or '',
+            # Navigate files the ETA against the truck or the stylist
+            'crew_function': team.get('function') or '',
             'lat':     lat,
             'lng':     lng,
         })

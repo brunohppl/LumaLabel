@@ -18,6 +18,7 @@
   var TYPE_LBL = { install: 'Install', pickup: 'Pickup' };
 
   var map = null, layer = null, styled = false, loading = false;
+  var points = [];      // kept so popup buttons can refer to a point by index
 
   var CSS = [
     '#mapview-root{padding-bottom:20px;}',
@@ -36,7 +37,11 @@
     '  white-space:nowrap;pointer-events:none;}',
     '#mapview-root .mv-label-wh{font-weight:600;}',
     '#mapview-root .mv-pop-ref{font-weight:600;font-size:0.9rem;}',
-    '#mapview-root .mv-pop-row{font-size:0.78rem;color:#555;margin-top:2px;}'
+    '#mapview-root .mv-pop-row{font-size:0.78rem;color:#555;margin-top:2px;}',
+    '.mv-nav{margin-top:8px;width:100%;padding:7px 10px;background:#b8935a;color:#fff;border:none;',
+    '  border-radius:5px;font-family:Jost,sans-serif;font-size:0.78rem;font-weight:500;',
+    '  letter-spacing:0.04em;cursor:pointer;}',
+    '.mv-nav:hover{filter:brightness(1.07);}'
   ].join('\n');
 
   function ensureStyles() {
@@ -165,19 +170,23 @@
     if (data.warehouse) {
       L.marker([data.warehouse.lat, data.warehouse.lng], { icon: warehouseIcon() })
         .bindPopup('<div class="mv-pop-ref">Warehouse</div>' +
-                   '<div class="mv-pop-row">' + esc(data.warehouse.address) + '</div>')
+                   '<div class="mv-pop-row">' + esc(data.warehouse.address) + '</div>' +
+                   '<button class="mv-nav" onclick="MapView.navTo(' +
+                     JSON.stringify(data.warehouse.address) + ')">📍 Navigate</button>')
         .addTo(layer);
       bounds.push([data.warehouse.lat, data.warehouse.lng]);
     }
 
-    (data.points || []).forEach(function (p) {
+    points = (data.points || []).slice();
+    points.forEach(function (p, i) {
       L.marker([p.lat, p.lng], { icon: jobIcon(p.type, p.crew) })
         .bindPopup(
           '<div class="mv-pop-ref">' + esc(p.ref) + '</div>' +
           '<div class="mv-pop-row">' + esc(p.address) + '</div>' +
           '<div class="mv-pop-row">' + (TYPE_LBL[p.type] || esc(p.type)) +
             (p.time ? ' · ' + esc(p.time) : '') +
-            (p.crew ? ' · ' + esc(p.crew) : '') + '</div>')
+            (p.crew ? ' · ' + esc(p.crew) : '') + '</div>' +
+          '<button class="mv-nav" onclick="MapView.nav(' + i + ')">📍 Navigate</button>')
         .addTo(layer);
       bounds.push([p.lat, p.lng]);
     });
@@ -200,7 +209,30 @@
     }
   }
 
+  /* Directions for a pin. Reuses the card view's navigate() so the Slack
+     ETA prompt and the ETA role both behave identically — but falls back to
+     opening Maps directly if that function isn't there, since this file is
+     meant to work even when the host page changes. */
+  function openDirections(address, jobId, crewFunction) {
+    if (jobId && typeof window.navigate === 'function') {
+      try {
+        window.navigate(jobId, address || '', crewFunction || '');
+        return;
+      } catch (e) { /* fall through to plain directions */ }
+    }
+    window.open('https://www.google.com/maps/search/?api=1&query=' +
+                encodeURIComponent(address || ''), '_blank');
+  }
+
   window.MapView = {
+    nav: function (i) {
+      var p = points[i];
+      if (!p) return;
+      openDirections(p.address, p.job_id, p.crew_function);
+    },
+    navTo: function (address) {
+      openDirections(address, null, null);
+    },
     render: function (dateStr, dateObj) {
       var root = document.getElementById('mapview-root');
       if (!root) return;

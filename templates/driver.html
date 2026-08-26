@@ -28,8 +28,11 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .hdr-addr:hover .hdr-addr-navigate{background:rgba(184,147,90,0.3);}
 .hdr-owner{font-size:0.8rem;color:rgba(250,248,244,0.35);margin-top:1px;}
 .prog-wrap{display:flex;align-items:center;gap:12px;margin-top:10px;}
-.prog-bar{flex:1;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;}
-.prog-fill{height:100%;background:var(--green);border-radius:3px;transition:width 0.4s ease;}
+.prog-bar{flex:1;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;display:flex;}
+.prog-fill{height:100%;background:var(--green);transition:width 0.4s ease;}
+/* Staged in the bay but not yet on the truck — sits alongside the loaded
+   portion so the two stages are readable at a glance. */
+.prog-bay{height:100%;background:var(--accent);opacity:0.85;transition:width 0.4s ease;}
 .prog-txt{font-size:0.82rem;color:rgba(250,248,244,0.55);white-space:nowrap;font-weight:600;}
 
 /* ── TRUCK ── */
@@ -162,7 +165,10 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
   </a>
   <div class="hdr-owner" id="job-owner"></div>
   <div class="prog-wrap">
-    <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+    <div class="prog-bar">
+      <div class="prog-fill" id="prog-fill" style="width:0%"></div>
+      <div class="prog-bay" id="prog-bay" style="width:0%"></div>
+    </div>
     <div class="prog-txt" id="prog-txt">0 / 0</div>
   </div>
 </div>
@@ -816,11 +822,24 @@ function rerenderRoomProgress(){
 }
 
 function updateProgress(){
-  const loadable=items.filter(i=>!i.is_transfer_item);
-  const total=loadable.length,checked=loadable.filter(i=>i.on_truck).length,pct=total?Math.round(checked/total*100):0;
-  document.getElementById('prog-fill').style.width=pct+'%';
-  document.getElementById('prog-txt').textContent=`${checked} / ${total}`;
-  const allDone=total>0&&checked===total;
+  // Match the stylist's count: items marked "not transferring" stay at the
+  // property, so they are not part of what gets loaded. Counting them here
+  // inflated the total against what the stylist sees.
+  const loadable=items.filter(i=>!i.is_transfer_item && !i.not_transferring);
+  const total=loadable.length;
+  const onTruck=loadable.filter(i=>i.on_truck).length;
+  // In the bay but not yet on the truck — the intermediate stage.
+  const inBay=loadable.filter(i=>i.checked && !i.on_truck).length;
+
+  const pctTruck=total?(onTruck/total*100):0;
+  const pctBay  =total?(inBay  /total*100):0;
+  document.getElementById('prog-fill').style.width=pctTruck+'%';
+  document.getElementById('prog-bay').style.width=pctBay+'%';
+
+  document.getElementById('prog-txt').textContent=
+    inBay ? `${onTruck} / ${total} · ${inBay} in bay` : `${onTruck} / ${total}`;
+
+  const allDone=total>0&&onTruck===total;
   document.getElementById('done-banner').classList.toggle('show',allDone&&job.status==='ready_to_load');
 }
 

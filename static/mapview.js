@@ -209,17 +209,10 @@
     }
   }
 
-  /* Directions for a pin. Reuses the card view's navigate() so the Slack
-     ETA prompt and the ETA role both behave identically — but falls back to
-     opening Maps directly if that function isn't there, since this file is
-     meant to work even when the host page changes. */
-  function openDirections(address, jobId, crewFunction) {
-    if (jobId && typeof window.navigate === 'function') {
-      try {
-        window.navigate(jobId, address || '', crewFunction || '');
-        return;
-      } catch (e) { /* fall through to plain directions */ }
-    }
+  /* Straight to Maps — no Slack prompt. The map is for orienting quickly
+     and rescuing a job that's gone wrong; the card view keeps the ETA flow
+     for the planned run. */
+  function openDirections(address) {
     window.open('https://www.google.com/maps/search/?api=1&query=' +
                 encodeURIComponent(address || ''), '_blank');
   }
@@ -228,10 +221,10 @@
     nav: function (i) {
       var p = points[i];
       if (!p) return;
-      openDirections(p.address, p.job_id, p.crew_function);
+      openDirections(p.address);
     },
     navTo: function (address) {
-      openDirections(address, null, null);
+      openDirections(address);
     },
     render: function (dateStr, dateObj) {
       var root = document.getElementById('mapview-root');

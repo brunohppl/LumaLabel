@@ -8,8 +8,8 @@ const ok=(l,c)=>{ c?(pass++,console.log('✓ '+l)):(fail++,console.log('✗ FAIL
 
 const MAPDATA={
   points:[
-    {job_id:'J1',ref:'QU-1351',address:'66 Hope St, South Brisbane',type:'install',time:'09:00',crew:'Nemo',lat:-27.48,lng:153.01},
-    {job_id:'J2',ref:'QU-1330',address:'5 Kent Rd, Wooloowin',type:'pickup',time:'13:00',crew:'Bruce',lat:-27.42,lng:153.04},
+    {job_id:'J1',ref:'QU-1351',address:'66 Hope St, South Brisbane',type:'install',time:'09:00',crew:'Nemo',crew_function:'transport',lat:-27.48,lng:153.01},
+    {job_id:'J2',ref:'QU-1330',address:'5 Kent Rd, Wooloowin',type:'pickup',time:'13:00',crew:'Marlin',crew_function:'styling',lat:-27.42,lng:153.04},
     {job_id:'J3',ref:'QU-1399',address:'9 Vine St',type:'install',time:'07:30',crew:'Nigel',lat:-27.55,lng:152.93}],
   warehouse:{address:'63 Westgate St, Wacol QLD',lat:-27.58,lng:152.93},
   unmapped:1, geocoding_available:true
@@ -55,13 +55,43 @@ w.L={
   ok('pickups plotted', drawn.markers.some(m=>/QU-1330/.test(m.html)));
   // Icons must be readable without tapping
   const icons=drawn.markers.map(m=>(m.icon&&m.icon.html)||'').join('');
-  ok('crew names labelled on the pins', /Nemo/.test(icons)&&/Bruce/.test(icons));
+  ok('crew names labelled on the pins', /Nemo/.test(icons)&&/Marlin/.test(icons));
   ok('installs marked I', />I</.test(icons));
   ok('pickups marked P', />P</.test(icons));
   ok('warehouse uses a house icon, not a job pin', /Warehouse<\/div>/.test(icons));
   ok('popups carry crew and time', drawn.markers.some(m=>/Nemo/.test(m.html)&&/09:00/.test(m.html)));
   ok('the view fits all the points', Array.isArray(drawn.bounds)&&drawn.bounds.length===4);
   ok('unmapped jobs are reported', /without a location/.test(d.getElementById('mv-note').textContent));
+
+  // ── Navigate from a pin ──
+  ok('every pin offers Navigate', drawn.markers.filter(m=>/mv-nav/.test(m.html)).length===4);
+  let navCall=null;
+  w.navigate=(jobId,addr,fn)=>{ navCall={jobId,addr,fn}; };
+  w.MapView.nav(0);
+  ok('uses the card view navigate', !!navCall);
+  ok('passes the job', navCall && navCall.jobId==='J1');
+  ok('passes the address', navCall && /Hope St/.test(navCall.addr));
+  ok('passes the crew function so the ETA is filed right',
+     navCall && navCall.fn==='transport');
+  w.MapView.nav(1);
+  ok('a styling crew is filed as styling', navCall.fn==='styling');
+
+  // The warehouse has no job, so it opens plain directions
+  let opened=null;
+  w.open=(url)=>{ opened=url; return null; };
+  w.MapView.navTo('63 Westgate St, Wacol QLD');
+  ok('warehouse opens Maps directly', opened && /Westgate/.test(decodeURIComponent(opened)));
+
+  // If the host page changed and navigate() vanished, still give directions.
+  // (delete does not work on a global function declaration — assign instead.)
+  w.navigate=undefined; opened=null;
+  w.MapView.nav(0);
+  ok('falls back to Maps when navigate is gone', opened && /Hope St/.test(decodeURIComponent(opened)));
+
+  // A bad index must not throw
+  let threw=false;
+  try{ w.MapView.nav(99); }catch(e){ threw=true; }
+  ok('an unknown pin index is harmless', !threw);
 
   // A day with nothing on it must still show a map, not a blank tab
   drawn.markers.length=0; drawn.bounds=null; drawn.view=null;

@@ -2413,6 +2413,12 @@ def api_job_notes(job_id):
     if 'cushion_bags' in data:
         v = data['cushion_bags']
         payload['cushion_bags'] = int(v) if v not in (None, '', 0) else None
+    # Whether the driver has loaded the packed bags / tubs. These are single
+    # rows on the driver page standing in for many small items.
+    if 'cushion_bags_loaded' in data:
+        payload['cushion_bags_loaded'] = bool(data['cushion_bags_loaded'])
+    if 'accessory_tubs_loaded' in data:
+        payload['accessory_tubs_loaded'] = bool(data['accessory_tubs_loaded'])
     result = sb_patch('jobs', f'id=eq.{job_id}', payload)
     return jsonify({'success': bool(result)})
 

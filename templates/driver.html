@@ -554,9 +554,21 @@ function updateRing(card, green, bay, total, done){
   card.classList.toggle('done', done);
 }
 
+// Items the driver can actually tick off. Small lamps, cushions and
+// accessories are packed into tubs and bags, so they are replaced by the
+// synthetic tub/bag rows and never appear individually — counting them in
+// the progress bar made the total unreachable no matter how much was loaded.
+function tickableItems(){
+  return items.filter(i =>
+    !i.is_extra &&
+    !isSmallLamp(i.description) &&
+    !isCushionItem(i.description) &&
+    !isAccessoryItem(i.description));
+}
+
 function renderRooms(){
   const container=document.getElementById('items-container');
-  const allGrouped=groupItems(items.filter(i=>!i.is_extra && !isSmallLamp(i.description) && !isCushionItem(i.description) && !isAccessoryItem(i.description)));
+  const allGrouped=groupItems(tickableItems());
 
   // "Not Transferring" items sit in their own group at the top, separate
   // from the item-type categories — these are real loadable items (going
@@ -822,10 +834,10 @@ function rerenderRoomProgress(){
 }
 
 function updateProgress(){
-  // Match the stylist's count: items marked "not transferring" stay at the
-  // property, so they are not part of what gets loaded. Counting them here
-  // inflated the total against what the stylist sees.
-  const loadable=items.filter(i=>!i.is_transfer_item && !i.not_transferring);
+  // Exactly the items shown as tickable rows on this page, so the bar can
+  // always reach 100%. Transfer items belong to the receiving end, and
+  // "not transferring" items stay at the property, so neither is loaded.
+  const loadable=tickableItems().filter(i=>!i.is_transfer_item && !i.not_transferring);
   const total=loadable.length;
   const onTruck=loadable.filter(i=>i.on_truck).length;
   // In the bay but not yet on the truck — the intermediate stage.

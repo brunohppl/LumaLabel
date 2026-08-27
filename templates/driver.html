@@ -668,8 +668,9 @@ function renderRooms(){
 
 function cushionBagsRowHTML(n){
   const label=`${n}× Cushion Bag${n===1?'':'s'}`;
-  return `<div class="group-row" id="cushion-bags-row" onclick="this.classList.toggle('checked')">
-    <button class="check-btn" onclick="this.closest('.group-row').classList.toggle('checked');event.stopPropagation()">
+  const on = !!(job && job.cushion_bags_loaded);
+  return `<div class="group-row${on?' checked':''}" id="cushion-bags-row" onclick="togglePacked('cushion')">
+    <button class="check-btn" onclick="togglePacked('cushion');event.stopPropagation()">
       <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
     </button>
     <div class="group-info">
@@ -679,6 +680,30 @@ function cushionBagsRowHTML(n){
   </div>`;
 }
 
+// The packed rows stand in for many small items, so they persist and count
+// like anything else. Previously the tick was cosmetic — lost on refresh.
+async function togglePacked(kind){
+  const field = kind === 'cushion' ? 'cushion_bags_loaded' : 'accessory_tubs_loaded';
+  const next  = !job[field];
+  job[field] = next;                       // optimistic: the row responds at once
+  const row = document.getElementById(kind === 'cushion' ? 'cushion-bags-row' : 'accessory-tubs-row');
+  if(row) row.classList.toggle('checked', next);
+  updateProgress();
+  try{
+    const res = await fetch(`/api/jobs/${job.id}/notes`,{
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({[field]: next})
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok || data.success === false) throw new Error('save failed');
+  }catch(e){
+    job[field] = !next;                    // put it back rather than show a lie
+    if(row) row.classList.toggle('checked', !next);
+    updateProgress();
+    alert('Could not save that — check your connection and try again.');
+  }
+}
+
 function accessoryTubsRowHTML(n){
   const label = n
     ? `${n} Accessory Box${n===1?'':'es'}`
@@ -686,8 +711,9 @@ function accessoryTubsRowHTML(n){
   const sub = n
     ? 'Tap to mark collected'
     : 'Number of boxes not set';
-  return `<div class="group-row" id="accessory-tubs-row" onclick="this.classList.toggle('checked')">
-    <button class="check-btn" onclick="this.closest('.group-row').classList.toggle('checked');event.stopPropagation()">
+  const on = !!(job && job.accessory_tubs_loaded);
+  return `<div class="group-row${n && on?' checked':''}" id="accessory-tubs-row"${n?' onclick="togglePacked(\'tubs\')"':''}>
+    <button class="check-btn"${n?' onclick="togglePacked(\'tubs\');event.stopPropagation()"':''}>
       <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
     </button>
     <div class="group-info">
@@ -838,10 +864,22 @@ function updateProgress(){
   // always reach 100%. Transfer items belong to the receiving end, and
   // "not transferring" items stay at the property, so neither is loaded.
   const loadable=tickableItems().filter(i=>!i.is_transfer_item && !i.not_transferring);
-  const total=loadable.length;
-  const onTruck=loadable.filter(i=>i.on_truck).length;
+  let total=loadable.length;
+  let onTruck=loadable.filter(i=>i.on_truck).length;
   // In the bay but not yet on the truck — the intermediate stage.
   const inBay=loadable.filter(i=>i.checked && !i.on_truck).length;
+
+  // The packed rows count as one item each — but only once the stylist has
+  // said how many there are. An unset count is a question for the stylist,
+  // not a thing the driver can load.
+  if(job && job.cushion_bags){
+    total++;
+    if(job.cushion_bags_loaded) onTruck++;
+  }
+  if(job && job.accessory_tubs){
+    total++;
+    if(job.accessory_tubs_loaded) onTruck++;
+  }
 
   const pctTruck=total?(onTruck/total*100):0;
   const pctBay  =total?(inBay  /total*100):0;
@@ -906,6 +944,9 @@ setInterval(async ()=>{
       newJob.driver_notes!==job.driver_notes ||
       newJob.accessory_tubs!==job.accessory_tubs ||
       newJob.cushion_bags!==job.cushion_bags ||
+      // ...including the packed rows, so a tick made on another device shows here
+      !!newJob.accessory_tubs_loaded!==!!job.accessory_tubs_loaded ||
+      !!newJob.cushion_bags_loaded!==!!job.cushion_bags_loaded ||
       data.items.length!==oldItemCount ||
       data.items.some(ni=>{
         const oi=checkedMap.get(ni.id);

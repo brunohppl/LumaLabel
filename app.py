@@ -2238,11 +2238,14 @@ def api_job_status(job_id):
 
 WAREHOUSE_ADDRESS = '63 Westgate St, Wacol QLD'
 
+# Rough bounding box for Australia incl. Tasmania — lat_min, lat_max, lng_min, lng_max
+AU_BOUNDS = (-44.0, -9.0, 112.0, 154.5)
+
 
 # Only these mean "this address will never resolve". Everything else —
 # REQUEST_DENIED, OVER_QUERY_LIMIT, a timeout — is a problem with the setup
 # or the moment, not the address, and must NOT blacklist the job.
-GEOCODE_PERMANENT_FAILURES = {'ZERO_RESULTS', 'INVALID_REQUEST'}
+GEOCODE_PERMANENT_FAILURES = {'ZERO_RESULTS', 'INVALID_REQUEST', 'OUT_OF_BOUNDS'}
 
 
 def geocode_address(address):
@@ -2259,9 +2262,14 @@ def geocode_address(address):
         return None, 'NO_ADDRESS'
     try:
         params = urllib.parse.urlencode({
-            'address': address,
-            'region':  'au',          # bias to Australia: "Kent Rd" is ambiguous worldwide
-            'key':     api_key,
+            'address':    address,
+            # region= is only a soft bias — Google still returned US matches
+            # for addresses like "5 Kent Rd" with no suburb. components=
+            # is a hard restriction: an address that isn't in Australia comes
+            # back as ZERO_RESULTS instead of the wrong continent.
+            'components': 'country:AU',
+            'region':     'au',
+            'key':        api_key,
         })
         url = f'https://maps.googleapis.com/maps/api/geocode/json?{params}'
         with urllib.request.urlopen(urllib.request.Request(url), timeout=8) as r:
@@ -2271,7 +2279,14 @@ def geocode_address(address):
             print(f'[GEO] {status} for {address!r} — {result.get("error_message", "")}')
             return None, status or 'UNKNOWN'
         loc = result['results'][0]['geometry']['location']
-        return (float(loc['lat']), float(loc['lng'])), 'OK'
+        lat, lng = float(loc['lat']), float(loc['lng'])
+        # Second line of defence: never cache a point outside Australia, even
+        # if the API returns one. A pin in the wrong hemisphere is worse than
+        # no pin, because it silently rescales the whole map.
+        if not (AU_BOUNDS[0] <= lat <= AU_BOUNDS[1] and AU_BOUNDS[2] <= lng <= AU_BOUNDS[3]):
+            print(f'[GEO] rejected out-of-bounds result for {address!r}: {lat},{lng}')
+            return None, 'OUT_OF_BOUNDS'
+        return (lat, lng), 'OK'
     except Exception as e:
         print(f'[GEO] failed for {address!r}: {e}')
         return None, 'EXCEPTION'

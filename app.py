@@ -432,11 +432,12 @@ def get_truck_eta(lat, lng, destination_address):
 # Workers split by role — both lists are combined for the full
 # worker dropdown; keeping them separate lets the UI group them.
 TRANSPORT_VEHICLES = ['Bruce', 'Nigel', 'Nemo']
-STYLING_VEHICLES   = ['Marlin', 'VUG']
+STYLING_VEHICLES   = ['Marlin', 'VUG', 'Deb', 'Flo']
 OTHER_VEHICLES     = ['Own Car']  # team editor also offers this — must validate cleanly
 RUNSHEET_VEHICLES  = TRANSPORT_VEHICLES + STYLING_VEHICLES + OTHER_VEHICLES
 
-RUNSHEET_STYLISTS = ['Addy', 'Montie', 'Delphine', 'India', 'Hayley', 'Lyndall']
+RUNSHEET_STYLISTS = ['Addy', 'Montie', 'Delphine', 'India', 'Hayley', 'Lyndall',
+                     'Gill', 'Carolina']
 RUNSHEET_DRIVERS  = ['Jo', 'Savio', 'Nick', 'Ayoub', 'Bruno', 'Phil', 'Thiago', 'Max']
 RUNSHEET_WORKERS  = RUNSHEET_STYLISTS + RUNSHEET_DRIVERS
 

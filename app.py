@@ -3739,6 +3739,7 @@ def _get_monday_board_data_inner():
             'type':     col_title_by_id.get(type_col_id),
             'size':     col_title_by_id.get(size_col_id),
             'style':    col_title_by_id.get(style_col_id),
+            'photos':   col_title_by_id.get(photos_col_id),
             'install_date': col_title_by_id.get(install_date_id),
             'end_date': col_title_by_id.get(end_date_id),
             'status':   col_title_by_id.get(status_col_id),

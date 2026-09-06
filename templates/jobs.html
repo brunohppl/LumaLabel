@@ -807,9 +807,17 @@ async function saveInstallDate(jobId, newDate){
 }
 
 async function downloadLabels(jobId, jobRef){
-  if(!confirm(`Download labels PDF for job ${jobRef}?`)) return;
+  // Both label stocks are in use, so a reprint has to say which sheet —
+  // otherwise it silently uses the server default and wastes a sheet.
+  let fmt = '18';
+  try{
+    const saved = localStorage.getItem('luma_label_format');
+    if(saved === '16' || saved === '18') fmt = saved;
+  }catch(e){}
+  const sheet = fmt === '16' ? '16 per page (105 × 37mm)' : '18 per page (Avery 62 × 42mm)';
+  if(!confirm(`Download labels for job ${jobRef}?\n\nSheet: ${sheet}\n\n(Change this on the Labels page.)`)) return;
   const a=document.createElement('a');
-  a.href=`/api/jobs/${jobId}/labels-pdf`;
+  a.href=`/api/jobs/${jobId}/labels-pdf?format=${fmt}`;
   a.download='';
   document.body.appendChild(a);
   a.click();

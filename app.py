@@ -1838,15 +1838,28 @@ def generate_job_summary(job, items, room_notes=None, photos_by_item=None):
     return buffer.getvalue()
 
 
+# Templates are static files read on every page load. Reading them once
+# per process removes a disk hit from each request; a deploy restarts the
+# process, so there is nothing to invalidate.
+_TEMPLATE_CACHE = {}
+
+
+def render_page(name):
+    html = _TEMPLATE_CACHE.get(name)
+    if html is None:
+        with open(f'templates/{name}', 'r') as f:
+            html = f.read()
+        _TEMPLATE_CACHE[name] = html
+    return html
+
+
 @app.route('/', methods=['GET'])
 def home():
-    with open('templates/home.html', 'r') as f:
-        return f.read()
+    return render_page('home.html')
 
 @app.route('/labels', methods=['GET'])
 def index():
-    with open('templates/index.html', 'r') as f:
-        return f.read()
+    return render_page('index.html')
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -1981,38 +1994,31 @@ def generate():
 
 @app.route('/jobs', methods=['GET'])
 def jobs_page():
-    with open('templates/jobs.html', 'r') as f:
-        return f.read()
+    return render_page('jobs.html')
 
 @app.route('/catalogue', methods=['GET'])
 def catalogue_page():
-    with open('templates/catalogue.html', 'r') as f:
-        return f.read()
+    return render_page('catalogue.html')
 
 @app.route('/today', methods=['GET'])
 def today_page():
-    with open('templates/today.html', 'r') as f:
-        return f.read()
+    return render_page('today.html')
 
 @app.route('/runsheet', methods=['GET'])
 def runsheet_page():
-    with open('templates/today.html', 'r') as f:
-        return f.read()
+    return render_page('today.html')
 
 @app.route('/scheduler', methods=['GET'])
 def scheduler_page():
-    with open('templates/runsheet.html', 'r') as f:
-        return f.read()
+    return render_page('runsheet.html')
 
 @app.route('/damages', methods=['GET'])
 def damages_page():
-    with open('templates/damages.html', 'r') as f:
-        return f.read()
+    return render_page('damages.html')
 
 @app.route('/damages/guide', methods=['GET'])
 def damages_guide():
-    with open('templates/damages_guide.html', 'r') as f:
-        return f.read()
+    return render_page('damages_guide.html')
 
 @app.route('/api/damages', methods=['GET'])
 def api_damages_list():
@@ -2077,13 +2083,11 @@ def api_damages_delete(report_id):
 
 @app.route('/stylist/<job_id>', methods=['GET'])
 def stylist_page(job_id):
-    with open('templates/stylist.html', 'r') as f:
-        return f.read()
+    return render_page('stylist.html')
 
 @app.route('/driver/<job_id>', methods=['GET'])
 def driver_page(job_id):
-    with open('templates/driver.html', 'r') as f:
-        return f.read()
+    return render_page('driver.html')
 
 @app.route('/api/jobs', methods=['GET'])
 def api_jobs():

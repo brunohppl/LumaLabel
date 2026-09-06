@@ -33,6 +33,10 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .tile-sub{font-size:0.7rem;color:var(--muted);text-align:center;line-height:1.3;}
 
 /* ── UPDATES ── */
+.hero-version{font-size:0.68rem;letter-spacing:0.12em;color:rgba(250,248,244,0.45);margin-top:6px;}
+.update-ver{display:inline-block;margin-right:8px;padding:1px 7px;border-radius:3px;
+  background:rgba(184,147,90,0.16);color:var(--accent);font-size:0.68rem;font-weight:700;
+  letter-spacing:0.06em;vertical-align:1px;}
 .updates-card{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:14px;}
 .updates-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--sand);}
 .updates-title{font-size:0.78rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink);}
@@ -60,6 +64,7 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 <div class="hero">
   <div class="hero-logo">LUMA <em>Design</em> Co</div>
   <div class="hero-sub">Brisbane Property Styling</div>
+  <div class="hero-version" id="hero-version"></div>
   <div class="hero-date" id="hero-date"></div>
 </div>
 
@@ -100,6 +105,69 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
       <div class="update-item">
         <div class="update-dot green"></div>
         <div>
+          <div class="update-text"><span class="update-ver">2.0</span>Team view has three tabs: Cards, Day view (a zoomable timeline of the whole day) and Map (installs, pickups and the warehouse, with Navigate on each pin).</div>
+          <div class="update-date">Aug 2026</div>
+        </div>
+      </div>
+      <div class="update-item">
+        <div class="update-dot blue"></div>
+        <div>
+          <div class="update-text"><span class="update-ver">2.0</span>Photography deadline pulled from Monday and shown on the job tiles, the scheduler and the team view.</div>
+          <div class="update-date">Aug 2026</div>
+        </div>
+      </div>
+      <div class="update-item">
+        <div class="update-dot"></div>
+        <div>
+          <div class="update-text"><span class="update-ver">2.0</span>Label sheet is now selectable — 18 per page (Avery 62 × 42mm) or 16 per page (105 × 37mm). Your choice is remembered, including for reprints.</div>
+          <div class="update-date">Aug 2026</div>
+        </div>
+      </div>
+      <div class="update-item">
+        <div class="update-dot green"></div>
+        <div>
+          <div class="update-text"><span class="update-ver">1.9</span>Jobs without a date go On Hold instead of getting an invented one, and labels print DATE TBC. Remove a date from the calendar icon to put a job on hold.</div>
+          <div class="update-date">Aug 2026</div>
+        </div>
+      </div>
+      <div class="update-item">
+        <div class="update-dot blue"></div>
+        <div>
+          <div class="update-text"><span class="update-ver">1.9</span>Assign or change a job's stylist straight from the job panel.</div>
+          <div class="update-date">Aug 2026</div>
+        </div>
+      </div>
+      <div class="update-item">
+        <div class="update-dot"></div>
+        <div>
+          <div class="update-text"><span class="update-ver">1.8</span>Stylists can download a job summary PDF — the packing slip layout plus every note and item photos.</div>
+          <div class="update-date">Aug 2026</div>
+        </div>
+      </div>
+      <div class="update-item">
+        <div class="update-dot green"></div>
+        <div>
+          <div class="update-text"><span class="update-ver">1.8</span>Cushion bags and accessory tubs count as items on the driver's loading bar, and the bar shows bay staging separately from truck loading.</div>
+          <div class="update-date">Aug 2026</div>
+        </div>
+      </div>
+      <div class="update-item">
+        <div class="update-dot blue"></div>
+        <div>
+          <div class="update-text"><span class="update-ver">1.7</span>Monday pull keeps property details in step, moves finished jobs to Completed, and holds jobs whose date is cleared.</div>
+          <div class="update-date">Aug 2026</div>
+        </div>
+      </div>
+      <div class="update-item">
+        <div class="update-dot"></div>
+        <div>
+          <div class="update-text"><span class="update-ver">1.7</span>Deliveries lines can be corrected in place, including the Programma status.</div>
+          <div class="update-date">Aug 2026</div>
+        </div>
+      </div>
+      <div class="update-item">
+        <div class="update-dot green"></div>
+        <div>
           <div class="update-text">Damage reports section added — log and track furniture damage with photos.</div>
           <div class="update-date">Jul 2026</div>
         </div>
@@ -107,25 +175,10 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
       <div class="update-item">
         <div class="update-dot blue"></div>
         <div>
-          <div class="update-text">Bay location dropdowns added to stylist interface — assign warehouse aisle and bay to each item.</div>
+          <div class="update-text">Runsheet has its own page with the full grid, crew management and tasks.</div>
           <div class="update-date">Jul 2026</div>
         </div>
       </div>
-      <div class="update-item">
-        <div class="update-dot"></div>
-        <div>
-          <div class="update-text">Runsheet now has its own dedicated page with full grid, crew management, and task creation.</div>
-          <div class="update-date">Jul 2026</div>
-        </div>
-      </div>
-      <div class="update-item">
-        <div class="update-dot green"></div>
-        <div>
-          <div class="update-text">Furniture catalogue auto-populates from job photos. Browse by type and room.</div>
-          <div class="update-date">Jul 2026</div>
-        </div>
-      </div>
-    </div>
   </div>
 
   <div class="section-label" style="margin-top:36px;">Today at a Glance</div>
@@ -178,6 +231,18 @@ async function loadStats(){
 }
 
 loadStats();
+
+// The version comes from the server, so the badge always matches what is
+// actually deployed rather than a number someone forgot to edit here.
+(function(){
+  fetch('/api/version')
+    .then(r=>r.json())
+    .then(d=>{
+      const el=document.getElementById('hero-version');
+      if(el && d && d.version) el.textContent='v'+d.version;
+    })
+    .catch(()=>{});
+})();
 </script>
 </body>
 </html>

@@ -65,6 +65,8 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
   font-size:0.82rem;color:#5C4318;
 }
 .card-transfer strong{text-transform:uppercase;letter-spacing:0.04em;font-size:0.72rem;}
+.card-photo{margin-top:6px;padding:4px 10px;border-radius:6px;display:inline-block;
+  background:rgba(184,147,90,0.16);color:var(--accent);font-size:0.8rem;font-weight:600;}
 .card-prop{font-size:0.78rem;color:var(--muted);font-style:italic;margin-bottom:8px;opacity:0.9;}
 .card-access{
   margin-top:8px;padding:8px 10px;border-radius:8px;
@@ -455,6 +457,8 @@ function cardHTML(e, jobById, showTeam){
       <div class="card-type">${typeLabel}${dur}</div>
       <div class="card-ref">${ref}</div>
       ${street?`<div class="card-addr">${street}</div>`:''}
+      ${(_pj && _pj.photo_time && !(e.kind==='break'||e.title==='Lunch break'))
+          ? `<div class="card-photo">📷 Photos ${_pj.photo_time}</div>` : ''}
       ${propTag?`<div class="card-prop">${propTag}</div>`:''}
       ${(e.type==='install')?loadedLine(_pj):''}
       ${transferLine(_pj, jobById)}

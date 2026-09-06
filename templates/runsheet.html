@@ -114,6 +114,8 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .rs-tile-label{font-size:0.6rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;opacity:0.75;color:rgba(255,255,255,0.8);}
 .rs-tile-ref{font-size:0.78rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:white;}
 .rs-tile-addr{font-size:0.78rem;color:rgba(255,255,255,0.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rs-photo{display:inline-block;margin-left:6px;padding:0 5px;border-radius:2px;
+  background:rgba(255,255,255,0.22);font-weight:700;font-size:0.66rem;white-space:nowrap;}
 .rs-tile-prop{font-size:0.68rem;color:rgba(255,255,255,0.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:italic;}
 .rs-tile-note{font-size:0.65rem;color:rgba(255,255,255,0.7);font-style:italic;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rs-tile-gear{position:absolute;bottom:2px;right:3px;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.4);font-size:0.68rem;padding:2px;}
@@ -581,6 +583,9 @@ function render(){
       const addr=(!isTask&&job)?job.address?.split(',')[0]||'':'';
       const taskJobRef=(isTask&&job)?(job.job_ref||('#'+String(job.job_number||'').slice(-3))):'';
       const propTag=(!isTask&&job&&(job.property_type||job.property_size||job.property_style))?[job.property_type,job.property_size,job.property_style].filter(Boolean).join(' — '):'';
+      // The photography deadline is the hard stop the day works back from,
+      // so it sits with the reference rather than buried in the detail line.
+      const photoTag=(!isTask&&job&&job.photo_time)?`<span class="rs-photo" title="Photography deadline">📷 ${job.photo_time}</span>`:'';
       const lbl=isBreak?'🍽 Break':(isTask?(taskJobRef?`Task · ${taskJobRef}`:'Task'):{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'');
       const accessTag=(!isTask&&job&&job.access_notes)?`<span class="rs-access" title="${String(job.access_notes).replace(/"/g,'&quot;')}">🔑</span>`:'';
       // A transfer comes from another job rather than the warehouse, so the
@@ -598,7 +603,7 @@ function render(){
       tile.style.cssText=`top:0;left:calc(${left}% + 2px);width:calc(${width}% - 4px);height:${span*SLOT_H-4}px;cursor:pointer;position:absolute;`;
       if(totalSubCols>1) tile.classList.add('clash');
       const share=shareIdx[e.id];
-      tile.innerHTML=`${totalSubCols>1?'<span class="rs-clash-flag" title="Overlaps another job on this team">⚠</span>':''}<div class="rs-tile-label">${lbl}<span class="rs-tile-dur" style="float:right;opacity:0.8;">${fmtDuration(e.duration)}</span></div><div class="rs-tile-ref">${ref}${loadTag}${transferTag}${accessTag}${share?`<span class="rs-share">${share.n} of ${share.of} crews</span>`:''}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''}${propTag?`<div class="rs-tile-prop">${propTag}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
+      tile.innerHTML=`${totalSubCols>1?'<span class="rs-clash-flag" title="Overlaps another job on this team">⚠</span>':''}<div class="rs-tile-label">${lbl}<span class="rs-tile-dur" style="float:right;opacity:0.8;">${fmtDuration(e.duration)}</span></div><div class="rs-tile-ref">${ref}${photoTag}${loadTag}${transferTag}${accessTag}${share?`<span class="rs-share">${share.n} of ${share.of} crews</span>`:''}</div>${addr?`<div class="rs-tile-addr">${addr}</div>`:''}${propTag?`<div class="rs-tile-prop">${propTag}</div>`:''} ${e.notes?`<div class="rs-tile-note">📝 ${e.notes}</div>`:''}`;
       tile.onclick=(ev)=>{ev.stopPropagation();if(_suppressClick)return;openEntryPop(e.id,team.id,null);};
 
       // Drag to move between teams / times
@@ -1056,6 +1061,7 @@ function renderTray(){
     const ref=job?(job.job_ref||job.job_number):null;
     const addr=job?.address||e.monday_address||'';
     const propTag=job&&(job.property_type||job.property_size||job.property_style)?[job.property_type,job.property_size,job.property_style].filter(Boolean).join(' — '):'';
+    const photoTag=job&&job.photo_time?`<div style="font-size:0.7rem;font-weight:600;color:var(--accent);">📷 ${job.photo_time}</div>`:'';
     const typeCls=e.type||'install';
     const orphanFlag=(e.start_time && !resolvesToTeam(e))?' <span title="Had a time but no matching team — please reassign">⚠️</span>':'';
     const trayTransfer=job?transferBadge(job):'';
@@ -1078,6 +1084,7 @@ function renderTray(){
       <div class="rs-tray-tile-ref">${ref?'#'+ref:'No job number'}</div>
       ${addr?`<div class="rs-tray-tile-addr">${addr}</div>`:''}
       ${trayLoad}${trayTransfer}
+      ${photoTag}
       ${propTag?`<div style="font-size:0.68rem;opacity:0.85;font-style:italic;">${propTag}</div>`:''}
       ${noJobHint}
     </div>`;

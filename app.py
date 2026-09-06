@@ -1855,6 +1855,13 @@ def _settled(future):
         return []
 
 
+# ── App version ──────────────────────────────────────────────────────
+# MAJOR bumps when a new interface or capability lands (a new page, a new
+# tab, a new way of working). MINOR bumps for features and fixes within
+# that. Single source of truth — the home page reads it from /api/version
+# so it can't drift from what's deployed.
+APP_VERSION = '2.0'
+
 _TEMPLATE_CACHE = {}
 
 
@@ -2422,6 +2429,11 @@ def api_map_day(date_str):
         # Surfaced so a blank map can be diagnosed without server log access
         'geocode_error': last_error,
     })
+
+
+@app.route('/api/version', methods=['GET'])
+def api_version():
+    return jsonify({'version': APP_VERSION})
 
 
 @app.route('/api/stylists', methods=['GET'])

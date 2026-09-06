@@ -15,6 +15,8 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .hero{background:var(--ink);padding:40px 28px 36px;text-align:center;}
 .hero-logo{font-family:'Cormorant Garamond',serif;font-size:2.8rem;font-weight:300;letter-spacing:0.16em;color:#faf8f4;}
 .hero-logo em{font-style:italic;color:var(--accent);}
+.logo-mark{height:74px;width:auto;display:block;margin:0 auto;}
+@media(max-width:480px){.logo-mark{height:58px;}}
 .hero-sub{font-size:0.78rem;letter-spacing:0.22em;text-transform:uppercase;color:rgba(250,248,244,0.4);margin-top:6px;}
 .hero-date{font-size:0.8rem;color:rgba(250,248,244,0.35);margin-top:10px;letter-spacing:0.06em;}
 
@@ -62,7 +64,7 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 <body>
 
 <div class="hero">
-  <div class="hero-logo">LUMA <em>Design</em> Co</div>
+  <img class="logo-mark" src="/static/luma-mark-light.png" alt="LUMA Design Co"/>
   <div class="hero-sub">Brisbane Property Styling</div>
   <div class="hero-version" id="hero-version"></div>
   <div class="hero-date" id="hero-date"></div>

@@ -48,7 +48,9 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .truck-label{font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap;font-weight:600;}
 .truck-input{flex:1;background:var(--warm);border:1px solid var(--border);border-radius:1px;padding:10px 13px;font-family:'Jost',sans-serif;font-size:1rem;color:var(--ink);outline:none;-webkit-appearance:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239A8F80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:16px;padding-right:36px;}
 .truck-input:focus{border-color:var(--accent);}
-.truck-save{padding:10px 16px;background:var(--accent);color:white;border:none;border-radius:1px;font-family:'Jost',sans-serif;font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;}
+.truck-saved{font-size:0.72rem;letter-spacing:0.06em;color:var(--muted);min-width:60px;}
+.truck-saved.ok{color:var(--green);font-weight:600;}
+.truck-saved.err{color:var(--red);font-weight:600;}
 
 /* ── ACTION BAR ── */
 .action-bar{background:white;border-bottom:2px solid var(--border);padding:14px 20px;}
@@ -187,13 +189,13 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 
 <div class="truck-section">
   <div class="truck-label">Truck</div>
-  <select class="truck-input" id="truck-input">
+  <select class="truck-input" id="truck-input" onchange="saveTruck()">
     <option value="" disabled selected>Select truck…</option>
     <option value="Nigel">Nigel</option>
     <option value="Bruce">Bruce</option>
     <option value="Nemo">Nemo</option>
   </select>
-  <button class="truck-save" onclick="saveTruck()">Save</button>
+  <span class="truck-saved" id="truck-saved"></span>
 </div>
 
 <div class="action-bar" id="action-bar"></div>
@@ -901,11 +903,35 @@ async function setStatus(newStatus){
   if(truck)job.truck=truck;renderStatusBar();
 }
 
+// Saves the moment a truck is chosen — one tap instead of two, which
+// matters when this is done standing at the roller door.
 async function saveTruck(){
-  const truck=document.getElementById('truck-input').value.trim();if(!truck)return;
-  await fetch(`/api/jobs/${job.id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:job.status,truck})});
-  job.truck=truck;const btn=document.querySelector('.truck-save');
-  btn.textContent='Saved ✓';setTimeout(()=>btn.textContent='Save',1500);
+  const sel=document.getElementById('truck-input');
+  const truck=sel.value.trim();
+  if(!truck) return;
+  const note=document.getElementById('truck-saved');
+  const previous=job.truck||'';
+  if(truck===previous) return;              // nothing changed, don't write
+
+  sel.disabled=true;
+  if(note){ note.textContent='Saving…'; note.className='truck-saved'; }
+  try{
+    const res=await fetch(`/api/jobs/${job.id}/status`,{
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({status:job.status,truck})
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    job.truck=truck;
+    if(note){ note.textContent='Saved ✓'; note.className='truck-saved ok'; }
+    setTimeout(()=>{ if(note && note.textContent==='Saved ✓') note.textContent=''; },2000);
+  }catch(e){
+    // Put the picker back to what is actually stored, so the screen never
+    // shows a truck that was not saved.
+    sel.value=previous;
+    if(note){ note.textContent='Not saved — tap again'; note.className='truck-saved err'; }
+  }finally{
+    sel.disabled=false;
+  }
 }
 
 async function finishLoading(){

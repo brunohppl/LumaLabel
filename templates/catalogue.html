@@ -16,6 +16,8 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 
 /* ── NAV ── */
 nav{background:var(--ink);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:100;}
+.logo-mark{height:38px;width:auto;display:block;}
+@media(max-width:480px){.logo-mark{height:30px;}}
 .nav-logo{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--warm);letter-spacing:0.08em;white-space:nowrap;}
 .nav-logo em{color:var(--accent);font-style:italic;}
 .nav-links{display:flex;gap:16px;flex-wrap:wrap;}
@@ -98,7 +100,7 @@ nav{background:var(--ink);padding:12px 20px;display:flex;align-items:center;just
 <body>
 
 <nav>
-  <div class="nav-logo">LUMA <em>Design</em> Co</div>
+  <img class="logo-mark" src="/static/luma-mark-light.png" alt="LUMA Design Co"/>
   <div class="nav-links">
     <a href="/">Home</a>
     <a href="/labels">Labels</a>

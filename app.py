@@ -1,4 +1,5 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
 import re
 import base64
 import tempfile
@@ -1841,6 +1842,19 @@ def generate_job_summary(job, items, room_notes=None, photos_by_item=None):
 # Templates are static files read on every page load. Reading them once
 # per process removes a disk hit from each request; a deploy restarts the
 # process, so there is nothing to invalidate.
+def _settled(future):
+    """Result of a parallel sb_get, or [] if the thread raised.
+
+    sb_get catches its own errors, but a thread that dies for any other
+    reason must not take the whole page down — the sequential version
+    degraded to an empty list, and so does this."""
+    try:
+        return future.result() or []
+    except Exception as e:
+        print(f'[PARALLEL] a day query failed: {e}')
+        return []
+
+
 _TEMPLATE_CACHE = {}
 
 
@@ -2665,34 +2679,47 @@ def api_job_runsheet(job_id):
 
 @app.route('/api/runsheet/<date_str>', methods=['GET'])
 def api_runsheet_day(date_str):
-    """Full day data — teams, schedule entries, jobs (all referenced), tasks."""
-    teams    = sb_get('day_teams',    f'date=eq.{date_str}&order=sort_order.asc,created_at.asc') or []
-    schedule = sb_get('job_schedule', f'date=eq.{date_str}&order=start_time.asc,created_at.asc') or []
-    tasks    = sb_get('runsheet_tasks', f'date=eq.{date_str}&order=start_time.asc') or []
+    """Full day data — teams, schedule entries, jobs (all referenced), tasks.
+
+    A day is only ~30 rows, so the time here is almost entirely latency:
+    each Supabase call is a separate HTTPS round trip. The three that don't
+    depend on each other run together, which removes two waits from the
+    chain. sb_get already swallows its own errors and returns [], so a
+    failure behaves exactly as it did when these ran one by one.
+    """
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        f_teams    = pool.submit(sb_get, 'day_teams',
+                                 f'date=eq.{date_str}&order=sort_order.asc,created_at.asc')
+        f_schedule = pool.submit(sb_get, 'job_schedule',
+                                 f'date=eq.{date_str}&order=start_time.asc,created_at.asc')
+        f_tasks    = pool.submit(sb_get, 'runsheet_tasks',
+                                 f'date=eq.{date_str}&order=start_time.asc')
+        teams    = _settled(f_teams)
+        schedule = _settled(f_schedule)
+        tasks    = _settled(f_tasks)
 
     # Collect ALL job_ids referenced by schedule entries — regardless of their install date
     job_ids = list({e['job_id'] for e in schedule if e.get('job_id')})
-    jobs = []
+
+    # jobs and loads both need job_ids, but not each other.
+    jobs, loads = [], []
     if job_ids:
         ids_str = ','.join(job_ids)
-        jobs = sb_get('jobs', f'id=in.({ids_str})') or []
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            f_jobs  = pool.submit(sb_get, 'jobs', f'id=in.({ids_str})')
+            f_loads = pool.submit(sb_get, 'job_schedule',
+                                  f'job_id=in.({ids_str})&type=eq.to_load'
+                                  '&vehicle=not.is.null')
+            jobs  = _settled(f_jobs)
+            loads = _settled(f_loads)
 
     # Transfers only store the link on the receiving job, so the other half of
     # the pair usually isn't on this day. Fetch both directions, otherwise the
     # runsheet can only say "a transfer" without saying from or to where.
+    # Needs the jobs above, so it stays sequential.
+    # (Loads are fetched alongside jobs — the install tile has to say which
+    # truck is already carrying the stock, and that load happened yesterday.)
     jobs = _attach_transfer_partners(jobs, job_ids)
-
-    # Where each job was loaded. The load happens the day before, so it isn't
-    # in this day's schedule — without it the install tile can't say which
-    # truck is already carrying the stock.
-    loads = []
-    if job_ids:
-        try:
-            loads = sb_get('job_schedule',
-                           f"job_id=in.({','.join(job_ids)})&type=eq.to_load"
-                           "&vehicle=not.is.null") or []
-        except Exception:
-            loads = []
 
     return jsonify({
         'teams':    teams,

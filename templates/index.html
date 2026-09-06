@@ -573,6 +573,15 @@
     </div>
 
     <div class="date-field">
+      <label>Label Sheet</label>
+      <select class="date-input" id="label-format" style="max-width:320px;">
+        <option value="18">18 per page — Avery 62 × 42mm</option>
+        <option value="16">16 per page — 105 × 37mm</option>
+      </select>
+      <span class="date-hint">Match the sheet in the printer. Your last choice is remembered.</span>
+    </div>
+
+    <div class="date-field">
       <label>Job Owner</label>
       <input type="text" class="date-input" id="job-owner" placeholder="e.g. Sarah" style="max-width:260px;" />
       <span class="date-hint">Optional</span>
@@ -871,7 +880,7 @@ generateBtn.addEventListener('click', async () => {
         installDate: installDate || null,
         jobOwner:    document.getElementById('job-owner').value.trim() || '',
         installAddress: installAddress || '',
-        labelFormat: 16,   // 105 x 37 mm, 16 per page — the current label stock
+        labelFormat: labelFormat(),
         colourName:  selectedColour,
         isTransfer:        isTransferJob,
         transferFromJobId: isTransferJob && selectedTransferJob ? selectedTransferJob.id : null
@@ -964,6 +973,28 @@ function readFileAsBase64(file) {
     reader.readAsDataURL(file);
   });
 }
+
+// ── Label sheet choice ──────────────────────────────────────────────
+// Both stocks are in use, so the format is per-print. Remembering the
+// last choice means the next person gets whatever was actually loaded
+// in the printer, instead of a default nobody thought about.
+function labelFormat(){
+  const el = document.getElementById('label-format');
+  const n  = parseInt(el && el.value, 10);
+  return (n === 16 || n === 18) ? n : 18;
+}
+
+(function(){
+  const el = document.getElementById('label-format');
+  if(!el) return;
+  try{
+    const saved = localStorage.getItem('luma_label_format');
+    if(saved === '16' || saved === '18') el.value = saved;
+  }catch(e){ /* private browsing — the default stands */ }
+  el.addEventListener('change', ()=>{
+    try{ localStorage.setItem('luma_label_format', el.value); }catch(e){}
+  });
+})();
 </script>
 </body>
 </html>

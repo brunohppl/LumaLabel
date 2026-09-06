@@ -15,6 +15,8 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
 .logo{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;letter-spacing:0.1em;color:#faf8f4;white-space:nowrap;}
 .logo em{font-style:italic;color:var(--accent);}
+.logo-mark{height:38px;width:auto;display:block;}
+@media(max-width:480px){.logo-mark{height:30px;}}
 .nav-links{display:flex;gap:16px;flex-wrap:wrap;}
 .nav-link{color:rgba(250,248,244,0.45);text-decoration:none;font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;transition:color 0.2s;white-space:nowrap;}
 .nav-link:hover,.nav-link.active{color:var(--accent);}
@@ -57,6 +59,12 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .damage-table td{padding:12px 14px;border-bottom:1px solid var(--sand);font-size:0.88rem;vertical-align:middle;}
 .damage-table tr:last-child td{border-bottom:none;}
 .damage-table tr:hover td{background:var(--sand);}
+.status-select{
+  font-size:0.75rem;font-weight:600;padding:4px 8px;border-radius:20px;
+  border:1px solid transparent;cursor:pointer;font-family:inherit;
+  appearance:none;-webkit-appearance:none;text-align:center;
+}
+.status-select:disabled{opacity:0.6;cursor:progress;}
 .damage-thumb{width:48px;height:48px;object-fit:cover;border-radius:2px;border:1px solid var(--border);cursor:pointer;margin-right:4px;}
 .damage-thumb:hover{border-color:var(--accent);}
 .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:600;letter-spacing:0.04em;}
@@ -122,7 +130,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 <body>
 
 <header>
-  <div class="logo">LUMA <em>Design</em> Co</div>
+  <img class="logo-mark" src="/static/luma-mark-light.png" alt="LUMA Design Co"/>
   <div class="nav-links">
     <a href="/" class="nav-link">Home</a>
     <a href="/labels" class="nav-link">Labels</a>
@@ -317,6 +325,17 @@ const LABELS = {
   furniture:  {sofa:'Sofa',table:'Table',chair:'Chair',rug:'Rug',storage_unit:'Storage unit',bedhead:'Bedhead',accessories:'Accessories'},
   property_element: {wall:'Wall',floor:'Floor',stairway:'Stairway',door:'Door',doorframe:'Door frame',ceiling:'Ceiling',skirting:'Skirting board',other:'Other'},
   damage_origin: {existing:'Pre-existing',caused:'Caused by us',unsure:'Not sure'},
+  repair_status: {to_schedule:'To be scheduled',scheduled:'Scheduled to fix',fixed:'Fixed',discard:'To be discarded'},
+};
+
+// Order matters: this is the order they appear in the dropdown, which follows
+// the workflow rather than the alphabet.
+const REPAIR_STATUSES = ['to_schedule','scheduled','fixed','discard'];
+const STATUS_STYLE = {
+  to_schedule:{bg:'var(--warm)',            fg:'var(--muted)'},
+  scheduled:  {bg:'rgba(33,131,217,0.14)',  fg:'#1565C0'},
+  fixed:      {bg:'rgba(74,124,89,0.14)',   fg:'var(--green)'},
+  discard:    {bg:'rgba(232,92,71,0.14)',   fg:'var(--red)'},
 };
 
 let reports = [];
@@ -375,6 +394,7 @@ function reportGroupHTML(title, list, isProperty){
         <th>Damage</th>
         <th>Item / Element</th>
         ${isProperty ? '<th>Origin</th>' : ''}
+        <th>Status</th>
         <th>Photo</th>
         <th></th>
       </tr></thead>
@@ -390,6 +410,7 @@ function reportGroupHTML(title, list, isProperty){
           ${isProperty ? `<td>${r.damage_origin
             ? `<span class="tag" style="background:${r.damage_origin==='caused'?'rgba(232,92,71,0.12)':r.damage_origin==='existing'?'rgba(74,124,89,0.12)':'var(--warm)'};color:${r.damage_origin==='caused'?'var(--red)':r.damage_origin==='existing'?'var(--green)':'var(--muted)'};">${LABELS.damage_origin[r.damage_origin]||r.damage_origin}</span>`
             : '<span style="color:var(--border);font-size:0.8rem;">—</span>'}</td>` : ''}
+          <td>${statusCell(r)}</td>
           <td>${(() => {
             if(!r.photo_url) return '<span style="color:var(--border);font-size:0.8rem;">—</span>';
             let urls;
@@ -405,6 +426,41 @@ function reportGroupHTML(title, list, isProperty){
       </tbody>
     </table>
   </div>`;
+}
+
+function statusCell(r){
+  const cur = r.repair_status || 'to_schedule';
+  const st  = STATUS_STYLE[cur] || STATUS_STYLE.to_schedule;
+  return `<select class="status-select" style="background:${st.bg};color:${st.fg};"
+            onchange="setRepairStatus('${r.id}', this.value, this)">
+    ${REPAIR_STATUSES.map(s=>`<option value="${s}"${s===cur?' selected':''}>${LABELS.repair_status[s]}</option>`).join('')}
+  </select>`;
+}
+
+// Change status straight from the table — no dialog, no page reload. Reverts
+// visibly if the save fails, so a status can't silently be wrong.
+async function setRepairStatus(id, status, sel){
+  const rep = reports.find(x=>x.id===id);
+  const prev = rep ? (rep.repair_status||'to_schedule') : null;
+  if(rep) rep.repair_status = status;
+  const st = STATUS_STYLE[status] || STATUS_STYLE.to_schedule;
+  sel.style.background = st.bg; sel.style.color = st.fg;
+  sel.disabled = true;
+  try{
+    const res = await fetch(`/api/damages/${id}`,{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({repair_status:status})});
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok || data.success===false) throw new Error(data.error||`HTTP ${res.status}`);
+  }catch(err){
+    if(rep) rep.repair_status = prev;
+    sel.value = prev;
+    const ps = STATUS_STYLE[prev] || STATUS_STYLE.to_schedule;
+    sel.style.background = ps.bg; sel.style.color = ps.fg;
+    alert('Could not update the status: '+err.message);
+  }finally{
+    sel.disabled = false;
+  }
 }
 
 function formatDate(iso){

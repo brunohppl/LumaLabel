@@ -13,6 +13,8 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
 .logo{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;letter-spacing:0.1em;color:#faf8f4;white-space:nowrap;}
 .logo em{font-style:italic;color:var(--accent);}
+.logo-mark{height:38px;width:auto;display:block;}
+@media(max-width:480px){.logo-mark{height:30px;}}
 .nav-links{display:flex;gap:16px;flex-wrap:wrap;}
 .nav-link{color:rgba(250,248,244,0.45);text-decoration:none;font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;transition:color 0.2s;white-space:nowrap;}
 .nav-link:hover,.nav-link.active{color:var(--accent);}
@@ -172,7 +174,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 </head>
 <body>
 <header>
-  <div class="logo">LUMA <em>Design</em> Co</div>
+  <img class="logo-mark" src="/static/luma-mark-light.png" alt="LUMA Design Co"/>
   <div class="nav-links">
     <a href="/" class="nav-link">Home</a>
     <a href="/labels" class="nav-link">Labels</a>

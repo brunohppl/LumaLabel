@@ -12,7 +12,7 @@ const DATA={teams:[{id:'T1',name:'Nemo Crew',vehicle:'Nemo',function:'transport'
   tasks:[{id:'K1',team_id:'T1',title:'Lunch break',kind:'break',start_time:'12:00',duration:30}],
   // J400 was loaded onto Nemo the day before
   loads:[{id:'L1',job_id:'J400',type:'to_load',date:'2026-08-19',vehicle:'Nemo'}],
-  jobs:[{id:'J402',job_ref:'#402',address:'4 Oxford St'},
+  jobs:[{id:'J402',job_ref:'#402',address:'4 Oxford St',photo_time:'11:00 AM'},
         {id:'J400',job_ref:'#400',address:'12 Somers St, Ascot',access_notes:'Gate 4823',
          property_type:'Apartment',property_size:'3 bed',is_transfer:true,transfer_from_job_id:'J401'},
         {id:'J401',job_ref:'#401',address:'9 Hale St'}]};
@@ -91,6 +91,7 @@ setTimeout(async()=>{
   // Prefetch: the request must start before the page script runs, and must
   // only be used for the date it was fetched for.
   const dayCalls=w.__gets.filter(u=>u.includes('/api/runsheet/'));
+  ok('photo deadline shown on the card', /📷 Photos 11:00 AM/.test(d.body.innerHTML));
   ok('the day request is made', dayCalls.length>=1);
   ok('it fires once, not twice (prefetch reused)', dayCalls.length===1);
   ok('prefetch slot is cleared after use', w.__prefetch===null);

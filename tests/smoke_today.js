@@ -18,8 +18,9 @@ const DATA={teams:[{id:'T1',name:'Nemo Crew',vehicle:'Nemo',function:'transport'
         {id:'J401',job_ref:'#401',address:'9 Hale St'}]};
 let errs=[];
 const dom=new JSDOM(html,{runScripts:'dangerously',url:'http://localhost/today',beforeParse(w){
-  w.__posts=[];
+  w.__posts=[]; w.__gets=[];
   w.fetch=async(url,opts={})=>{
+    if((opts.method||'GET')==='GET') w.__gets.push(String(url));
     if((opts.method||'GET')!=='GET'){ w.__posts.push({url,body:JSON.parse(opts.body||'{}')}); return {ok:true,status:200,text:async()=>'',json:async()=>({success:true})}; }
     return {ok:true,status:200,json:async()=>DATA};
   };
@@ -87,6 +88,12 @@ setTimeout(async()=>{
      !w.__posts.some(p=>p.url.includes('/actual')));
 
   // ── Day view tab: present, not default, and isolated ──
+  // Prefetch: the request must start before the page script runs, and must
+  // only be used for the date it was fetched for.
+  const dayCalls=w.__gets.filter(u=>u.includes('/api/runsheet/'));
+  ok('the day request is made', dayCalls.length>=1);
+  ok('it fires once, not twice (prefetch reused)', dayCalls.length===1);
+  ok('prefetch slot is cleared after use', w.__prefetch===null);
   ok('all three tabs exist', !!d.getElementById('tab-cards') && !!d.getElementById('tab-day') && !!d.getElementById('tab-map'));
   ok('Cards is the default tab', d.getElementById('tab-cards').classList.contains('active'));
   ok('cards are visible on load', d.getElementById('day-content').style.display!=='none');

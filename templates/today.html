@@ -139,6 +139,20 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .slack-btn-no{background:white;color:var(--ink);border:1px solid var(--border);}
 .slack-btn-cancel{background:none;color:var(--muted);font-size:0.82rem;}
 </style>
+<script>
+// Start fetching today's data immediately, while the rest of the page is
+// still downloading and parsing. The request and the parse then overlap
+// instead of running one after the other. Nothing here touches the DOM.
+(function(){
+  try{
+    var d = new Date();
+    var ds = d.getFullYear() + '-' +
+             String(d.getMonth()+1).padStart(2,'0') + '-' +
+             String(d.getDate()).padStart(2,'0');
+    window.__prefetch = { date: ds, promise: fetch('/api/runsheet/' + ds) };
+  }catch(e){ /* the normal load path still works without this */ }
+})();
+</script>
 </head>
 <body>
 
@@ -230,7 +244,14 @@ async function load(){
   document.getElementById('hero-date').textContent=fmtDate(viewDate);
   document.getElementById('day-content').innerHTML='<div class="loading">Loading…</div>';
   try{
-    const res=await fetch(`/api/runsheet/${ds}`);
+    // The head-start request only covers today; any other date fetches now.
+    let res;
+    if(window.__prefetch && window.__prefetch.date===ds){
+      res = await window.__prefetch.promise;
+      window.__prefetch = null;        // one use only — never serve it stale
+    }else{
+      res = await fetch(`/api/runsheet/${ds}`);
+    }
     dayData=await res.json();
     renderDay();
     if(activeTab==='day') drawDayView();

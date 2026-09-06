@@ -3599,6 +3599,11 @@ def _get_monday_board_data_inner():
     type_col_id     = find_col('type')
     size_col_id     = find_col('size', 'sqm', 'sq m', 'm2')
     style_col_id    = find_col('style', 'styling', 'package', 'look', exclude=['stylist'])
+    # The photography deadline. 'photo' alone is enough, but exclude the
+    # photographer's NAME column if the board has one — that's a person,
+    # not a time.
+    photos_col_id   = find_col('photos', 'photo', 'photography',
+                               exclude=['photographer'])
     install_date_id = find_col('install date', 'install')
     end_date_id     = find_col('end date', 'de-install', 'deinstall', 'pickup date', 'finish')
     date_cols = [c['id'] for c in columns if c['type'] == 'date']
@@ -3683,6 +3688,7 @@ def _get_monday_board_data_inner():
         type_val    = col_text(type_col_id)
         size_val    = col_text(size_col_id)
         style_val   = col_text(style_col_id) if style_col_id else ''
+        photos_val  = col_text(photos_col_id) if photos_col_id else ''
         install_dt  = col_text(install_date_id)
         end_dt      = col_text(end_date_id)
         status_val  = col_text(status_col_id)
@@ -3700,6 +3706,7 @@ def _get_monday_board_data_inner():
             'install_type':      type_val,
             'install_size':      size_val,
             'install_style':     style_val,
+            'photo_time':        photos_val,
             'install_date':      install_dt,
             'end_date':          end_dt,
             'status':            status_val,
@@ -3926,7 +3933,8 @@ def _api_monday_pull_inner():
                 #     blank column never wipes something entered by hand.
                 for field, value in (('property_type',  item.get('install_type')),
                                      ('property_size',  item.get('install_size')),
-                                     ('property_style', item.get('install_style'))):
+                                     ('property_style', item.get('install_style')),
+                                     ('photo_time',     item.get('photo_time'))):
                     val = (value or '').strip()
                     if val and luma_job.get(field) != val:
                         patch[field] = val
@@ -4015,7 +4023,8 @@ def _api_monday_pull_inner():
             patch = {}
             for field, value in (('property_type',  item.get('install_type')),
                                  ('property_size',  item.get('install_size')),
-                                 ('property_style', item.get('install_style'))):
+                                 ('property_style', item.get('install_style')),
+                                 ('photo_time',     item.get('photo_time'))):
                 val = (value or '').strip()
                 if val and luma_job.get(field) != val:
                     patch[field] = val

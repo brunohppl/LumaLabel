@@ -8,7 +8,9 @@ const DATA={teams:[{id:'T1',name:'Nemo Crew',vehicle:'Nemo',function:'transport'
             {id:'E2',job_id:'J400',team_id:'T4',type:'install',start_time:'07:30',duration:180},
             {id:'E3',job_id:'J401',team_id:'T1',type:'pickup',start_time:'10:00',duration:60},
             {id:'E4',job_id:'J402',team_id:'T4',type:'install',start_time:'13:00',duration:90},
-            {id:'E5',job_id:'J402',team_id:'T1',type:'install',start_time:'14:00',duration:60}],
+            {id:'E5',job_id:'J402',team_id:'T1',type:'install',start_time:'14:00',duration:60},
+            {id:'E6',job_id:'J400',team_id:'T1',type:'bay',start_time:'07:30',duration:60},
+            {id:'E7',job_id:'J401',team_id:'T4',type:'selection',start_time:'10:00',duration:90}],
   tasks:[{id:'K9',team_id:'T1',title:'Stage bay — QU-1351',job_id:'J402',start_time:'08:00',duration:60,notes:'Bay B3'},{id:'K1',team_id:'T1',title:'Lunch break',kind:'break',start_time:'12:00',duration:30}],
   // J400 was loaded onto Nemo the day before
   loads:[{id:'L1',job_id:'J400',type:'to_load',date:'2026-08-19',vehicle:'Nemo'}],
@@ -95,10 +97,22 @@ setTimeout(async()=>{
   // Bay staging task: names its job and links to the loading list
   ok('staging task card shown', /Stage bay/.test(d.body.innerHTML));
   ok('names the job it belongs to', /card-job-link/.test(d.body.innerHTML));
-  const dl=[...d.querySelectorAll('a.card-btn-driver')].find(a=>/loading list/i.test(a.textContent));
-  ok('links to the driver loading list', !!dl && dl.getAttribute('href')==='/driver/J402');
+  const dl=[...d.querySelectorAll('a.card-btn-driver')].find(a=>/Open loading list/i.test(a.textContent) && a.getAttribute('href')==='/driver/J402');
+  ok('links to the driver loading list', !!dl);
   ok('no Navigate on a warehouse task',
      !/Stage bay[\s\S]{0,400}Navigate/.test(d.body.innerHTML));
+  // Load Bay and Selection are warehouse visits on a job
+  const html2=d.body.innerHTML;
+  ok('Load Bay labelled', /Load Bay/.test(html2));
+  ok('Selection labelled', /Selection/.test(html2));
+  const bayLink=[...d.querySelectorAll('a.card-btn-driver')].find(a=>a.getAttribute('href')==='/driver/J400' && /^\s*🚛 Loading list/.test(a.textContent));
+  ok('Load Bay links to the loading list', !!bayLink);
+  const selLink=[...d.querySelectorAll('a.card-btn-stylist')].find(a=>a.getAttribute('href')==='/stylist/J401');
+  ok('Selection links to the stylist page', !!selLink);
+  ok('no Navigate on a Load Bay card',
+     !/Load Bay[\s\S]{0,500}📍 Navigate/.test(html2));
+  ok('no Navigate on a Selection card',
+     !/Selection[\s\S]{0,500}📍 Navigate/.test(html2));
   ok('card shows street and suburb', /12 Somers St, Ascot/.test(d.body.innerHTML));
   ok('the day request is made', dayCalls.length>=1);
   ok('it fires once, not twice (prefetch reused)', dayCalls.length===1);

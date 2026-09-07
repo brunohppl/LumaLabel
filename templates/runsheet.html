@@ -767,7 +767,7 @@ function renderWeek(d){
     const job=isTask?null:jobById[e.job_id];
     const ref=isTask?(e.title||'Task'):(job?(job.job_ref||job.job_number):(e.monday_address||'—'));
     const t=isTask?'task':(e.type||'install');
-    const time=e.start_time?fmtSlot(e.start_time)+' ':'';
+    let time =e.start_time?fmtSlot(e.start_time)+' ':'';
     const cls=(!isTask && !e.start_time)?'unplaced':t;
     return `<span class="wk-chip ${cls}" onclick="jumpToDay('${e.date}')" title="${time}${ref}">${time}${ref}</span>`;
   };
@@ -1408,6 +1408,8 @@ function setSaveStatus(state, text){
   }
 }
 
+let _lastStaleReload = 0;
+
 async function apiFetch(url, opts){
   let res, data;
   try{
@@ -1424,11 +1426,21 @@ async function apiFetch(url, opts){
   }
   if(!res.ok || (data && data.success===false)){
     const msg = (data && data.error) ? data.error : `Save failed (HTTP ${res.status}).`;
-    // A stale tile isn't a failure worth interrupting for — the row is gone,
-    // so just refresh the day and let the user carry on.
+    // A stale tile means the row is gone from the database — usually removed
+    // on another device. Refresh once so the page matches reality, but never
+    // in a tight loop: repeated failed saves used to reload the whole day
+    // each time, which looked like the page flickering for no reason.
     if(data && data.stale){
-      setSaveStatus('error','Out of date — refreshing');
-      load();
+      const now=Date.now();
+      if(now - _lastStaleReload > 5000){
+        _lastStaleReload = now;
+        setSaveStatus('error','Out of date — refreshing');
+        closeEntryPop();
+        load();
+      }else{
+        setSaveStatus('error','That tile no longer exists');
+        alert('That tile has been removed — it may have been changed on another device. The page has been refreshed.');
+      }
       return {ok:false, data};
     }
     setSaveStatus('error', msg);
@@ -1754,7 +1766,7 @@ async function cloneEntryToTeam(){
 async function saveEntry(){
   const eid=document.getElementById('entry-id').value;
   const tid=document.getElementById('entry-team-id').value;
-  const time=document.getElementById('entry-time').value||null;
+  let time=document.getElementById('entry-time').value||null;
   const dur=parseInt(document.getElementById('entry-dur').value)||null;
   const notes=document.getElementById('entry-notes').value.trim()||null;
   const team=dayTeams.find(t=>t.id===tid);
@@ -1766,7 +1778,21 @@ async function saveEntry(){
 
   // A time without any team would vanish from both the grid and the tray —
   // require a team the moment a time is set.
-  if(time && !tid && !crewsTicked){alert('Please select a team before setting a time.');return;}
+  //
+  // Except when editing a tray tile that HAD no time: opening it pre-fills
+  // the default start, so editing only the type or the notes hit this and
+  // was rejected outright. There was no way to change a tray tile's type at
+  // all — you had to delete it and start again. Keep it in the tray instead.
+  const _editing = eid ? (daySchedule.find(x=>x.id===eid) || null) : null;
+  const _wasUnplaced = !!_editing && !_editing.team_id && !_editing.start_time;
+  if(time && !tid && !crewsTicked){
+    if(_wasUnplaced){
+      time = null;         // stays unscheduled; the edit itself still saves
+    }else{
+      alert('Please select a team before setting a time.');
+      return;
+    }
+  }
 
   setSaveStatus('saving');
 

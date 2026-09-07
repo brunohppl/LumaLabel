@@ -9,7 +9,7 @@ const DATA={teams:[{id:'T1',name:'Nemo Crew',vehicle:'Nemo',function:'transport'
             {id:'E3',job_id:'J401',team_id:'T1',type:'pickup',start_time:'10:00',duration:60},
             {id:'E4',job_id:'J402',team_id:'T4',type:'install',start_time:'13:00',duration:90},
             {id:'E5',job_id:'J402',team_id:'T1',type:'install',start_time:'14:00',duration:60}],
-  tasks:[{id:'K1',team_id:'T1',title:'Lunch break',kind:'break',start_time:'12:00',duration:30}],
+  tasks:[{id:'K9',team_id:'T1',title:'Stage bay — QU-1351',job_id:'J402',start_time:'08:00',duration:60,notes:'Bay B3'},{id:'K1',team_id:'T1',title:'Lunch break',kind:'break',start_time:'12:00',duration:30}],
   // J400 was loaded onto Nemo the day before
   loads:[{id:'L1',job_id:'J400',type:'to_load',date:'2026-08-19',vehicle:'Nemo'}],
   jobs:[{id:'J402',job_ref:'#402',address:'4 Oxford St',photo_time:'11:00 AM'},
@@ -92,6 +92,13 @@ setTimeout(async()=>{
   // only be used for the date it was fetched for.
   const dayCalls=w.__gets.filter(u=>u.includes('/api/runsheet/'));
   ok('photo deadline shown on the card', /📷 Photos 11:00 AM/.test(d.body.innerHTML));
+  // Bay staging task: names its job and links to the loading list
+  ok('staging task card shown', /Stage bay/.test(d.body.innerHTML));
+  ok('names the job it belongs to', /card-job-link/.test(d.body.innerHTML));
+  const dl=[...d.querySelectorAll('a.card-btn-driver')].find(a=>/loading list/i.test(a.textContent));
+  ok('links to the driver loading list', !!dl && dl.getAttribute('href')==='/driver/J402');
+  ok('no Navigate on a warehouse task',
+     !/Stage bay[\s\S]{0,400}Navigate/.test(d.body.innerHTML));
   ok('the day request is made', dayCalls.length>=1);
   ok('it fires once, not twice (prefetch reused)', dayCalls.length===1);
   ok('prefetch slot is cleared after use', w.__prefetch===null);

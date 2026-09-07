@@ -99,6 +99,7 @@ setTimeout(async()=>{
   ok('links to the driver loading list', !!dl && dl.getAttribute('href')==='/driver/J402');
   ok('no Navigate on a warehouse task',
      !/Stage bay[\s\S]{0,400}Navigate/.test(d.body.innerHTML));
+  ok('card shows street and suburb', /12 Somers St, Ascot/.test(d.body.innerHTML));
   ok('the day request is made', dayCalls.length>=1);
   ok('it fires once, not twice (prefetch reused)', dayCalls.length===1);
   ok('prefetch slot is cleared after use', w.__prefetch===null);

@@ -410,6 +410,19 @@ function loadedLine(job){
 // A transfer is only useful if you can tell WHICH job it is — reference
 // plus street name, e.g. "QU-1351 · 66 Hope St". Falls back gracefully when
 // either half is missing.
+// Street AND suburb — several Brisbane suburbs share street names, and
+// crews were having to check elsewhere. State and postcode stay off: they
+// add width without telling anyone anything.
+function streetSuburb(addr){
+  const parts=String(addr||'').split(',').map(s=>s.trim()).filter(Boolean);
+  if(!parts.length) return '';
+  const suburb=(parts[1]||'')
+    .replace(/\s+(NSW|VIC|QLD|SA|WA|TAS|NT|ACT)\b/i,'')   // drop the state
+    .replace(/\s*\b\d{4}\b\s*$/,'')                      // and the postcode
+    .trim();
+  return suburb ? `${parts[0]}, ${suburb}` : parts[0];
+}
+
 function transferPartnerLabel(j){
   if(!j) return '';
   const ref=j.job_ref||(j.job_number?('#'+String(j.job_number).slice(-3)):'');
@@ -445,7 +458,7 @@ function cardHTML(e, jobById, showTeam){
   const job=isTask?null:jobById[e.job_id];
   const ref=isTask?(e.title||'Task'):(job?job.job_ref||job.job_number:'—');
   const addr=job?job.address||'':'';
-  const street=addr.split(',')[0];
+  const street=streetSuburb(addr);
   const{h,ampm}=fmtTime(e.start_time);
   const dur=e.duration?` · ${fmtDuration(e.duration)}`:'';
   const typeLabel=TYPE_LBL[typeKey]||typeKey;

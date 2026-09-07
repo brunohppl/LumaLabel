@@ -16,7 +16,8 @@
   // values the backend writes: install / pickup / to_load / styling.
   var TYPE_LBL = {
     install: 'Install', pickup: 'Pickup', to_load: 'To Load',
-    styling: 'Styling', task: 'Task', brk: 'Break'
+    styling: 'Styling', task: 'Task', brk: 'Break',
+    bay: 'Load Bay', selection: 'Selection'
   };
   // Same colours as the card view's left border, so a type reads the same
   // way in both tabs.
@@ -64,6 +65,8 @@
     '#dayview-root .blk.pickup{background:var(--blue,#2e5a8a);}',
     '#dayview-root .blk.to_load{background:var(--accent,#b8935a);}',
     '#dayview-root .blk.styling{background:var(--purple,#6a3d8a);}',
+    '#dayview-root .blk.bay{background:var(--accent,#b8935a);}',
+    '#dayview-root .blk.selection{background:var(--purple,#6a3d8a);}',
     '#dayview-root .blk.task{background:var(--purple,#6a3d8a);}',
     '#dayview-root .blk-type{font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;opacity:0.9;}',
     '#dayview-root .blk.brk{background:repeating-linear-gradient(45deg,#8C8375,#8C8375 5px,#7E7568 5px,#7E7568 10px);}',

@@ -48,6 +48,8 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .card.to_load{border-left-color:var(--accent);}
 .card.task{border-left-color:var(--muted);}
 .card.styling{border-left-color:var(--purple);}
+.card.bay{border-left-color:var(--accent);}
+.card.selection{border-left-color:var(--purple);}
 .card-time{text-align:center;min-width:48px;flex-shrink:0;}
 .card-time-h{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;line-height:1;color:var(--ink);}
 .card-time-ampm{font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-top:2px;}
@@ -228,7 +230,7 @@ function fmtSlot(t){if(!t)return'';const[h,m]=t.split(':').map(Number);return`${
 
 const FN_COL={transport:'#2e5a8a',styling:'#6a3d8a',warehouse:'#b8935a'};
 const FN_LBL={transport:'🚛 Transport',styling:'🎨 Styling',warehouse:'🏭 Warehouse'};
-const TYPE_LBL={install:'Install',pickup:'Pickup',to_load:'To Load',task:'Task',styling:'Styling'};
+const TYPE_LBL={install:'Install',pickup:'Pickup',to_load:'To Load',task:'Task',styling:'Styling',bay:'Load Bay',selection:'Selection'};
 
 let viewDate=new Date();
 let dayData={teams:[],schedule:[],tasks:[],jobs:[]};
@@ -491,10 +493,12 @@ function cardHTML(e, jobById, showTeam){
       </div>`
           : ''}
       ${job?`<div class="card-btns">
-        <button class="card-btn card-btn-nav" onclick="navigate('${job.id}','${addr.replace(/'/g,"\\'")}','${e._team?.function||''}')">📍 Navigate</button>
+        ${(e.type==='bay'||e.type==='selection')?'':`<button class="card-btn card-btn-nav" onclick="navigate('${job.id}','${addr.replace(/'/g,"\\'")}','${e._team?.function||''}')">📍 Navigate</button>`}
 
-        ${e._team?.function==='styling'?`<a href="/stylist/${job.id}" target="_blank" class="card-btn card-btn-stylist">✎ Stylist</a>`:''}
-        ${e._team?.function!=='styling'?`<a href="/driver/${job.id}" target="_blank" class="card-btn card-btn-driver">🚛 Driver</a>`:''}
+        ${(e.type==='selection'||(e.type!=='bay'&&e._team?.function==='styling'))
+            ? `<a href="/stylist/${job.id}" target="_blank" class="card-btn card-btn-stylist">✎ Stylist</a>`:''}
+        ${(e.type==='bay'||(e.type!=='selection'&&e._team?.function!=='styling'))
+            ? `<a href="/driver/${job.id}" target="_blank" class="card-btn card-btn-driver">🚛 ${e.type==='bay'?'Loading list':'Driver'}</a>`:''}
       </div>`:''}
     </div>
   </div>`;

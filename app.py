@@ -2711,8 +2711,12 @@ def api_runsheet_day(date_str):
         schedule = _settled(f_schedule)
         tasks    = _settled(f_tasks)
 
-    # Collect ALL job_ids referenced by schedule entries — regardless of their install date
-    job_ids = list({e['job_id'] for e in schedule if e.get('job_id')})
+    # Collect ALL job_ids referenced by schedule entries — regardless of their
+    # install date — plus any job a TASK points at. A bay-staging task links
+    # to a job whose install is another day, so without the tasks here the
+    # card couldn't name the job it belongs to.
+    job_ids = list({e['job_id'] for e in schedule if e.get('job_id')} |
+                   {t['job_id'] for t in tasks if t.get('job_id')})
 
     # jobs and loads both need job_ids, but not each other.
     jobs, loads = [], []
@@ -2734,12 +2738,33 @@ def api_runsheet_day(date_str):
     # truck is already carrying the stock, and that load happened yesterday.)
     jobs = _attach_transfer_partners(jobs, job_ids)
 
+    # Jobs scheduled within a few days either side, for the task job picker.
+    # Bay staging is created the day BEFORE a load, when the job has no tile
+    # on the day being viewed — without these it couldn't be selected.
+    nearby = []
+    try:
+        from datetime import datetime as _dt, timedelta as _td
+        d = _dt.strptime(date_str, '%Y-%m-%d')
+        lo = (d - _td(days=3)).strftime('%Y-%m-%d')
+        hi = (d + _td(days=3)).strftime('%Y-%m-%d')
+        rows = sb_get('job_schedule',
+                      f'date=gte.{lo}&date=lte.{hi}&select=job_id') or []
+        near_ids = {r['job_id'] for r in rows if r.get('job_id')} - set(job_ids)
+        if near_ids:
+            nearby = sb_get('jobs',
+                            f"id=in.({','.join(near_ids)})"
+                            "&select=id,job_ref,job_number,address") or []
+    except Exception as e:
+        print(f'[RUNSHEET] nearby jobs lookup failed: {e}')
+        nearby = []
+
     return jsonify({
         'teams':    teams,
         'schedule': schedule,
         'tasks':    tasks,
         'jobs':     jobs,
         'loads':    loads,
+        'jobs_nearby': nearby,
     })
 
 

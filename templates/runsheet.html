@@ -132,6 +132,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .pop.open{display:block;}
 .pop-title{font-family:'Cormorant Garamond',serif;font-size:1.35rem;font-weight:600;margin-bottom:14px;}
 .fl{font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block;margin-top:12px;}
+.task-preset{margin-top:6px;padding:6px 12px;background:transparent;border:1px solid var(--border);
+  border-radius:3px;font-family:'Jost',sans-serif;font-size:0.7rem;letter-spacing:0.06em;
+  color:var(--muted);cursor:pointer;}
+.task-preset:hover{border-color:var(--accent);color:var(--accent);}
 .fi{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:4px;font-family:'Jost',sans-serif;font-size:0.86rem;background:white;color:var(--ink);outline:none;}
 .fi:focus{border-color:var(--accent);}
 .chip-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
@@ -312,7 +316,9 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     <label class="fl">Description</label>
     <input type="text" class="fi" id="task-title" placeholder="e.g. Stage sofa at bay B3, pick up linen…"/>
     <label class="fl" style="margin-top:10px;">For job <span style="font-weight:400;text-transform:none;">(optional)</span></label>
-    <select class="fi" id="task-job"></select>
+    <select class="fi" id="task-job" onchange="maybePresetStaging()"></select>
+    <button type="button" class="task-preset" onclick="presetBayStaging()"
+            title="Fill this in as a bay staging task">📦 Bay staging</button>
     <div style="font-size:0.7rem;color:var(--muted);margin-top:4px;">
       Links this task to a job so it shows up with that job's other work.
     </div>
@@ -400,7 +406,7 @@ async function load(){
     const[dr,tr]=await Promise.all([fetch(`/api/runsheet/${ds}`),fetch('/api/team-templates')]);
     const d=await dr.json();
     if(seq!==_loadSeq) return; // a newer load has since started — abandon this one
-    dayTeams=d.teams||[];daySchedule=d.schedule||[];dayTasks=d.tasks||[];dayJobs=d.jobs||[];dayLoads=d.loads||[];
+    dayTeams=d.teams||[];daySchedule=d.schedule||[];dayTasks=d.tasks||[];dayJobs=d.jobs||[];dayLoads=d.loads||[];window.dayJobsNearby=d.jobs_nearby||[];
     templates=await tr.json();
     if(seq!==_loadSeq) return;
 
@@ -453,7 +459,7 @@ async function load(){
       const dr2=await fetch(`/api/runsheet/${ds}`);
       const d2=await dr2.json();
       if(seq!==_loadSeq) return;
-      dayTeams=d2.teams||[];daySchedule=d2.schedule||[];dayTasks=d2.tasks||[];dayJobs=d2.jobs||[];
+      dayTeams=d2.teams||[];daySchedule=d2.schedule||[];dayTasks=d2.tasks||[];dayJobs=d2.jobs||[];window.dayJobsNearby=d2.jobs_nearby||window.dayJobsNearby||[];
     }
 
     render();
@@ -1428,21 +1434,52 @@ async function apiFetch(url, opts){
 // duration. Used when one job is run by more than one crew on the day.
 // Jobs on the runsheet this day, offered as an optional parent for a task.
 // "No job" stays first: plenty of warehouse tasks stand alone.
+// Bay staging is the warehouse's most common job-linked task, so it gets a
+// one-tap preset — consistent titles make them findable later.
+function presetBayStaging(){
+  const sel=document.getElementById('task-job');
+  const titleEl=document.getElementById('task-title');
+  const job=(dayJobs||[]).concat(window.dayJobsNearby||[]).find(j=>j.id===sel.value);
+  const ref=job?(job.job_ref||('#'+String(job.job_number||'').slice(-3))):'';
+  titleEl.value = ref ? `Stage bay — ${ref}` : 'Stage bay';
+  titleEl.focus();
+}
+
+// Keep the preset title in step if the job is changed afterwards
+function maybePresetStaging(){
+  const titleEl=document.getElementById('task-title');
+  if(titleEl && /^Stage bay\b/.test(titleEl.value)) presetBayStaging();
+}
+
 function populateTaskJobs(selected){
   const sel=document.getElementById('task-job');
   if(!sel) return;
   const seen=new Map();
+  // Jobs already on this day come first — the common case.
   daySchedule.forEach(e=>{
     if(!e.job_id) return;
     const j=dayJobs.find(x=>x.id===e.job_id);
     if(j && !seen.has(j.id)) seen.set(j.id,j);
   });
-  let opts='<option value="">— No job —</option>';
-  seen.forEach(j=>{
+  // Then jobs scheduled NEARBY. Bay staging is done the day before a load,
+  // so the job being staged usually has no tile on the day you're creating
+  // the task — without this it simply wouldn't be in the list.
+  const near=[];
+  (window.dayJobsNearby||[]).forEach(j=>{
+    if(!seen.has(j.id)) near.push(j);
+  });
+  const optFor=j=>{
     const ref=j.job_number?('#'+String(j.job_number).slice(-3)):(j.job_ref||'Job');
     const addr=(j.address||'').slice(0,40);
-    opts+=`<option value="${j.id}">${ref}${addr?' — '+addr:''}</option>`;
-  });
+    return `<option value="${j.id}">${ref}${addr?' — '+addr:''}</option>`;
+  };
+  let opts='<option value="">— No job —</option>';
+  seen.forEach(j=>{ opts+=optFor(j); });
+  if(near.length){
+    opts+='<optgroup label="Other days">';
+    near.forEach(j=>{ opts+=optFor(j); });
+    opts+='</optgroup>';
+  }
   // A task may already point at a job that has no tile today — keep it listed
   // so opening and saving the task doesn't silently drop the link.
   if(selected && !seen.has(selected)){

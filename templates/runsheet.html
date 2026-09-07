@@ -310,6 +310,8 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
       <button class="chip selected" onclick="pickType(this,'install')">Install</button>
       <button class="chip" onclick="pickType(this,'pickup')">Pickup</button>
       <button class="chip" onclick="pickType(this,'to_load')">To Load</button>
+      <button class="chip" onclick="pickType(this,'bay')">Load Bay</button>
+      <button class="chip" onclick="pickType(this,'selection')">Selection</button>
     </div>
   </div>
   <div id="task-fields" style="display:none;">
@@ -374,7 +376,7 @@ const FN_LBL={transport:'🚛 Transport',styling:'🎨 Styling',warehouse:'🏭 
 const DEFAULT_START='07:30';
 const FN_DURATION={transport:60,styling:180,warehouse:60};
 const fnDuration=fn=>FN_DURATION[fn]||60;
-const TYPE_LBL={install:'Install',to_load:'Load',pickup:'Pickup'};
+const TYPE_LBL={install:'Install',to_load:'Load',pickup:'Pickup',bay:'Load Bay',selection:'Selection'};
 
 let viewDate=new Date(),dayTeams=[],daySchedule=[],dayTasks=[],dayJobs=[],templates=[];
 let _fn='transport',_vehicle='',_mode='job',_type='install',_jobId=null,_jsTimer=null;

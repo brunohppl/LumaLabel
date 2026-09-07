@@ -439,7 +439,8 @@ RUNSHEET_VEHICLES  = TRANSPORT_VEHICLES + STYLING_VEHICLES + OTHER_VEHICLES
 
 RUNSHEET_STYLISTS = ['Addy', 'Montie', 'Delphine', 'India', 'Hayley', 'Lyndall',
                      'Gill', 'Carolina']
-RUNSHEET_DRIVERS  = ['Jo', 'Savio', 'Nick', 'Ayoub', 'Bruno', 'Phil', 'Thiago', 'Max']
+RUNSHEET_DRIVERS  = ['Jo', 'Savio', 'Nick', 'Ayoub', 'Bruno', 'Phil', 'Thiago', 'Max',
+                     'Isaac']
 RUNSHEET_WORKERS  = RUNSHEET_STYLISTS + RUNSHEET_DRIVERS
 
 # Time slots: 07:30 to 15:30 in 30-minute increments — matches the

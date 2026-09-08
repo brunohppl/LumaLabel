@@ -51,7 +51,7 @@
     '#dayview-root .crew-util{margin-top:5px;height:3px;background:var(--sand,#f0ebe4);border-radius:2px;overflow:hidden;}',
     '#dayview-root .crew-util span{display:block;height:100%;background:var(--green,#4a7c59);}',
     '#dayview-root .crew-util.low span{background:var(--red,#e85c47);}',
-    '#dayview-root .lane{position:relative;flex:1;padding:10px 0;}',
+    '#dayview-root .lane{position:relative;flex:1;padding:10px 0;min-height:72px;}',
     '#dayview-root .ruler{display:flex;align-items:flex-end;height:24px;}',
     '#dayview-root .ruler .rowhead{padding-bottom:4px;border-bottom:none;}',
     '#dayview-root .ruler-lane{position:relative;flex:1;}',
@@ -59,7 +59,7 @@
     '#dayview-root .gridline{position:absolute;top:0;bottom:0;width:1px;background:var(--border,#e0d8ce);opacity:0.55;}',
     '#dayview-root .gridline.hour{opacity:0.9;}',
     '#dayview-root .blk{position:absolute;top:10px;bottom:10px;border-radius:3px;padding:4px 6px;overflow:hidden;cursor:pointer;color:#fff;font-size:0.7rem;line-height:1.25;background:var(--muted,#9a8f80);}',
-    '#dayview-root .blk-ref{font-weight:600;white-space:nowrap;}',
+    '#dayview-root .blk-ref{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
     '#dayview-root .blk-sub{opacity:0.86;font-size:0.64rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
     '#dayview-root .blk.install{background:var(--green,#4a7c59);}',
     '#dayview-root .blk.pickup{background:var(--blue,#2e5a8a);}',
@@ -68,7 +68,7 @@
     '#dayview-root .blk.bay{background:var(--accent,#b8935a);}',
     '#dayview-root .blk.selection{background:var(--purple,#6a3d8a);}',
     '#dayview-root .blk.task{background:var(--purple,#6a3d8a);}',
-    '#dayview-root .blk-type{font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;opacity:0.9;}',
+    '#dayview-root .blk-type{font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;opacity:0.9;white-space:nowrap;overflow:hidden;line-height:1.2;}',
     '#dayview-root .blk.brk{background:repeating-linear-gradient(45deg,#8C8375,#8C8375 5px,#7E7568 5px,#7E7568 10px);}',
     '#dayview-root .blk.tight .blk-sub{display:none;}',
     '#dayview-root .idle{position:absolute;top:10px;bottom:10px;border-radius:3px;background:repeating-linear-gradient(135deg,rgba(232,92,71,0.10),rgba(232,92,71,0.10) 4px,transparent 4px,transparent 9px);border:1px dashed rgba(232,92,71,0.35);}',
@@ -90,9 +90,9 @@
        so more of the day is legible without zooming. */
     '@media(min-width:1100px){#dayview-root .rowhead{width:170px;flex:0 0 170px;}',
     '#dayview-root .crew-name{font-size:0.9rem;}',
-    '#dayview-root .lane{padding:14px 0;}',
-    '#dayview-root .blk{top:14px;bottom:14px;}',
-    '#dayview-root .idle{top:14px;bottom:14px;}}'
+    '#dayview-root .lane{padding:12px 0;min-height:74px;}',
+    '#dayview-root .blk{top:12px;bottom:12px;}',
+    '#dayview-root .idle{top:12px;bottom:12px;}}'
   ].join('\n');
 
   var MARKUP =

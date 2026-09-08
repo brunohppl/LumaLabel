@@ -602,7 +602,7 @@ function render(){
       // The photography deadline is the hard stop the day works back from,
       // so it sits with the reference rather than buried in the detail line.
       const photoTag=(!isTask&&job&&job.photo_time)?`<span class="rs-photo" title="Photography deadline">📷 ${job.photo_time}</span>`:'';
-      const lbl=isBreak?'🍽 Break':(isTask?(taskJobRef?`Task · ${taskJobRef}`:'Task'):{install:'Install',pickup:'Pickup',to_load:'To Load'}[e.type]||'');
+      const lbl=isBreak?'🍽 Break':(isTask?(taskJobRef?`Task · ${taskJobRef}`:'Task'):(TYPE_LBL[e.type]||e.type||''));
       const accessTag=(!isTask&&job&&job.access_notes)?`<span class="rs-access" title="${String(job.access_notes).replace(/"/g,'&quot;')}">🔑</span>`:'';
       // A transfer comes from another job rather than the warehouse, so the
       // crew needs to know before they start loading.

@@ -42,7 +42,7 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .team-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:6px;margin-bottom:16px;font-size:0.82rem;font-weight:600;color:white;}
 
 /* CARDS */
-.card{background:white;border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:12px;display:flex;gap:14px;align-items:flex-start;border-left:4px solid transparent;}
+.card{background:white;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;border-left:4px solid transparent;}
 .card.install{border-left-color:var(--green);}
 .card.pickup{border-left-color:var(--blue);}
 .card.to_load{border-left-color:var(--accent);}
@@ -50,13 +50,23 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .card.styling{border-left-color:var(--purple);}
 .card.bay{border-left-color:var(--accent);}
 .card.selection{border-left-color:var(--purple);}
-.card-time{text-align:center;min-width:48px;flex-shrink:0;}
+.card-time{text-align:center;min-width:58px;flex-shrink:0;}
 .card-time-h{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;line-height:1;color:var(--ink);}
+.card-type-pill{margin-top:8px;padding:2px 3px;border-radius:3px;font-size:0.56rem;font-weight:700;
+  letter-spacing:0.06em;text-transform:uppercase;color:#fff;background:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card-type-pill.install{background:var(--green);}
+.card-type-pill.pickup{background:var(--blue);}
+.card-type-pill.to_load{background:var(--accent);}
+.card-type-pill.styling,.card-type-pill.selection{background:var(--purple);}
+.card-type-pill.bay{background:var(--accent);}
+.card-type-pill.task{background:#7a7060;}
+.card-dur{margin-top:4px;font-size:0.7rem;color:var(--muted);}
 .card-time-ampm{font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-top:2px;}
 .card-body{flex:1;}
 .card-type{font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:3px;color:var(--muted);}
-.card-ref{font-size:1rem;font-weight:600;color:var(--ink);margin-bottom:2px;}
-.card-addr{font-size:0.85rem;color:var(--muted);margin-bottom:2px;}
+.card-ref{font-size:1rem;font-weight:600;color:var(--ink);margin-bottom:1px;}
+.card-addr{font-size:0.85rem;color:var(--muted);margin-bottom:6px;}
 .card-loaded{
   margin-top:6px;padding:7px 10px;border-radius:8px;
   background:rgba(31,75,44,0.10);border-left:3px solid #2E7D32;
@@ -69,10 +79,10 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
   font-size:0.82rem;color:#5C4318;
 }
 .card-transfer strong{text-transform:uppercase;letter-spacing:0.04em;font-size:0.72rem;}
-.card-photo{margin-top:6px;padding:4px 10px;border-radius:6px;display:inline-block;
+.card-photo{margin-top:5px;padding:4px 10px;border-radius:6px;display:inline-block;
   background:rgba(184,147,90,0.16);color:var(--accent);font-size:0.8rem;font-weight:600;}
 .card-job-link{margin-top:6px;font-size:0.8rem;color:var(--muted);}
-.card-prop{font-size:0.78rem;color:var(--muted);font-style:italic;margin-bottom:8px;opacity:0.9;}
+.card-prop{font-size:0.78rem;color:var(--muted);font-style:italic;margin-top:5px;opacity:0.9;}
 .card-access{
   margin-top:8px;padding:8px 10px;border-radius:8px;
   background:rgba(201,162,39,0.14);border-left:3px solid #C9A227;
@@ -469,18 +479,19 @@ function cardHTML(e, jobById, showTeam){
     <div class="card-time">
       <div class="card-time-h">${h}</div>
       <div class="card-time-ampm">${ampm}</div>
+      <div class="card-type-pill ${typeKey}">${typeLabel}</div>
+      ${e.duration?`<div class="card-dur">${fmtDuration(e.duration)}</div>`:''}
     </div>
     <div class="card-body">
       ${teamLabel}
-      <div class="card-type">${typeLabel}${dur}</div>
       <div class="card-ref">${ref}</div>
       ${street?`<div class="card-addr">${street}</div>`:''}
+      ${(e.kind==='break'||e.title==='Lunch break')?'':(job&&job.access_notes?`<div class="card-access">🔑 <strong>Access</strong> ${job.access_notes}</div>`:'')}
       ${(_pj && _pj.photo_time && !(e.kind==='break'||e.title==='Lunch break'))
           ? `<div class="card-photo">📷 Photos ${_pj.photo_time}</div>` : ''}
       ${propTag?`<div class="card-prop">${propTag}</div>`:''}
       ${(e.type==='install')?loadedLine(_pj):''}
       ${transferLine(_pj, jobById)}
-      ${(e.kind==='break'||e.title==='Lunch break')?'':(job&&job.access_notes?`<div class="card-access">🔑 <strong>Access</strong> ${job.access_notes}</div>`:'')}
       ${e.notes?`<div class="card-note">📝 ${e.notes}</div>`:''}
       ${(isTask && e.job_id && jobById[e.job_id])
           ? `<div class="card-job-link">${jobById[e.job_id].job_ref||jobById[e.job_id].job_number||'Job'}${

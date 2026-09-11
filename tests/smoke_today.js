@@ -52,7 +52,7 @@ setTimeout(async()=>{
      !/not the warehouse|not back to the warehouse/i.test(body));
   ok('90 minutes reads as 1.5h', body.includes('1.5h'));
   ok('and not the doubled-up form', !body.includes('1.5h30m'));
-  ok('a whole hour reads as 1h', /·\s*1h/.test(body));
+  ok('a whole hour reads as 1h', [...d.querySelectorAll('.card-dur')].some(x=>x.textContent.trim()==='1h'));
 
   // The styling crew needs to know which truck is turning up
   const stylingCard=[...d.querySelectorAll('#day-content *')]
@@ -113,6 +113,19 @@ setTimeout(async()=>{
      !/Load Bay[\s\S]{0,500}📍 Navigate/.test(html2));
   ok('no Navigate on a Selection card',
      !/Selection[\s\S]{0,500}📍 Navigate/.test(html2));
+  ok('type pill rendered in the time column',
+     [...d.querySelectorAll('.card-time .card-type-pill')].length>0);
+  ok('pill is colour-coded by type', !!d.querySelector('.card-type-pill.install'));
+  ok('duration sits under the time', [...d.querySelectorAll('.card-time .card-dur')].length>0);
+  ok('the old type line is gone', d.querySelectorAll('.card-type').length===0);
+  const accBody=[...d.querySelectorAll('.card-body')].find(b=>/Gate 4823/.test(b.textContent));
+  ok('access notes still shown', !!accBody);
+  if(accBody){
+    const h3=accBody.innerHTML, a=h3.indexOf('card-access'), p=h3.indexOf('card-prop');
+    ok('access appears above the property line', a>-1 && (p===-1 || a<p));
+    ok('access appears below the address', h3.indexOf('card-addr')<a);
+  }
+  ok('property line kept', /card-prop/.test(d.body.innerHTML));
   ok('card shows street and suburb', /12 Somers St, Ascot/.test(d.body.innerHTML));
   ok('the day request is made', dayCalls.length>=1);
   ok('it fires once, not twice (prefetch reused)', dayCalls.length===1);

@@ -73,6 +73,7 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;}
 .stage.due{background:rgba(200,138,46,0.12);border-color:rgba(200,138,46,0.3);}
 .stage.due .stage-val{color:var(--amber);}
 .stage-note{font-size:0.62rem;color:var(--muted);margin-top:1px;}
+.stage.done .stage-note{color:var(--amber);font-weight:600;}
 
 .row-btns{display:flex;gap:7px;margin-top:9px;}
 .row-btn{flex:1;text-align:center;padding:6px;border-radius:5px;text-decoration:none;
@@ -136,9 +137,9 @@ function stageHTML(s){
   // The words matter more than the colour: a red dot says something is wrong,
   // "18 of 42 picked" says what to do about it.
   let val;
-  if(!s.total)                    val = '—';
-  else if(s.done>=s.total)             val = `All ${s.total}`;
-  else                                 val = `${s.done} of ${s.total}`;
+  if(!s.total)              val = '—';
+  else if(s.done>=s.total)  val = `All ${s.total}`;
+  else                      val = `${s.done} of ${s.total}`;   // keep the gap visible
   return `<div class="stage ${s.state}">
     <div class="stage-name">${esc(s.name)}</div>
     <div class="stage-val">${esc(val)}</div>

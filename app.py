@@ -2440,6 +2440,21 @@ def readiness_page():
 # How late is late. Picking must be done before the load is packed; the bay
 # must be staged by the loading day; the truck must be loaded by the evening
 # before the install.
+# The driver page doesn't tick items that are packed into tubs and bags —
+# they appear as single "N Cushion Bags" / "N Accessory Boxes" rows instead.
+# Counting them individually here made readiness disagree with the loading
+# list. Keep these in step with isSmallLamp/isCushionItem/isAccessoryItem
+# in driver.html.
+_CUSHION_RE   = re.compile(r'cushion|pillow|throw|coverlet', re.I)
+_ACCESSORY_RE = re.compile(r'accessor|centrepiece', re.I)
+
+
+def _is_packed_item(desc):
+    d = (desc or '').lower()
+    small_lamp = 'lamp' in d and 'floor lamp' not in d
+    return small_lamp or bool(_CUSHION_RE.search(d)) or bool(_ACCESSORY_RE.search(d))
+
+
 READINESS_RULES = {
     'picked': 2,    # days before install that picking should be complete
     'staged': 1,    # days before install the bay should be staged
@@ -2544,11 +2559,32 @@ def api_readiness():
         # What the stylist picks, and what the driver loads, exclude
         # different things — mirror each page rather than inventing a third rule.
         pickable = [i for i in job_items if not i.get('not_transferring')]
+        # Exactly what the driver can tick on the loading list
         loadable = [i for i in pickable if not i.get('is_transfer_item')
-                    and not i.get('is_extra')]
+                    and not i.get('is_extra')
+                    and not _is_packed_item(i.get('description'))]
 
         picked_n = sum(1 for i in pickable if i.get('picked'))
         loaded_n = sum(1 for i in loadable if i.get('on_truck'))
+
+        # The packed rows count as one item each, as they do for the driver
+        loaded_total = len(loadable)
+        if job.get('cushion_bags'):
+            loaded_total += 1
+            if job.get('cushion_bags_loaded'):
+                loaded_n += 1
+        if job.get('accessory_tubs'):
+            loaded_total += 1
+            if job.get('accessory_tubs_loaded'):
+                loaded_n += 1
+
+        # A job the warehouse has already marked loaded is loaded, whatever
+        # the per-item ticks say — the status is the human's final word.
+        status_loaded = (job.get('status') or '') in ('loaded', 'installed',
+                                                      'ready_to_collect',
+                                                      'returned', 'archived')
+        if status_loaded:
+            loaded_n = loaded_total
         job_tiles = tiles_by_job.get(jid, [])
         has_bay = any(t.get('type') == 'bay' for t in job_tiles)
         bay_done = any(t.get('type') == 'bay' and t.get('date', '') <= str(today)
@@ -2566,15 +2602,21 @@ def api_readiness():
             return {'name': name, 'done': done_n, 'total': total_n,
                     'state': state, 'note': extra}
 
+        # Same for picking: once a job is loaded or beyond, picking is done.
+        picked_total = len(pickable)
+        if status_loaded or (job.get('status') or '') == 'ready_to_load':
+            picked_n = picked_total
+
         stages = [
-            stage('Picked', picked_n, len(pickable), READINESS_RULES['picked']),
+            stage('Picked', picked_n, picked_total, READINESS_RULES['picked']),
             {'name': 'Staged',
              'done': 1 if bay_done else 0, 'total': 1,
              'state': ('done' if bay_done else
                        ('ok' if install_days_out > READINESS_RULES['staged'] else
                         ('due' if install_days_out == READINESS_RULES['staged'] else 'late'))),
              'note': None if has_bay else 'no bay tile'},
-            stage('Loaded', loaded_n, len(loadable), READINESS_RULES['loaded']),
+            stage('Loaded', loaded_n, loaded_total, READINESS_RULES['loaded'],
+                  'marked loaded' if status_loaded and loaded_total else None),
         ]
         # A staging row cares about picking and staging; a load row about
         # picking and loading. Showing all three everywhere was noise.

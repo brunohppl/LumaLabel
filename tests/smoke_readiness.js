@@ -58,6 +58,17 @@ setTimeout(()=>{
   // stages say what to do, not just a colour
   const late=[...d.querySelectorAll('.row')].find(r=>/QU-1351/.test(r.textContent));
   ok('a behind job is flagged', late.classList.contains('late'));
+  // Colour alone isn't enough — check the shape too
+  ok('behind jobs carry an alert mark', !!late.querySelector('.alert'));
+  ok('the mark reads as an exclamation', late.querySelector('.alert').textContent.trim()==='!');
+  ok('it is labelled for screen readers',
+     /Behind/i.test(late.querySelector('.alert').getAttribute('aria-label')||''));
+  const dueRow=[...d.querySelectorAll('.row')].find(r=>r.classList.contains('due'));
+  ok('due-today rows do NOT get a mark', dueRow && !dueRow.querySelector('.alert'));
+  const doneRows=[...d.querySelectorAll('.row')].filter(r=>!r.classList.contains('late'));
+  ok('no mark on anything not behind', doneRows.every(r=>!r.querySelector('.alert')));
+  ok('the column header counts what is behind', /1 behind/.test(cols[0].textContent));
+  ok('a clean column says nothing about being behind', !/behind/.test(cols[2].textContent));
   ok('picking shortfall is stated in words', /18 of 42/.test(late.textContent));
   ok('bay progress stated in numbers', /12 of 40/.test(late.textContent));
   ok('a missing bay booking is noted', /no bay tile booked/.test(late.textContent));

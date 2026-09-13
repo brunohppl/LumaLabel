@@ -15,7 +15,7 @@ const DATA={
              {name:'Loaded',done:0,total:40,state:'late'}]},
     {job_id:'J2',ref:'QU-1362',address:'9 Vine St, Clayfield',date:'2026-09-09',
      time:'08:00',kind:'install',days_out:1,worst:'due',
-     stages:[{name:'Picked',done:30,total:30,state:'done'},
+     stages:[{name:'Picked',done:28,total:30,state:'done',note:'marked ready to load · 2 not ticked'},
              {name:'In bay',done:30,total:30,state:'done'},
              {name:'Loaded',done:12,total:30,state:'due'}]},
     {job_id:'J3',ref:'QU-1370',address:'5 Kent Rd, Wooloowin',date:'2026-09-10',
@@ -62,6 +62,11 @@ setTimeout(()=>{
   ok('bay progress stated in numbers', /12 of 40/.test(late.textContent));
   ok('a missing bay booking is noted', /no bay tile booked/.test(late.textContent));
   ok('a finished stage reads as done', /All 30/.test(d.body.textContent));
+  // A stage completed by status must still show the real numbers
+  const forcedRow=[...d.querySelectorAll('.row')].find(r=>/marked ready to load/.test(r.textContent));
+  ok('a status-completed stage shows green', !!forcedRow.querySelector('.stage.done'));
+  ok('and keeps the real count', /28 of 30/.test(forcedRow.textContent));
+  ok('and names the shortfall', /2 not ticked/.test(forcedRow.textContent));
 
   // pickups are the reverse flow — no picking/staging/loading stages
   const pick=[...d.querySelectorAll('.row')].find(r=>/QU-1330/.test(r.textContent));

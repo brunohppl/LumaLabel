@@ -11,24 +11,24 @@ const DATA={
     {job_id:'J1',ref:'QU-1351',address:'12 Somers St, Ascot QLD 4007',date:'2026-09-08',
      time:'09:00',kind:'install',days_out:0,worst:'late',photo_time:'11:00 AM',items:42,
      stages:[{name:'Picked',done:18,total:42,state:'late'},
-             {name:'Staged',done:0,total:1,state:'late',note:'no bay tile'},
+             {name:'In bay',done:12,total:40,state:'late',note:'no bay tile booked'},
              {name:'Loaded',done:0,total:40,state:'late'}]},
     {job_id:'J2',ref:'QU-1362',address:'9 Vine St, Clayfield',date:'2026-09-09',
      time:'08:00',kind:'install',days_out:1,worst:'due',
      stages:[{name:'Picked',done:30,total:30,state:'done'},
-             {name:'Staged',done:1,total:1,state:'done'},
+             {name:'In bay',done:30,total:30,state:'done'},
              {name:'Loaded',done:12,total:30,state:'due'}]},
     {job_id:'J3',ref:'QU-1370',address:'5 Kent Rd, Wooloowin',date:'2026-09-10',
      time:'10:00',kind:'install',days_out:2,worst:'done',
      stages:[{name:'Picked',done:20,total:20,state:'done'},
-             {name:'Staged',done:1,total:1,state:'done'},
+             {name:'In bay',done:30,total:30,state:'done'},
              {name:'Loaded',done:20,total:20,state:'done'}]},
     {job_id:'J4',ref:'QU-1330',address:'1 Hale St, Paddington',date:'2026-09-08',
      time:'13:00',kind:'pickup',days_out:0,worst:'ok',stages:[]},
     {job_id:'J2',ref:'QU-1362',address:'9 Vine St, Clayfield',date:'2026-09-08',
      time:'08:00',kind:'bay',days_out:0,worst:'due',install_date:'2026-09-09',
      stages:[{name:'Picked',done:30,total:30,state:'done'},
-             {name:'Staged',done:0,total:1,state:'due'}]},
+             {name:'In bay',done:10,total:30,state:'due'}]},
     {job_id:'J3',ref:'QU-1370',address:'5 Kent Rd, Wooloowin',date:'2026-09-09',
      time:'15:00',kind:'to_load',days_out:1,worst:'ok',install_date:'2026-09-10',
      stages:[{name:'Picked',done:20,total:20,state:'done'},
@@ -59,8 +59,8 @@ setTimeout(()=>{
   const late=[...d.querySelectorAll('.row')].find(r=>/QU-1351/.test(r.textContent));
   ok('a behind job is flagged', late.classList.contains('late'));
   ok('picking shortfall is stated in words', /18 of 42/.test(late.textContent));
-  ok('unstaged is stated plainly', /Not staged/.test(late.textContent));
-  ok('the reason is given', /no bay tile/.test(late.textContent));
+  ok('bay progress stated in numbers', /12 of 40/.test(late.textContent));
+  ok('a missing bay booking is noted', /no bay tile booked/.test(late.textContent));
   ok('a finished stage reads as done', /All 30/.test(d.body.textContent));
 
   // pickups are the reverse flow — no picking/staging/loading stages

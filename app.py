@@ -2432,6 +2432,151 @@ def api_map_day(date_str):
     })
 
 
+@app.route('/readiness', methods=['GET'])
+def readiness_page():
+    return render_page('readiness.html')
+
+
+# How late is late. Picking must be done before the load is packed; the bay
+# must be staged by the loading day; the truck must be loaded by the evening
+# before the install.
+READINESS_RULES = {
+    'picked': 2,    # days before install that picking should be complete
+    'staged': 1,    # days before install the bay should be staged
+    'loaded': 1,    # days before install the truck should be loaded
+}
+
+
+@app.route('/api/readiness', methods=['GET'])
+def api_readiness():
+    """Job readiness for today and the next two days.
+
+    Every figure is derived from work the crews already record — picking from
+    items.picked, staging from whether a Load Bay tile exists, loading from
+    items.on_truck plus the tub and bag flags. Nothing here asks anyone to
+    tick anything extra, so there is nothing extra to forget.
+    """
+    from datetime import datetime as _dt, timedelta as _td
+
+    try:
+        start = _dt.strptime(request.args.get('from') or '', '%Y-%m-%d')
+    except ValueError:
+        start = _dt.now()
+    days = [(start + _td(days=i)).strftime('%Y-%m-%d') for i in range(3)]
+
+    entries = sb_get('job_schedule',
+                     f'date=gte.{days[0]}&date=lte.{days[-1]}') or []
+    # Installs and pickups are the deadlines; load/bay tiles are evidence.
+    job_ids = list({e['job_id'] for e in entries if e.get('job_id')})
+    if not job_ids:
+        return jsonify({'days': days, 'jobs': [], 'rules': READINESS_RULES})
+
+    ids_str = ','.join(job_ids)
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        f_jobs  = pool.submit(sb_get, 'jobs', f'id=in.({ids_str})')
+        f_items = pool.submit(sb_get, 'items',
+                              f'job_id=in.({ids_str})'
+                              '&select=id,job_id,picked,on_truck,is_extra,'
+                              'not_transferring,is_transfer_item,description')
+        # Every tile for these jobs, on ANY date — staging and loading happen
+        # before the install day, so this day's tiles alone wouldn't show them.
+        f_tiles = pool.submit(sb_get, 'job_schedule', f'job_id=in.({ids_str})')
+        jobs  = _settled(f_jobs)
+        items = _settled(f_items)
+        tiles = _settled(f_tiles)
+
+    jobs_by_id = {j['id']: j for j in jobs}
+    items_by_job = {}
+    for it in items:
+        items_by_job.setdefault(it.get('job_id'), []).append(it)
+    tiles_by_job = {}
+    for t in tiles:
+        tiles_by_job.setdefault(t.get('job_id'), []).append(t)
+
+    today = _dt.now().date()
+    out = []
+    seen = set()
+
+    for e in entries:
+        if (e.get('type') or '') not in ('install', 'pickup'):
+            continue
+        jid = e.get('job_id')
+        job = jobs_by_id.get(jid)
+        if not job or (jid, e.get('date')) in seen:
+            continue
+        seen.add((jid, e.get('date')))
+
+        try:
+            due = _dt.strptime(e['date'], '%Y-%m-%d').date()
+            days_out = (due - today).days
+        except Exception:
+            continue
+
+        # ── Pickups are the reverse flow: only "collected" applies ──
+        if e.get('type') == 'pickup':
+            out.append({
+                'job_id': jid, 'ref': job.get('job_ref') or job.get('job_number') or '—',
+                'address': job.get('address') or '', 'date': e['date'],
+                'time': e.get('start_time'), 'kind': 'pickup',
+                'days_out': days_out, 'stages': [], 'worst': 'ok',
+                'photo_time': job.get('photo_time'),
+            })
+            continue
+
+        job_items = items_by_job.get(jid, [])
+        # What the stylist picks, and what the driver loads, exclude
+        # different things — mirror each page rather than inventing a third rule.
+        pickable = [i for i in job_items if not i.get('not_transferring')]
+        loadable = [i for i in pickable if not i.get('is_transfer_item')
+                    and not i.get('is_extra')]
+
+        picked_n = sum(1 for i in pickable if i.get('picked'))
+        loaded_n = sum(1 for i in loadable if i.get('on_truck'))
+        job_tiles = tiles_by_job.get(jid, [])
+        has_bay = any(t.get('type') == 'bay' for t in job_tiles)
+        bay_done = any(t.get('type') == 'bay' and t.get('date', '') <= str(today)
+                       for t in job_tiles)
+
+        def stage(name, done_n, total_n, due_in, extra=None):
+            if total_n and done_n >= total_n:
+                state = 'done'
+            elif days_out > due_in:
+                state = 'ok'            # not due yet
+            elif days_out == due_in:
+                state = 'due'
+            else:
+                state = 'late'
+            return {'name': name, 'done': done_n, 'total': total_n,
+                    'state': state, 'note': extra}
+
+        stages = [
+            stage('Picked', picked_n, len(pickable), READINESS_RULES['picked']),
+            {'name': 'Staged',
+             'done': 1 if bay_done else 0, 'total': 1,
+             'state': ('done' if bay_done else
+                       ('ok' if days_out > READINESS_RULES['staged'] else
+                        ('due' if days_out == READINESS_RULES['staged'] else 'late'))),
+             'note': None if has_bay else 'no bay tile'},
+            stage('Loaded', loaded_n, len(loadable), READINESS_RULES['loaded']),
+        ]
+        order = {'late': 3, 'due': 2, 'ok': 1, 'done': 0}
+        worst = max((s['state'] for s in stages), key=lambda s: order[s])
+
+        out.append({
+            'job_id': jid, 'ref': job.get('job_ref') or job.get('job_number') or '—',
+            'address': job.get('address') or '', 'date': e['date'],
+            'time': e.get('start_time'), 'kind': 'install',
+            'days_out': days_out, 'stages': stages, 'worst': worst,
+            'photo_time': job.get('photo_time'),
+            'items': len(pickable),
+        })
+
+    # Worst first: the page exists to surface the few jobs needing attention.
+    rank = {'late': 0, 'due': 1, 'ok': 2, 'done': 3}
+    out.sort(key=lambda r: (rank.get(r['worst'], 2), r['date'], r['time'] or '99:99'))
+    return jsonify({'days': days, 'jobs': out, 'rules': READINESS_RULES})
+
+
 @app.route('/api/version', methods=['GET'])
 def api_version():
     return jsonify({'version': APP_VERSION})

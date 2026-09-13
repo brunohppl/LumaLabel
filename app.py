@@ -2491,7 +2491,7 @@ def api_readiness():
         f_jobs  = pool.submit(sb_get, 'jobs', f'id=in.({ids_str})')
         f_items = pool.submit(sb_get, 'items',
                               f'job_id=in.({ids_str})'
-                              '&select=id,job_id,picked,on_truck,is_extra,'
+                              '&select=id,job_id,picked,checked,on_truck,is_extra,'
                               'not_transferring,is_transfer_item,description')
         # Every tile for these jobs, on ANY date — staging and loading happen
         # before the install day, so this day's tiles alone wouldn't show them.
@@ -2567,16 +2567,23 @@ def api_readiness():
         picked_n = sum(1 for i in pickable if i.get('picked'))
         loaded_n = sum(1 for i in loadable if i.get('on_truck'))
 
+        # Staging comes from the driver's yellow ticks: an item in the bay.
+        # An item already on the truck has obviously passed through the bay,
+        # so "at least yellow" is checked OR on_truck.
+        staged_n = sum(1 for i in loadable if i.get('checked') or i.get('on_truck'))
+
         # The packed rows count as one item each, as they do for the driver
         loaded_total = len(loadable)
         if job.get('cushion_bags'):
             loaded_total += 1
             if job.get('cushion_bags_loaded'):
                 loaded_n += 1
+                staged_n += 1
         if job.get('accessory_tubs'):
             loaded_total += 1
             if job.get('accessory_tubs_loaded'):
                 loaded_n += 1
+                staged_n += 1
 
         # A job the warehouse has already marked loaded is loaded, whatever
         # the per-item ticks say — the status is the human's final word.
@@ -2585,10 +2592,11 @@ def api_readiness():
                                                       'returned', 'archived')
         if status_loaded:
             loaded_n = loaded_total
+            staged_n = loaded_total
         job_tiles = tiles_by_job.get(jid, [])
+        # Kept only as a note on the row — staging itself is measured from
+        # the driver's yellow ticks, not from a tile having a past date.
         has_bay = any(t.get('type') == 'bay' for t in job_tiles)
-        bay_done = any(t.get('type') == 'bay' and t.get('date', '') <= str(today)
-                       for t in job_tiles)
 
         def stage(name, done_n, total_n, due_in, extra=None):
             if total_n and done_n >= total_n:
@@ -2609,12 +2617,8 @@ def api_readiness():
 
         stages = [
             stage('Picked', picked_n, picked_total, READINESS_RULES['picked']),
-            {'name': 'Staged',
-             'done': 1 if bay_done else 0, 'total': 1,
-             'state': ('done' if bay_done else
-                       ('ok' if install_days_out > READINESS_RULES['staged'] else
-                        ('due' if install_days_out == READINESS_RULES['staged'] else 'late'))),
-             'note': None if has_bay else 'no bay tile'},
+            stage('In bay', staged_n, loaded_total, READINESS_RULES['staged'],
+                  None if has_bay else 'no bay tile booked'),
             stage('Loaded', loaded_n, loaded_total, READINESS_RULES['loaded'],
                   'marked loaded' if status_loaded and loaded_total else None),
         ]

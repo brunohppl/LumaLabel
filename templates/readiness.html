@@ -136,8 +136,7 @@ function stageHTML(s){
   // The words matter more than the colour: a red dot says something is wrong,
   // "18 of 42 picked" says what to do about it.
   let val;
-  if(s.total===1 && s.name==='Staged') val = s.done ? 'Staged' : 'Not staged';
-  else if(!s.total)                    val = '—';
+  if(!s.total)                    val = '—';
   else if(s.done>=s.total)             val = `All ${s.total}`;
   else                                 val = `${s.done} of ${s.total}`;
   return `<div class="stage ${s.state}">

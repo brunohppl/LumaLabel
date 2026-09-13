@@ -36,6 +36,7 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;}
   border-radius:8px 8px 0 0;display:flex;justify-content:space-between;align-items:baseline;}
 .col-day{font-family:'Cormorant Garamond',serif;font-size:1.15rem;}
 .col-date{font-size:0.68rem;letter-spacing:0.08em;color:rgba(250,248,244,0.55);}
+.col-late{color:#E8836F;font-weight:700;}
 .col-body{background:rgba(0,0,0,0.03);border:1px solid var(--border);border-top:none;
   border-radius:0 0 8px 8px;padding:10px;min-height:120px;}
 
@@ -46,6 +47,13 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;}
 .row.k-pickup{border-left-color:var(--blue);}
 .row.k-bay{border-left-color:var(--accent);}
 .row.k-to_load{border-left-color:var(--accent);}
+/* Colour alone isn't enough — colour-blind eyes and sunlit screens both
+   lose red. The shape says the same thing a second way. Only "late" gets
+   one: if "due today" had one too, the distinction would vanish. */
+.alert{display:inline-flex;align-items:center;justify-content:center;
+  width:19px;height:19px;margin-right:7px;border-radius:50%;
+  background:var(--red);color:#fff;font-size:0.76rem;font-weight:700;
+  line-height:1;vertical-align:-3px;}
 .kind{display:inline-block;margin-right:7px;padding:1px 7px;border-radius:3px;
   font-size:0.6rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;
   color:#fff;background:var(--muted);vertical-align:1px;}
@@ -154,7 +162,7 @@ function rowHTML(j){
   // Every row says what has to happen THAT DAY — that was the thing missing.
   return `<div class="row ${cls}">
     <div class="row-top">
-      <div class="row-ref"><span class="kind ${j.kind}">${KIND_LBL[j.kind]||j.kind}</span>${esc(j.ref)}</div>
+      <div class="row-ref">${j.worst==='late'?'<span class="alert" title="Behind schedule" aria-label="Behind schedule">!</span>':''}<span class="kind ${j.kind}">${KIND_LBL[j.kind]||j.kind}</span>${esc(j.ref)}</div>
       <div class="row-time">${fmtTime(j.time)}</div>
     </div>
     <div class="row-addr">${esc(streetSuburb(j.address))}</div>
@@ -178,7 +186,11 @@ function render(){
     <div class="col">
       <div class="col-hdr">
         <span class="col-day">${DAY_LABEL[i]||''}</span>
-        <span class="col-date">${fmtDay(d,i).split('· ')[1]||''}</span>
+        <span class="col-date">${(() => {
+          const n=byDay[d].filter(r=>r.worst==='late').length;
+          const when=fmtDay(d,i).split('· ')[1]||'';
+          return n ? `<span class="col-late">${n} behind</span> · ${when}` : when;
+        })()}</span>
       </div>
       <div class="col-body">
         ${byDay[d].length?byDay[d].map(rowHTML).join('')

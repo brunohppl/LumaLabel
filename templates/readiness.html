@@ -43,7 +43,16 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;}
   border-radius:7px;padding:11px 12px;margin-bottom:9px;}
 .row.late{border-left-color:var(--red);}
 .row.due{border-left-color:var(--amber);}
-.row.pickup{border-left-color:var(--blue);}
+.row.k-pickup{border-left-color:var(--blue);}
+.row.k-bay{border-left-color:var(--accent);}
+.row.k-to_load{border-left-color:var(--accent);}
+.kind{display:inline-block;margin-right:7px;padding:1px 7px;border-radius:3px;
+  font-size:0.6rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;
+  color:#fff;background:var(--muted);vertical-align:1px;}
+.kind.install{background:var(--green);}
+.kind.pickup{background:var(--blue);}
+.kind.bay,.kind.to_load{background:var(--accent);}
+.row-due{font-size:0.72rem;color:var(--muted);margin-top:3px;font-style:italic;}
 .row-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
 .row-ref{font-size:0.95rem;font-weight:600;}
 .row-time{font-size:0.78rem;color:var(--muted);white-space:nowrap;}
@@ -102,6 +111,12 @@ function fmtDay(iso,i){
   const d=new Date(iso+'T00:00:00');
   return `${DAY_LABEL[i]||''} · ${d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'})}`;
 }
+function fmtShort(iso){
+  try{
+    const d=new Date(iso+'T00:00:00');
+    return d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+  }catch(e){ return iso; }
+}
 function fmtTime(t){
   if(!t) return '';
   const [h,m]=String(t).split(':').map(Number);
@@ -132,14 +147,18 @@ function stageHTML(s){
   </div>`;
 }
 
+const KIND_LBL={install:'Install',pickup:'Pickup',to_load:'Load truck',bay:'Load bay'};
+
 function rowHTML(j){
-  const cls=j.kind==='pickup'?'pickup':(j.worst==='late'?'late':(j.worst==='due'?'due':''));
+  const cls=(j.worst==='late'?'late':(j.worst==='due'?'due':''))+' k-'+j.kind;
+  // Every row says what has to happen THAT DAY — that was the thing missing.
   return `<div class="row ${cls}">
     <div class="row-top">
-      <div class="row-ref">${esc(j.ref)}${j.kind==='pickup'?' · Pickup':''}</div>
+      <div class="row-ref"><span class="kind ${j.kind}">${KIND_LBL[j.kind]||j.kind}</span>${esc(j.ref)}</div>
       <div class="row-time">${fmtTime(j.time)}</div>
     </div>
     <div class="row-addr">${esc(streetSuburb(j.address))}</div>
+    ${j.install_date?`<div class="row-due">Installs ${fmtShort(j.install_date)}</div>`:''}
     ${j.photo_time?`<div class="row-photo">📷 ${esc(j.photo_time)}</div>`:''}
     ${j.stages.length?`<div class="stages">${j.stages.map(stageHTML).join('')}</div>`:''}
     <div class="row-btns">
@@ -167,9 +186,18 @@ function render(){
       </div>
     </div>`).join('');
 
-  const late=(DATA.jobs||[]).filter(j=>j.worst==='late').length;
-  const due =(DATA.jobs||[]).filter(j=>j.worst==='due').length;
-  const done=(DATA.jobs||[]).filter(j=>j.worst==='done').length;
+  // Count JOBS, not rows: one job can appear as a bay row and an install
+  // row on different days, and counting it twice overstates the problem.
+  const worstByJob={};
+  const rank={late:3,due:2,ok:1,done:0};
+  (DATA.jobs||[]).forEach(j=>{
+    const cur=worstByJob[j.job_id];
+    if(cur===undefined || rank[j.worst]>rank[cur]) worstByJob[j.job_id]=j.worst;
+  });
+  const vals=Object.values(worstByJob);
+  const late=vals.filter(v=>v==='late').length;
+  const due =vals.filter(v=>v==='due').length;
+  const done=vals.filter(v=>v==='done').length;
   document.getElementById('summary').innerHTML=`
     <div class="sum late"><span class="sum-n">${late}</span><span class="sum-l">behind</span></div>
     <div class="sum due"><span class="sum-n">${due}</span><span class="sum-l">due today</span></div>

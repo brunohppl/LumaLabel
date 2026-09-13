@@ -2585,14 +2585,13 @@ def api_readiness():
                 loaded_n += 1
                 staged_n += 1
 
-        # A job the warehouse has already marked loaded is loaded, whatever
-        # the per-item ticks say — the status is the human's final word.
+        # The status is the human's final word on whether a stage is done.
+        # But the real tick counts stay visible: if a job is marked loaded
+        # with 38 of 42 ticked, that gap is exactly what someone wants to
+        # see — either items are missing or they weren't recorded.
         status_loaded = (job.get('status') or '') in ('loaded', 'installed',
                                                       'ready_to_collect',
                                                       'returned', 'archived')
-        if status_loaded:
-            loaded_n = loaded_total
-            staged_n = loaded_total
         job_tiles = tiles_by_job.get(jid, [])
         # Kept only as a note on the row — staging itself is measured from
         # the driver's yellow ticks, not from a tile having a past date.
@@ -2610,17 +2609,24 @@ def api_readiness():
             return {'name': name, 'done': done_n, 'total': total_n,
                     'state': state, 'note': extra}
 
-        # Same for picking: once a job is loaded or beyond, picking is done.
         picked_total = len(pickable)
-        if status_loaded or (job.get('status') or '') == 'ready_to_load':
-            picked_n = picked_total
+        status_picked = status_loaded or (job.get('status') or '') == 'ready_to_load'
+
+        def forced(st, done_n, total_n, why):
+            """Mark a stage complete because of the job status, while keeping
+            the real counts on show."""
+            st['state'] = 'done'
+            if total_n and done_n < total_n:
+                st['note'] = f'{why} · {total_n - done_n} not ticked'
+            else:
+                st['note'] = why
+            return st
 
         stages = [
             stage('Picked', picked_n, picked_total, READINESS_RULES['picked']),
             stage('In bay', staged_n, loaded_total, READINESS_RULES['staged'],
                   None if has_bay else 'no bay tile booked'),
-            stage('Loaded', loaded_n, loaded_total, READINESS_RULES['loaded'],
-                  'marked loaded' if status_loaded and loaded_total else None),
+            stage('Loaded', loaded_n, loaded_total, READINESS_RULES['loaded']),
         ]
         # A staging row cares about picking and staging; a load row about
         # picking and loading. Showing all three everywhere was noise.
@@ -2628,6 +2634,12 @@ def api_readiness():
             stages = [stages[0], stages[1]]
         elif kind == 'to_load':
             stages = [stages[0], stages[2]]
+
+        if status_picked:
+            forced(stages[0], picked_n, picked_total, 'marked ready to load')
+        if status_loaded:
+            forced(stages[1], staged_n, loaded_total, 'marked loaded')
+            forced(stages[2], loaded_n, loaded_total, 'marked loaded')
 
         order = {'late': 3, 'due': 2, 'ok': 1, 'done': 0}
         worst = max((s['state'] for s in stages), key=lambda s: order[s])

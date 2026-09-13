@@ -442,15 +442,22 @@ function transferPartnerLabel(j){
   return [ref,street].filter(Boolean).join(' · ') || 'another job';
 }
 
-function transferLine(job, jobById){
+function transferLine(job, jobById, type){
   if(!job) return '';
   const all=Object.values(jobById||{});
   const refOf=transferPartnerLabel;
-  if(job.is_transfer && job.transfer_from_job_id){
+
+  // On a pickup the crew is taking stock away, so where it's GOING is what
+  // matters. Where it came from is history that mattered on install day.
+  const showFrom = type!=='pickup';
+
+  if(showFrom && job.is_transfer && job.transfer_from_job_id){
     const src=jobById[job.transfer_from_job_id];
     const who=src?` ${refOf(src)}`:' another job';
     return `<div class="card-transfer">⇄ <strong>Transfer from</strong>${who}</div>`;
   }
+  // Checked even when the job also received a transfer — the early return
+  // above used to hide the onward leg on exactly the jobs that have one.
   const dest=all.find(j=>j.is_transfer && j.transfer_from_job_id===job.id);
   if(dest){
     return `<div class="card-transfer">⇄ <strong>Transfer to</strong> ${refOf(dest)}</div>`;
@@ -491,7 +498,7 @@ function cardHTML(e, jobById, showTeam){
           ? `<div class="card-photo">📷 Photos ${_pj.photo_time}</div>` : ''}
       ${propTag?`<div class="card-prop">${propTag}</div>`:''}
       ${(e.type==='install')?loadedLine(_pj):''}
-      ${transferLine(_pj, jobById)}
+      ${transferLine(_pj, jobById, e.type)}
       ${e.notes?`<div class="card-note">📝 ${e.notes}</div>`:''}
       ${(isTask && e.job_id && jobById[e.job_id])
           ? `<div class="card-job-link">${jobById[e.job_id].job_ref||jobById[e.job_id].job_number||'Job'}${

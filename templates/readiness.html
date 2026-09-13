@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Readiness · LUMA</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{--ink:#1A1714;--muted:#9A8F80;--border:#D8CFBF;--warm:#F2EDE4;--cream:#FAF8F4;
+  --accent:#B8935A;--green:#4A7C59;--red:#A63D2F;--amber:#C88A2E;--blue:#4A7EB8;--purple:#6A3D8A;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;}
+
+.hero{background:var(--ink);padding:20px;text-align:center;}
+.logo-mark{height:44px;width:auto;display:block;margin:0 auto;}
+.hero-sub{font-size:0.7rem;letter-spacing:0.2em;text-transform:uppercase;
+  color:rgba(250,248,244,0.5);margin-top:10px;}
+
+/* The answer before any row is read */
+.summary{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;
+  padding:14px 16px;background:#fff;border-bottom:1px solid var(--border);}
+.sum{display:flex;align-items:baseline;gap:6px;padding:6px 14px;border-radius:20px;
+  background:var(--warm);}
+.sum-n{font-family:'Cormorant Garamond',serif;font-size:1.3rem;line-height:1;}
+.sum-l{font-size:0.66rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
+.sum.late{background:rgba(166,61,47,0.1);} .sum.late .sum-n{color:var(--red);}
+.sum.due{background:rgba(200,138,46,0.12);} .sum.due .sum-n{color:var(--amber);}
+.sum.ready .sum-n{color:var(--green);}
+
+.page{max-width:1500px;margin:0 auto;padding:16px;}
+.cols{display:flex;gap:12px;overflow-x:auto;padding-bottom:14px;
+  scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}
+.col{flex:0 0 88vw;max-width:430px;scroll-snap-align:start;}
+@media(min-width:900px){.cols{overflow-x:visible;}.col{flex:1;max-width:none;}}
+.col-hdr{padding:10px 14px;background:var(--ink);color:var(--cream);
+  border-radius:8px 8px 0 0;display:flex;justify-content:space-between;align-items:baseline;}
+.col-day{font-family:'Cormorant Garamond',serif;font-size:1.15rem;}
+.col-date{font-size:0.68rem;letter-spacing:0.08em;color:rgba(250,248,244,0.55);}
+.col-body{background:rgba(0,0,0,0.03);border:1px solid var(--border);border-top:none;
+  border-radius:0 0 8px 8px;padding:10px;min-height:120px;}
+
+.row{background:#fff;border:1px solid var(--border);border-left:4px solid var(--green);
+  border-radius:7px;padding:11px 12px;margin-bottom:9px;}
+.row.late{border-left-color:var(--red);}
+.row.due{border-left-color:var(--amber);}
+.row.pickup{border-left-color:var(--blue);}
+.row-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+.row-ref{font-size:0.95rem;font-weight:600;}
+.row-time{font-size:0.78rem;color:var(--muted);white-space:nowrap;}
+.row-addr{font-size:0.8rem;color:var(--muted);margin-top:1px;}
+.row-photo{display:inline-block;margin-top:6px;padding:1px 7px;border-radius:3px;
+  background:rgba(184,147,90,0.14);color:var(--accent);font-size:0.68rem;font-weight:600;}
+
+/* Stages: the colour catches the eye, the words say what to do */
+.stages{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap;}
+.stage{flex:1;min-width:92px;padding:6px 8px;border-radius:5px;background:var(--warm);
+  border:1px solid transparent;}
+.stage-name{font-size:0.6rem;letter-spacing:0.09em;text-transform:uppercase;color:var(--muted);}
+.stage-val{font-size:0.78rem;font-weight:600;margin-top:1px;}
+.stage.done{background:rgba(74,124,89,0.1);border-color:rgba(74,124,89,0.25);}
+.stage.done .stage-val{color:var(--green);}
+.stage.late{background:rgba(166,61,47,0.1);border-color:rgba(166,61,47,0.3);}
+.stage.late .stage-val{color:var(--red);}
+.stage.due{background:rgba(200,138,46,0.12);border-color:rgba(200,138,46,0.3);}
+.stage.due .stage-val{color:var(--amber);}
+.stage-note{font-size:0.62rem;color:var(--muted);margin-top:1px;}
+
+.row-btns{display:flex;gap:7px;margin-top:9px;}
+.row-btn{flex:1;text-align:center;padding:6px;border-radius:5px;text-decoration:none;
+  font-size:0.7rem;font-weight:600;letter-spacing:0.04em;color:#fff;}
+.btn-stylist{background:var(--purple);} .btn-driver{background:var(--green);}
+
+.empty{padding:24px 10px;text-align:center;color:var(--muted);font-size:0.8rem;}
+.loading{padding:40px;text-align:center;color:var(--muted);}
+.note{max-width:680px;margin:6px auto 30px;padding:0 16px;font-size:0.72rem;
+  color:var(--muted);line-height:1.65;text-align:center;}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <img class="logo-mark" src="/static/luma-mark-light.png" alt="LUMA Design Co"/>
+  <div class="hero-sub">Readiness — next three days</div>
+</div>
+
+<div class="summary" id="summary"></div>
+
+<div class="page">
+  <div class="cols" id="cols"><div class="loading">Loading…</div></div>
+</div>
+
+<p class="note" id="rules-note"></p>
+
+<script>
+let DATA={days:[],jobs:[],rules:{}};
+
+const DAY_LABEL=['Today','Tomorrow','Day after'];
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function fmtDay(iso,i){
+  const d=new Date(iso+'T00:00:00');
+  return `${DAY_LABEL[i]||''} · ${d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'})}`;
+}
+function fmtTime(t){
+  if(!t) return '';
+  const [h,m]=String(t).split(':').map(Number);
+  if(isNaN(h)) return '';
+  return `${h%12||12}:${String(m).padStart(2,'0')}${h<12?'am':'pm'}`;
+}
+// Street and suburb — several suburbs share street names
+function streetSuburb(addr){
+  const p=String(addr||'').split(',').map(s=>s.trim()).filter(Boolean);
+  if(!p.length) return '';
+  const suburb=(p[1]||'').replace(/\s+(NSW|VIC|QLD|SA|WA|TAS|NT|ACT)\b/i,'')
+                         .replace(/\s*\b\d{4}\b\s*$/,'').trim();
+  return suburb?`${p[0]}, ${suburb}`:p[0];
+}
+
+function stageHTML(s){
+  // The words matter more than the colour: a red dot says something is wrong,
+  // "18 of 42 picked" says what to do about it.
+  let val;
+  if(s.total===1 && s.name==='Staged') val = s.done ? 'Staged' : 'Not staged';
+  else if(!s.total)                    val = '—';
+  else if(s.done>=s.total)             val = `All ${s.total}`;
+  else                                 val = `${s.done} of ${s.total}`;
+  return `<div class="stage ${s.state}">
+    <div class="stage-name">${esc(s.name)}</div>
+    <div class="stage-val">${esc(val)}</div>
+    ${s.note?`<div class="stage-note">${esc(s.note)}</div>`:''}
+  </div>`;
+}
+
+function rowHTML(j){
+  const cls=j.kind==='pickup'?'pickup':(j.worst==='late'?'late':(j.worst==='due'?'due':''));
+  return `<div class="row ${cls}">
+    <div class="row-top">
+      <div class="row-ref">${esc(j.ref)}${j.kind==='pickup'?' · Pickup':''}</div>
+      <div class="row-time">${fmtTime(j.time)}</div>
+    </div>
+    <div class="row-addr">${esc(streetSuburb(j.address))}</div>
+    ${j.photo_time?`<div class="row-photo">📷 ${esc(j.photo_time)}</div>`:''}
+    ${j.stages.length?`<div class="stages">${j.stages.map(stageHTML).join('')}</div>`:''}
+    <div class="row-btns">
+      <a class="row-btn btn-stylist" href="/stylist/${j.job_id}" target="_blank">Picking list</a>
+      <a class="row-btn btn-driver" href="/driver/${j.job_id}" target="_blank">Loading list</a>
+    </div>
+  </div>`;
+}
+
+function render(){
+  const cols=document.getElementById('cols');
+  const byDay={};
+  (DATA.days||[]).forEach(d=>byDay[d]=[]);
+  (DATA.jobs||[]).forEach(j=>{ if(byDay[j.date]) byDay[j.date].push(j); });
+
+  cols.innerHTML=(DATA.days||[]).map((d,i)=>`
+    <div class="col">
+      <div class="col-hdr">
+        <span class="col-day">${DAY_LABEL[i]||''}</span>
+        <span class="col-date">${fmtDay(d,i).split('· ')[1]||''}</span>
+      </div>
+      <div class="col-body">
+        ${byDay[d].length?byDay[d].map(rowHTML).join('')
+                          :'<div class="empty">Nothing scheduled</div>'}
+      </div>
+    </div>`).join('');
+
+  const late=(DATA.jobs||[]).filter(j=>j.worst==='late').length;
+  const due =(DATA.jobs||[]).filter(j=>j.worst==='due').length;
+  const done=(DATA.jobs||[]).filter(j=>j.worst==='done').length;
+  document.getElementById('summary').innerHTML=`
+    <div class="sum late"><span class="sum-n">${late}</span><span class="sum-l">behind</span></div>
+    <div class="sum due"><span class="sum-n">${due}</span><span class="sum-l">due today</span></div>
+    <div class="sum ready"><span class="sum-n">${done}</span><span class="sum-l">ready</span></div>`;
+
+  const r=DATA.rules||{};
+  document.getElementById('rules-note').textContent=
+    `Counted against: picking complete ${r.picked??2} days before install, `+
+    `bay staged ${r.staged??1} day before, truck loaded ${r.loaded??1} day before. `+
+    `Everything here is worked out from what the crews already tick — nothing extra to record.`;
+}
+
+async function load(){
+  try{
+    const res=await fetch('/api/readiness');
+    DATA=await res.json();
+    render();
+  }catch(e){
+    document.getElementById('cols').innerHTML=
+      '<div class="loading">Could not load. Check the connection and try again.</div>';
+  }
+}
+load();
+setInterval(load, 120000);   // the board is meant to be left open
+</script>
+</body>
+</html>

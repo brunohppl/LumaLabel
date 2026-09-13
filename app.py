@@ -2497,8 +2497,17 @@ def api_readiness():
     out = []
     seen = set()
 
+    # Every action that has to happen on a day gets its own row: staging and
+    # loading happen BEFORE the install, so keying only on the install date
+    # left "what must I do today" invisible.
+    ACTION_TYPES = ('install', 'pickup', 'to_load', 'bay')
+    install_date_by_job = {}
+    for t in tiles:
+        if t.get('type') == 'install' and t.get('date'):
+            install_date_by_job.setdefault(t['job_id'], t['date'])
+
     for e in entries:
-        if (e.get('type') or '') not in ('install', 'pickup'):
+        if (e.get('type') or '') not in ACTION_TYPES:
             continue
         jid = e.get('job_id')
         job = jobs_by_id.get(jid)
@@ -2512,8 +2521,16 @@ def api_readiness():
         except Exception:
             continue
 
+        kind = e.get('type')
+        # Progress is judged against the INSTALL date, wherever the row sits.
+        inst = install_date_by_job.get(jid) or e['date']
+        try:
+            install_days_out = (_dt.strptime(inst, '%Y-%m-%d').date() - today).days
+        except Exception:
+            install_days_out = days_out
+
         # ── Pickups are the reverse flow: only "collected" applies ──
-        if e.get('type') == 'pickup':
+        if kind == 'pickup':
             out.append({
                 'job_id': jid, 'ref': job.get('job_ref') or job.get('job_number') or '—',
                 'address': job.get('address') or '', 'date': e['date'],
@@ -2540,7 +2557,7 @@ def api_readiness():
         def stage(name, done_n, total_n, due_in, extra=None):
             if total_n and done_n >= total_n:
                 state = 'done'
-            elif days_out > due_in:
+            elif install_days_out > due_in:
                 state = 'ok'            # not due yet
             elif days_out == due_in:
                 state = 'due'
@@ -2554,21 +2571,30 @@ def api_readiness():
             {'name': 'Staged',
              'done': 1 if bay_done else 0, 'total': 1,
              'state': ('done' if bay_done else
-                       ('ok' if days_out > READINESS_RULES['staged'] else
-                        ('due' if days_out == READINESS_RULES['staged'] else 'late'))),
+                       ('ok' if install_days_out > READINESS_RULES['staged'] else
+                        ('due' if install_days_out == READINESS_RULES['staged'] else 'late'))),
              'note': None if has_bay else 'no bay tile'},
             stage('Loaded', loaded_n, len(loadable), READINESS_RULES['loaded']),
         ]
+        # A staging row cares about picking and staging; a load row about
+        # picking and loading. Showing all three everywhere was noise.
+        if kind == 'bay':
+            stages = [stages[0], stages[1]]
+        elif kind == 'to_load':
+            stages = [stages[0], stages[2]]
+
         order = {'late': 3, 'due': 2, 'ok': 1, 'done': 0}
         worst = max((s['state'] for s in stages), key=lambda s: order[s])
 
         out.append({
             'job_id': jid, 'ref': job.get('job_ref') or job.get('job_number') or '—',
             'address': job.get('address') or '', 'date': e['date'],
-            'time': e.get('start_time'), 'kind': 'install',
+            'time': e.get('start_time'), 'kind': kind,
             'days_out': days_out, 'stages': stages, 'worst': worst,
             'photo_time': job.get('photo_time'),
             'items': len(pickable),
+            # So a staging or loading row says when the job is actually due
+            'install_date': inst if kind != 'install' else None,
         })
 
     # Worst first: the page exists to surface the few jobs needing attention.

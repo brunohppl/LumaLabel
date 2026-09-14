@@ -46,32 +46,38 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;
 .crew-sub{font-size:0.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;}
 
 .cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);
-  padding:4px;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;
+  padding:4px;display:flex;flex-direction:column;gap:4px;
   overflow:hidden;background:#fff;}
 .cell.quiet{background:rgba(255,255,255,0.45);}
 
 /* A chip per piece of work. Colour is readiness — what needs rescuing. */
-.chip{flex:1 1 auto;min-width:88px;max-width:100%;border-radius:3px;padding:3px 6px;
-  color:#fff;line-height:1.2;overflow:hidden;}
+/* Each chip takes an equal share of the cell's height, so one job fills the
+   cell and the type reads from across the room. */
+.chip{flex:1 1 0;min-height:0;border-radius:4px;padding:5px 8px;color:#fff;
+  line-height:1.15;overflow:hidden;display:flex;flex-direction:column;
+  justify-content:center;}
 .chip.late{background:var(--red);}
 .chip.due{background:var(--amber);}
 .chip.ok{background:var(--ontrack);}
 .chip.done{background:var(--green);}
-.chip-top{font-size:0.72rem;font-weight:700;white-space:nowrap;overflow:hidden;
-  text-overflow:ellipsis;}
-.chip-sub{font-size:0.62rem;opacity:0.93;white-space:nowrap;overflow:hidden;
-  text-overflow:ellipsis;}
-.bang{display:inline-block;width:11px;height:11px;border-radius:50%;background:#fff;
-  color:var(--red);font-size:0.55rem;font-weight:700;text-align:center;line-height:11px;
-  margin-right:3px;vertical-align:0.5px;}
+/* The action first and largest — Install or To Load is the thing to read */
+.chip-kind{font-size:clamp(0.72rem,1.5vh,1.15rem);font-weight:700;letter-spacing:0.08em;
+  text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  line-height:1.1;}
+.chip-top{font-size:clamp(0.64rem,1.15vh,0.9rem);font-weight:600;opacity:0.95;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chip-sub{font-size:clamp(0.6rem,1vh,0.82rem);opacity:0.9;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;}
+.bang{display:inline-block;width:13px;height:13px;border-radius:50%;background:#fff;
+  color:var(--red);font-size:0.62rem;font-weight:700;text-align:center;line-height:13px;
+  margin-right:5px;vertical-align:1px;}
 .kind{opacity:0.75;font-weight:500;}
 .msg{padding:30px;text-align:center;color:var(--muted);grid-column:1/-1;}
 
 /* Denser when there are many crews, so it still fits one screen */
 body.tight .crew{font-size:0.72rem;}
-body.tight .chip-top{font-size:0.66rem;}
-body.tight .chip-sub{font-size:0.58rem;}
-body.tight .chip{min-width:74px;padding:2px 5px;}
+body.tight .chip{padding:3px 6px;}
+body.tight .chip-kind{font-size:clamp(0.62rem,1.15vh,0.9rem);}
 </style>
 </head>
 <body>
@@ -119,8 +125,8 @@ function chipHTML(j){
     `${s.name}: ${s.total?`${s.done}/${s.total}`:'—'}${s.note?' ('+s.note+')':''}`).join('\n');
   return `<div class="chip ${j.worst}"
       title="${esc(j.ref)} · ${esc(KIND[j.kind]||j.kind)}\n${esc(street(j.address))}${j.install_date?'\nInstalls '+esc(shortDate(j.install_date)):''}\n${esc(detail)}">
-    <div class="chip-top">${j.worst==='late'?'<span class="bang">!</span>':''}${esc(j.ref)}
-      <span class="kind">${esc((KIND[j.kind]||'').replace('Load ','').slice(0,5))}</span></div>
+    <div class="chip-kind">${j.worst==='late'?'<span class="bang">!</span>':''}${esc(KIND[j.kind]||j.kind)}</div>
+    <div class="chip-top">${esc(j.ref)}</div>
     <div class="chip-sub">${esc(blurb(j))}</div>
   </div>`;
 }

@@ -606,7 +606,7 @@ function render(){
       const accessTag=(!isTask&&job&&job.access_notes)?`<span class="rs-access" title="${String(job.access_notes).replace(/"/g,'&quot;')}">🔑</span>`:'';
       // A transfer comes from another job rather than the warehouse, so the
       // crew needs to know before they start loading.
-      const transferTag=(!isTask&&job)?transferBadge(job):'';
+      const transferTag=(!isTask&&job)?transferBadge(job, e.type):'';
       const loadTag=(!isTask&&job)?loadedTag(e, job):'';
 
       // Sub-column positioning
@@ -1080,7 +1080,7 @@ function renderTray(){
     const photoTag=job&&job.photo_time?`<div style="font-size:0.7rem;font-weight:600;color:var(--accent);">📷 ${job.photo_time}</div>`:'';
     const typeCls=e.type||'install';
     const orphanFlag=(e.start_time && !resolvesToTeam(e))?' <span title="Had a time but no matching team — please reassign">⚠️</span>':'';
-    const trayTransfer=job?transferBadge(job):'';
+    const trayTransfer=job?transferBadge(job, e.type):'';
     // Which truck is already carrying this job's stock — the thing you need to
     // know BEFORE placing it, so it lands on the right vehicle.
     const trayVehicles=(job && e.type==='install')?loadVehicles(job.id):[];
@@ -1670,12 +1670,18 @@ function loadedTag(entry, job){
   return `<span class="rs-loaded" title="Loaded on ${label}">📦 ${label}</span>`;
 }
 
-function transferInfo(job){
+function transferInfo(job, type){
   if(!job) return null;
-  if(job.is_transfer && job.transfer_from_job_id){
+  // On a pickup the crew is taking stock away, so where it's GOING matters.
+  // Where it came from is history that mattered on install day. Same rule as
+  // the team view.
+  const showFrom = type!=='pickup';
+  if(showFrom && job.is_transfer && job.transfer_from_job_id){
     const src=dayJobs.find(j=>j.id===job.transfer_from_job_id);
     return {dir:'from', ref: transferPartnerLabel(src)};
   }
+  // Checked even when the job also received a transfer — otherwise a job in
+  // the middle of a chain never shows its onward leg.
   const dest=dayJobs.find(j=>j.is_transfer && j.transfer_from_job_id===job.id);
   if(dest) return {dir:'to', ref: transferPartnerLabel(dest)};
   return null;
@@ -1691,8 +1697,8 @@ function transferPartnerLabel(j){
   return [ref,street].filter(Boolean).join(' · ') || 'another job';
 }
 
-function transferBadge(job){
-  const t=transferInfo(job);
+function transferBadge(job, type){
+  const t=transferInfo(job, type);
   if(!t) return '';
   const label = t.dir==='from' ? 'TRANSFER FROM' : 'TRANSFER TO';
   return `<span class="rs-transfer">${label}${t.ref?' '+t.ref:''}</span>`;

@@ -126,6 +126,29 @@ setTimeout(async()=>{
     ok('access appears below the address', h3.indexOf('card-addr')<a);
   }
   ok('property line kept', /card-prop/.test(d.body.innerHTML));
+  // ── Filters and empty crews ──
+  ok('filter buttons present', d.querySelectorAll('#fn-filter .fn-btn').length===4);
+  ok('All is selected by default', d.querySelector('.fn-btn[data-fn="all"]').classList.contains('active'));
+  const colNames=()=>[...d.querySelectorAll('.team-col-name')].map(x=>x.textContent.trim());
+  ok('a crew with nothing scheduled is hidden', !colNames().includes('Idle Crew'));
+  ok('crews with work are shown', colNames().length>0);
+
+  const before=colNames().length;
+  w.setFnFilter('warehouse');
+  await sleep(40);
+  const wh=[...d.querySelectorAll('.team-col-fn')].map(x=>x.textContent);
+  ok('filtering to warehouse shows only warehouse', wh.every(t=>/Warehouse/.test(t)));
+  ok('and the button is marked active', d.querySelector('.fn-btn[data-fn="warehouse"]').classList.contains('active'));
+
+  w.setFnFilter('transport');
+  await sleep(40);
+  ok('filtering to transport shows only transport',
+     [...d.querySelectorAll('.team-col-fn')].map(x=>x.textContent).every(t=>/Transport/.test(t)));
+
+  w.setFnFilter('all');
+  await sleep(40);
+  ok('All brings every working crew back', colNames().length===before);
+
   ok('card shows street and suburb', /12 Somers St, Ascot/.test(d.body.innerHTML));
   ok('the day request is made', dayCalls.length>=1);
   ok('it fires once, not twice (prefetch reused)', dayCalls.length===1);

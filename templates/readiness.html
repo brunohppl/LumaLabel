@@ -4,223 +4,202 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Readiness · LUMA</title>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 :root{--ink:#1A1714;--muted:#9A8F80;--border:#D8CFBF;--warm:#F2EDE4;--cream:#FAF8F4;
-  --accent:#B8935A;--green:#4A7C59;--red:#A63D2F;--amber:#C88A2E;--blue:#4A7EB8;--purple:#6A3D8A;}
+  --accent:#B8935A;--green:#4A7C59;--red:#A63D2F;--amber:#C88A2E;--sand:#EDE7DC;
+  --ontrack:#8D8577;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;}
+html,body{height:100%;}
+body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;
+  display:flex;flex-direction:column;overflow:hidden;}
 
-.hero{background:var(--ink);padding:20px;text-align:center;}
-.logo-mark{height:44px;width:auto;display:block;margin:0 auto;}
-.hero-sub{font-size:0.7rem;letter-spacing:0.2em;text-transform:uppercase;
-  color:rgba(250,248,244,0.5);margin-top:10px;}
+/* Thin header — the grid is what matters */
+.bar{display:flex;align-items:center;gap:14px;padding:7px 14px;background:var(--ink);flex:0 0 auto;}
+.bar img{height:24px;width:auto;}
+.bar-title{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--cream);letter-spacing:0.05em;}
+.legend{display:flex;gap:11px;margin-left:auto;align-items:center;flex-wrap:wrap;}
+.lg{display:flex;align-items:center;gap:5px;font-size:0.62rem;letter-spacing:0.08em;
+  text-transform:uppercase;color:rgba(250,248,244,0.6);}
+.lg i{width:10px;height:10px;border-radius:2px;display:inline-block;}
+.fs{background:transparent;border:1px solid rgba(250,248,244,0.28);color:rgba(250,248,244,0.75);
+  font-family:'Jost',sans-serif;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;
+  padding:5px 11px;border-radius:3px;cursor:pointer;}
+.fs:hover{border-color:var(--accent);color:var(--accent);}
 
-/* The answer before any row is read */
-.summary{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;
-  padding:14px 16px;background:#fff;border-bottom:1px solid var(--border);}
-.sum{display:flex;align-items:baseline;gap:6px;padding:6px 14px;border-radius:20px;
-  background:var(--warm);}
-.sum-n{font-family:'Cormorant Garamond',serif;font-size:1.3rem;line-height:1;}
-.sum-l{font-size:0.66rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
-.sum.late{background:rgba(166,61,47,0.1);} .sum.late .sum-n{color:var(--red);}
-.sum.due{background:rgba(200,138,46,0.12);} .sum.due .sum-n{color:var(--amber);}
-.sum.ready .sum-n{color:var(--green);}
+/* Three days split the height evenly — no filler */
+.days{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;}
+.day{flex:1 1 0;display:flex;flex-direction:column;min-height:0;border-top:2px solid var(--border);}
+.day:first-child{border-top:none;}
+.day-hdr{flex:0 0 auto;display:flex;align-items:baseline;gap:10px;padding:3px 12px;background:var(--sand);}
+.day-name{font-size:0.72rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;}
+.day-date{font-size:0.66rem;color:var(--muted);}
+.day-late{margin-left:auto;font-size:0.66rem;font-weight:700;color:var(--red);letter-spacing:0.06em;}
+.day-body{flex:1 1 auto;overflow:auto;}
 
-.page{max-width:1500px;margin:0 auto;padding:16px;}
-.cols{display:flex;gap:12px;overflow-x:auto;padding-bottom:14px;
-  scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}
-.col{flex:0 0 88vw;max-width:430px;scroll-snap-align:start;}
-@media(min-width:900px){.cols{overflow-x:visible;}.col{flex:1;max-width:none;}}
-.col-hdr{padding:10px 14px;background:var(--ink);color:var(--cream);
-  border-radius:8px 8px 0 0;display:flex;justify-content:space-between;align-items:baseline;}
-.col-day{font-family:'Cormorant Garamond',serif;font-size:1.15rem;}
-.col-date{font-size:0.68rem;letter-spacing:0.08em;color:rgba(250,248,244,0.55);}
-.col-late{color:#E8836F;font-weight:700;}
-.col-body{background:rgba(0,0,0,0.03);border:1px solid var(--border);border-top:none;
-  border-radius:0 0 8px 8px;padding:10px;min-height:120px;}
+/* Crew rows and a time axis — the day view's shape */
+.rowline{display:flex;border-bottom:1px solid rgba(216,207,191,0.55);min-height:32px;}
+.rowline:last-child{border-bottom:none;}
+.rowhead{position:sticky;left:0;z-index:3;flex:0 0 106px;background:var(--warm);
+  border-right:1px solid var(--border);padding:4px 7px;}
+.crew{font-size:0.72rem;font-weight:600;line-height:1.15;}
+.crew-sub{font-size:0.58rem;color:var(--muted);line-height:1.15;text-transform:uppercase;
+  letter-spacing:0.05em;}
+.lane{position:relative;flex:1;}
+.ruler{display:flex;background:var(--sand);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:4;}
+.ruler .rowhead{background:var(--sand);}
+.ruler-lane{position:relative;flex:1;height:15px;}
+.tick{position:absolute;bottom:1px;font-size:0.57rem;color:var(--muted);
+  transform:translateX(-50%);white-space:nowrap;}
+.gl{position:absolute;top:0;bottom:0;width:1px;background:rgba(216,207,191,0.5);}
 
-.row{background:#fff;border:1px solid var(--border);border-left:4px solid var(--green);
-  border-radius:7px;padding:11px 12px;margin-bottom:9px;}
-.row.late{border-left-color:var(--red);}
-.row.due{border-left-color:var(--amber);}
-.row.k-pickup{border-left-color:var(--blue);}
-.row.k-bay{border-left-color:var(--accent);}
-.row.k-to_load{border-left-color:var(--accent);}
-/* Colour alone isn't enough — colour-blind eyes and sunlit screens both
-   lose red. The shape says the same thing a second way. Only "late" gets
-   one: if "due today" had one too, the distinction would vanish. */
-.alert{display:inline-flex;align-items:center;justify-content:center;
-  width:19px;height:19px;margin-right:7px;border-radius:50%;
-  background:var(--red);color:#fff;font-size:0.76rem;font-weight:700;
-  line-height:1;vertical-align:-3px;}
-.kind{display:inline-block;margin-right:7px;padding:1px 7px;border-radius:3px;
-  font-size:0.6rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;
-  color:#fff;background:var(--muted);vertical-align:1px;}
-.kind.install{background:var(--green);}
-.kind.pickup{background:var(--blue);}
-.kind.bay,.kind.to_load{background:var(--accent);}
-.row-due{font-size:0.72rem;color:var(--muted);margin-top:3px;font-style:italic;}
-.row-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
-.row-ref{font-size:0.95rem;font-weight:600;}
-.row-time{font-size:0.78rem;color:var(--muted);white-space:nowrap;}
-.row-addr{font-size:0.8rem;color:var(--muted);margin-top:1px;}
-.row-photo{display:inline-block;margin-top:6px;padding:1px 7px;border-radius:3px;
-  background:rgba(184,147,90,0.14);color:var(--accent);font-size:0.68rem;font-weight:600;}
-
-/* Stages: the colour catches the eye, the words say what to do */
-.stages{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap;}
-.stage{flex:1;min-width:92px;padding:6px 8px;border-radius:5px;background:var(--warm);
-  border:1px solid transparent;}
-.stage-name{font-size:0.6rem;letter-spacing:0.09em;text-transform:uppercase;color:var(--muted);}
-.stage-val{font-size:0.78rem;font-weight:600;margin-top:1px;}
-.stage.done{background:rgba(74,124,89,0.1);border-color:rgba(74,124,89,0.25);}
-.stage.done .stage-val{color:var(--green);}
-.stage.late{background:rgba(166,61,47,0.1);border-color:rgba(166,61,47,0.3);}
-.stage.late .stage-val{color:var(--red);}
-.stage.due{background:rgba(200,138,46,0.12);border-color:rgba(200,138,46,0.3);}
-.stage.due .stage-val{color:var(--amber);}
-.stage-note{font-size:0.62rem;color:var(--muted);margin-top:1px;}
-.stage.done .stage-note{color:var(--amber);font-weight:600;}
-
-.row-btns{display:flex;gap:7px;margin-top:9px;}
-.row-btn{flex:1;text-align:center;padding:6px;border-radius:5px;text-decoration:none;
-  font-size:0.7rem;font-weight:600;letter-spacing:0.04em;color:#fff;}
-.btn-stylist{background:var(--purple);} .btn-driver{background:var(--green);}
-
-.empty{padding:24px 10px;text-align:center;color:var(--muted);font-size:0.8rem;}
-.loading{padding:40px;text-align:center;color:var(--muted);}
-.note{max-width:680px;margin:6px auto 30px;padding:0 16px;font-size:0.72rem;
-  color:var(--muted);line-height:1.65;text-align:center;}
+/* Colour is READINESS, not job type — this board is about what needs rescuing */
+.blk{position:absolute;top:3px;bottom:3px;border-radius:3px;padding:2px 5px;overflow:hidden;
+  color:#fff;font-size:0.63rem;line-height:1.2;border-left:3px solid rgba(0,0,0,0.22);}
+.blk.late{background:var(--red);}
+.blk.due{background:var(--amber);}
+.blk.ok{background:var(--ontrack);}
+.blk.done{background:var(--green);}
+.blk-top{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.blk-sub{opacity:0.93;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:0.59rem;}
+.bang{display:inline-block;width:12px;height:12px;border-radius:50%;background:#fff;
+  color:var(--red);font-size:0.57rem;font-weight:700;text-align:center;line-height:12px;
+  margin-right:4px;vertical-align:0.5px;}
+.empty{padding:7px 12px;color:var(--muted);font-size:0.68rem;}
+.msg{padding:30px;text-align:center;color:var(--muted);}
 </style>
 </head>
 <body>
 
-<div class="hero">
-  <img class="logo-mark" src="/static/luma-mark-light.png" alt="LUMA Design Co"/>
-  <div class="hero-sub">Readiness — next three days</div>
+<div class="bar">
+  <img src="/static/luma-mark-light.png" alt="LUMA"/>
+  <span class="bar-title">Readiness</span>
+  <div class="legend">
+    <span class="lg"><i style="background:#A63D2F"></i>Behind</span>
+    <span class="lg"><i style="background:#C88A2E"></i>Due</span>
+    <span class="lg"><i style="background:#8D8577"></i>On track</span>
+    <span class="lg"><i style="background:#4A7C59"></i>Ready</span>
+    <button class="fs" id="fs-btn" onclick="toggleFull()">Full screen</button>
+  </div>
 </div>
 
-<div class="summary" id="summary"></div>
-
-<div class="page">
-  <div class="cols" id="cols"><div class="loading">Loading…</div></div>
-</div>
-
-<p class="note" id="rules-note"></p>
+<div class="days" id="days"><div class="msg">Loading…</div></div>
 
 <script>
-let DATA={days:[],jobs:[],rules:{}};
-
+const DAY_START=7*60+30, DAY_END=15*60+30;
 const DAY_LABEL=['Today','Tomorrow','Day after'];
+const KIND={install:'Install',to_load:'Load truck',bay:'Load bay'};
+let DATA={days:[],jobs:[],teams:[],rules:{}};
+
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-
-function fmtDay(iso,i){
-  const d=new Date(iso+'T00:00:00');
-  return `${DAY_LABEL[i]||''} · ${d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'})}`;
-}
-function fmtShort(iso){
+const toMin=t=>{
+  if(!t) return null;
+  const [h,m]=String(t).split(':').map(Number);
+  return (isNaN(h)||isNaN(m))?null:h*60+m;
+};
+const fmtH=m=>`${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
+const street=a=>String(a||'').split(',')[0].trim();
+function shortDate(iso){
   try{
-    const d=new Date(iso+'T00:00:00');
-    return d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+    return new Date(iso+'T00:00:00')
+      .toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
   }catch(e){ return iso; }
 }
-function fmtTime(t){
-  if(!t) return '';
-  const [h,m]=String(t).split(':').map(Number);
-  if(isNaN(h)) return '';
-  return `${h%12||12}:${String(m).padStart(2,'0')}${h<12?'am':'pm'}`;
-}
-// Street and suburb — several suburbs share street names
-function streetSuburb(addr){
-  const p=String(addr||'').split(',').map(s=>s.trim()).filter(Boolean);
-  if(!p.length) return '';
-  const suburb=(p[1]||'').replace(/\s+(NSW|VIC|QLD|SA|WA|TAS|NT|ACT)\b/i,'')
-                         .replace(/\s*\b\d{4}\b\s*$/,'').trim();
-  return suburb?`${p[0]}, ${suburb}`:p[0];
+
+// Say the shortfall that needs rescuing, not just the stage name
+function blurb(j){
+  const st=j.stages||[];
+  const bad=st.filter(s=>s.state==='late') .concat(st.filter(s=>s.state==='due'));
+  const s=bad[0]||st[0];
+  if(!s) return KIND[j.kind]||j.kind;
+  if(s.total && s.done<s.total) return `${s.name} ${s.done}/${s.total}`;
+  return s.note || `${s.name} done`;
 }
 
-function stageHTML(s){
-  // The words matter more than the colour: a red dot says something is wrong,
-  // "18 of 42 picked" says what to do about it.
-  let val;
-  if(!s.total)              val = '—';
-  else if(s.done>=s.total)  val = `All ${s.total}`;
-  else                      val = `${s.done} of ${s.total}`;   // keep the gap visible
-  return `<div class="stage ${s.state}">
-    <div class="stage-name">${esc(s.name)}</div>
-    <div class="stage-val">${esc(val)}</div>
-    ${s.note?`<div class="stage-note">${esc(s.note)}</div>`:''}
-  </div>`;
-}
-
-const KIND_LBL={install:'Install',pickup:'Pickup',to_load:'Load truck',bay:'Load bay'};
-
-function rowHTML(j){
-  const cls=(j.worst==='late'?'late':(j.worst==='due'?'due':''))+' k-'+j.kind;
-  // Every row says what has to happen THAT DAY — that was the thing missing.
-  return `<div class="row ${cls}">
-    <div class="row-top">
-      <div class="row-ref">${j.worst==='late'?'<span class="alert" title="Behind schedule" aria-label="Behind schedule">!</span>':''}<span class="kind ${j.kind}">${KIND_LBL[j.kind]||j.kind}</span>${esc(j.ref)}</div>
-      <div class="row-time">${fmtTime(j.time)}</div>
-    </div>
-    <div class="row-addr">${esc(streetSuburb(j.address))}</div>
-    ${j.install_date?`<div class="row-due">Installs ${fmtShort(j.install_date)}</div>`:''}
-    ${j.photo_time?`<div class="row-photo">📷 ${esc(j.photo_time)}</div>`:''}
-    ${j.stages.length?`<div class="stages">${j.stages.map(stageHTML).join('')}</div>`:''}
-    <div class="row-btns">
-      <a class="row-btn btn-stylist" href="/stylist/${j.job_id}" target="_blank">Picking list</a>
-      <a class="row-btn btn-driver" href="/driver/${j.job_id}" target="_blank">Loading list</a>
-    </div>
+function blockHTML(j){
+  const t=toMin(j.time);
+  const start=(t===null)?DAY_START:Math.min(Math.max(DAY_START,t),DAY_END-30);
+  const dur=Math.max(30,j.duration||60);
+  const left=(start-DAY_START)/(DAY_END-DAY_START)*100;
+  const width=Math.max(4,Math.min(100-left,dur/(DAY_END-DAY_START)*100));
+  // Read-only, so everything sits in the tooltip rather than behind a tap
+  const detail=(j.stages||[]).map(s=>
+    `${s.name}: ${s.total?`${s.done}/${s.total}`:'—'}${s.note?' ('+s.note+')':''}`).join('\n');
+  const head=`${j.ref} · ${KIND[j.kind]||j.kind}`;
+  return `<div class="blk ${j.worst}" style="left:${left}%;width:${width}%"
+      title="${esc(head)}\n${esc(street(j.address))}${j.install_date?'\nInstalls '+esc(shortDate(j.install_date)):''}\n${esc(detail)}">
+    <div class="blk-top">${j.worst==='late'?'<span class="bang">!</span>':''}${esc(j.ref)}</div>
+    <div class="blk-sub">${esc(blurb(j))}</div>
   </div>`;
 }
 
 function render(){
-  const cols=document.getElementById('cols');
-  const byDay={};
-  (DATA.days||[]).forEach(d=>byDay[d]=[]);
-  (DATA.jobs||[]).forEach(j=>{ if(byDay[j.date]) byDay[j.date].push(j); });
+  const wrap=document.getElementById('days');
+  const teamsByDay={}, rowsByDay={};
+  (DATA.days||[]).forEach(d=>{ teamsByDay[d]=[]; rowsByDay[d]=[]; });
+  (DATA.teams||[]).forEach(t=>{ if(teamsByDay[t.date]) teamsByDay[t.date].push(t); });
+  (DATA.jobs||[]).forEach(j=>{ if(rowsByDay[j.date]) rowsByDay[j.date].push(j); });
 
-  cols.innerHTML=(DATA.days||[]).map((d,i)=>`
-    <div class="col">
-      <div class="col-hdr">
-        <span class="col-day">${DAY_LABEL[i]||''}</span>
-        <span class="col-date">${(() => {
-          const n=byDay[d].filter(r=>r.worst==='late').length;
-          const when=fmtDay(d,i).split('· ')[1]||'';
-          return n ? `<span class="col-late">${n} behind</span> · ${when}` : when;
-        })()}</span>
+  wrap.innerHTML=(DATA.days||[]).map((d,i)=>{
+    const teams=teamsByDay[d]||[], rows=rowsByDay[d]||[];
+    const late=rows.filter(r=>r.worst==='late').length;
+
+    const groups=teams.map(t=>({team:t,
+      rows:rows.filter(r=>r.team_id===t.id ||
+        (!r.team_id && r.vehicle && r.vehicle===t.vehicle))}));
+    // Work nobody has been given is exactly what gets missed — show it.
+    const placed=new Set(groups.flatMap(g=>g.rows));
+    const loose=rows.filter(r=>!placed.has(r));
+    if(loose.length) groups.push({team:{id:'_',name:'Unassigned',function:''},rows:loose});
+
+    let ticks='',gl='';
+    for(let m=DAY_START;m<=DAY_END;m+=60){
+      const pct=(m-DAY_START)/(DAY_END-DAY_START)*100;
+      ticks+=`<div class="tick" style="left:${pct}%">${fmtH(m)}</div>`;
+      gl+=`<div class="gl" style="left:${pct}%"></div>`;
+    }
+
+    const body=groups.length
+      ? groups.map(g=>`
+        <div class="rowline">
+          <div class="rowhead">
+            <div class="crew">${esc(g.team.name||g.team.vehicle||'Team')}</div>
+            <div class="crew-sub">${esc(g.team.function||'')}</div>
+          </div>
+          <div class="lane">${gl}${g.rows.map(blockHTML).join('')}</div>
+        </div>`).join('')
+      : '<div class="empty">Nothing scheduled</div>';
+
+    return `<section class="day">
+      <div class="day-hdr">
+        <span class="day-name">${DAY_LABEL[i]||''}</span>
+        <span class="day-date">${shortDate(d)}</span>
+        ${late?`<span class="day-late">${late} need rescuing</span>`:''}
       </div>
-      <div class="col-body">
-        ${byDay[d].length?byDay[d].map(rowHTML).join('')
-                          :'<div class="empty">Nothing scheduled</div>'}
+      <div class="day-body">
+        <div class="ruler"><div class="rowhead"></div><div class="ruler-lane">${ticks}</div></div>
+        ${body}
       </div>
-    </div>`).join('');
-
-  // Count JOBS, not rows: one job can appear as a bay row and an install
-  // row on different days, and counting it twice overstates the problem.
-  const worstByJob={};
-  const rank={late:3,due:2,ok:1,done:0};
-  (DATA.jobs||[]).forEach(j=>{
-    const cur=worstByJob[j.job_id];
-    if(cur===undefined || rank[j.worst]>rank[cur]) worstByJob[j.job_id]=j.worst;
-  });
-  const vals=Object.values(worstByJob);
-  const late=vals.filter(v=>v==='late').length;
-  const due =vals.filter(v=>v==='due').length;
-  const done=vals.filter(v=>v==='done').length;
-  document.getElementById('summary').innerHTML=`
-    <div class="sum late"><span class="sum-n">${late}</span><span class="sum-l">behind</span></div>
-    <div class="sum due"><span class="sum-n">${due}</span><span class="sum-l">due today</span></div>
-    <div class="sum ready"><span class="sum-n">${done}</span><span class="sum-l">ready</span></div>`;
-
-  const r=DATA.rules||{};
-  document.getElementById('rules-note').textContent=
-    `Counted against: picking complete ${r.picked??2} days before install, `+
-    `bay staged ${r.staged??1} day before, truck loaded ${r.loaded??1} day before. `+
-    `Everything here is worked out from what the crews already tick — nothing extra to record.`;
+    </section>`;
+  }).join('');
 }
+
+function toggleFull(){
+  const el=document.documentElement;
+  try{
+    if(!document.fullscreenElement){
+      (el.requestFullscreen||el.webkitRequestFullscreen||(()=>{})).call(el);
+    }else{
+      (document.exitFullscreen||document.webkitExitFullscreen||(()=>{})).call(document);
+    }
+  }catch(e){ /* not supported — the page still works */ }
+}
+document.addEventListener('fullscreenchange',()=>{
+  const b=document.getElementById('fs-btn');
+  if(b) b.textContent=document.fullscreenElement?'Exit full screen':'Full screen';
+});
 
 async function load(){
   try{
@@ -228,12 +207,12 @@ async function load(){
     DATA=await res.json();
     render();
   }catch(e){
-    document.getElementById('cols').innerHTML=
-      '<div class="loading">Could not load. Check the connection and try again.</div>';
+    document.getElementById('days').innerHTML=
+      '<div class="msg">Could not load. Check the connection and try again.</div>';
   }
 }
 load();
-setInterval(load, 120000);   // the board is meant to be left open
+setInterval(load,120000);   // meant to be left on a screen
 </script>
 </body>
 </html>

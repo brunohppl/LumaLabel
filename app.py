@@ -2464,6 +2464,19 @@ READINESS_RULES = {
 
 @app.route('/api/readiness', methods=['GET'])
 def api_readiness():
+    try:
+        return _readiness_payload()
+    except Exception as e:
+        # A blank board with "could not load" is impossible to diagnose from
+        # the outside; name the failure instead.
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'{type(e).__name__}: {e}',
+                        'days': [], 'jobs': [], 'teams': [],
+                        'rules': READINESS_RULES}), 500
+
+
+def _readiness_payload():
     """Job readiness for today and the next two days.
 
     Every figure is derived from work the crews already record — picking from
@@ -2535,9 +2548,9 @@ def api_readiness():
             continue
         jid = e.get('job_id')
         job = jobs_by_id.get(jid)
-        if not job or (jid, e.get('date')) in seen:
+        if not job or (jid, e.get('date'), e.get('type')) in seen:
             continue
-        seen.add((jid, e.get('date')))
+        seen.add((jid, e.get('date'), e.get('type')))
 
         try:
             due = _dt.strptime(e['date'], '%Y-%m-%d').date()

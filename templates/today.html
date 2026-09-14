@@ -103,6 +103,12 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .nav-back:hover{color:var(--accent);}
 
 /* Team columns — full day view */
+.fn-filter{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:0 0 14px;}
+.fn-btn{padding:6px 13px;background:transparent;border:1px solid var(--border);border-radius:20px;
+  font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.04em;color:var(--muted);
+  cursor:pointer;white-space:nowrap;}
+.fn-btn:hover{border-color:var(--accent);color:var(--accent);}
+.fn-btn.active{background:var(--ink);border-color:var(--ink);color:var(--cream);}
 .team-cols{display:flex;gap:12px;overflow-x:auto;padding-bottom:20px;margin:0 -16px;padding-left:16px;padding-right:16px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}
 .team-cols::-webkit-scrollbar{height:4px;}
 .team-cols::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
@@ -209,6 +215,13 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
     <button class="btn-today" onclick="goToday()">Today</button>
   </div>
 
+  <div class="fn-filter" id="fn-filter">
+    <button class="fn-btn active" data-fn="all" onclick="setFnFilter('all')">All</button>
+    <button class="fn-btn" data-fn="transport" onclick="setFnFilter('transport')">🚛 Transport</button>
+    <button class="fn-btn" data-fn="styling" onclick="setFnFilter('styling')">🎨 Styling</button>
+    <button class="fn-btn" data-fn="warehouse" onclick="setFnFilter('warehouse')">🏭 Warehouse</button>
+  </div>
+
   <div class="scroll-hint" id="scroll-hint" style="display:none;">← swipe to see more teams →</div>
   <div id="dayview-root" style="display:none;"></div>
   <div id="mapview-root" style="display:none;"></div>
@@ -276,6 +289,14 @@ async function load(){
 }
 
 let activeTab='cards';
+let fnFilter='all';       // all | transport | styling | warehouse
+
+function setFnFilter(fn){
+  fnFilter=fn;
+  document.querySelectorAll('#fn-filter .fn-btn').forEach(b=>
+    b.classList.toggle('active', b.dataset.fn===fn));
+  renderDay();
+}
 
 function showTab(which){
   activeTab = which;
@@ -334,14 +355,38 @@ function renderDay(){
       content.innerHTML='<div class="empty"><div class="empty-title">Nothing scheduled</div><div class="empty-sub">No teams set up for this day yet.</div></div>';
       return;
     }
+    // Work out each crew's entries first: a crew with nothing scheduled is
+    // just an empty column to scroll past, and the filter should count only
+    // crews that actually have something on.
+    const withWork=teams.map(team=>({
+      team,
+      entries:[
+        ...schedule.filter(e=>e.team_id===team.id||(!e.team_id&&team.vehicle&&e.vehicle===team.vehicle))
+                   .map(e=>({...e,_team:team,_isTask:false})),
+        ...tasks.filter(t=>resolveTaskTeam(t,teams)===team.id).map(t=>({...t,_team:team,_isTask:true})),
+      ].sort((a,b)=>(a.start_time||'99:99').localeCompare(b.start_time||'99:99'))
+    })).filter(x=>x.entries.length);
+
+    const shown=withWork.filter(x=>fnFilter==='all'||x.team.function===fnFilter);
+
+    // Only offer a filter for crews that are actually on today
+    const present=new Set(withWork.map(x=>x.team.function));
+    document.querySelectorAll('#fn-filter .fn-btn').forEach(b=>{
+      const f=b.dataset.fn;
+      b.style.display=(f==='all'||present.has(f))?'':'none';
+    });
+
+    if(!shown.length){
+      document.getElementById('day-content').innerHTML=
+        `<div class="empty">Nothing scheduled${fnFilter==='all'?' for this day':' for that group'}.</div>`;
+      document.getElementById('scroll-hint').style.display='none';
+      return;
+    }
+
     let html=`<div class="team-cols">`;
-    teams.forEach(team=>{
+    shown.forEach(({team,entries:teamEntries})=>{
       const col=FN_COL[team.function]||'#1a1714';
       const others=(team.members||[]).filter(m=>m!==team.lead).join(', ');
-      const teamEntries=[
-        ...schedule.filter(e=>e.team_id===team.id||(!e.team_id&&team.vehicle&&e.vehicle===team.vehicle)).map(e=>({...e,_team:team,_isTask:false})),
-        ...tasks.filter(t=>resolveTaskTeam(t,teams)===team.id).map(t=>({...t,_team:team,_isTask:true})),
-      ].sort((a,b)=>(a.start_time||'99:99').localeCompare(b.start_time||'99:99'));
 
       html+=`<div class="team-col">
         <div class="team-col-hdr" style="background:${col};">
@@ -352,10 +397,7 @@ function renderDay(){
           ${others?`<div class="team-col-sub">${others}</div>`:''}
         </div>
         <div class="team-col-cards">
-          ${teamEntries.length
-            ? teamEntries.map(e=>cardHTML(e,jobById,false)).join('')
-            : '<div style="font-size:0.82rem;color:var(--muted);padding:16px 4px;">Nothing scheduled.</div>'
-          }
+          ${teamEntries.map(e=>cardHTML(e,jobById,false)).join('')}
         </div>
       </div>`;
     });

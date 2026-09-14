@@ -2639,18 +2639,22 @@ def _readiness_payload():
                   None if has_bay else 'no bay tile booked'),
             stage('Loaded', loaded_n, loaded_total, READINESS_RULES['loaded']),
         ]
+        # Apply the status overrides BEFORE trimming. Trimming first left
+        # two stages behind and the code below still indexed the third —
+        # any bay or load row on a job marked loaded took the whole board
+        # down with an IndexError.
+        if status_picked:
+            forced(stages[0], picked_n, picked_total, 'marked ready to load')
+        if status_loaded:
+            forced(stages[1], staged_n, loaded_total, 'marked loaded')
+            forced(stages[2], loaded_n, loaded_total, 'marked loaded')
+
         # A staging row cares about picking and staging; a load row about
         # picking and loading. Showing all three everywhere was noise.
         if kind == 'bay':
             stages = [stages[0], stages[1]]
         elif kind == 'to_load':
             stages = [stages[0], stages[2]]
-
-        if status_picked:
-            forced(stages[0], picked_n, picked_total, 'marked ready to load')
-        if status_loaded:
-            forced(stages[1], staged_n, loaded_total, 'marked loaded')
-            forced(stages[2], loaded_n, loaded_total, 'marked loaded')
 
         order = {'late': 3, 'due': 2, 'ok': 1, 'done': 0}
         worst = max((s['state'] for s in stages), key=lambda s: order[s])

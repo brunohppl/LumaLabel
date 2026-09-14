@@ -17,16 +17,16 @@ const DATA={
          {id:'S2',date:D[1],name:'VUG',vehicle:'VUG',function:'styling'}],
   jobs:[
     {job_id:'J1',ref:'QU-1351',address:'12 Somers St, Ascot',date:D[0],kind:'install',
-     team_id:'A1',worst:'late',
+     team_id:'A1',worst:'late',status:'ready',status_label:'Ready to pick',needs:'Loaded',met:false,
      stages:[{name:'Picked',done:18,total:42,state:'late'},
              {name:'In bay',done:0,total:40,state:'late'},
              {name:'Loaded',done:0,total:40,state:'late'}]},
     {job_id:'J2',ref:'QU-1362',address:'9 Vine St, Clayfield',date:D[0],kind:'bay',
-     team_id:'A2',worst:'due',install_date:D[1],
+     team_id:'A2',worst:'due',install_date:D[1],status:'ready',status_label:'Ready to pick',needs:'Ready to load',met:false,
      stages:[{name:'Picked',done:30,total:30,state:'done'},
              {name:'In bay',done:10,total:30,state:'due'}]},
     {job_id:'J3',ref:'QU-1370',address:'5 Kent Rd, Wooloowin',date:D[1],kind:'install',
-     team_id:'B1',worst:'done',
+     team_id:'B1',worst:'done',status:'loaded',status_label:'Loaded',needs:'Loaded',met:true,
      stages:[{name:'Picked',done:20,total:20,state:'done'},
              {name:'In bay',done:20,total:20,state:'done'},
              {name:'Loaded',done:20,total:20,state:'done'}]},
@@ -37,10 +37,10 @@ const DATA={
      team_id:'S1',worst:'late',
      stages:[{name:'Picked',done:1,total:9,state:'late'}]},
     {job_id:'J6',ref:'QU-1390',address:'4 Legacy St',date:D[0],kind:'install',
-     team_id:null,vehicle:'Nemo',worst:'due',
+     team_id:null,vehicle:'Nemo',worst:'due',status:'ready_to_load',status_label:'Ready to load',needs:'Loaded',met:false,
      stages:[{name:'Picked',done:5,total:10,state:'due'}]},
     {job_id:'J7',ref:'QU-1400',address:'8 Load St',date:D[1],kind:'to_load',
-     team_id:'B1',worst:'due',install_date:D[2],
+     team_id:'B1',worst:'due',status:'ready_to_load',status_label:'Ready to load',needs:'Loaded',met:false,install_date:D[2],
      stages:[{name:'Picked',done:9,total:9,state:'done'},
              {name:'Loaded',done:2,total:9,state:'due'}]}]};
 
@@ -75,7 +75,13 @@ setTimeout(()=>{
   const c1=[...d.querySelectorAll('.chip')].find(c=>/QU-1351/.test(c.textContent));
   ok('behind is red', c1.classList.contains('late'));
   ok('and marked with an exclamation', !!c1.querySelector('.bang'));
-  ok('states the shortfall', /Picked 18\/42/.test(c1.textContent));
+  ok('the job number leads the tile',
+     c1.querySelector('.chip-ref').textContent.trim()==='QU-1351');
+  ok('the status is shown in words',
+     /Ready to pick/.test(c1.querySelector('.chip-status').textContent));
+  ok('the kind of day is shown quietly',
+     /Install/i.test(c1.querySelector('.chip-kind').textContent));
+  ok('what it still needs is in the tooltip', /needs Loaded/.test(c1.getAttribute('title')));
   ok('full detail in the tooltip', /Loaded: 0\/40/.test(c1.getAttribute('title')));
   const c2=[...d.querySelectorAll('.chip')].find(c=>/QU-1362/.test(c.textContent));
   ok('due is amber', c2.classList.contains('due'));
@@ -110,17 +116,21 @@ setTimeout(()=>{
   const nemoTomorrow=cells[rows.indexOf('Nemo')*3+1];
   ok('a crew shows its install work', /QU-1370/.test(nemoTomorrow.textContent));
   ok('and its to-load work', /QU-1400/.test(nemoTomorrow.textContent));
-  ok('the load chip is labelled To Load', /TO LOAD|To Load/i.test(nemoTomorrow.textContent));
+  ok('the load chip is labelled To Load', /To Load/i.test(nemoTomorrow.textContent));
   ok('both chips share the cell', nemoTomorrow.querySelectorAll('.chip').length===2);
 
   // The action is the headline, and chips fill the cell
   const kinds=[...d.querySelectorAll('.chip-kind')].map(x=>x.textContent.trim());
-  ok('Install spelled out in full', kinds.some(k=>/^!?\s*Install$/.test(k)));
-  ok('Load Bay spelled out in full', kinds.some(k=>/Load Bay/i.test(k)));
-  ok('the action comes before the reference',
+  ok('Install spelled out', kinds.some(k=>/Install/i.test(k)));
+  ok('Load Bay spelled out', kinds.some(k=>/Load Bay/i.test(k)));
+  ok('the job number comes before the status',
      [...d.querySelectorAll('.chip')].every(c=>{
-       const h=c.innerHTML; return h.indexOf('chip-kind')<h.indexOf('chip-top');
+       const h=c.innerHTML; return h.indexOf('chip-ref')<h.indexOf('chip-status');
      }));
+  ok('a loaded job reads Loaded',
+     [...d.querySelectorAll('.chip-status')].some(x=>x.textContent.trim()==='Loaded'));
+  ok('no item counters on the tiles',
+     ![...d.querySelectorAll('.chip')].some(c=>/\d+\/\d+/.test(c.textContent)));
   ok('chips grow to fill the cell', /flex:1 1 0/.test(html.replace(/\s+/g,' ')) ||
      /\.chip\{[^}]*flex:\s*1 1 0/.test(html));
   ok('cells stack chips vertically', /\.cell\{[^}]*flex-direction:column/.test(html));

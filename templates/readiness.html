@@ -10,64 +10,68 @@
   --accent:#B8935A;--green:#4A7C59;--red:#A63D2F;--amber:#C88A2E;--sand:#EDE7DC;
   --ontrack:#8D8577;}
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;}
+html,body{height:100%;overflow:hidden;}
 body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;
-  display:flex;flex-direction:column;overflow:hidden;}
+  display:flex;flex-direction:column;}
 
-/* Thin header — the grid is what matters */
-.bar{display:flex;align-items:center;gap:14px;padding:7px 14px;background:var(--ink);flex:0 0 auto;}
-.bar img{height:24px;width:auto;}
-.bar-title{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--cream);letter-spacing:0.05em;}
-.legend{display:flex;gap:11px;margin-left:auto;align-items:center;flex-wrap:wrap;}
-.lg{display:flex;align-items:center;gap:5px;font-size:0.62rem;letter-spacing:0.08em;
+/* Thin header — every pixel below belongs to the board */
+.bar{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:6px 12px;background:var(--ink);}
+.bar img{height:22px;width:auto;}
+.bar-title{font-family:'Cormorant Garamond',serif;font-size:0.95rem;color:var(--cream);
+  letter-spacing:0.05em;}
+.legend{display:flex;gap:10px;margin-left:auto;align-items:center;}
+.lg{display:flex;align-items:center;gap:4px;font-size:0.6rem;letter-spacing:0.07em;
   text-transform:uppercase;color:rgba(250,248,244,0.6);}
-.lg i{width:10px;height:10px;border-radius:2px;display:inline-block;}
+.lg i{width:9px;height:9px;border-radius:2px;display:inline-block;}
 .fs{background:transparent;border:1px solid rgba(250,248,244,0.28);color:rgba(250,248,244,0.75);
-  font-family:'Jost',sans-serif;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;
-  padding:5px 11px;border-radius:3px;cursor:pointer;}
+  font-family:'Jost',sans-serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;
+  padding:4px 10px;border-radius:3px;cursor:pointer;}
 .fs:hover{border-color:var(--accent);color:var(--accent);}
 
-/* Three days split the height evenly — no filler */
-.days{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;}
-.day{flex:1 1 0;display:flex;flex-direction:column;min-height:0;border-top:2px solid var(--border);}
-.day:first-child{border-top:none;}
-.day-hdr{flex:0 0 auto;display:flex;align-items:baseline;gap:10px;padding:3px 12px;background:var(--sand);}
-.day-name{font-size:0.72rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;}
-.day-date{font-size:0.66rem;color:var(--muted);}
-.day-late{margin-left:auto;font-size:0.66rem;font-weight:700;color:var(--red);letter-spacing:0.06em;}
-.day-body{flex:1 1 auto;overflow:auto;}
+/* ── The matrix: crews down, three days across, no scrolling ── */
+.grid{flex:1 1 auto;display:grid;grid-template-columns:var(--headw) repeat(3,1fr);
+  grid-auto-rows:1fr;min-height:0;--headw:132px;}
+.hcell{background:var(--sand);border-bottom:1px solid var(--border);
+  border-right:1px solid var(--border);padding:5px 9px;display:flex;
+  flex-direction:column;justify-content:center;}
+.hcell.corner{border-right:1px solid var(--border);}
+.hday{font-size:0.78rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;}
+.hdate{font-size:0.64rem;color:var(--muted);}
+.hlate{font-size:0.64rem;font-weight:700;color:var(--red);letter-spacing:0.04em;}
 
-/* Crew rows and a time axis — the day view's shape */
-.rowline{display:flex;border-bottom:1px solid rgba(216,207,191,0.55);min-height:32px;}
-.rowline:last-child{border-bottom:none;}
-.rowhead{position:sticky;left:0;z-index:3;flex:0 0 106px;background:var(--warm);
-  border-right:1px solid var(--border);padding:4px 7px;}
-.crew{font-size:0.72rem;font-weight:600;line-height:1.15;}
-.crew-sub{font-size:0.58rem;color:var(--muted);line-height:1.15;text-transform:uppercase;
-  letter-spacing:0.05em;}
-.lane{position:relative;flex:1;}
-.ruler{display:flex;background:var(--sand);border-bottom:1px solid var(--border);
-  position:sticky;top:0;z-index:4;}
-.ruler .rowhead{background:var(--sand);}
-.ruler-lane{position:relative;flex:1;height:15px;}
-.tick{position:absolute;bottom:1px;font-size:0.57rem;color:var(--muted);
-  transform:translateX(-50%);white-space:nowrap;}
-.gl{position:absolute;top:0;bottom:0;width:1px;background:rgba(216,207,191,0.5);}
+.rowhead{background:var(--warm);border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border);padding:4px 9px;display:flex;
+  flex-direction:column;justify-content:center;}
+.crew{font-size:0.8rem;font-weight:600;line-height:1.15;}
+.crew-sub{font-size:0.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;}
 
-/* Colour is READINESS, not job type — this board is about what needs rescuing */
-.blk{position:absolute;top:3px;bottom:3px;border-radius:3px;padding:2px 5px;overflow:hidden;
-  color:#fff;font-size:0.63rem;line-height:1.2;border-left:3px solid rgba(0,0,0,0.22);}
-.blk.late{background:var(--red);}
-.blk.due{background:var(--amber);}
-.blk.ok{background:var(--ontrack);}
-.blk.done{background:var(--green);}
-.blk-top{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.blk-sub{opacity:0.93;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:0.59rem;}
-.bang{display:inline-block;width:12px;height:12px;border-radius:50%;background:#fff;
-  color:var(--red);font-size:0.57rem;font-weight:700;text-align:center;line-height:12px;
-  margin-right:4px;vertical-align:0.5px;}
-.empty{padding:7px 12px;color:var(--muted);font-size:0.68rem;}
-.msg{padding:30px;text-align:center;color:var(--muted);}
+.cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);
+  padding:4px;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;
+  overflow:hidden;background:#fff;}
+.cell.quiet{background:rgba(255,255,255,0.45);}
+
+/* A chip per piece of work. Colour is readiness — what needs rescuing. */
+.chip{flex:1 1 auto;min-width:88px;max-width:100%;border-radius:3px;padding:3px 6px;
+  color:#fff;line-height:1.2;overflow:hidden;}
+.chip.late{background:var(--red);}
+.chip.due{background:var(--amber);}
+.chip.ok{background:var(--ontrack);}
+.chip.done{background:var(--green);}
+.chip-top{font-size:0.72rem;font-weight:700;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;}
+.chip-sub{font-size:0.62rem;opacity:0.93;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;}
+.bang{display:inline-block;width:11px;height:11px;border-radius:50%;background:#fff;
+  color:var(--red);font-size:0.55rem;font-weight:700;text-align:center;line-height:11px;
+  margin-right:3px;vertical-align:0.5px;}
+.kind{opacity:0.75;font-weight:500;}
+.msg{padding:30px;text-align:center;color:var(--muted);grid-column:1/-1;}
+
+/* Denser when there are many crews, so it still fits one screen */
+body.tight .crew{font-size:0.72rem;}
+body.tight .chip-top{font-size:0.66rem;}
+body.tight .chip-sub{font-size:0.58rem;}
+body.tight .chip{min-width:74px;padding:2px 5px;}
 </style>
 </head>
 <body>
@@ -84,106 +88,94 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;
   </div>
 </div>
 
-<div class="days" id="days"><div class="msg">Loading…</div></div>
+<div class="grid" id="grid"><div class="msg">Loading…</div></div>
 
 <script>
-const DAY_START=7*60+30, DAY_END=15*60+30;
 const DAY_LABEL=['Today','Tomorrow','Day after'];
 const KIND={install:'Install',to_load:'Load truck',bay:'Load bay'};
 let DATA={days:[],jobs:[],teams:[],rules:{}};
 
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const toMin=t=>{
-  if(!t) return null;
-  const [h,m]=String(t).split(':').map(Number);
-  return (isNaN(h)||isNaN(m))?null:h*60+m;
-};
-const fmtH=m=>`${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
 const street=a=>String(a||'').split(',')[0].trim();
 function shortDate(iso){
-  try{
-    return new Date(iso+'T00:00:00')
-      .toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
-  }catch(e){ return iso; }
+  try{ return new Date(iso+'T00:00:00')
+    .toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}); }
+  catch(e){ return iso; }
 }
 
-// Say the shortfall that needs rescuing, not just the stage name
+// The shortfall worth rescuing, in as few words as fit
 function blurb(j){
   const st=j.stages||[];
-  const bad=st.filter(s=>s.state==='late') .concat(st.filter(s=>s.state==='due'));
+  const bad=st.filter(s=>s.state==='late').concat(st.filter(s=>s.state==='due'));
   const s=bad[0]||st[0];
   if(!s) return KIND[j.kind]||j.kind;
   if(s.total && s.done<s.total) return `${s.name} ${s.done}/${s.total}`;
-  return s.note || `${s.name} done`;
+  return s.note || 'Ready';
 }
 
-function blockHTML(j){
-  const t=toMin(j.time);
-  const start=(t===null)?DAY_START:Math.min(Math.max(DAY_START,t),DAY_END-30);
-  const dur=Math.max(30,j.duration||60);
-  const left=(start-DAY_START)/(DAY_END-DAY_START)*100;
-  const width=Math.max(4,Math.min(100-left,dur/(DAY_END-DAY_START)*100));
-  // Read-only, so everything sits in the tooltip rather than behind a tap
+function chipHTML(j){
   const detail=(j.stages||[]).map(s=>
     `${s.name}: ${s.total?`${s.done}/${s.total}`:'—'}${s.note?' ('+s.note+')':''}`).join('\n');
-  const head=`${j.ref} · ${KIND[j.kind]||j.kind}`;
-  return `<div class="blk ${j.worst}" style="left:${left}%;width:${width}%"
-      title="${esc(head)}\n${esc(street(j.address))}${j.install_date?'\nInstalls '+esc(shortDate(j.install_date)):''}\n${esc(detail)}">
-    <div class="blk-top">${j.worst==='late'?'<span class="bang">!</span>':''}${esc(j.ref)}</div>
-    <div class="blk-sub">${esc(blurb(j))}</div>
+  return `<div class="chip ${j.worst}"
+      title="${esc(j.ref)} · ${esc(KIND[j.kind]||j.kind)}\n${esc(street(j.address))}${j.install_date?'\nInstalls '+esc(shortDate(j.install_date)):''}\n${esc(detail)}">
+    <div class="chip-top">${j.worst==='late'?'<span class="bang">!</span>':''}${esc(j.ref)}
+      <span class="kind">${esc((KIND[j.kind]||'').replace('Load ','').slice(0,5))}</span></div>
+    <div class="chip-sub">${esc(blurb(j))}</div>
   </div>`;
 }
 
 function render(){
-  const wrap=document.getElementById('days');
-  const teamsByDay={}, rowsByDay={};
-  (DATA.days||[]).forEach(d=>{ teamsByDay[d]=[]; rowsByDay[d]=[]; });
-  (DATA.teams||[]).forEach(t=>{ if(teamsByDay[t.date]) teamsByDay[t.date].push(t); });
-  (DATA.jobs||[]).forEach(j=>{ if(rowsByDay[j.date]) rowsByDay[j.date].push(j); });
+  const grid=document.getElementById('grid');
+  const days=DATA.days||[];
 
-  wrap.innerHTML=(DATA.days||[]).map((d,i)=>{
-    const teams=teamsByDay[d]||[], rows=rowsByDay[d]||[];
-    const late=rows.filter(r=>r.worst==='late').length;
+  // Crews come from day_teams per date, so the same crew is a different row
+  // each day. Key rows by name so one crew is one line across all three days.
+  const rowKeys=[], seen=new Set();
+  (DATA.teams||[]).forEach(t=>{
+    const k=(t.name||t.vehicle||'Team');
+    if(!seen.has(k)){ seen.add(k); rowKeys.push({key:k,fn:t.function||''}); }
+  });
 
-    const groups=teams.map(t=>({team:t,
-      rows:rows.filter(r=>r.team_id===t.id ||
-        (!r.team_id && r.vehicle && r.vehicle===t.vehicle))}));
-    // Work nobody has been given is exactly what gets missed — show it.
-    const placed=new Set(groups.flatMap(g=>g.rows));
-    const loose=rows.filter(r=>!placed.has(r));
-    if(loose.length) groups.push({team:{id:'_',name:'Unassigned',function:''},rows:loose});
+  const teamIdToKey={};
+  (DATA.teams||[]).forEach(t=>{ teamIdToKey[t.id]=(t.name||t.vehicle||'Team'); });
 
-    let ticks='',gl='';
-    for(let m=DAY_START;m<=DAY_END;m+=60){
-      const pct=(m-DAY_START)/(DAY_END-DAY_START)*100;
-      ticks+=`<div class="tick" style="left:${pct}%">${fmtH(m)}</div>`;
-      gl+=`<div class="gl" style="left:${pct}%"></div>`;
-    }
+  const cell={};   // key|date -> rows
+  const loose={};  // date -> rows with no crew
+  (DATA.jobs||[]).forEach(j=>{
+    const k=teamIdToKey[j.team_id];
+    if(k){ (cell[k+'|'+j.date]=cell[k+'|'+j.date]||[]).push(j); }
+    else { (loose[j.date]=loose[j.date]||[]).push(j); }
+  });
+  const hasLoose=Object.keys(loose).length>0;
+  if(hasLoose) rowKeys.push({key:'Unassigned',fn:''});
 
-    const body=groups.length
-      ? groups.map(g=>`
-        <div class="rowline">
-          <div class="rowhead">
-            <div class="crew">${esc(g.team.name||g.team.vehicle||'Team')}</div>
-            <div class="crew-sub">${esc(g.team.function||'')}</div>
-          </div>
-          <div class="lane">${gl}${g.rows.map(blockHTML).join('')}</div>
-        </div>`).join('')
-      : '<div class="empty">Nothing scheduled</div>';
+  const lateOn=d=>(DATA.jobs||[]).filter(j=>j.date===d && j.worst==='late').length;
 
-    return `<section class="day">
-      <div class="day-hdr">
-        <span class="day-name">${DAY_LABEL[i]||''}</span>
-        <span class="day-date">${shortDate(d)}</span>
-        ${late?`<span class="day-late">${late} need rescuing</span>`:''}
-      </div>
-      <div class="day-body">
-        <div class="ruler"><div class="rowhead"></div><div class="ruler-lane">${ticks}</div></div>
-        ${body}
-      </div>
-    </section>`;
-  }).join('');
+  let html=`<div class="hcell corner"></div>`;
+  days.forEach((d,i)=>{
+    const n=lateOn(d);
+    html+=`<div class="hcell">
+      <div class="hday">${DAY_LABEL[i]||''}</div>
+      <div class="hdate">${shortDate(d)}</div>
+      ${n?`<div class="hlate">${n} need rescuing</div>`:''}
+    </div>`;
+  });
+
+  rowKeys.forEach(r=>{
+    html+=`<div class="rowhead">
+      <div class="crew">${esc(r.key)}</div>
+      <div class="crew-sub">${esc(r.fn)}</div>
+    </div>`;
+    days.forEach(d=>{
+      const rows=(r.key==='Unassigned') ? (loose[d]||[]) : (cell[r.key+'|'+d]||[]);
+      html+=`<div class="cell ${rows.length?'':'quiet'}">${rows.map(chipHTML).join('')}</div>`;
+    });
+  });
+
+  grid.innerHTML=html||'<div class="msg">Nothing scheduled</div>';
+  // Shrink the type when there are many crews, so it still fits one screen
+  document.body.classList.toggle('tight', rowKeys.length>7);
 }
 
 function toggleFull(){
@@ -194,7 +186,7 @@ function toggleFull(){
     }else{
       (document.exitFullscreen||document.webkitExitFullscreen||(()=>{})).call(document);
     }
-  }catch(e){ /* not supported — the page still works */ }
+  }catch(e){ /* unsupported — the board still works */ }
 }
 document.addEventListener('fullscreenchange',()=>{
   const b=document.getElementById('fs-btn');
@@ -206,19 +198,19 @@ async function load(){
     const res=await fetch('/api/readiness');
     DATA=await res.json();
     if(DATA && DATA.error){
-      document.getElementById('days').innerHTML=
+      document.getElementById('grid').innerHTML=
         '<div class="msg">Could not build the board.<br><code style="font-size:0.7rem">'+
         String(DATA.error).replace(/[<>]/g,'')+'</code></div>';
       return;
     }
     render();
   }catch(e){
-    document.getElementById('days').innerHTML=
+    document.getElementById('grid').innerHTML=
       '<div class="msg">Could not load. Check the connection and try again.</div>';
   }
 }
 load();
-setInterval(load,120000);   // meant to be left on a screen
+setInterval(load,120000);   // left on a screen, never touched
 </script>
 </body>
 </html>

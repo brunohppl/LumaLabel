@@ -205,6 +205,12 @@ async function load(){
   try{
     const res=await fetch('/api/readiness');
     DATA=await res.json();
+    if(DATA && DATA.error){
+      document.getElementById('days').innerHTML=
+        '<div class="msg">Could not build the board.<br><code style="font-size:0.7rem">'+
+        String(DATA.error).replace(/[<>]/g,'')+'</code></div>';
+      return;
+    }
     render();
   }catch(e){
     document.getElementById('days').innerHTML=

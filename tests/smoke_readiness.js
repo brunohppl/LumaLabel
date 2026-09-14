@@ -103,6 +103,18 @@ setTimeout(()=>{
      rows.indexOf('Bruce')<rows.indexOf('Nemo') && rows.indexOf('Nemo')<rows.indexOf('Warehouse'));
   ok('Unassigned stays last', rows[rows.length-1]==='Unassigned');
 
+  // The action is the headline, and chips fill the cell
+  const kinds=[...d.querySelectorAll('.chip-kind')].map(x=>x.textContent.trim());
+  ok('Install spelled out in full', kinds.some(k=>/^!?\s*Install$/.test(k)));
+  ok('Load bay spelled out in full', kinds.some(k=>/Load bay/.test(k)));
+  ok('the action comes before the reference',
+     [...d.querySelectorAll('.chip')].every(c=>{
+       const h=c.innerHTML; return h.indexOf('chip-kind')<h.indexOf('chip-top');
+     }));
+  ok('chips grow to fill the cell', /flex:1 1 0/.test(html.replace(/\s+/g,' ')) ||
+     /\.chip\{[^}]*flex:\s*1 1 0/.test(html));
+  ok('cells stack chips vertically', /\.cell\{[^}]*flex-direction:column/.test(html));
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);
 },350);

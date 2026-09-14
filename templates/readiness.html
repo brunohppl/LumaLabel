@@ -131,18 +131,27 @@ function render(){
 
   // Crews come from day_teams per date, so the same crew is a different row
   // each day. Key rows by name so one crew is one line across all three days.
+  // Styling crews don't pick, stage or load — nothing on this board applies
+  // to them, so their rows were only taking up height.
+  const relevant=(DATA.teams||[]).filter(t=>(t.function||'')!=='styling');
+
   const rowKeys=[], seen=new Set();
-  (DATA.teams||[]).forEach(t=>{
+  relevant.forEach(t=>{
     const k=(t.name||t.vehicle||'Team');
     if(!seen.has(k)){ seen.add(k); rowKeys.push({key:k,fn:t.function||''}); }
   });
 
   const teamIdToKey={};
-  (DATA.teams||[]).forEach(t=>{ teamIdToKey[t.id]=(t.name||t.vehicle||'Team'); });
+  relevant.forEach(t=>{ teamIdToKey[t.id]=(t.name||t.vehicle||'Team'); });
+  // A styling crew's id maps to nothing, so its work would fall into
+  // "Unassigned" — drop it instead.
+  const stylingIds=new Set((DATA.teams||[])
+    .filter(t=>(t.function||'')==='styling').map(t=>t.id));
 
   const cell={};   // key|date -> rows
   const loose={};  // date -> rows with no crew
   (DATA.jobs||[]).forEach(j=>{
+    if(stylingIds.has(j.team_id)) return;
     const k=teamIdToKey[j.team_id];
     if(k){ (cell[k+'|'+j.date]=cell[k+'|'+j.date]||[]).push(j); }
     else { (loose[j.date]=loose[j.date]||[]).push(j); }
@@ -150,7 +159,8 @@ function render(){
   const hasLoose=Object.keys(loose).length>0;
   if(hasLoose) rowKeys.push({key:'Unassigned',fn:''});
 
-  const lateOn=d=>(DATA.jobs||[]).filter(j=>j.date===d && j.worst==='late').length;
+  const lateOn=d=>(DATA.jobs||[]).filter(j=>j.date===d && j.worst==='late'
+                     && !stylingIds.has(j.team_id)).length;
 
   let html=`<div class="hcell corner"></div>`;
   days.forEach((d,i)=>{

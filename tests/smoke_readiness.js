@@ -38,7 +38,11 @@ const DATA={
      stages:[{name:'Picked',done:1,total:9,state:'late'}]},
     {job_id:'J6',ref:'QU-1390',address:'4 Legacy St',date:D[0],kind:'install',
      team_id:null,vehicle:'Nemo',worst:'due',
-     stages:[{name:'Picked',done:5,total:10,state:'due'}]}]};
+     stages:[{name:'Picked',done:5,total:10,state:'due'}]},
+    {job_id:'J7',ref:'QU-1400',address:'8 Load St',date:D[1],kind:'to_load',
+     team_id:'B1',worst:'due',install_date:D[2],
+     stages:[{name:'Picked',done:9,total:9,state:'done'},
+             {name:'Loaded',done:2,total:9,state:'due'}]}]};
 
 const dom=new JSDOM(html,{runScripts:'dangerously',url:'http://x/readiness',
   beforeParse(w){ w.fetch=async()=>({ok:true,status:200,json:async()=>DATA}); }});
@@ -53,7 +57,8 @@ setTimeout(()=>{
   const rows=[...d.querySelectorAll('.rowhead')].map(x=>x.querySelector('.crew').textContent);
   ok('crews down the left', rows.includes('Nemo')&&rows.includes('Warehouse'));
   ok('one row per crew across all days', rows.filter(r=>r==='Nemo').length===1);
-  ok('unassigned work gets its own row', rows.includes('Unassigned'));
+  // Tray work has no column on the runsheet, so it has no row here either
+  ok('no Unassigned row', !rows.includes('Unassigned'));
   ok('three cells per crew row', d.querySelectorAll('.cell').length===rows.length*3);
 
   // ── Chips land in the right crew and day ──
@@ -64,8 +69,7 @@ setTimeout(()=>{
   const whIdx=rows.indexOf('Warehouse');
   ok('a bay job sits with the warehouse', /QU-1362/.test(cells[whIdx*3].textContent));
   ok('tomorrow column holds tomorrow work', /QU-1370/.test(cells[nemoIdx*3+1].textContent));
-  const unIdx=rows.indexOf('Unassigned');
-  ok('unassigned work is visible', /QU-1399/.test(cells[unIdx*3+2].textContent));
+  ok('tray work is not shown anywhere', !/QU-1399/.test(d.querySelector('.grid').textContent));
 
   // ── Colour and wording ──
   const c1=[...d.querySelectorAll('.chip')].find(c=>/QU-1351/.test(c.textContent));
@@ -90,23 +94,29 @@ setTimeout(()=>{
   // Styling crews have nothing to pick, stage or load
   ok('no styling crew rows', !rows.includes('Marlin') && !rows.includes('VUG'));
   ok('their work is not shown', !/QU-1380/.test(d.querySelector('.grid').textContent));
-  ok('and is not dumped into Unassigned',
-     !/QU-1380/.test(cells[rows.indexOf('Unassigned')*3].textContent));
+  ok('and is not shown anywhere', !/QU-1380/.test(d.querySelector('.grid').textContent));
   ok('nor counted as needing rescuing', /1 need rescuing/.test(heads[1].textContent));
 
   // Crew resolution and order follow the runsheet
   ok('a vehicle-only tile lands on its crew, not Unassigned',
      /QU-1390/.test(cells[rows.indexOf('Nemo')*3].textContent));
-  ok('and is kept out of Unassigned',
-     !/QU-1390/.test(cells[rows.indexOf('Unassigned')*3].textContent));
+  ok('a vehicle-only tile is not treated as tray work',
+     /QU-1390/.test(d.querySelector('.grid').textContent));
   ok('rows follow the runsheet column order (Bruce, Nemo, Warehouse)',
      rows.indexOf('Bruce')<rows.indexOf('Nemo') && rows.indexOf('Nemo')<rows.indexOf('Warehouse'));
-  ok('Unassigned stays last', rows[rows.length-1]==='Unassigned');
+  ok('every row is a real crew', rows.every(r=>['Bruce','Nemo','Warehouse'].includes(r)));
+
+  // A crew's install AND load work both show on that crew
+  const nemoTomorrow=cells[rows.indexOf('Nemo')*3+1];
+  ok('a crew shows its install work', /QU-1370/.test(nemoTomorrow.textContent));
+  ok('and its to-load work', /QU-1400/.test(nemoTomorrow.textContent));
+  ok('the load chip is labelled To Load', /TO LOAD|To Load/i.test(nemoTomorrow.textContent));
+  ok('both chips share the cell', nemoTomorrow.querySelectorAll('.chip').length===2);
 
   // The action is the headline, and chips fill the cell
   const kinds=[...d.querySelectorAll('.chip-kind')].map(x=>x.textContent.trim());
   ok('Install spelled out in full', kinds.some(k=>/^!?\s*Install$/.test(k)));
-  ok('Load bay spelled out in full', kinds.some(k=>/Load bay/.test(k)));
+  ok('Load Bay spelled out in full', kinds.some(k=>/Load Bay/i.test(k)));
   ok('the action comes before the reference',
      [...d.querySelectorAll('.chip')].every(c=>{
        const h=c.innerHTML; return h.indexOf('chip-kind')<h.indexOf('chip-top');

@@ -12,7 +12,9 @@ const DATA={
          // same crews again on later days — must stay ONE row each
          {id:'B1',date:D[1],name:'Nemo',vehicle:'Nemo',function:'transport'},
          {id:'B2',date:D[1],name:'Warehouse',vehicle:null,function:'warehouse'},
-         {id:'C1',date:D[2],name:'Nemo',vehicle:'Nemo',function:'transport'}],
+         {id:'C1',date:D[2],name:'Nemo',vehicle:'Nemo',function:'transport'},
+         {id:'S1',date:D[0],name:'Marlin',vehicle:'Marlin',function:'styling'},
+         {id:'S2',date:D[1],name:'VUG',vehicle:'VUG',function:'styling'}],
   jobs:[
     {job_id:'J1',ref:'QU-1351',address:'12 Somers St, Ascot',date:D[0],kind:'install',
      team_id:'A1',worst:'late',
@@ -30,7 +32,10 @@ const DATA={
              {name:'Loaded',done:20,total:20,state:'done'}]},
     {job_id:'J4',ref:'QU-1399',address:'7 Forfar St',date:D[2],kind:'install',
      team_id:null,worst:'ok',
-     stages:[{name:'Picked',done:0,total:12,state:'ok'}]}]};
+     stages:[{name:'Picked',done:0,total:12,state:'ok'}]},
+    {job_id:'J5',ref:'QU-1380',address:'2 Styling Ave',date:D[0],kind:'install',
+     team_id:'S1',worst:'late',
+     stages:[{name:'Picked',done:1,total:9,state:'late'}]}]};
 
 const dom=new JSDOM(html,{runScripts:'dangerously',url:'http://x/readiness',
   beforeParse(w){ w.fetch=async()=>({ok:true,status:200,json:async()=>DATA}); }});
@@ -78,6 +83,13 @@ setTimeout(()=>{
   ok('day header counts what needs rescuing', /1 need rescuing/.test(heads[1].textContent));
   ok('a clean day says nothing', !/need rescuing/.test(heads[3].textContent));
   ok('full screen available', !!d.getElementById('fs-btn'));
+
+  // Styling crews have nothing to pick, stage or load
+  ok('no styling crew rows', !rows.includes('Marlin') && !rows.includes('VUG'));
+  ok('their work is not shown', !/QU-1380/.test(d.querySelector('.grid').textContent));
+  ok('and is not dumped into Unassigned',
+     !/QU-1380/.test(cells[rows.indexOf('Unassigned')*3].textContent));
+  ok('nor counted as needing rescuing', /1 need rescuing/.test(heads[1].textContent));
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);

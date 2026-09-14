@@ -135,14 +135,27 @@ function render(){
   // to them, so their rows were only taking up height.
   const relevant=(DATA.teams||[]).filter(t=>(t.function||'')!=='styling');
 
-  const rowKeys=[], seen=new Set();
+  // Row order follows the runsheet's column order, so the board reads the
+  // same way round as the page the scheduler actually works in.
+  const order={}, rowKeys=[], seen=new Set();
   relevant.forEach(t=>{
     const k=(t.name||t.vehicle||'Team');
+    const so=(t.sort_order===undefined||t.sort_order===null)?999:t.sort_order;
+    order[k]=Math.min(order[k]===undefined?999:order[k], so);
     if(!seen.has(k)){ seen.add(k); rowKeys.push({key:k,fn:t.function||''}); }
   });
+  rowKeys.sort((a,b)=>(order[a.key]-order[b.key]) || a.key.localeCompare(b.key));
 
-  const teamIdToKey={};
-  relevant.forEach(t=>{ teamIdToKey[t.id]=(t.name||t.vehicle||'Team'); });
+  // Resolve a job to its crew exactly as the runsheet does: by team_id, and
+  // by vehicle for rows saved before team_id existed. Matching on team_id
+  // alone put those older tiles under "Unassigned" here while the runsheet
+  // showed them on a crew.
+  const teamIdToKey={}, vehToKeyByDay={};
+  relevant.forEach(t=>{
+    const k=(t.name||t.vehicle||'Team');
+    teamIdToKey[t.id]=k;
+    if(t.vehicle) (vehToKeyByDay[t.date]=vehToKeyByDay[t.date]||{})[t.vehicle]=k;
+  });
   // A styling crew's id maps to nothing, so its work would fall into
   // "Unassigned" — drop it instead.
   const stylingIds=new Set((DATA.teams||[])
@@ -152,7 +165,8 @@ function render(){
   const loose={};  // date -> rows with no crew
   (DATA.jobs||[]).forEach(j=>{
     if(stylingIds.has(j.team_id)) return;
-    const k=teamIdToKey[j.team_id];
+    const k = teamIdToKey[j.team_id]
+           || (!j.team_id && j.vehicle ? (vehToKeyByDay[j.date]||{})[j.vehicle] : null);
     if(k){ (cell[k+'|'+j.date]=cell[k+'|'+j.date]||[]).push(j); }
     else { (loose[j.date]=loose[j.date]||[]).push(j); }
   });

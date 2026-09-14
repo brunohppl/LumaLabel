@@ -53,31 +53,36 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;
 /* A chip per piece of work. Colour is readiness — what needs rescuing. */
 /* Each chip takes an equal share of the cell's height, so one job fills the
    cell and the type reads from across the room. */
-.chip{flex:1 1 0;min-height:0;border-radius:4px;padding:5px 8px;color:#fff;
-  line-height:1.15;overflow:hidden;display:flex;flex-direction:column;
+.chip{position:relative;flex:1 1 0;min-height:0;border-radius:4px;padding:6px 9px;
+  color:#fff;line-height:1.15;overflow:hidden;display:flex;flex-direction:column;
   justify-content:center;}
 .chip.late{background:var(--red);}
 .chip.due{background:var(--amber);}
 .chip.ok{background:var(--ontrack);}
 .chip.done{background:var(--green);}
 /* The action first and largest — Install or To Load is the thing to read */
-.chip-kind{font-size:clamp(0.72rem,1.5vh,1.15rem);font-weight:700;letter-spacing:0.08em;
-  text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  line-height:1.1;}
-.chip-top{font-size:clamp(0.64rem,1.15vh,0.9rem);font-weight:600;opacity:0.95;
+/* The job number carries the tile — readable from across the room */
+.chip-ref{font-family:'Cormorant Garamond',serif;font-weight:600;
+  font-size:clamp(1.3rem,3.6vh,2.9rem);line-height:1;letter-spacing:0.01em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.chip-sub{font-size:clamp(0.6rem,1vh,0.82rem);opacity:0.9;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;}
-.bang{display:inline-block;width:13px;height:13px;border-radius:50%;background:#fff;
-  color:var(--red);font-size:0.62rem;font-weight:700;text-align:center;line-height:13px;
-  margin-right:5px;vertical-align:1px;}
+/* Where the job has actually got to */
+.chip-status{font-size:clamp(0.68rem,1.5vh,1.1rem);font-weight:600;line-height:1.15;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+/* Which kind of day this is — quiet, in the corner */
+.chip-kind{font-size:clamp(0.55rem,1vh,0.74rem);letter-spacing:0.1em;text-transform:uppercase;
+  opacity:0.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:auto;}
+/* Same corner on every tile, so it never shifts the number sideways */
+.bang{position:absolute;top:6px;right:8px;width:17px;height:17px;border-radius:50%;
+  background:#fff;color:var(--red);font-size:0.74rem;font-weight:700;text-align:center;
+  line-height:17px;}
 .kind{opacity:0.75;font-weight:500;}
 .msg{padding:30px;text-align:center;color:var(--muted);grid-column:1/-1;}
 
 /* Denser when there are many crews, so it still fits one screen */
 body.tight .crew{font-size:0.72rem;}
 body.tight .chip{padding:3px 6px;}
-body.tight .chip-kind{font-size:clamp(0.62rem,1.15vh,0.9rem);}
+body.tight .chip-ref{font-size:clamp(1.05rem,2.6vh,2rem);}
+body.tight .chip-status{font-size:clamp(0.6rem,1.2vh,0.85rem);}
 </style>
 </head>
 <body>
@@ -111,24 +116,18 @@ function shortDate(iso){
   catch(e){ return iso; }
 }
 
-// The shortfall worth rescuing, in as few words as fit
-function blurb(j){
-  const st=j.stages||[];
-  const bad=st.filter(s=>s.state==='late').concat(st.filter(s=>s.state==='due'));
-  const s=bad[0]||st[0];
-  if(!s) return KIND[j.kind]||j.kind;
-  if(s.total && s.done<s.total) return `${s.name} ${s.done}/${s.total}`;
-  return s.note || 'Ready';
-}
 
 function chipHTML(j){
+  // Detail stays in the tooltip; the tile itself says the job and where it's got to.
   const detail=(j.stages||[]).map(s=>
     `${s.name}: ${s.total?`${s.done}/${s.total}`:'—'}${s.note?' ('+s.note+')':''}`).join('\n');
+  const needs=j.met?'':` · needs ${j.needs}`;
   return `<div class="chip ${j.worst}"
-      title="${esc(j.ref)} · ${esc(KIND[j.kind]||j.kind)}\n${esc(street(j.address))}${j.install_date?'\nInstalls '+esc(shortDate(j.install_date)):''}\n${esc(detail)}">
-    <div class="chip-kind">${j.worst==='late'?'<span class="bang">!</span>':''}${esc(KIND[j.kind]||j.kind)}</div>
-    <div class="chip-top">${esc(j.ref)}</div>
-    <div class="chip-sub">${esc(blurb(j))}</div>
+      title="${esc(j.ref)} · ${esc(KIND[j.kind]||j.kind)}\n${esc(street(j.address))}${j.install_date?'\nInstalls '+esc(shortDate(j.install_date)):''}\nStatus: ${esc(j.status_label||'')}${esc(needs)}\n${esc(detail)}">
+    ${j.worst==='late'?'<span class="bang">!</span>':''}
+    <div class="chip-ref">${esc(j.ref)}</div>
+    <div class="chip-status">${esc(j.status_label||'')}</div>
+    <div class="chip-kind">${esc(KIND[j.kind]||j.kind)}</div>
   </div>`;
 }
 

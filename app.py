@@ -2455,6 +2455,22 @@ def _is_packed_item(desc):
     return small_lamp or bool(_CUSHION_RE.search(d)) or bool(_ACCESSORY_RE.search(d))
 
 
+# Where a job has got to, as a ladder. Everything on the readiness board
+# compares where a job IS against where its day requires it to BE.
+STATUS_RANK = {
+    'on_hold': 0, 'ready': 1, 'ready_to_load': 2, 'loaded': 3,
+    'installed': 4, 'ready_to_collect': 5, 'returned': 6, 'archived': 6,
+}
+STATUS_LABEL = {
+    'on_hold': 'On hold', 'ready': 'Ready to pick', 'ready_to_load': 'Ready to load',
+    'loaded': 'Loaded', 'installed': 'Installed', 'ready_to_collect': 'On site',
+    'returned': 'Completed', 'archived': 'Completed',
+}
+# What "done" means for each kind of day. Staging day is done when the job
+# is ready to load; loading day when it's loaded; install day likewise.
+REQUIRED_STATUS = {'bay': 'ready_to_load', 'to_load': 'loaded', 'install': 'loaded'}
+
+
 READINESS_RULES = {
     'picked': 2,    # days before install that picking should be complete
     'staged': 1,    # days before install the bay should be staged
@@ -2656,10 +2672,24 @@ def _readiness_payload():
         elif kind == 'to_load':
             stages = [stages[0], stages[2]]
 
-        order = {'late': 3, 'due': 2, 'ok': 1, 'done': 0}
-        worst = max((s['state'] for s in stages), key=lambda s: order[s])
+        # ── Status against what this day needs ──
+        raw = (job.get('status') or 'ready')
+        need = REQUIRED_STATUS.get(kind, 'loaded')
+        met = STATUS_RANK.get(raw, 0) >= STATUS_RANK.get(need, 99)
+        if met:
+            worst = 'done'
+        elif days_out <= 0:
+            worst = 'late'          # the day has arrived and it isn't there
+        elif days_out == 1:
+            worst = 'due'
+        else:
+            worst = 'ok'
 
         out.append({
+            'status': raw,
+            'status_label': STATUS_LABEL.get(raw, raw.replace('_', ' ').title()),
+            'needs': STATUS_LABEL.get(need, need),
+            'met': met,
             'job_id': jid, 'ref': job.get('job_ref') or job.get('job_number') or '—',
             'address': job.get('address') or '', 'date': e['date'],
             'time': e.get('start_time'), 'kind': kind,

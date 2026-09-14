@@ -118,6 +118,9 @@ setTimeout(()=>{
   ok('and its to-load work', /QU-1400/.test(nemoTomorrow.textContent));
   ok('the load chip is labelled To Load', /To Load/i.test(nemoTomorrow.textContent));
   ok('both chips share the cell', nemoTomorrow.querySelectorAll('.chip').length===2);
+  ok('a shared cell is marked so it can scale down', nemoTomorrow.classList.contains('multi'));
+  ok('both are real chips with content',
+     [...nemoTomorrow.querySelectorAll('.chip')].every(c=>c.querySelector('.chip-ref').textContent.trim().length>2));
 
   // The action is the headline, and chips fill the cell
   const kinds=[...d.querySelectorAll('.chip-kind')].map(x=>x.textContent.trim());
@@ -131,8 +134,7 @@ setTimeout(()=>{
      [...d.querySelectorAll('.chip-status')].some(x=>x.textContent.trim()==='Loaded'));
   ok('no item counters on the tiles',
      ![...d.querySelectorAll('.chip')].some(c=>/\d+\/\d+/.test(c.textContent)));
-  ok('chips grow to fill the cell', /flex:1 1 0/.test(html.replace(/\s+/g,' ')) ||
-     /\.chip\{[^}]*flex:\s*1 1 0/.test(html));
+  ok('chips grow to fill the cell', /\.chip\{[^}]*flex:\s*1 1 auto/.test(html));
   ok('cells stack chips vertically', /\.cell\{[^}]*flex-direction:column/.test(html));
 
   console.log(`\n${pass} passed, ${fail} failed`);

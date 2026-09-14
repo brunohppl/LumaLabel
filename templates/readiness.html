@@ -30,7 +30,7 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;
 
 /* ── The matrix: crews down, three days across, no scrolling ── */
 .grid{flex:1 1 auto;display:grid;grid-template-columns:var(--headw) repeat(3,1fr);
-  grid-auto-rows:1fr;min-height:0;--headw:132px;}
+  grid-auto-rows:minmax(0,1fr);min-height:0;--headw:132px;overflow:auto;}
 .hcell{background:var(--sand);border-bottom:1px solid var(--border);
   border-right:1px solid var(--border);padding:5px 9px;display:flex;
   flex-direction:column;justify-content:center;}
@@ -53,9 +53,16 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;
 /* A chip per piece of work. Colour is readiness — what needs rescuing. */
 /* Each chip takes an equal share of the cell's height, so one job fills the
    cell and the type reads from across the room. */
-.chip{position:relative;flex:1 1 0;min-height:0;border-radius:4px;padding:6px 9px;
+.chip{position:relative;flex:1 1 auto;min-height:34px;border-radius:4px;padding:6px 9px;
   color:#fff;line-height:1.15;overflow:hidden;display:flex;flex-direction:column;
   justify-content:center;}
+/* With more than one piece of work in a cell, everything scales down rather
+   than the second chip being squeezed out of sight. */
+.cell.multi .chip{padding:4px 7px;min-height:28px;}
+.cell.multi .chip-ref{font-size:clamp(0.95rem,2.2vh,1.6rem);}
+.cell.multi .chip-status{font-size:clamp(0.6rem,1.1vh,0.8rem);}
+.cell.multi .chip-kind{font-size:clamp(0.5rem,0.85vh,0.66rem);}
+.cell.multi .bang{width:14px;height:14px;line-height:14px;font-size:0.62rem;top:4px;right:5px;}
 .chip.late{background:var(--red);}
 .chip.due{background:var(--amber);}
 .chip.ok{background:var(--ontrack);}
@@ -200,7 +207,8 @@ function render(){
     </div>`;
     days.forEach(d=>{
       const rows=cell[r.key+'|'+d]||[];
-      html+=`<div class="cell ${rows.length?'':'quiet'}">${rows.map(chipHTML).join('')}</div>`;
+      const cls=(rows.length?'':'quiet')+(rows.length>1?' multi':'');
+      html+=`<div class="cell ${cls}">${rows.map(chipHTML).join('')}</div>`;
     });
   });
 

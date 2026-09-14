@@ -108,7 +108,7 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
   font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.04em;color:var(--muted);
   cursor:pointer;white-space:nowrap;}
 .fn-btn:hover{border-color:var(--accent);color:var(--accent);}
-.fn-btn.active{background:var(--ink);border-color:var(--ink);color:var(--cream);}
+.fn-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
 .team-cols{display:flex;gap:12px;overflow-x:auto;padding-bottom:20px;margin:0 -16px;padding-left:16px;padding-right:16px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}
 .team-cols::-webkit-scrollbar{height:4px;}
 .team-cols::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
@@ -217,9 +217,9 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 
   <div class="fn-filter" id="fn-filter">
     <button class="fn-btn active" data-fn="all" onclick="setFnFilter('all')">All</button>
-    <button class="fn-btn" data-fn="transport" onclick="setFnFilter('transport')">🚛 Transport</button>
-    <button class="fn-btn" data-fn="styling" onclick="setFnFilter('styling')">🎨 Styling</button>
-    <button class="fn-btn" data-fn="warehouse" onclick="setFnFilter('warehouse')">🏭 Warehouse</button>
+    <button class="fn-btn" data-fn="transport" onclick="setFnFilter('transport')">Transport</button>
+    <button class="fn-btn" data-fn="styling" onclick="setFnFilter('styling')">Styling</button>
+    <button class="fn-btn" data-fn="warehouse" onclick="setFnFilter('warehouse')">Warehouse</button>
   </div>
 
   <div class="scroll-hint" id="scroll-hint" style="display:none;">← swipe to see more teams →</div>

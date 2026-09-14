@@ -2479,12 +2479,19 @@ def api_readiness():
         start = _dt.now()
     days = [(start + _td(days=i)).strftime('%Y-%m-%d') for i in range(3)]
 
-    entries = sb_get('job_schedule',
-                     f'date=gte.{days[0]}&date=lte.{days[-1]}') or []
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        f_entries = pool.submit(sb_get, 'job_schedule',
+                                f'date=gte.{days[0]}&date=lte.{days[-1]}')
+        f_teams   = pool.submit(sb_get, 'day_teams',
+                                f'date=gte.{days[0]}&date=lte.{days[-1]}'
+                                '&order=sort_order.asc,created_at.asc')
+        entries   = _settled(f_entries)
+        day_teams = _settled(f_teams)
     # Installs and pickups are the deadlines; load/bay tiles are evidence.
     job_ids = list({e['job_id'] for e in entries if e.get('job_id')})
     if not job_ids:
-        return jsonify({'days': days, 'jobs': [], 'rules': READINESS_RULES})
+        return jsonify({'days': days, 'jobs': [], 'teams': day_teams,
+                        'rules': READINESS_RULES})
 
     ids_str = ','.join(job_ids)
     with ThreadPoolExecutor(max_workers=3) as pool:
@@ -2515,7 +2522,9 @@ def api_readiness():
     # Every action that has to happen on a day gets its own row: staging and
     # loading happen BEFORE the install, so keying only on the install date
     # left "what must I do today" invisible.
-    ACTION_TYPES = ('install', 'pickup', 'to_load', 'bay')
+    # Pickups are excluded: there is nothing to pick, stage or load for a
+    # collection, so they can't be behind on anything.
+    ACTION_TYPES = ('install', 'to_load', 'bay')
     install_date_by_job = {}
     for t in tiles:
         if t.get('type') == 'install' and t.get('date'):
@@ -2543,17 +2552,6 @@ def api_readiness():
             install_days_out = (_dt.strptime(inst, '%Y-%m-%d').date() - today).days
         except Exception:
             install_days_out = days_out
-
-        # ── Pickups are the reverse flow: only "collected" applies ──
-        if kind == 'pickup':
-            out.append({
-                'job_id': jid, 'ref': job.get('job_ref') or job.get('job_number') or '—',
-                'address': job.get('address') or '', 'date': e['date'],
-                'time': e.get('start_time'), 'kind': 'pickup',
-                'days_out': days_out, 'stages': [], 'worst': 'ok',
-                'photo_time': job.get('photo_time'),
-            })
-            continue
 
         job_items = items_by_job.get(jid, [])
         # What the stylist picks, and what the driver loads, exclude
@@ -2653,12 +2651,16 @@ def api_readiness():
             'items': len(pickable),
             # So a staging or loading row says when the job is actually due
             'install_date': inst if kind != 'install' else None,
+            'team_id': e.get('team_id'),
+            'vehicle': e.get('vehicle'),
+            'duration': e.get('duration'),
         })
 
     # Worst first: the page exists to surface the few jobs needing attention.
     rank = {'late': 0, 'due': 1, 'ok': 2, 'done': 3}
     out.sort(key=lambda r: (rank.get(r['worst'], 2), r['date'], r['time'] or '99:99'))
-    return jsonify({'days': days, 'jobs': out, 'rules': READINESS_RULES})
+    return jsonify({'days': days, 'jobs': out, 'teams': day_teams,
+                    'rules': READINESS_RULES})
 
 
 @app.route('/api/version', methods=['GET'])

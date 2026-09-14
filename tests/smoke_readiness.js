@@ -1,109 +1,73 @@
-// Readiness board: three days, worst first, stages in words.
+// Readiness board: three day timelines, crew rows, colour = readiness.
 const fs=require('fs'), {JSDOM}=require('jsdom');
 const html=fs.readFileSync('/mnt/user-data/outputs/readiness.html','utf8');
 let pass=0,fail=0;
 const ok=(l,c)=>{ c?(pass++,console.log('✓ '+l)):(fail++,console.log('✗ FAIL '+l)); };
 
+const D=['2026-09-08','2026-09-09','2026-09-10'];
 const DATA={
-  days:['2026-09-08','2026-09-09','2026-09-10'],
-  rules:{picked:2,staged:1,loaded:1},
+  days:D, rules:{picked:2,staged:1,loaded:1},
+  teams:[{id:'T1',date:D[0],name:'Nemo',vehicle:'Nemo',function:'transport'},
+         {id:'T2',date:D[0],name:'Warehouse',vehicle:null,function:'warehouse'},
+         {id:'T3',date:D[1],name:'Bruce',vehicle:'Bruce',function:'transport'},
+         {id:'T4',date:D[2],name:'Nigel',vehicle:'Nigel',function:'transport'}],
   jobs:[
-    {job_id:'J1',ref:'QU-1351',address:'12 Somers St, Ascot QLD 4007',date:'2026-09-08',
-     time:'09:00',kind:'install',days_out:0,worst:'late',photo_time:'11:00 AM',items:42,
+    {job_id:'J1',ref:'QU-1351',address:'12 Somers St, Ascot',date:D[0],time:'09:00',
+     duration:90,kind:'install',team_id:'T1',worst:'late',
      stages:[{name:'Picked',done:18,total:42,state:'late'},
-             {name:'In bay',done:12,total:40,state:'late',note:'no bay tile booked'},
+             {name:'In bay',done:0,total:40,state:'late'},
              {name:'Loaded',done:0,total:40,state:'late'}]},
-    {job_id:'J2',ref:'QU-1362',address:'9 Vine St, Clayfield',date:'2026-09-09',
-     time:'08:00',kind:'install',days_out:1,worst:'due',
-     stages:[{name:'Picked',done:28,total:30,state:'done',note:'marked ready to load · 2 not ticked'},
-             {name:'In bay',done:30,total:30,state:'done'},
-             {name:'Loaded',done:12,total:30,state:'due'}]},
-    {job_id:'J3',ref:'QU-1370',address:'5 Kent Rd, Wooloowin',date:'2026-09-10',
-     time:'10:00',kind:'install',days_out:2,worst:'done',
-     stages:[{name:'Picked',done:20,total:20,state:'done'},
-             {name:'In bay',done:30,total:30,state:'done'},
-             {name:'Loaded',done:20,total:20,state:'done'}]},
-    {job_id:'J4',ref:'QU-1330',address:'1 Hale St, Paddington',date:'2026-09-08',
-     time:'13:00',kind:'pickup',days_out:0,worst:'ok',stages:[]},
-    {job_id:'J2',ref:'QU-1362',address:'9 Vine St, Clayfield',date:'2026-09-08',
-     time:'08:00',kind:'bay',days_out:0,worst:'due',install_date:'2026-09-09',
+    {job_id:'J2',ref:'QU-1362',address:'9 Vine St, Clayfield',date:D[0],time:'08:00',
+     duration:60,kind:'bay',team_id:'T2',worst:'due',install_date:D[1],
      stages:[{name:'Picked',done:30,total:30,state:'done'},
              {name:'In bay',done:10,total:30,state:'due'}]},
-    {job_id:'J3',ref:'QU-1370',address:'5 Kent Rd, Wooloowin',date:'2026-09-09',
-     time:'15:00',kind:'to_load',days_out:1,worst:'ok',install_date:'2026-09-10',
+    {job_id:'J3',ref:'QU-1370',address:'5 Kent Rd, Wooloowin',date:D[1],time:'10:00',
+     duration:120,kind:'install',team_id:'T3',worst:'done',
      stages:[{name:'Picked',done:20,total:20,state:'done'},
-             {name:'Loaded',done:0,total:20,state:'ok'}]}]};
+             {name:'In bay',done:20,total:20,state:'done'},
+             {name:'Loaded',done:20,total:20,state:'done'}]},
+    {job_id:'J4',ref:'QU-1399',address:'7 Forfar St',date:D[2],time:null,
+     duration:null,kind:'install',team_id:null,worst:'ok',
+     stages:[{name:'Picked',done:0,total:12,state:'ok'}]}]};
 
 const dom=new JSDOM(html,{runScripts:'dangerously',url:'http://x/readiness',
   beforeParse(w){ w.fetch=async()=>({ok:true,status:200,json:async()=>DATA}); }});
 const w=dom.window,d=w.document;
 
 setTimeout(()=>{
-  ok('three day columns', d.querySelectorAll('.col').length===3);
-  ok('columns labelled Today / Tomorrow / Day after',
-     /Today/.test(d.body.textContent) && /Tomorrow/.test(d.body.textContent) && /Day after/.test(d.body.textContent));
+  const days=[...d.querySelectorAll('.day')];
+  ok('three day sections', days.length===3);
+  ok('labelled Today / Tomorrow / Day after',
+     /Today/.test(days[0].textContent)&&/Tomorrow/.test(days[1].textContent)&&/Day after/.test(days[2].textContent));
+  ok('crew rows for the day', /Nemo/.test(days[0].textContent));
+  ok('warehouse crew shown too', /Warehouse/.test(days[0].textContent));
+  ok('each day has its own crews', /Bruce/.test(days[1].textContent) && !/Bruce/.test(days[0].textContent));
+  ok('a time axis is drawn', days[0].querySelectorAll('.tick').length>=8);
 
-  // the answer before reading any row
-  const sum=d.getElementById('summary').textContent.replace(/\s+/g,' ');
-  ok('summary counts what is behind', /1\s*behind/.test(sum));
-  ok('summary counts what is due', /1\s*due today/.test(sum));
-  ok('a job is only ready when every one of its rows is', /0\s*ready/.test(sum));
+  const b1=[...days[0].querySelectorAll('.blk')].find(b=>/QU-1351/.test(b.textContent));
+  ok('job block drawn on its crew row', !!b1);
+  ok('positioned by start time', /left:\s*18\.75%/.test(b1.getAttribute('style')));
+  ok('a behind job is red', b1.classList.contains('late'));
+  ok('and carries the alert mark', !!b1.querySelector('.bang'));
+  const b2=[...d.querySelectorAll('.blk')].find(b=>/QU-1362/.test(b.textContent));
+  ok('a due job is amber', b2.classList.contains('due'));
+  ok('due jobs get no alert mark', !b2.querySelector('.bang'));
+  const b3=[...d.querySelectorAll('.blk')].find(b=>/QU-1370/.test(b.textContent));
+  ok('a ready job is green', b3.classList.contains('done'));
 
-  // rows land in the right day
-  const cols=[...d.querySelectorAll('.col')];
-  ok('today holds its jobs', /QU-1351/.test(cols[0].textContent) && /QU-1330/.test(cols[0].textContent));
-  ok('tomorrow holds its job', /QU-1362/.test(cols[1].textContent));
-  ok('day after holds its job', /QU-1370/.test(cols[2].textContent));
+  ok('block states the shortfall', /Picked 18\/42/.test(b1.textContent));
+  ok('detail sits in the tooltip', /Loaded: 0\/40/.test(b1.getAttribute('title')));
+  ok('a load-bay block says when it installs', /Installs/.test(b2.getAttribute('title')));
 
-  // stages say what to do, not just a colour
-  const late=[...d.querySelectorAll('.row')].find(r=>/QU-1351/.test(r.textContent));
-  ok('a behind job is flagged', late.classList.contains('late'));
-  // Colour alone isn't enough — check the shape too
-  ok('behind jobs carry an alert mark', !!late.querySelector('.alert'));
-  ok('the mark reads as an exclamation', late.querySelector('.alert').textContent.trim()==='!');
-  ok('it is labelled for screen readers',
-     /Behind/i.test(late.querySelector('.alert').getAttribute('aria-label')||''));
-  const dueRow=[...d.querySelectorAll('.row')].find(r=>r.classList.contains('due'));
-  ok('due-today rows do NOT get a mark', dueRow && !dueRow.querySelector('.alert'));
-  const doneRows=[...d.querySelectorAll('.row')].filter(r=>!r.classList.contains('late'));
-  ok('no mark on anything not behind', doneRows.every(r=>!r.querySelector('.alert')));
-  ok('the column header counts what is behind', /1 behind/.test(cols[0].textContent));
-  ok('a clean column says nothing about being behind', !/behind/.test(cols[2].textContent));
-  ok('picking shortfall is stated in words', /18 of 42/.test(late.textContent));
-  ok('bay progress stated in numbers', /12 of 40/.test(late.textContent));
-  ok('a missing bay booking is noted', /no bay tile booked/.test(late.textContent));
-  ok('a finished stage reads as done', /All 30/.test(d.body.textContent));
-  // A stage completed by status must still show the real numbers
-  const forcedRow=[...d.querySelectorAll('.row')].find(r=>/marked ready to load/.test(r.textContent));
-  ok('a status-completed stage shows green', !!forcedRow.querySelector('.stage.done'));
-  ok('and keeps the real count', /28 of 30/.test(forcedRow.textContent));
-  ok('and names the shortfall', /2 not ticked/.test(forcedRow.textContent));
+  ok('unassigned work is still shown', /Unassigned/.test(days[2].textContent));
+  ok('and its block is drawn', !!days[2].querySelector('.blk'));
 
-  // pickups are the reverse flow — no picking/staging/loading stages
-  const pick=[...d.querySelectorAll('.row')].find(r=>/QU-1330/.test(r.textContent));
-  ok('pickup shown', !!pick);
-  ok('pickup has no install stages', pick.querySelectorAll('.stage').length===0);
-  ok('pickup marked as such', /Pickup/.test(pick.textContent));
+  ok('the day header counts what needs rescuing', /1 need rescuing/.test(days[0].textContent));
+  ok('a clean day says nothing', !/need rescuing/.test(days[1].textContent));
+  ok('full screen control present', !!d.getElementById('fs-btn'));
 
-  // Every row now says what has to happen that day
-  ok('install rows are labelled', [...d.querySelectorAll('.kind.install')].length>0);
-  ok('load bay rows are labelled', [...d.querySelectorAll('.kind.bay')].length===1);
-  ok('truck loading rows are labelled', [...d.querySelectorAll('.kind.to_load')].length===1);
-  const bayRow=[...d.querySelectorAll('.row')].find(r=>r.querySelector('.kind.bay'));
-  ok('a bay row sits on the day it must be done', cols[0].contains(bayRow));
-  ok('and says when the job actually installs', /Installs/.test(bayRow.textContent));
-  ok('a bay row shows only picking and staging', bayRow.querySelectorAll('.stage').length===2);
-  const loadRow=[...d.querySelectorAll('.row')].find(r=>r.querySelector('.kind.to_load'));
-  ok('a load row shows picking and loading', loadRow.querySelectorAll('.stage').length===2);
-
-  // links to act on it
-  ok('links to the picking list', !!d.querySelector('a[href="/stylist/J1"]'));
-  ok('links to the loading list', !!d.querySelector('a[href="/driver/J1"]'));
-
-  ok('address shows the suburb', /Somers St, Ascot/.test(d.body.textContent));
-  ok('state and postcode dropped', !/QLD 4007/.test(d.body.textContent));
-  ok('photo deadline shown', /11:00 AM/.test(d.body.textContent));
-  ok('the rules are spelled out', /picking complete 2 days before/.test(d.body.textContent));
+  ok('no pickups', !/Pickup/.test(d.body.textContent));
+  ok('no links at all — read only', d.querySelectorAll('a[href]').length===0);
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);

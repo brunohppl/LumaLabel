@@ -98,7 +98,8 @@ body.tight .chip-kind{font-size:clamp(0.62rem,1.15vh,0.9rem);}
 
 <script>
 const DAY_LABEL=['Today','Tomorrow','Day after'];
-const KIND={install:'Install',to_load:'Load truck',bay:'Load bay'};
+// Wording matches the rest of the app, not a third set of names
+const KIND={install:'Install',to_load:'To Load',bay:'Load Bay'};
 let DATA={days:[],jobs:[],teams:[],rules:{}};
 
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>
@@ -168,19 +169,20 @@ function render(){
     .filter(t=>(t.function||'')==='styling').map(t=>t.id));
 
   const cell={};   // key|date -> rows
-  const loose={};  // date -> rows with no crew
   (DATA.jobs||[]).forEach(j=>{
     if(stylingIds.has(j.team_id)) return;
     const k = teamIdToKey[j.team_id]
            || (!j.team_id && j.vehicle ? (vehToKeyByDay[j.date]||{})[j.vehicle] : null);
-    if(k){ (cell[k+'|'+j.date]=cell[k+'|'+j.date]||[]).push(j); }
-    else { (loose[j.date]=loose[j.date]||[]).push(j); }
+    if(!k) return;               // in the tray on the runsheet — not a column
+    (cell[k+'|'+j.date]=cell[k+'|'+j.date]||[]).push(j);
   });
-  const hasLoose=Object.keys(loose).length>0;
-  if(hasLoose) rowKeys.push({key:'Unassigned',fn:''});
+  // Work with no crew lives in the runsheet's tray, not in a column — so it
+  // doesn't get a row here either. The board mirrors the runsheet's columns.
 
-  const lateOn=d=>(DATA.jobs||[]).filter(j=>j.date===d && j.worst==='late'
-                     && !stylingIds.has(j.team_id)).length;
+
+  const onBoard=j=>!stylingIds.has(j.team_id) && !!(teamIdToKey[j.team_id]
+                   || (!j.team_id && j.vehicle ? (vehToKeyByDay[j.date]||{})[j.vehicle] : null));
+  const lateOn=d=>(DATA.jobs||[]).filter(j=>j.date===d && j.worst==='late' && onBoard(j)).length;
 
   let html=`<div class="hcell corner"></div>`;
   days.forEach((d,i)=>{
@@ -198,7 +200,7 @@ function render(){
       <div class="crew-sub">${esc(r.fn)}</div>
     </div>`;
     days.forEach(d=>{
-      const rows=(r.key==='Unassigned') ? (loose[d]||[]) : (cell[r.key+'|'+d]||[]);
+      const rows=cell[r.key+'|'+d]||[];
       html+=`<div class="cell ${rows.length?'':'quiet'}">${rows.map(chipHTML).join('')}</div>`;
     });
   });

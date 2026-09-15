@@ -53,9 +53,9 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;
 /* A chip per piece of work. Colour is readiness — what needs rescuing. */
 /* Each chip takes an equal share of the cell's height, so one job fills the
    cell and the type reads from across the room. */
-.chip{position:relative;flex:1 1 auto;min-height:34px;border-radius:4px;padding:6px 9px;
+.chip{position:relative;flex:1 1 auto;min-height:38px;border-radius:4px;padding:6px 9px;
   color:#fff;line-height:1.15;overflow:hidden;display:flex;flex-direction:column;
-  justify-content:center;}
+  justify-content:center;align-items:flex-start;}
 /* With more than one piece of work in a cell, everything scales down rather
    than the second chip being squeezed out of sight. */
 .cell.multi .chip{padding:4px 7px;min-height:28px;}
@@ -76,8 +76,16 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;
 .chip-status{font-size:clamp(0.68rem,1.5vh,1.1rem);font-weight:600;line-height:1.15;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
 /* Which kind of day this is — quiet, in the corner */
-.chip-kind{font-size:clamp(0.55rem,1vh,0.74rem);letter-spacing:0.1em;text-transform:uppercase;
-  opacity:0.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:auto;}
+/* Which kind of work this is — a solid pill so Install, To Load and Load Bay
+   are told apart at a glance, not by reading small grey text. */
+.chip-kind{align-self:flex-start;max-width:100%;padding:2px 8px;border-radius:10px;
+  background:#fff;font-size:clamp(0.55rem,1.1vh,0.78rem);font-weight:700;
+  letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;margin-bottom:3px;}
+.chip.late  .chip-kind{color:var(--red);}
+.chip.due   .chip-kind{color:var(--amber);}
+.chip.ok    .chip-kind{color:var(--ontrack);}
+.chip.done  .chip-kind{color:var(--green);}
 /* Same corner on every tile, so it never shifts the number sideways */
 .bang{position:absolute;top:6px;right:8px;width:17px;height:17px;border-radius:50%;
   background:#fff;color:var(--red);font-size:0.74rem;font-weight:700;text-align:center;
@@ -132,9 +140,9 @@ function chipHTML(j){
   return `<div class="chip ${j.worst}"
       title="${esc(j.ref)} · ${esc(KIND[j.kind]||j.kind)}\n${esc(street(j.address))}${j.install_date?'\nInstalls '+esc(shortDate(j.install_date)):''}\nStatus: ${esc(j.status_label||'')}${esc(needs)}\n${esc(detail)}">
     ${j.worst==='late'?'<span class="bang">!</span>':''}
+    <div class="chip-kind k-${esc(j.kind)}">${esc(KIND[j.kind]||j.kind)}</div>
     <div class="chip-ref">${esc(j.ref)}</div>
     <div class="chip-status">${esc(j.status_label||'')}</div>
-    <div class="chip-kind">${esc(KIND[j.kind]||j.kind)}</div>
   </div>`;
 }
 

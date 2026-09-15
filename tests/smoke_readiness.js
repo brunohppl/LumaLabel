@@ -126,6 +126,11 @@ setTimeout(()=>{
   const kinds=[...d.querySelectorAll('.chip-kind')].map(x=>x.textContent.trim());
   ok('Install spelled out', kinds.some(k=>/Install/i.test(k)));
   ok('Load Bay spelled out', kinds.some(k=>/Load Bay/i.test(k)));
+  ok('the action pill comes first on the tile',
+     [...d.querySelectorAll('.chip')].every(c=>{
+       const h=c.innerHTML; return h.indexOf('chip-kind')<h.indexOf('chip-ref');
+     }));
+  ok('the pill is class-tagged by kind', !!d.querySelector('.chip-kind.k-to_load'));
   ok('the job number comes before the status',
      [...d.querySelectorAll('.chip')].every(c=>{
        const h=c.innerHTML; return h.indexOf('chip-ref')<h.indexOf('chip-status');

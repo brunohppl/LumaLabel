@@ -8,7 +8,7 @@ import urllib.request
 import urllib.parse
 import urllib.error
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import pdfplumber
 from flask import Flask, request, jsonify, Response
@@ -2455,6 +2455,16 @@ def _is_packed_item(desc):
     return small_lamp or bool(_CUSHION_RE.search(d)) or bool(_ACCESSORY_RE.search(d))
 
 
+# Render runs in UTC; Queensland is UTC+10 and has no daylight saving. Using
+# the server clock made "today" a day behind for most of the working day,
+# which shifted the whole board and pushed the third day off the end.
+BRISBANE = timezone(timedelta(hours=10))
+
+
+def brisbane_now():
+    return datetime.now(BRISBANE)
+
+
 # Where a job has got to, as a ladder. Everything on the readiness board
 # compares where a job IS against where its day requires it to BE.
 STATUS_RANK = {
@@ -2505,7 +2515,7 @@ def _readiness_payload():
     try:
         start = _dt.strptime(request.args.get('from') or '', '%Y-%m-%d')
     except ValueError:
-        start = _dt.now()
+        start = brisbane_now().replace(tzinfo=None)
     days = [(start + _td(days=i)).strftime('%Y-%m-%d') for i in range(3)]
 
     with ThreadPoolExecutor(max_workers=2) as pool:
@@ -2544,7 +2554,7 @@ def _readiness_payload():
     for t in tiles:
         tiles_by_job.setdefault(t.get('job_id'), []).append(t)
 
-    today = _dt.now().date()
+    today = brisbane_now().date()
     out = []
     seen = set()
 

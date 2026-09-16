@@ -183,19 +183,29 @@ function render(){
     .filter(t=>(t.function||'')==='styling').map(t=>t.id));
 
   const cell={};   // key|date -> rows
+  // Anything the scheduler has PLACED must appear. Resolve the crew the way
+  // the runsheet does; if that fails but the tile is placed (it has a crew or
+  // a vehicle), give it a row of its own rather than dropping it — silently
+  // losing scheduled work is the worst thing this board could do.
+  const extraRows=[];
   (DATA.jobs||[]).forEach(j=>{
     if(stylingIds.has(j.team_id)) return;
-    const k = teamIdToKey[j.team_id]
-           || (!j.team_id && j.vehicle ? (vehToKeyByDay[j.date]||{})[j.vehicle] : null);
-    if(!k) return;               // in the tray on the runsheet — not a column
+    let k = teamIdToKey[j.team_id]
+         || (j.vehicle ? (vehToKeyByDay[j.date]||{})[j.vehicle] : null);
+    if(!k){
+      const placed = !!(j.team_id || j.vehicle);
+      if(!placed) return;                 // genuinely in the tray
+      k = j.vehicle || 'Crew';            // placed, but the crew record is gone
+      if(!seen.has(k)){ seen.add(k); extraRows.push({key:k,fn:''}); }
+    }
     (cell[k+'|'+j.date]=cell[k+'|'+j.date]||[]).push(j);
   });
+  extraRows.forEach(r=>rowKeys.push(r));
   // Work with no crew lives in the runsheet's tray, not in a column — so it
   // doesn't get a row here either. The board mirrors the runsheet's columns.
 
 
-  const onBoard=j=>!stylingIds.has(j.team_id) && !!(teamIdToKey[j.team_id]
-                   || (!j.team_id && j.vehicle ? (vehToKeyByDay[j.date]||{})[j.vehicle] : null));
+  const onBoard=j=>!stylingIds.has(j.team_id) && !!(j.team_id || j.vehicle);
   const lateOn=d=>(DATA.jobs||[]).filter(j=>j.date===d && j.worst==='late' && onBoard(j)).length;
 
   let html=`<div class="hcell corner"></div>`;

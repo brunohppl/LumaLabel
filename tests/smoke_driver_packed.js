@@ -68,7 +68,9 @@ const txt=()=>d.getElementById('prog-txt').textContent;
 
   // no counts set: rows must not be counted
   w.eval(`job={...job,cushion_bags:null,accessory_tubs:0}; renderRooms(); updateProgress();`);
-  ok('unset counts are not counted ('+txt()+')', /\/ 2$/.test(txt().trim()));
+  // A visible row counts even with no number against it, so ticking it
+  // moves the bar; the prompt keeps the missing count visible.
+  ok('a visible packed row still counts ('+txt()+')', /\/ 4$/.test(txt().trim()));
 
   // Towels ride in the bags — not a separate line to load
   ok('towel sets are not listed individually', !/Towel Set/.test(d.body.innerHTML));
@@ -77,8 +79,17 @@ const txt=()=>d.getElementById('prog-txt').textContent;
      /check with the Stylist/i.test(d.getElementById('cushion-bags-row').textContent));
   ok('and says the number is not set',
      /not set/i.test(d.getElementById('cushion-bags-row').textContent));
-  ok('cushion row is not tickable without a count',
-     !d.getElementById('cushion-bags-row').getAttribute('onclick'));
+  ok('cushion row IS tickable without a count',
+     !!d.getElementById('cushion-bags-row').getAttribute('onclick'));
+  ok('tub row is tickable without a count',
+     !!d.getElementById('accessory-tubs-row').getAttribute('onclick'));
+  // ticking one with no count still moves the bar
+  const beforeTxt=txt();
+  await w.togglePacked('cushion'); await sleep(50);
+  ok('ticking it counts toward the bar ('+beforeTxt+' -> '+txt()+')', beforeTxt!==txt());
+  ok('and it saves', patched && patched.body.cushion_bags_loaded===true);
+  ok('the missing count is still flagged',
+     /not set|check with the Stylist/i.test(d.getElementById('cushion-bags-row').textContent));
   ok('tub row behaves the same',
      /check with the Stylist/i.test(d.getElementById('accessory-tubs-row').textContent));
   ok('the tub row still shows a prompt to ask the stylist',

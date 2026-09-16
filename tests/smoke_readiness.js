@@ -39,6 +39,12 @@ const DATA={
     {job_id:'J6',ref:'QU-1390',address:'4 Legacy St',date:D[0],kind:'install',
      team_id:null,vehicle:'Nemo',worst:'due',status:'ready_to_load',status_label:'Ready to load',needs:'Loaded',met:false,
      stages:[{name:'Picked',done:5,total:10,state:'due'}]},
+    {job_id:'J8',ref:'QU-1410',address:'9 Ghost St',date:D[0],kind:'to_load',
+     team_id:'GONE',vehicle:'Nigel',worst:'late',status:'ready',status_label:'Ready to pick',
+     needs:'Loaded',met:false,stages:[{name:'Picked',done:0,total:8,state:'late'}]},
+    {job_id:'J9',ref:'QU-1420',address:'3 Split St',date:D[0],kind:'install',
+     team_id:'A1',worst:'due',status:'ready_to_load',status_label:'Ready to load',
+     needs:'Loaded',met:false,stages:[{name:'Picked',done:6,total:6,state:'done'}]},
     {job_id:'J7',ref:'QU-1400',address:'8 Load St',date:D[1],kind:'to_load',
      team_id:'B1',worst:'due',status:'ready_to_load',status_label:'Ready to load',needs:'Loaded',met:false,install_date:D[2],
      stages:[{name:'Picked',done:9,total:9,state:'done'},
@@ -93,7 +99,7 @@ setTimeout(()=>{
   ok('no times shown', !/\b\d{1,2}:\d{2}\b/.test(d.querySelector('.grid').textContent));
   ok('no links', d.querySelectorAll('a[href]').length===0);
   ok('no scrollable timeline', d.querySelectorAll('.lane, .ruler').length===0);
-  ok('day header counts what needs rescuing', /1 need rescuing/.test(heads[1].textContent));
+  ok('day header counts what needs rescuing', /2 need rescuing/.test(heads[1].textContent));
   ok('a clean day says nothing', !/need rescuing/.test(heads[3].textContent));
   ok('full screen available', !!d.getElementById('fs-btn'));
 
@@ -101,7 +107,7 @@ setTimeout(()=>{
   ok('no styling crew rows', !rows.includes('Marlin') && !rows.includes('VUG'));
   ok('their work is not shown', !/QU-1380/.test(d.querySelector('.grid').textContent));
   ok('and is not shown anywhere', !/QU-1380/.test(d.querySelector('.grid').textContent));
-  ok('nor counted as needing rescuing', /1 need rescuing/.test(heads[1].textContent));
+  ok('styling work is not counted', /2 need rescuing/.test(heads[1].textContent));
 
   // Crew resolution and order follow the runsheet
   ok('a vehicle-only tile lands on its crew, not Unassigned',
@@ -110,7 +116,14 @@ setTimeout(()=>{
      /QU-1390/.test(d.querySelector('.grid').textContent));
   ok('rows follow the runsheet column order (Bruce, Nemo, Warehouse)',
      rows.indexOf('Bruce')<rows.indexOf('Nemo') && rows.indexOf('Nemo')<rows.indexOf('Warehouse'));
-  ok('every row is a real crew', rows.every(r=>['Bruce','Nemo','Warehouse'].includes(r)));
+  // Placed work must never vanish, even if its crew record is gone
+  ok('a placed tile with an unknown crew still shows',
+     /QU-1410/.test(d.querySelector('.grid').textContent));
+  ok('and gets a row named after its vehicle', rows.includes('Nigel'));
+  // A crew with two jobs on one day shows both
+  const nemoToday2=cells[rows.indexOf('Nemo')*3];
+  ok('two jobs on one crew both appear',
+     /QU-1390/.test(nemoToday2.textContent) && /QU-1420/.test(nemoToday2.textContent));
 
   // A crew's install AND load work both show on that crew
   const nemoTomorrow=cells[rows.indexOf('Nemo')*3+1];

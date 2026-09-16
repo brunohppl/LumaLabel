@@ -2574,9 +2574,13 @@ def _readiness_payload():
             continue
         jid = e.get('job_id')
         job = jobs_by_id.get(jid)
-        if not job or (jid, e.get('date'), e.get('type')) in seen:
+        # Keyed by the TILE, not the job: a job split across two crews has two
+        # tiles on the runsheet and must have two here. Only a genuine
+        # duplicate row (same crew, same action, same day) is collapsed.
+        key = (jid, e.get('date'), e.get('type'), e.get('team_id'), e.get('vehicle'))
+        if not job or key in seen:
             continue
-        seen.add((jid, e.get('date'), e.get('type')))
+        seen.add(key)
 
         try:
             due = _dt.strptime(e['date'], '%Y-%m-%d').date()

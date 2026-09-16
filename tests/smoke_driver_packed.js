@@ -12,7 +12,8 @@ const ITEMS=[
   {id:'2',description:'Dining Table',room:'Dining',on_truck:true},
   {id:'3',description:'Table Lamp',room:'Living'},
   {id:'4',description:'Cushions / Throw',room:'Living'},
-  {id:'5',description:'Accessories',room:'Kitchen'}];
+  {id:'5',description:'Accessories',room:'Kitchen'},
+  {id:'6',description:'Towel Set',room:'Bath'}];
 
 const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://x.test/driver/J1',
   beforeParse(w){
@@ -68,6 +69,18 @@ const txt=()=>d.getElementById('prog-txt').textContent;
   // no counts set: rows must not be counted
   w.eval(`job={...job,cushion_bags:null,accessory_tubs:0}; renderRooms(); updateProgress();`);
   ok('unset counts are not counted ('+txt()+')', /\/ 2$/.test(txt().trim()));
+
+  // Towels ride in the bags — not a separate line to load
+  ok('towel sets are not listed individually', !/Towel Set/.test(d.body.innerHTML));
+  // With no count, both rows still appear and prompt the driver
+  ok('cushion row still shown without a count',
+     /check with the Stylist/i.test(d.getElementById('cushion-bags-row').textContent));
+  ok('and says the number is not set',
+     /not set/i.test(d.getElementById('cushion-bags-row').textContent));
+  ok('cushion row is not tickable without a count',
+     !d.getElementById('cushion-bags-row').getAttribute('onclick'));
+  ok('tub row behaves the same',
+     /check with the Stylist/i.test(d.getElementById('accessory-tubs-row').textContent));
   ok('the tub row still shows a prompt to ask the stylist',
      /check with the Stylist/i.test(d.getElementById('accessory-tubs-row').textContent));
 

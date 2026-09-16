@@ -463,7 +463,9 @@ function isSmallLamp(desc){
 function isCushionItem(desc){
   if(!desc) return false;
   const d = desc.toLowerCase();
-  return /cushion|pillow|throw|coverlet/.test(d);
+  // Towels go in the bags with the linen — the driver doesn't load them as
+  // separate items, so they don't belong on the list.
+  return /cushion|pillow|throw|coverlet|towel/.test(d);
 }
 
 // Individual accessor items from the packing slip are replaced by a single
@@ -589,10 +591,15 @@ function renderRooms(){
   }
 
 
-  // If stylist set cushion bags, ensure "Linen and Cushions" appears even
-  // when all individual cushion items were filtered out
+  // The bags row shows whenever this job has soft furnishings at all — with
+  // a count if the stylist entered one, and a prompt to check with them if
+  // not. Previously a job with cushions but no count showed nothing, so the
+  // bags could be left behind with nothing on screen to say so.
   const cushionBagCount = job && job.cushion_bags ? job.cushion_bags : 0;
-  if(cushionBagCount && !catMap['Linen and Cushions']){
+  const hasCushionItems = items.some(i => isCushionItem(i.description)
+                                       && !i.is_extra && !i.not_transferring);
+  const showCushionRow = cushionBagCount || hasCushionItems;
+  if(showCushionRow && !catMap['Linen and Cushions']){
     catMap['Linen and Cushions'] = [];
   }
 
@@ -639,7 +646,7 @@ function renderRooms(){
     const key=cat.replace(/[^a-zA-Z0-9]/g,'_');
 
     // Cushion bags row — injected at the top of the Linen and Cushions category
-    const cushionBagRow = (cat==='Linen and Cushions' && cushionBagCount)
+    const cushionBagRow = (cat==='Linen and Cushions' && showCushionRow)
       ? cushionBagsRowHTML(cushionBagCount)
       : '';
 
@@ -669,15 +676,21 @@ function renderRooms(){
 }
 
 function cushionBagsRowHTML(n){
-  const label=`${n}× Cushion Bag${n===1?'':'s'}`;
+  const label = n
+    ? `${n}× Cushion Bag${n===1?'':'s'}`
+    : 'Cushions and linen — please check with the Stylist';
+  const sub = n ? 'Packed by stylist · tap when loaded' : 'Number of bags not set';
   const on = !!(job && job.cushion_bags_loaded);
-  return `<div class="group-row${on?' checked':''}" id="cushion-bags-row" onclick="togglePacked('cushion')">
-    <button class="check-btn" onclick="togglePacked('cushion');event.stopPropagation()">
+  // With no count there is nothing to confirm, so the row can't be ticked —
+  // otherwise the bar could reach 100% without anyone knowing how many bags
+  // were meant to come.
+  return `<div class="group-row${n && on?' checked':''}" id="cushion-bags-row"${n?' onclick="togglePacked(\'cushion\')"':''}>
+    <button class="check-btn"${n?' onclick="togglePacked(\'cushion\');event.stopPropagation()"':''}>
       <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
     </button>
     <div class="group-info">
       <div class="group-desc" style="font-weight:600;">${label}</div>
-      <div class="group-desc" style="font-size:0.8rem;color:var(--muted);">Packed by stylist</div>
+      <div class="group-desc" style="font-size:0.8rem;color:var(--muted);">${sub}</div>
     </div>
   </div>`;
 }

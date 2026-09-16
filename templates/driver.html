@@ -562,6 +562,13 @@ function updateRing(card, green, bay, total, done){
 // accessories are packed into tubs and bags, so they are replaced by the
 // synthetic tub/bag rows and never appear individually — counting them in
 // the progress bar made the total unreachable no matter how much was loaded.
+// Does this job have soft furnishings at all? Decides whether the bags row
+// is on screen, and therefore whether it counts.
+function hasCushionStock(){
+  return items.some(i => isCushionItem(i.description)
+                      && !i.is_extra && !i.not_transferring);
+}
+
 function tickableItems(){
   return items.filter(i =>
     !i.is_extra &&
@@ -681,11 +688,11 @@ function cushionBagsRowHTML(n){
     : 'Cushions and linen — please check with the Stylist';
   const sub = n ? 'Packed by stylist · tap when loaded' : 'Number of bags not set';
   const on = !!(job && job.cushion_bags_loaded);
-  // With no count there is nothing to confirm, so the row can't be ticked —
-  // otherwise the bar could reach 100% without anyone knowing how many bags
-  // were meant to come.
-  return `<div class="group-row${n && on?' checked':''}" id="cushion-bags-row"${n?' onclick="togglePacked(\'cushion\')"':''}>
-    <button class="check-btn"${n?' onclick="togglePacked(\'cushion\');event.stopPropagation()"':''}>
+  // Tickable either way: the driver may well have the bags in hand before
+  // anyone fills the number in. The prompt below stays visible so the
+  // missing count is still obvious.
+  return `<div class="group-row${on?' checked':''}" id="cushion-bags-row" onclick="togglePacked('cushion')">
+    <button class="check-btn" onclick="togglePacked('cushion');event.stopPropagation()">
       <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
     </button>
     <div class="group-info">
@@ -727,8 +734,8 @@ function accessoryTubsRowHTML(n){
     ? 'Tap to mark collected'
     : 'Number of boxes not set';
   const on = !!(job && job.accessory_tubs_loaded);
-  return `<div class="group-row${n && on?' checked':''}" id="accessory-tubs-row"${n?' onclick="togglePacked(\'tubs\')"':''}>
-    <button class="check-btn"${n?' onclick="togglePacked(\'tubs\');event.stopPropagation()"':''}>
+  return `<div class="group-row${on?' checked':''}" id="accessory-tubs-row" onclick="togglePacked('tubs')">
+    <button class="check-btn" onclick="togglePacked('tubs');event.stopPropagation()">
       <div class="check-circle"><span class="check-tick">✓</span><span class="check-empty"></span></div>
     </button>
     <div class="group-info">
@@ -887,12 +894,14 @@ function updateProgress(){
   // The packed rows count as one item each — but only once the stylist has
   // said how many there are. An unset count is a question for the stylist,
   // not a thing the driver can load.
-  if(job && job.cushion_bags){
+  // A visible row counts, with or without a number against it — otherwise
+  // ticking it would do nothing to the bar.
+  if(job && (job.cushion_bags || hasCushionStock())){
     total++;
     if(job.cushion_bags_loaded) onTruck++;
   }
-  if(job && job.accessory_tubs){
-    total++;
+  if(job){
+    total++;                       // the accessories row is always shown
     if(job.accessory_tubs_loaded) onTruck++;
   }
 

@@ -2445,7 +2445,7 @@ def readiness_page():
 # Counting them individually here made readiness disagree with the loading
 # list. Keep these in step with isSmallLamp/isCushionItem/isAccessoryItem
 # in driver.html.
-_CUSHION_RE   = re.compile(r'cushion|pillow|throw|coverlet', re.I)
+_CUSHION_RE   = re.compile(r'cushion|pillow|throw|coverlet|towel', re.I)
 _ACCESSORY_RE = re.compile(r'accessor|centrepiece', re.I)
 
 

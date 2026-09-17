@@ -152,6 +152,11 @@ body.mobile-mode .mobile-only{display:block !important;}
 .room-card-sub{font-size:0.72rem;color:var(--muted);margin-top:2px;}
 .room-delete-btn{background:none;border:none;cursor:pointer;padding:6px;color:var(--muted);border-radius:2px;transition:color 0.15s,background 0.15s;flex-shrink:0;display:flex;align-items:center;margin-left:auto;}
 .room-delete-btn:hover{color:var(--red);background:rgba(232,92,71,0.08);}
+.item-edit-btn{background:none;border:none;cursor:pointer;padding:3px;color:var(--border);
+  border-radius:2px;line-height:0;flex-shrink:0;transition:color 0.15s;}
+.item-edit-btn:hover{color:var(--accent);}
+.item-name-input{font-size:0.82rem;color:var(--ink);border:none;border-bottom:2px solid var(--accent);
+  background:none;outline:none;font-family:'Jost',sans-serif;padding:0;min-width:140px;flex:1;}
 .room-edit-btn{background:none;border:none;cursor:pointer;padding:6px;color:var(--muted);border-radius:2px;transition:color 0.15s,background 0.15s;flex-shrink:0;display:flex;align-items:center;}
 .room-edit-btn:hover{color:var(--accent);background:rgba(184,147,90,0.08);}
 .room-name-input{font-size:1rem;font-weight:600;color:var(--ink);border:none;border-bottom:2px solid var(--accent);background:none;outline:none;width:100%;font-family:'Jost',sans-serif;padding:0;}
@@ -1179,7 +1184,14 @@ function groupRow(grp){
     <button class="${btnCls}" onclick="toggleGroupPicked('${ids}', this)" style="margin-top:0;">✓</button>
     <div class="item-serial" style="margin-top:0;">${serialTxt}</div>
     <div style="flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <span class="item-desc" style="margin-top:0;">${descTxt}</span>
+      <span class="item-desc" id="desc-${grp.firstSerial}" style="margin-top:0;">${descTxt}</span>
+      <button class="item-edit-btn" title="Rename item"
+        onclick="event.stopPropagation();startRenameItem('${grp.firstSerial}','${ids}')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
       ${aisleDD}${numDD}
       ${transferCheckbox}
       ${notTransferringCheckbox}
@@ -1500,6 +1512,49 @@ async function saveRenameRoom(oldName, newName, itemIds, key, nameDiv, input){
   allItems.forEach(item => {
     if(item.room === oldName) item.room = newName;
   });
+  renderItems();
+}
+
+// Renaming a group renames every item in it — the group IS several items
+// that share a description, so they have to move together or the group
+// splits in two.
+function startRenameItem(serial, ids){
+  const span=document.getElementById(`desc-${serial}`);
+  if(!span) return;
+  const idList=String(ids).split(',').filter(Boolean);
+  // Edit the plain description, not the "4×  " prefix the row displays
+  const first=allItems.find(i=>i.id===idList[0]);
+  const current=(first && first.description) || '';
+
+  const input=document.createElement('input');
+  input.className='item-name-input';
+  input.value=current;
+  input.onclick=e=>e.stopPropagation();
+  input.onkeydown=e=>{
+    if(e.key==='Enter'){ e.preventDefault(); saveRenameItem(current, input.value.trim(), idList, span, input); }
+    if(e.key==='Escape'){ input._saving=true; renderItems(); }
+  };
+  input.onblur=()=>saveRenameItem(current, input.value.trim(), idList, span, input);
+  span.innerHTML='';
+  span.appendChild(input);
+  input.focus();
+  input.select();
+}
+
+async function saveRenameItem(oldName, newName, ids, span, input){
+  if(input._saving) return;          // Enter and blur both fire
+  input._saving=true;
+  if(!newName || newName===oldName){ renderItems(); return; }
+  span.innerHTML='<span style="color:var(--muted)">Saving…</span>';
+  try{
+    const results=await Promise.all(ids.map(id=>
+      fetch(`/api/items/${id}/check`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({description:newName})})));
+    if(results.some(r=>!r.ok)) throw new Error('save failed');
+    allItems.forEach(i=>{ if(ids.includes(i.id)) i.description=newName; });
+  }catch(e){
+    alert('Could not rename that — check your connection and try again.');
+  }
   renderItems();
 }
 

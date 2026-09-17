@@ -21,6 +21,13 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .pill-installed{background:rgba(74,124,89,0.45);color:#9FFFCE;font-weight:800;}
 .pill-readycollect{background:rgba(106,13,173,0.35);color:#CB9FFF;font-weight:800;}
 .pill-returned{background:rgba(74,126,184,0.3);color:#8ABAEE;font-weight:800;}
+.hdr-ref-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+/* The physical labels are colour-coded, so the driver is scanning the bay
+   for a colour. Show it the same way it looks on the label: a solid block
+   with the colour's name on it. */
+.label-chip{display:inline-flex;align-items:center;justify-content:center;
+  min-width:96px;padding:8px 16px;border-radius:4px;font-size:0.92rem;font-weight:700;
+  letter-spacing:0.1em;text-transform:uppercase;border:1px solid rgba(255,255,255,0.3);}
 .hdr-ref{font-size:2.6rem;font-weight:700;color:var(--accent);line-height:1;letter-spacing:-0.01em;}
 .hdr-addr{font-size:0.92rem;color:rgba(250,248,244,0.6);margin-top:2px;display:flex;align-items:center;gap:8px;text-decoration:none;cursor:pointer;flex-wrap:wrap;}
 .hdr-addr:hover{color:rgba(250,248,244,0.8);}
@@ -157,7 +164,10 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
     </a>
     <div id="status-badge" class="pill pill-readyload">Ready to Load</div>
   </div>
-  <div class="hdr-ref" id="job-ref">—</div>
+  <div class="hdr-ref-row">
+    <div class="hdr-ref" id="job-ref">—</div>
+    <div class="label-chip" id="label-colour" style="display:none;"></div>
+  </div>
   <a class="hdr-addr" id="job-addr" href="#" target="_blank" onclick="return onAddressClick(event)">
     <span id="job-addr-text"></span>
     <span class="hdr-addr-navigate">
@@ -286,6 +296,7 @@ async function loadJob(){
   const res=await fetch(`/api/jobs/${jobId}`);
   const data=await res.json();
   job=data.job;items=data.items;
+  renderLabelColour(data.label_colour);
   document.getElementById('job-ref').textContent=job.job_ref||job.job_number;
   const addrLink=document.getElementById('job-addr');
   document.getElementById('job-addr-text').textContent=job.address;
@@ -567,6 +578,19 @@ function updateRing(card, green, bay, total, done){
 function hasCushionStock(){
   return items.some(i => isCushionItem(i.description)
                       && !i.is_extra && !i.not_transferring);
+}
+
+// The label colour, shown as the label itself looks — block of colour with
+// its name. Without a colour on the job there's nothing to hunt for, so the
+// chip stays hidden rather than showing an empty box.
+function renderLabelColour(lc){
+  const el=document.getElementById('label-colour');
+  if(!el) return;
+  if(!lc || !lc.hex){ el.style.display='none'; return; }
+  el.style.display='inline-flex';
+  el.style.background=lc.hex;
+  el.style.color=(lc.text==='white')?'#fff':'#1A1714';
+  el.textContent=lc.name;
 }
 
 function tickableItems(){

@@ -2089,7 +2089,14 @@ def api_damages_update(report_id):
     if 'job_id'           in data: payload['job_id']           = data['job_id'] or None
     if 'job_ref_snapshot' in data: payload['job_ref_snapshot'] = data['job_ref_snapshot'] or None
     if 'photo_url'        in data: payload['photo_url']        = data['photo_url'] or None
-    if 'notes'            in data: payload['notes']            = data['notes'] or None
+    if 'notes'            in data: payload['notes']            = data['notes']
+    # Stylists rename items from their page, the same way they rename a room.
+    # Blank is refused: an item with no description can't be picked or loaded.
+    if 'description'      in data:
+        desc = (data['description'] or '').strip()
+        if not desc:
+            return jsonify({'success': False, 'error': 'Description cannot be empty'}), 400
+        payload['description'] = desc or None
     result = sb_patch('damage_reports', f'id=eq.{report_id}', payload)
     if result:
         return jsonify({'success': True, 'report': result[0]})

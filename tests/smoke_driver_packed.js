@@ -23,7 +23,8 @@ const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'h
         if(failNext) return {ok:false,status:500,json:async()=>({success:false})};
         return {ok:true,status:200,json:async()=>({success:true})};
       }
-      return {ok:true,status:200,json:async()=>({job:JOB,items:ITEMS})};
+      return {ok:true,status:200,json:async()=>({job:JOB,items:ITEMS,
+        label_colour:{name:'Sage',hex:'#AABF69',text:'black'}})};
     };
     w.alert=()=>{};
   }});
@@ -94,6 +95,21 @@ const txt=()=>d.getElementById('prog-txt').textContent;
      /check with the Stylist/i.test(d.getElementById('accessory-tubs-row').textContent));
   ok('the tub row still shows a prompt to ask the stylist',
      /check with the Stylist/i.test(d.getElementById('accessory-tubs-row').textContent));
+
+  // The label colour the driver is hunting for
+  w.renderLabelColour({name:'Sage',hex:'#AABF69',text:'black'});
+  const lc=d.getElementById('label-colour');
+  ok('label colour shown', lc.style.display!=='none');
+  ok('named so it can be asked for', /Sage/.test(lc.textContent));
+  ok('just the colour name, nothing else', lc.textContent.trim()==='Sage');
+  ok('painted in the actual colour', /170, 191, 105|#AABF69/i.test(lc.style.background));
+  ok('dark text on a pale colour', /26, 23, 20|#1A1714/i.test(lc.style.color));
+
+  w.renderLabelColour({name:'Purple',hex:'#6A3D8A',text:'white'});
+  ok('white text on a dark colour', /255, 255, 255|#fff/i.test(lc.style.color));
+
+  w.renderLabelColour(null);
+  ok('hidden when the job has no colour', lc.style.display==='none');
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);

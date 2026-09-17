@@ -2124,8 +2124,17 @@ def api_job(job_id):
         return jsonify({'error': 'Job not found'}), 404
     transferring_to = sb_get('jobs', f'transfer_from_job_id=eq.{job_id}')
     schedule = sb_get('job_schedule', f'job_id=eq.{job_id}&order=start_time.asc')
+    # Resolve the label colour here: the job stores a NAME, and only the
+    # server knows the palette (including retired names). The driver is
+    # hunting for physical labels of that colour in the bay.
+    label_colour = None
+    if job[0].get('colour'):
+        c = find_colour(job[0]['colour'])
+        if c:
+            label_colour = {'name': c['name'], 'hex': c['hex'], 'text': c['text']}
     return jsonify({'job': job[0], 'items': items,
                     'transferring_to': transferring_to,
+                    'label_colour': label_colour,
                     'schedule': schedule or []})
 
 @app.route('/api/jobs/<job_id>/room-notes', methods=['GET'])

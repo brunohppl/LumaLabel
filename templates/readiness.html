@@ -63,8 +63,10 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;
 .cell.multi .chip-status{font-size:clamp(0.6rem,1.1vh,0.8rem);}
 .cell.multi .chip-kind{font-size:clamp(0.5rem,0.85vh,0.66rem);}
 .cell.multi .bang{width:14px;height:14px;line-height:14px;font-size:0.62rem;top:4px;right:5px;}
+.chip.overdue{background:#7E2D22;}      /* deeper red — it should have happened */
 .chip.late{background:var(--red);}
 .chip.due{background:var(--amber);}
+.chip.warn{background:var(--amber);}
 .chip.ok{background:var(--ontrack);}
 .chip.done{background:var(--green);}
 /* The action first and largest — Install or To Load is the thing to read */
@@ -82,14 +84,19 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;
   background:#fff;font-size:clamp(0.55rem,1.1vh,0.78rem);font-weight:700;
   letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;margin-bottom:3px;}
+.chip.overdue .chip-kind{color:#7E2D22;}
 .chip.late  .chip-kind{color:var(--red);}
 .chip.due   .chip-kind{color:var(--amber);}
+.chip.warn  .chip-kind{color:var(--amber);}
 .chip.ok    .chip-kind{color:var(--ontrack);}
 .chip.done  .chip-kind{color:var(--green);}
 /* Same corner on every tile, so it never shifts the number sideways */
-.bang{position:absolute;top:6px;right:8px;width:17px;height:17px;border-radius:50%;
-  background:#fff;color:var(--red);font-size:0.74rem;font-weight:700;text-align:center;
+.bang{position:absolute;top:6px;right:8px;min-width:17px;height:17px;padding:0 3px;
+  border-radius:9px;background:#fff;font-size:0.74rem;font-weight:700;text-align:center;
   line-height:17px;}
+.chip.overdue .bang{color:#7E2D22;}
+.chip.late .bang{color:var(--red);}
+.chip.warn .bang{color:var(--amber);}
 .kind{opacity:0.75;font-weight:500;}
 .msg{padding:30px;text-align:center;color:var(--muted);grid-column:1/-1;}
 
@@ -104,12 +111,13 @@ body.tight .chip-status{font-size:clamp(0.6rem,1.2vh,0.85rem);}
 
 <div class="bar">
   <img src="/static/luma-mark-light.png" alt="LUMA"/>
-  <span class="bar-title">Readiness</span>
+  <span class="bar-title">Loading readiness</span>
   <div class="legend">
-    <span class="lg"><i style="background:#A63D2F"></i>Behind</span>
-    <span class="lg"><i style="background:#C88A2E"></i>Due</span>
+    <span class="lg"><i style="background:#7E2D22"></i>Overdue</span>
+    <span class="lg"><i style="background:#A63D2F"></i>Not ready</span>
+    <span class="lg"><i style="background:#C88A2E"></i>Needs attention</span>
     <span class="lg"><i style="background:#8D8577"></i>On track</span>
-    <span class="lg"><i style="background:#4A7C59"></i>Ready</span>
+    <span class="lg"><i style="background:#4A7C59"></i>Loaded</span>
     <button class="fs" id="fs-btn" onclick="toggleFull()">Full screen</button>
   </div>
 </div>
@@ -120,6 +128,7 @@ body.tight .chip-status{font-size:clamp(0.6rem,1.2vh,0.85rem);}
 const DAY_LABEL=['Today','Tomorrow','Day after'];
 // Wording matches the rest of the app, not a third set of names
 const KIND={install:'Install',to_load:'To Load',bay:'Load Bay'};
+const MARK={overdue:'!',late:'!',warn:'⚠'};   // red shouts, amber warns
 let DATA={days:[],jobs:[],teams:[],rules:{}};
 
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>
@@ -133,16 +142,15 @@ function shortDate(iso){
 
 
 function chipHTML(j){
-  // Detail stays in the tooltip; the tile itself says the job and where it's got to.
-  const detail=(j.stages||[]).map(s=>
-    `${s.name}: ${s.total?`${s.done}/${s.total}`:'—'}${s.note?' ('+s.note+')':''}`).join('\n');
-  const needs=j.met?'':` · needs ${j.needs}`;
-  return `<div class="chip ${j.worst}"
-      title="${esc(j.ref)} · ${esc(KIND[j.kind]||j.kind)}\n${esc(street(j.address))}${j.install_date?'\nInstalls '+esc(shortDate(j.install_date)):''}\nStatus: ${esc(j.status_label||'')}${esc(needs)}\n${esc(detail)}">
-    ${j.worst==='late'?'<span class="bang">!</span>':''}
-    <div class="chip-kind k-${esc(j.kind)}">${esc(KIND[j.kind]||j.kind)}</div>
+  // Deliberately plain: what it is, which job, where it stands. Item counts
+  // live on the driver page, not here.
+  const mark=MARK[j.state]||'';
+  return `<div class="chip ${esc(j.state)}"
+      title="${esc(j.ref)} · ${esc(KIND[j.kind]||j.kind)}\n${esc(street(j.address))}\n${esc(j.label||'')}${j.overdue?'\nWas due '+esc(shortDate(j.due_date)):''}">
+    ${mark?`<span class="bang">${mark}</span>`:''}
+    <div class="chip-kind k-${esc(j.kind)}">${esc(KIND[j.kind]||j.kind)}${j.overdue?' · overdue':''}</div>
     <div class="chip-ref">${esc(j.ref)}</div>
-    <div class="chip-status">${esc(j.status_label||'')}</div>
+    <div class="chip-status">${esc(j.label||'')}</div>
   </div>`;
 }
 
@@ -206,7 +214,7 @@ function render(){
 
 
   const onBoard=j=>!stylingIds.has(j.team_id) && !!(j.team_id || j.vehicle);
-  const lateOn=d=>(DATA.jobs||[]).filter(j=>j.date===d && j.worst==='late' && onBoard(j)).length;
+  const lateOn=d=>(DATA.jobs||[]).filter(j=>j.date===d && MARK[j.state] && onBoard(j)).length;
 
   let html=`<div class="hcell corner"></div>`;
   days.forEach((d,i)=>{
@@ -214,7 +222,7 @@ function render(){
     html+=`<div class="hcell">
       <div class="hday">${DAY_LABEL[i]||''}</div>
       <div class="hdate">${shortDate(d)}</div>
-      ${n?`<div class="hlate">${n} need rescuing</div>`:''}
+      ${n?`<div class="hlate">${n} need attention</div>`:''}
     </div>`;
   });
 

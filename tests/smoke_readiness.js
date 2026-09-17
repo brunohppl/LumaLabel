@@ -1,159 +1,82 @@
-// Readiness board: crews as rows, three days as columns, one screen, read-only.
+// Loading readiness board: to-load tiles only, state from the job status.
 const fs=require('fs'), {JSDOM}=require('jsdom');
 const html=fs.readFileSync('/mnt/user-data/outputs/readiness.html','utf8');
 let pass=0,fail=0;
 const ok=(l,c)=>{ c?(pass++,console.log('✓ '+l)):(fail++,console.log('✗ FAIL '+l)); };
 
-const D=['2026-09-08','2026-09-09','2026-09-10'];
+const D=['2026-09-16','2026-09-17','2026-09-18'];
 const DATA={
-  days:D, rules:{picked:2,staged:1,loaded:1},
+  days:D,
   teams:[{id:'A1',date:D[0],name:'Nemo',vehicle:'Nemo',function:'transport',sort_order:1},
-         {id:'A2',date:D[0],name:'Warehouse',vehicle:null,function:'warehouse',sort_order:9},
-         // same crews again on later days — must stay ONE row each
-         {id:'B1',date:D[1],name:'Nemo',vehicle:'Nemo',function:'transport',sort_order:1},
-         {id:'B2',date:D[1],name:'Warehouse',vehicle:null,function:'warehouse',sort_order:9},
-         {id:'C1',date:D[2],name:'Bruce',vehicle:'Bruce',function:'transport',sort_order:0},
-         {id:'S1',date:D[0],name:'Marlin',vehicle:'Marlin',function:'styling'},
-         {id:'S2',date:D[1],name:'VUG',vehicle:'VUG',function:'styling'}],
+         {id:'A2',date:D[0],name:'Bruce',vehicle:'Bruce',function:'transport',sort_order:0},
+         {id:'A3',date:D[0],name:'Marlin',vehicle:'Marlin',function:'styling',sort_order:5},
+         {id:'B1',date:D[1],name:'Nemo',vehicle:'Nemo',function:'transport',sort_order:1}],
   jobs:[
-    {job_id:'J1',ref:'QU-1351',address:'12 Somers St, Ascot',date:D[0],kind:'install',
-     team_id:'A1',worst:'late',status:'ready',status_label:'Ready to pick',needs:'Loaded',met:false,
-     stages:[{name:'Picked',done:18,total:42,state:'late'},
-             {name:'In bay',done:0,total:40,state:'late'},
-             {name:'Loaded',done:0,total:40,state:'late'}]},
-    {job_id:'J2',ref:'QU-1362',address:'9 Vine St, Clayfield',date:D[0],kind:'bay',
-     team_id:'A2',worst:'due',install_date:D[1],status:'ready',status_label:'Ready to pick',needs:'Ready to load',met:false,
-     stages:[{name:'Picked',done:30,total:30,state:'done'},
-             {name:'In bay',done:10,total:30,state:'due'}]},
-    {job_id:'J3',ref:'QU-1370',address:'5 Kent Rd, Wooloowin',date:D[1],kind:'install',
-     team_id:'B1',worst:'done',status:'loaded',status_label:'Loaded',needs:'Loaded',met:true,
-     stages:[{name:'Picked',done:20,total:20,state:'done'},
-             {name:'In bay',done:20,total:20,state:'done'},
-             {name:'Loaded',done:20,total:20,state:'done'}]},
-    {job_id:'J4',ref:'QU-1399',address:'7 Forfar St',date:D[2],kind:'install',
-     team_id:null,worst:'ok',
-     stages:[{name:'Picked',done:0,total:12,state:'ok'}]},
-    {job_id:'J5',ref:'QU-1380',address:'2 Styling Ave',date:D[0],kind:'install',
-     team_id:'S1',worst:'late',
-     stages:[{name:'Picked',done:1,total:9,state:'late'}]},
-    {job_id:'J6',ref:'QU-1390',address:'4 Legacy St',date:D[0],kind:'install',
-     team_id:null,vehicle:'Nemo',worst:'due',status:'ready_to_load',status_label:'Ready to load',needs:'Loaded',met:false,
-     stages:[{name:'Picked',done:5,total:10,state:'due'}]},
-    {job_id:'J8',ref:'QU-1410',address:'9 Ghost St',date:D[0],kind:'to_load',
-     team_id:'GONE',vehicle:'Nigel',worst:'late',status:'ready',status_label:'Ready to pick',
-     needs:'Loaded',met:false,stages:[{name:'Picked',done:0,total:8,state:'late'}]},
-    {job_id:'J9',ref:'QU-1420',address:'3 Split St',date:D[0],kind:'install',
-     team_id:'A1',worst:'due',status:'ready_to_load',status_label:'Ready to load',
-     needs:'Loaded',met:false,stages:[{name:'Picked',done:6,total:6,state:'done'}]},
-    {job_id:'J7',ref:'QU-1400',address:'8 Load St',date:D[1],kind:'to_load',
-     team_id:'B1',worst:'due',status:'ready_to_load',status_label:'Ready to load',needs:'Loaded',met:false,install_date:D[2],
-     stages:[{name:'Picked',done:9,total:9,state:'done'},
-             {name:'Loaded',done:2,total:9,state:'due'}]}]};
+    {job_id:'J1',ref:'QU-1351',address:'12 Somers St, Ascot',date:D[0],due_date:'2026-09-14',
+     overdue:true,kind:'to_load',state:'overdue',label:'Not loaded',status:'ready_to_load',team_id:'A1'},
+    {job_id:'J2',ref:'QU-1362',address:'9 Vine St, Clayfield',date:D[0],due_date:D[0],
+     overdue:false,kind:'to_load',state:'late',label:'Not ready',status:'ready',team_id:'A2'},
+    {job_id:'J3',ref:'QU-1370',address:'5 Kent Rd, Wooloowin',date:D[1],due_date:D[1],
+     overdue:false,kind:'to_load',state:'warn',label:'Not ready yet',status:'ready',team_id:'B1'},
+    {job_id:'J4',ref:'QU-1380',address:'7 Forfar St',date:D[0],due_date:D[0],
+     overdue:false,kind:'to_load',state:'done',label:'Loaded',status:'loaded',team_id:'A1'},
+    // same job, two crews — one tile each
+    {job_id:'J5',ref:'QU-1390',address:'3 Split St',date:D[0],due_date:D[0],
+     overdue:false,kind:'to_load',state:'due',label:'Ready to load',status:'ready_to_load',team_id:'A1'},
+    {job_id:'J5',ref:'QU-1390',address:'3 Split St',date:D[0],due_date:D[0],
+     overdue:false,kind:'to_load',state:'due',label:'Ready to load',status:'ready_to_load',team_id:'A2'}]};
 
 const dom=new JSDOM(html,{runScripts:'dangerously',url:'http://x/readiness',
   beforeParse(w){ w.fetch=async()=>({ok:true,status:200,json:async()=>DATA}); }});
 const w=dom.window,d=w.document;
 
 setTimeout(()=>{
-  // ── Layout: crews down, days across ──
-  const heads=[...d.querySelectorAll('.hcell')];
-  ok('a corner plus three day headers', heads.length===4);
-  ok('days across the top in order',
-     /Today/.test(heads[1].textContent)&&/Tomorrow/.test(heads[2].textContent)&&/Day after/.test(heads[3].textContent));
-  const rows=[...d.querySelectorAll('.rowhead')].map(x=>x.querySelector('.crew').textContent);
-  ok('crews down the left', rows.includes('Nemo')&&rows.includes('Warehouse'));
-  ok('one row per crew across all days', rows.filter(r=>r==='Nemo').length===1);
-  // Tray work has no column on the runsheet, so it has no row here either
-  ok('no Unassigned row', !rows.includes('Unassigned'));
-  ok('three cells per crew row', d.querySelectorAll('.cell').length===rows.length*3);
-
-  // ── Chips land in the right crew and day ──
+  const rows=[...d.querySelectorAll('.rowhead .crew')].map(x=>x.textContent.trim());
   const cells=[...d.querySelectorAll('.cell')];
-  const nemoIdx=rows.indexOf('Nemo');
-  const nemoToday=cells[nemoIdx*3];
-  ok('a job sits in its crew and day', /QU-1351/.test(nemoToday.textContent));
-  const whIdx=rows.indexOf('Warehouse');
-  ok('a bay job sits with the warehouse', /QU-1362/.test(cells[whIdx*3].textContent));
-  ok('tomorrow column holds tomorrow work', /QU-1370/.test(cells[nemoIdx*3+1].textContent));
-  ok('tray work is not shown anywhere', !/QU-1399/.test(d.querySelector('.grid').textContent));
+  const chip=ref=>[...d.querySelectorAll('.chip')].filter(c=>c.textContent.includes(ref));
 
-  // ── Colour and wording ──
-  const c1=[...d.querySelectorAll('.chip')].find(c=>/QU-1351/.test(c.textContent));
-  ok('behind is red', c1.classList.contains('late'));
-  ok('and marked with an exclamation', !!c1.querySelector('.bang'));
-  ok('the job number leads the tile',
-     c1.querySelector('.chip-ref').textContent.trim()==='QU-1351');
-  ok('the status is shown in words',
-     /Ready to pick/.test(c1.querySelector('.chip-status').textContent));
-  ok('the kind of day is shown quietly',
-     /Install/i.test(c1.querySelector('.chip-kind').textContent));
-  ok('what it still needs is in the tooltip', /needs Loaded/.test(c1.getAttribute('title')));
-  ok('full detail in the tooltip', /Loaded: 0\/40/.test(c1.getAttribute('title')));
-  const c2=[...d.querySelectorAll('.chip')].find(c=>/QU-1362/.test(c.textContent));
-  ok('due is amber', c2.classList.contains('due'));
-  ok('due carries no exclamation', !c2.querySelector('.bang'));
-  const c3=[...d.querySelectorAll('.chip')].find(c=>/QU-1370/.test(c.textContent));
-  ok('ready is green', c3.classList.contains('done'));
+  // ── layout kept ──
+  ok('three day columns', d.querySelectorAll('.hcell').length===4);
+  ok('crews down the left', rows.includes('Nemo')&&rows.includes('Bruce'));
+  ok('runsheet order kept', rows.indexOf('Bruce')<rows.indexOf('Nemo'));
+  ok('styling crews still excluded', !rows.includes('Marlin'));
 
-  // ── Nothing to touch ──
-  ok('no times shown', !/\b\d{1,2}:\d{2}\b/.test(d.querySelector('.grid').textContent));
+  // ── tiles are simple ──
+  const c=chip('QU-1362')[0];
+  ok('the action is named', /To Load/i.test(c.querySelector('.chip-kind').textContent));
+  ok('the job number leads', c.querySelector('.chip-ref').textContent.trim()==='QU-1362');
+  ok('the state is in words', /Not ready/.test(c.querySelector('.chip-status').textContent));
+  ok('no item counts anywhere', ![...d.querySelectorAll('.chip')].some(x=>/\d+\/\d+/.test(x.textContent)));
+
+  // ── states read differently ──
+  ok('late is red with an exclamation',
+     c.classList.contains('late') && c.querySelector('.bang').textContent==='!');
+  const warn=chip('QU-1370')[0];
+  ok('a warning is amber with a warning sign',
+     warn.classList.contains('warn') && warn.querySelector('.bang').textContent==='⚠');
+  const over=chip('QU-1351')[0];
+  ok('overdue has its own colour', over.classList.contains('overdue'));
+  ok('and says so', /overdue/i.test(over.textContent));
+  ok('overdue sits in the Today column', cells.indexOf(over.closest('.cell'))%3===0);
+  ok('and the tooltip says when it was due', /Was due/.test(over.getAttribute('title')));
+  const done=chip('QU-1380')[0];
+  ok('loaded is green with no mark',
+     done.classList.contains('done') && !done.querySelector('.bang'));
+  const due=chip('QU-1390')[0];
+  ok('ready-to-load on the day is amber, no exclamation',
+     due.classList.contains('due') && !due.querySelector('.bang'));
+
+  // ── one tile per crew ──
+  ok('a job on two crews shows twice', chip('QU-1390').length===2);
+  ok('once on each crew',
+     chip('QU-1390').map(x=>x.closest('.cell')).filter((v,i,a)=>a.indexOf(v)===i).length===2);
+
+  // ── read-only ──
+  const heads=[...d.querySelectorAll('.hcell')];
+  ok('today counts what needs attention', /2 need attention/.test(heads[1].textContent));
+  ok('a settled day says nothing', !/need attention/.test(heads[3].textContent));
   ok('no links', d.querySelectorAll('a[href]').length===0);
-  ok('no scrollable timeline', d.querySelectorAll('.lane, .ruler').length===0);
-  ok('day header counts what needs rescuing', /2 need rescuing/.test(heads[1].textContent));
-  ok('a clean day says nothing', !/need rescuing/.test(heads[3].textContent));
   ok('full screen available', !!d.getElementById('fs-btn'));
-
-  // Styling crews have nothing to pick, stage or load
-  ok('no styling crew rows', !rows.includes('Marlin') && !rows.includes('VUG'));
-  ok('their work is not shown', !/QU-1380/.test(d.querySelector('.grid').textContent));
-  ok('and is not shown anywhere', !/QU-1380/.test(d.querySelector('.grid').textContent));
-  ok('styling work is not counted', /2 need rescuing/.test(heads[1].textContent));
-
-  // Crew resolution and order follow the runsheet
-  ok('a vehicle-only tile lands on its crew, not Unassigned',
-     /QU-1390/.test(cells[rows.indexOf('Nemo')*3].textContent));
-  ok('a vehicle-only tile is not treated as tray work',
-     /QU-1390/.test(d.querySelector('.grid').textContent));
-  ok('rows follow the runsheet column order (Bruce, Nemo, Warehouse)',
-     rows.indexOf('Bruce')<rows.indexOf('Nemo') && rows.indexOf('Nemo')<rows.indexOf('Warehouse'));
-  // Placed work must never vanish, even if its crew record is gone
-  ok('a placed tile with an unknown crew still shows',
-     /QU-1410/.test(d.querySelector('.grid').textContent));
-  ok('and gets a row named after its vehicle', rows.includes('Nigel'));
-  // A crew with two jobs on one day shows both
-  const nemoToday2=cells[rows.indexOf('Nemo')*3];
-  ok('two jobs on one crew both appear',
-     /QU-1390/.test(nemoToday2.textContent) && /QU-1420/.test(nemoToday2.textContent));
-
-  // A crew's install AND load work both show on that crew
-  const nemoTomorrow=cells[rows.indexOf('Nemo')*3+1];
-  ok('a crew shows its install work', /QU-1370/.test(nemoTomorrow.textContent));
-  ok('and its to-load work', /QU-1400/.test(nemoTomorrow.textContent));
-  ok('the load chip is labelled To Load', /To Load/i.test(nemoTomorrow.textContent));
-  ok('both chips share the cell', nemoTomorrow.querySelectorAll('.chip').length===2);
-  ok('a shared cell is marked so it can scale down', nemoTomorrow.classList.contains('multi'));
-  ok('both are real chips with content',
-     [...nemoTomorrow.querySelectorAll('.chip')].every(c=>c.querySelector('.chip-ref').textContent.trim().length>2));
-
-  // The action is the headline, and chips fill the cell
-  const kinds=[...d.querySelectorAll('.chip-kind')].map(x=>x.textContent.trim());
-  ok('Install spelled out', kinds.some(k=>/Install/i.test(k)));
-  ok('Load Bay spelled out', kinds.some(k=>/Load Bay/i.test(k)));
-  ok('the action pill comes first on the tile',
-     [...d.querySelectorAll('.chip')].every(c=>{
-       const h=c.innerHTML; return h.indexOf('chip-kind')<h.indexOf('chip-ref');
-     }));
-  ok('the pill is class-tagged by kind', !!d.querySelector('.chip-kind.k-to_load'));
-  ok('the job number comes before the status',
-     [...d.querySelectorAll('.chip')].every(c=>{
-       const h=c.innerHTML; return h.indexOf('chip-ref')<h.indexOf('chip-status');
-     }));
-  ok('a loaded job reads Loaded',
-     [...d.querySelectorAll('.chip-status')].some(x=>x.textContent.trim()==='Loaded'));
-  ok('no item counters on the tiles',
-     ![...d.querySelectorAll('.chip')].some(c=>/\d+\/\d+/.test(c.textContent)));
-  ok('chips grow to fill the cell', /\.chip\{[^}]*flex:\s*1 1 auto/.test(html));
-  ok('cells stack chips vertically', /\.cell\{[^}]*flex-direction:column/.test(html));
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);

@@ -530,8 +530,11 @@ const RING_R = 20, RING_C = 2 * Math.PI * 20;
 function bayCount(list){ return list.filter(i => i.checked && !i.on_truck).length; }
 
 function ringSVG(green, bay, total, done){
-  const gOff = RING_C * (1 - (total ? green / total : 0));
-  const bOff = RING_C * (1 - (total ? (green + bay) / total : 0));
+  // With nothing to load, "done" has no fraction to draw from — fill it, or
+  // the tick sits inside an empty ring and reads as untouched.
+  const frac = total ? green / total : (done ? 1 : 0);
+  const gOff = RING_C * (1 - frac);
+  const bOff = RING_C * (1 - (total ? (green + bay) / total : frac));
   return `<div class="ring-wrap">
     <svg width="48" height="48" viewBox="0 0 48 48">
       <circle class="ring-bg" cx="24" cy="24" r="${RING_R}"/>
@@ -546,8 +549,9 @@ function ringSVG(green, bay, total, done){
 }
 
 function updateRing(card, green, bay, total, done){
-  const gOff = RING_C * (1 - (total ? green / total : 0));
-  const bOff = RING_C * (1 - (total ? (green + bay) / total : 0));
+  const frac = total ? green / total : (done ? 1 : 0);
+  const gOff = RING_C * (1 - frac);
+  const bOff = RING_C * (1 - (total ? (green + bay) / total : frac));
   const wrap = card.querySelector('.ring-wrap');
   const rf = card.querySelector('.ring-fill');
   const rb = card.querySelector('.ring-bay');
@@ -673,7 +677,12 @@ function renderRooms(){
     const checked=loadable.filter(i=>i.on_truck).length;
     const bay=bayCount(loadable);
     const total=loadable.length;
-    const done=checked===total&&total>0;
+    // Everything here is coming from another job, so there is nothing for
+    // this driver to load. That's finished, not "0 of 0" — it used to read
+    // as outstanding work and the crew went looking for items they were
+    // never meant to collect.
+    const allTransfer = catItems.length>0 && total===0;
+    const done=(checked===total&&total>0) || allTransfer;
     const key=cat.replace(/[^a-zA-Z0-9]/g,'_');
 
     // Cushion bags row — injected at the top of the Linen and Cushions category
@@ -691,7 +700,9 @@ function renderRooms(){
         ${ringSVG(checked, bay, total, done)}
         <div class="room-card-info">
           <div class="room-card-name">${cat}</div>
-          <div class="room-card-sub">${groups.length} line${groups.length!==1?'s':''} · ${total} item${total!==1?'s':''}</div>
+          <div class="room-card-sub">${allTransfer
+            ? `${catItems.length} item${catItems.length!==1?'s':''} — all transferring, nothing to load`
+            : `${groups.length} line${groups.length!==1?'s':''} · ${total} item${total!==1?'s':''}`}</div>
         </div>
         <div class="room-chevron" id="chev-${key}">▼</div>
       </div>
@@ -900,8 +911,11 @@ function rerenderRoomProgress(){
     const card=document.getElementById('room-'+key);if(!card)continue;
     const catItems=groups.flatMap(g=>g.items);
     const loadable=catItems.filter(i=>!i.is_transfer_item);
-    const checked=loadable.filter(i=>i.on_truck).length,total=loadable.length,done=checked===total&&total>0;
+    const checked=loadable.filter(i=>i.on_truck).length,total=loadable.length;
+    // Same rule as the initial render: all transferring means nothing to load.
+    const done=(checked===total&&total>0)||(catItems.length>0&&total===0);
     updateRing(card, checked, bayCount(loadable), total, done);
+    card.classList.toggle('done', done);
   }
 }
 

@@ -2503,225 +2503,114 @@ def api_readiness():
 
 
 def _readiness_payload():
-    """Job readiness for today and the next two days.
+    """Loading readiness — which loads are prepared, and which are not.
 
-    Every figure is derived from work the crews already record — picking from
-    items.picked, staging from whether a Load Bay tile exists, loading from
-    items.on_truck plus the tub and bag flags. Nothing here asks anyone to
-    tick anything extra, so there is nothing extra to forget.
+    Scope is deliberately narrow: only TO LOAD tiles. Installs can be added
+    later by putting them in TRACKED_TYPES and giving them a rule below.
+
+    One source of truth for state: the job's status. The job panel, the
+    driver page and the stylist page all write to it, so there is nothing to
+    reconcile — whoever set it last is what the board shows.
+
+    The deadline, as agreed: a job must be READY TO LOAD by the end of the
+    day before it is loaded, and LOADED by the end of its loading day.
     """
     from datetime import datetime as _dt, timedelta as _td
+
+    TRACKED_TYPES = ('to_load',)
+    OVERDUE_LOOKBACK = 7          # days back to hunt for loads never done
 
     try:
         start = _dt.strptime(request.args.get('from') or '', '%Y-%m-%d')
     except ValueError:
         start = brisbane_now().replace(tzinfo=None)
+    today = start.date()
     days = [(start + _td(days=i)).strftime('%Y-%m-%d') for i in range(3)]
+    back = (start - _td(days=OVERDUE_LOOKBACK)).strftime('%Y-%m-%d')
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         f_entries = pool.submit(sb_get, 'job_schedule',
-                                f'date=gte.{days[0]}&date=lte.{days[-1]}')
+                                f'date=gte.{back}&date=lte.{days[-1]}')
         f_teams   = pool.submit(sb_get, 'day_teams',
                                 f'date=gte.{days[0]}&date=lte.{days[-1]}'
                                 '&order=sort_order.asc,created_at.asc')
         entries   = _settled(f_entries)
         day_teams = _settled(f_teams)
-    # Installs and pickups are the deadlines; load/bay tiles are evidence.
-    job_ids = list({e['job_id'] for e in entries if e.get('job_id')})
+
+    tiles = [e for e in entries if (e.get('type') or '') in TRACKED_TYPES]
+    job_ids = list({e['job_id'] for e in tiles if e.get('job_id')})
     if not job_ids:
-        return jsonify({'days': days, 'jobs': [], 'teams': day_teams,
-                        'rules': READINESS_RULES})
+        return jsonify({'days': days, 'jobs': [], 'teams': day_teams})
 
-    ids_str = ','.join(job_ids)
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        f_jobs  = pool.submit(sb_get, 'jobs', f'id=in.({ids_str})')
-        f_items = pool.submit(sb_get, 'items',
-                              f'job_id=in.({ids_str})'
-                              '&select=id,job_id,picked,checked,on_truck,is_extra,'
-                              'not_transferring,is_transfer_item,description')
-        # Every tile for these jobs, on ANY date — staging and loading happen
-        # before the install day, so this day's tiles alone wouldn't show them.
-        f_tiles = pool.submit(sb_get, 'job_schedule', f'job_id=in.({ids_str})')
-        jobs  = _settled(f_jobs)
-        items = _settled(f_items)
-        tiles = _settled(f_tiles)
-
+    jobs = sb_get('jobs', f"id=in.({','.join(job_ids)})") or []
     jobs_by_id = {j['id']: j for j in jobs}
-    items_by_job = {}
-    for it in items:
-        items_by_job.setdefault(it.get('job_id'), []).append(it)
-    tiles_by_job = {}
-    for t in tiles:
-        tiles_by_job.setdefault(t.get('job_id'), []).append(t)
 
-    today = brisbane_now().date()
-    out = []
-    seen = set()
+    def state_for(job, due):
+        """Where this load stands, as a word plus a severity."""
+        rank = STATUS_RANK.get(job.get('status') or 'ready', 0)
+        loaded_rank = STATUS_RANK['loaded']
+        ready_rank  = STATUS_RANK['ready_to_load']
+        days_out = (due - today).days
 
-    # Every action that has to happen on a day gets its own row: staging and
-    # loading happen BEFORE the install, so keying only on the install date
-    # left "what must I do today" invisible.
-    # Pickups are excluded: there is nothing to pick, stage or load for a
-    # collection, so they can't be behind on anything.
-    ACTION_TYPES = ('install', 'to_load', 'bay')
-    install_date_by_job = {}
-    for t in tiles:
-        if t.get('type') == 'install' and t.get('date'):
-            install_date_by_job.setdefault(t['job_id'], t['date'])
+        if rank >= loaded_rank:
+            return 'done', 'Loaded'
+        if days_out < 0:
+            return 'overdue', 'Not loaded'
+        if days_out == 0:
+            # Loading day. Prepared but not loaded is a different problem
+            # from not prepared at all.
+            return ('due', 'Ready to load') if rank >= ready_rank else ('late', 'Not ready')
+        if days_out == 1:
+            # Must be ready to load by the end of today.
+            return ('ok', 'Ready to load') if rank >= ready_rank else ('warn', 'Not ready yet')
+        return 'ok', STATUS_LABEL.get(job.get('status') or 'ready', 'Ready to pick')
 
-    for e in entries:
-        if (e.get('type') or '') not in ACTION_TYPES:
-            continue
+    out, seen = [], set()
+    for e in tiles:
         jid = e.get('job_id')
         job = jobs_by_id.get(jid)
-        # Keyed by the TILE, not the job: a job split across two crews has two
-        # tiles on the runsheet and must have two here. Only a genuine
-        # duplicate row (same crew, same action, same day) is collapsed.
-        key = (jid, e.get('date'), e.get('type'), e.get('team_id'), e.get('vehicle'))
-        if not job or key in seen:
+        if not job:
+            continue
+        # One tile per crew: a job split across two crews appears on both.
+        key = (e.get('id'),)
+        if key in seen:
             continue
         seen.add(key)
 
         try:
             due = _dt.strptime(e['date'], '%Y-%m-%d').date()
-            days_out = (due - today).days
         except Exception:
             continue
 
-        kind = e.get('type')
-        # Progress is judged against the INSTALL date, wherever the row sits.
-        inst = install_date_by_job.get(jid) or e['date']
-        try:
-            install_days_out = (_dt.strptime(inst, '%Y-%m-%d').date() - today).days
-        except Exception:
-            install_days_out = days_out
+        state, label = state_for(job, due)
+        days_out = (due - today).days
 
-        job_items = items_by_job.get(jid, [])
-        # What the stylist picks, and what the driver loads, exclude
-        # different things — mirror each page rather than inventing a third rule.
-        pickable = [i for i in job_items if not i.get('not_transferring')]
-        # Exactly what the driver can tick on the loading list
-        loadable = [i for i in pickable if not i.get('is_transfer_item')
-                    and not i.get('is_extra')
-                    and not _is_packed_item(i.get('description'))]
-
-        picked_n = sum(1 for i in pickable if i.get('picked'))
-        loaded_n = sum(1 for i in loadable if i.get('on_truck'))
-
-        # Staging comes from the driver's yellow ticks: an item in the bay.
-        # An item already on the truck has obviously passed through the bay,
-        # so "at least yellow" is checked OR on_truck.
-        staged_n = sum(1 for i in loadable if i.get('checked') or i.get('on_truck'))
-
-        # The packed rows count as one item each, as they do for the driver
-        loaded_total = len(loadable)
-        if job.get('cushion_bags'):
-            loaded_total += 1
-            if job.get('cushion_bags_loaded'):
-                loaded_n += 1
-                staged_n += 1
-        if job.get('accessory_tubs'):
-            loaded_total += 1
-            if job.get('accessory_tubs_loaded'):
-                loaded_n += 1
-                staged_n += 1
-
-        # The status is the human's final word on whether a stage is done.
-        # But the real tick counts stay visible: if a job is marked loaded
-        # with 38 of 42 ticked, that gap is exactly what someone wants to
-        # see — either items are missing or they weren't recorded.
-        status_loaded = (job.get('status') or '') in ('loaded', 'installed',
-                                                      'ready_to_collect',
-                                                      'returned', 'archived')
-        job_tiles = tiles_by_job.get(jid, [])
-        # Kept only as a note on the row — staging itself is measured from
-        # the driver's yellow ticks, not from a tile having a past date.
-        has_bay = any(t.get('type') == 'bay' for t in job_tiles)
-
-        def stage(name, done_n, total_n, due_in, extra=None):
-            if total_n and done_n >= total_n:
-                state = 'done'
-            elif install_days_out > due_in:
-                state = 'ok'            # not due yet
-            elif days_out == due_in:
-                state = 'due'
-            else:
-                state = 'late'
-            return {'name': name, 'done': done_n, 'total': total_n,
-                    'state': state, 'note': extra}
-
-        picked_total = len(pickable)
-        status_picked = status_loaded or (job.get('status') or '') == 'ready_to_load'
-
-        def forced(st, done_n, total_n, why):
-            """Mark a stage complete because of the job status, while keeping
-            the real counts on show."""
-            st['state'] = 'done'
-            if total_n and done_n < total_n:
-                st['note'] = f'{why} · {total_n - done_n} not ticked'
-            else:
-                st['note'] = why
-            return st
-
-        stages = [
-            stage('Picked', picked_n, picked_total, READINESS_RULES['picked']),
-            stage('In bay', staged_n, loaded_total, READINESS_RULES['staged'],
-                  None if has_bay else 'no bay tile booked'),
-            stage('Loaded', loaded_n, loaded_total, READINESS_RULES['loaded']),
-        ]
-        # Apply the status overrides BEFORE trimming. Trimming first left
-        # two stages behind and the code below still indexed the third —
-        # any bay or load row on a job marked loaded took the whole board
-        # down with an IndexError.
-        if status_picked:
-            forced(stages[0], picked_n, picked_total, 'marked ready to load')
-        if status_loaded:
-            forced(stages[1], staged_n, loaded_total, 'marked loaded')
-            forced(stages[2], loaded_n, loaded_total, 'marked loaded')
-
-        # A staging row cares about picking and staging; a load row about
-        # picking and loading. Showing all three everywhere was noise.
-        if kind == 'bay':
-            stages = [stages[0], stages[1]]
-        elif kind == 'to_load':
-            stages = [stages[0], stages[2]]
-
-        # ── Status against what this day needs ──
-        raw = (job.get('status') or 'ready')
-        need = REQUIRED_STATUS.get(kind, 'loaded')
-        met = STATUS_RANK.get(raw, 0) >= STATUS_RANK.get(need, 99)
-        if met:
-            worst = 'done'
-        elif days_out <= 0:
-            worst = 'late'          # the day has arrived and it isn't there
-        elif days_out == 1:
-            worst = 'due'
-        else:
-            worst = 'ok'
+        # Older tiles are only worth showing if they never got loaded.
+        if days_out < 0 and state != 'overdue':
+            continue
+        # An overdue load belongs on today, where someone will see it.
+        column = days[0] if days_out < 0 else e['date']
+        if column not in days:
+            continue
 
         out.append({
-            'status': raw,
-            'status_label': STATUS_LABEL.get(raw, raw.replace('_', ' ').title()),
-            'needs': STATUS_LABEL.get(need, need),
-            'met': met,
-            'job_id': jid, 'ref': job.get('job_ref') or job.get('job_number') or '—',
-            'address': job.get('address') or '', 'date': e['date'],
-            'time': e.get('start_time'), 'kind': kind,
-            'days_out': days_out, 'stages': stages, 'worst': worst,
-            'photo_time': job.get('photo_time'),
-            'items': len(pickable),
-            # So a staging or loading row says when the job is actually due
-            'install_date': inst if kind != 'install' else None,
-            'team_id': e.get('team_id'),
-            'vehicle': e.get('vehicle'),
-            'duration': e.get('duration'),
+            'job_id':   jid,
+            'ref':      job.get('job_ref') or job.get('job_number') or '—',
+            'address':  job.get('address') or '',
+            'date':     column,
+            'due_date': e['date'],
+            'overdue':  days_out < 0,
+            'kind':     e.get('type'),
+            'state':    state,
+            'label':    label,
+            'status':   job.get('status') or 'ready',
+            'team_id':  e.get('team_id'),
+            'vehicle':  e.get('vehicle'),
         })
 
-    # Worst first: the page exists to surface the few jobs needing attention.
-    rank = {'late': 0, 'due': 1, 'ok': 2, 'done': 3}
-    out.sort(key=lambda r: (rank.get(r['worst'], 2), r['date'], r['time'] or '99:99'))
-    return jsonify({'days': days, 'jobs': out, 'teams': day_teams,
-                    'rules': READINESS_RULES})
+    severity = {'overdue': 0, 'late': 1, 'due': 2, 'warn': 3, 'ok': 4, 'done': 5}
+    out.sort(key=lambda r: (severity.get(r['state'], 9), r['date']))
+    return jsonify({'days': days, 'jobs': out, 'teams': day_teams})
 
 
 @app.route('/api/version', methods=['GET'])

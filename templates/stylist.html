@@ -29,6 +29,12 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
 .pill-readycollect{background:rgba(106,13,173,0.3);color:#CB9FFF;font-weight:700;}
 .pill-returned{background:rgba(21,101,192,0.3);color:#8ABAEE;font-weight:700;}
 
+.hdr-ref-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+/* Same block as the driver page: the labels are colour-coded, so show the
+   colour the way it looks on the label itself. */
+.label-chip{display:inline-flex;align-items:center;justify-content:center;
+  min-width:96px;padding:8px 16px;border-radius:4px;font-size:0.92rem;font-weight:700;
+  letter-spacing:0.1em;text-transform:uppercase;border:1px solid rgba(255,255,255,0.3);}
 .hdr-ref{font-family:'Cormorant Garamond',serif;font-size:2.2rem;font-weight:400;color:var(--accent);line-height:1;}
 .hdr-address-row{font-size:0.95rem;margin-top:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .hdr-address{display:inline-flex;align-items:center;gap:8px;color:rgba(250,248,244,0.6);text-decoration:none;cursor:pointer;}
@@ -59,6 +65,7 @@ body{background:var(--cream);color:var(--ink);font-family:'Jost',sans-serif;font
   body{font-size:14px;}
   .hdr{padding:14px 24px;}
   .hdr-ref{font-size:1.8rem;}
+  .label-chip{min-width:80px;padding:6px 12px;font-size:0.82rem;}
   .actions-bar{padding:10px 24px;}
 
   .content{padding:12px 16px 40px;}
@@ -239,7 +246,10 @@ body.mobile-mode .mobile-only{display:block !important;}
       <span id="status-badge" class="pill pill-ready">Job Assigned</span>
     </div>
   </div>
-  <div class="hdr-ref" id="job-ref">—</div>
+  <div class="hdr-ref-row">
+    <div class="hdr-ref" id="job-ref">—</div>
+    <div class="label-chip" id="label-colour" style="display:none;"></div>
+  </div>
   <div class="hdr-address-row">
     <a class="hdr-address" id="job-address" href="#" target="_blank" onclick="return onAddressClick(event)">
       <span id="job-address-text"></span>
@@ -430,6 +440,7 @@ async function loadJob(){
   }
 
   document.getElementById('job-ref').textContent = currentJob.job_ref || currentJob.job_number;
+  renderLabelColour(data.label_colour);
   const addrLink = document.getElementById('job-address');
   document.getElementById('job-address-text').textContent = currentJob.address;
   addrLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(currentJob.address||'')}`;
@@ -1518,6 +1529,18 @@ async function saveRenameRoom(oldName, newName, itemIds, key, nameDiv, input){
 // Renaming a group renames every item in it — the group IS several items
 // that share a description, so they have to move together or the group
 // splits in two.
+// The job's label colour, shown as the label looks. Hidden when the job has
+// no colour rather than showing an empty box.
+function renderLabelColour(lc){
+  const el=document.getElementById('label-colour');
+  if(!el) return;
+  if(!lc || !lc.hex){ el.style.display='none'; return; }
+  el.style.display='inline-flex';
+  el.style.background=lc.hex;
+  el.style.color=(lc.text==='white')?'#fff':'#1A1714';
+  el.textContent=lc.name;
+}
+
 function startRenameItem(serial, ids){
   const span=document.getElementById(`desc-${serial}`);
   if(!span) return;

@@ -32,6 +32,18 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
   ok('rename function exists', typeof w.startRenameItem==='function');
 
+  // Label colour, same component as the driver page
+  const lc=d.getElementById('label-colour');
+  ok('the colour block exists', !!lc);
+  w.renderLabelColour({name:'Sage',hex:'#AABF69',text:'black'});
+  ok('shows the colour name', lc.textContent.trim()==='Sage');
+  ok('painted in that colour', /170, 191, 105|#AABF69/i.test(lc.style.background));
+  ok('dark text on a pale colour', /26, 23, 20|#1A1714/i.test(lc.style.color));
+  w.renderLabelColour({name:'Purple',hex:'#6A3D8A',text:'white'});
+  ok('white text on a dark colour', /255, 255, 255|#fff/i.test(lc.style.color));
+  w.renderLabelColour(null);
+  ok('hidden when the job has no colour', lc.style.display==='none');
+
   // a group of two shares one description
   patched=[];
   await w.saveRenameItem('Dining Chair','Oak Dining Chair',['i1','i2'],

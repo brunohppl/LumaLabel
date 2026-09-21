@@ -439,7 +439,7 @@ RUNSHEET_VEHICLES  = TRANSPORT_VEHICLES + STYLING_VEHICLES + OTHER_VEHICLES
 
 RUNSHEET_STYLISTS = ['Addy', 'Montie', 'Delphine', 'India', 'Hayley', 'Lyndall',
                      'Gill', 'Carolina']
-RUNSHEET_DRIVERS  = ['Jo', 'Savio', 'Nick', 'Ayoub', 'Bruno', 'Phil', 'Thiago', 'Rohan',
+RUNSHEET_DRIVERS  = ['Jo', 'Savio', 'Nick', 'Ayoub', 'Bruno', 'Phil', 'Thiago', 'Rohan', 'Jack',
                      'Isaac']
 RUNSHEET_WORKERS  = RUNSHEET_STYLISTS + RUNSHEET_DRIVERS
 

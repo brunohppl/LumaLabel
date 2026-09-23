@@ -144,6 +144,14 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .task-preset:hover{border-color:var(--accent);color:var(--accent);}
 .fi{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:4px;font-family:'Jost',sans-serif;font-size:0.86rem;background:white;color:var(--ink);outline:none;}
 .fi:focus{border-color:var(--accent);}
+.add-person{display:flex;gap:6px;margin-top:8px;}
+.add-person-input{flex:1;font-size:0.82rem;padding:7px 10px;}
+.add-person-btn{padding:7px 14px;background:transparent;border:1px solid var(--border);
+  border-radius:3px;font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.06em;
+  text-transform:uppercase;color:var(--muted);cursor:pointer;white-space:nowrap;}
+.add-person-btn:hover{border-color:var(--accent);color:var(--accent);}
+.add-person-msg{font-size:0.72rem;color:var(--muted);margin-top:5px;min-height:1em;}
+.add-person-msg.err{color:var(--red,#A63D2F);}
 .chip-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
 .chip{padding:5px 11px;border:1.5px solid var(--border);border-radius:20px;font-size:0.74rem;font-weight:600;cursor:pointer;background:white;transition:all 0.15s;font-family:'Jost',sans-serif;}
 .chip.selected{border-color:var(--accent);background:rgba(184,147,90,0.1);color:var(--accent);}
@@ -262,6 +270,13 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   <select class="fi" id="team-lead"><option value="">— no lead —</option></select>
   <label class="fl">Members <span style="font-weight:400;text-transform:none;">(tap to add)</span></label>
   <div class="chip-row" id="member-chips"></div>
+  <div class="add-person">
+    <input type="text" class="fi add-person-input" id="new-person"
+           placeholder="Add someone not listed…" maxlength="40"
+           onkeydown="if(event.key==='Enter'){event.preventDefault();addPerson();}"/>
+    <button type="button" class="add-person-btn" onclick="addPerson()">Add</button>
+  </div>
+  <div class="add-person-msg" id="add-person-msg"></div>
   <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
     <input type="checkbox" id="save-tmpl"/>
     <label for="save-tmpl" style="font-size:0.82rem;color:var(--muted);cursor:pointer;">Save as template</label>
@@ -370,7 +385,9 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 
 <script>
 const VEHICLES=['Bruce','Nigel','Nemo','Marlin','VUG','Deb','Flo','Own Car'];
-const ALL_WORKERS=['Addy','Montie','Delphine','India','Hayley','Lyndall','Gill','Carolina','Jo','Savio','Nick','Ayoub','Bruno','Phil','Thiago','Rohan','Isaac','Jack'];
+// The built-in roster. Also the fallback: if /api/staff can't be reached,
+// the pickers show exactly these names rather than emptying out.
+let ALL_WORKERS=['Addy','Montie','Delphine','India','Hayley','Lyndall','Gill','Carolina','Jo','Savio','Nick','Ayoub','Bruno','Phil','Thiago','Rohan','Isaac','Jack'];
 const SLOTS=[];for(let h=7;h<=15;h++)for(let m=0;m<60;m+=30){if(h===15&&m>30)break;SLOTS.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);}
 const DURS=[30,60,90,120,150,180,210,240,270,300,330,360,390,420,450,480,510,540];
 const SLOT_H=46;
@@ -1138,6 +1155,51 @@ function setFn(fn,silent){
     b.className='fn-btn'+(f===fn?' active-'+fn:'');
   });
 }
+// Adding someone here saves them to the roster and selects them straight
+// away — the moment you notice a name is missing is the moment you need it.
+async function addPerson(){
+  const input=document.getElementById('new-person');
+  const msg=document.getElementById('add-person-msg');
+  const name=(input.value||'').trim();
+  if(!name) return;
+  msg.className='add-person-msg'; msg.textContent='Saving…';
+  try{
+    const res=await fetch('/api/staff',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok || data.success===false) throw new Error(data.error||`HTTP ${res.status}`);
+
+    const saved=data.name||name;
+    if(!ALL_WORKERS.some(w=>w.toLowerCase()===saved.toLowerCase())) ALL_WORKERS.push(saved);
+    // Add the chip selected, and offer them as lead too
+    const chips=document.getElementById('member-chips');
+    if(![...chips.querySelectorAll('.chip')].some(b=>b.textContent===saved)){
+      const b=document.createElement('button');
+      b.className='chip selected';
+      b.textContent=saved;
+      b.onclick=function(){ this.classList.toggle('selected'); };
+      chips.appendChild(b);
+    }
+    const lead=document.getElementById('team-lead');
+    if(lead && ![...lead.options].some(o=>o.textContent===saved)){
+      const o=document.createElement('option'); o.textContent=saved; lead.appendChild(o);
+    }
+    input.value='';
+    msg.textContent=data.already?`${saved} is already on the roster — selected`:`${saved} added`;
+  }catch(e){
+    msg.className='add-person-msg err';
+    msg.textContent='Could not add that name — '+e.message;
+  }
+}
+
+async function loadStaff(){
+  try{
+    const res=await fetch('/api/staff');
+    const data=await res.json();
+    if(Array.isArray(data.staff) && data.staff.length) ALL_WORKERS=data.staff;
+  }catch(e){ /* built-in roster stands */ }
+}
+
 function pickVehicle(btn,v){_vehicle=v;document.querySelectorAll('#vehicle-chips .chip').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');}
 function applyTmpl(id){
   const t=templates.find(x=>x.id===id);if(!t)return;
@@ -1936,6 +1998,7 @@ async function deleteEntry(){
   render(); renderTray();
 }
 
+loadStaff();
 load();
 </script>
 </body>

@@ -2634,6 +2634,52 @@ def api_version():
     return jsonify({'version': APP_VERSION})
 
 
+@app.route('/api/staff', methods=['GET'])
+def api_staff():
+    """The crew roster: the built-in names plus anyone added in the app.
+
+    The built-in list is the fallback — if the staff table is missing or
+    Supabase is unreachable, every picker still shows the people it shows
+    today rather than emptying out.
+    """
+    names = list(RUNSHEET_WORKERS)
+    try:
+        for row in sb_get('staff', 'active=eq.true&order=name.asc') or []:
+            n = (row.get('name') or '').strip()
+            if n and n.lower() not in {x.lower() for x in names}:
+                names.append(n)
+    except Exception as e:
+        print(f'[STAFF] falling back to the built-in roster: {e}')
+    return jsonify({'staff': names})
+
+
+@app.route('/api/staff', methods=['POST'])
+def api_staff_add():
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'Name is required'}), 400
+    if len(name) > 40:
+        return jsonify({'success': False, 'error': 'That name is too long'}), 400
+
+    # Already known? Nothing to do — and say so rather than erroring, so the
+    # caller can just select them.
+    if name.lower() in {x.lower() for x in RUNSHEET_WORKERS}:
+        return jsonify({'success': True, 'name': name, 'already': True})
+    existing = sb_get('staff', f'name=ilike.{urllib.parse.quote(name)}') or []
+    if existing:
+        if not existing[0].get('active'):
+            sb_patch('staff', f"id=eq.{existing[0]['id']}", {'active': True})
+        return jsonify({'success': True, 'name': existing[0].get('name') or name,
+                        'already': True})
+
+    result = sb_post('staff', {'name': name, 'active': True})
+    if result:
+        return jsonify({'success': True, 'name': name})
+    return jsonify({'success': False,
+                    'error': sb_last_error() or 'Could not save'}), 400
+
+
 @app.route('/api/stylists', methods=['GET'])
 def api_stylists():
     """The stylist roster, so the jobs page picker and the label screen

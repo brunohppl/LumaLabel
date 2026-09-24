@@ -111,6 +111,24 @@ const txt=()=>d.getElementById('prog-txt').textContent;
   w.renderLabelColour(null);
   ok('hidden when the job has no colour', lc.style.display==='none');
 
+  // A job with not-transferring items must render — a stray variable here
+  // threw inside renderRooms and left the page stuck on "loading" forever.
+  let threw=null;
+  w.eval(`
+    job={id:'J1',status:'ready_to_collect'};
+    items=[{id:'n1',description:'Sofa',room:'Living',not_transferring:true},
+           {id:'n2',description:'Lamp',room:'Living'}];
+  `);
+  try{ w.renderRooms(); }catch(e){ threw=e.message; }
+  ok('a job with not-transferring items renders', threw===null);
+  ok('and the Not Transferring card is drawn', !!d.getElementById('room-not_transferring'));
+
+  // every item staying behind
+  threw=null;
+  w.eval(`items=[{id:'n1',description:'Sofa',room:'Living',not_transferring:true}];`);
+  try{ w.renderRooms(); }catch(e){ threw=e.message; }
+  ok('all items staying behind still renders', threw===null);
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);
 })();

@@ -53,6 +53,11 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .transfer-banner-out b{color:var(--accent);}
 .truck-section{background:white;border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;}
 .truck-label{font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap;font-weight:600;}
+/* Underlined so it's obviously tappable inside a sentence, and in the
+   banner's own colour rather than a browser blue. */
+.transfer-link{color:inherit;font-weight:700;text-decoration:underline;
+  text-underline-offset:2px;}
+.transfer-link:hover{opacity:0.75;}
 .truck-value{flex:1;padding:10px 13px;font-size:1.05rem;font-weight:600;color:var(--ink);
   background:var(--warm);border:1px solid var(--border);border-radius:1px;}
 .truck-value.unset{font-weight:400;color:var(--muted);font-size:0.92rem;}
@@ -284,6 +289,12 @@ let job=null,items=[];
 const STATUS_PILLS={ready_to_load:'pill-readyload',loaded:'pill-loaded',installed:'pill-installed',ready_to_collect:'pill-readycollect',returned:'pill-returned',archived:'pill-returned'};
 const STATUS_LABELS={ready_to_load:'Ready to Load',loaded:'Loaded',installed:'Installed',ready_to_collect:'Ready to Collect',returned:'Completed',archived:'Completed'};
 
+// Job references and addresses go into innerHTML here, so escape them.
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,c=>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 async function loadJob(){
   const res=await fetch(`/api/jobs/${jobId}`);
   const data=await res.json();
@@ -311,7 +322,12 @@ async function loadJob(){
         const srcRes=await fetch(`/api/jobs/${job.transfer_from_job_id}`);
         const srcData=await srcRes.json();
         const src=srcData.job;
-        transferBanner.innerHTML=`<b>Transfer From</b> — items marked "Transfer" below are already in the truck from ${src.job_ref||src.job_number} (${src.address||''})`;
+        // The reference links to that job's loading list — the crew often
+        // needs to check what actually came across.
+        const srcRef=esc(src.job_ref||src.job_number||'that job');
+        transferBanner.innerHTML=`<b>Transfer From</b> — items marked "Transfer" below are already in the truck from `+
+          `<a class="transfer-link" href="/driver/${encodeURIComponent(src.id)}">${srcRef}</a>`+
+          ` (${esc(src.address||'')})`;
       }catch(e){
         transferBanner.innerHTML=`<b>Transfer From</b> — items marked "Transfer" below are already in the truck`;
       }
@@ -326,7 +342,9 @@ async function loadJob(){
   const transferOutBanner=document.getElementById('transfer-out-banner');
   const transferringTo=data.transferring_to||[];
   if(transferringTo.length){
-    const links=transferringTo.map(j=>`${j.job_ref||j.job_number} (${j.address||''})`).join(', ');
+    const links=transferringTo.map(j=>
+      `<a class="transfer-link" href="/driver/${encodeURIComponent(j.id)}">${esc(j.job_ref||j.job_number||'job')}</a>`+
+      ` (${esc(j.address||'')})`).join(', ');
     transferOutBanner.innerHTML=`<b>Transferring To</b> — items marked "Not Transferring" below stay behind; everything else goes to ${links}`;
     transferOutBanner.style.display='block';
   } else {

@@ -62,8 +62,14 @@ def _first_sheet_path(zf):
     return sorted(names)[0]
 
 
-def read_xlsx_rows(file_bytes):
-    """Yield each row as a dict of {column_letter: cell_text}."""
+def read_xlsx_rows(file_bytes, with_row_index=False):
+    """Yield each row as a dict of {column_letter: cell_text}.
+
+    With with_row_index, yields (row_index, cells) instead. The index is the
+    sheet's own 1-based row number, which is how embedded images are
+    anchored — without it there is no way to tell which photo belongs to
+    which line.
+    """
     with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
         strings = _shared_strings(zf)
         sheet_xml = zf.read(_first_sheet_path(zf))
@@ -97,7 +103,60 @@ def read_xlsx_rows(file_bytes):
             val = (val or '').replace('_x000D_', ' ').strip()
             if val:
                 cells[_col_letter(ref)] = val
-        yield cells
+        if with_row_index:
+            try:
+                yield int(row.get('r')), cells
+            except (TypeError, ValueError):
+                yield 0, cells
+        else:
+            yield cells
+
+
+def extract_row_images(file_bytes):
+    """Embedded product photos, as {sheet_row: (filename, bytes)}.
+
+    Programma anchors one picture per line in column A. The anchor carries a
+    0-based row, so it is shifted to match the 1-based numbers read_xlsx_rows
+    reports. Returns {} for a file with no pictures — plenty of exports have
+    none, and that is not an error.
+    """
+    out = {}
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
+            names = set(zf.namelist())
+            drawing = next((n for n in names
+                            if n.startswith('xl/drawings/drawing') and n.endswith('.xml')), None)
+            if not drawing:
+                return out
+            rels_path = drawing.replace('xl/drawings/', 'xl/drawings/_rels/') + '.rels'
+            if rels_path not in names:
+                return out
+
+            rels = {}
+            for m in re.finditer(r'Id="([^"]+)"[^>]*Target="([^"]+)"',
+                                 zf.read(rels_path).decode('utf8', 'ignore')):
+                target = m.group(2)
+                rels[m.group(1)] = ('xl/' + target[3:]) if target.startswith('../') else target
+
+            xml = zf.read(drawing).decode('utf8', 'ignore')
+            anchors = re.findall(
+                r'<xdr:(?:one|two)CellAnchor.*?</xdr:(?:one|two)CellAnchor>', xml, re.S)
+            for a in anchors:
+                r_m   = re.search(r'<xdr:from>.*?<xdr:row>(\d+)</xdr:row>', a, re.S)
+                rid_m = re.search(r'r:embed="([^"]+)"', a)
+                if not (r_m and rid_m):
+                    continue
+                path = rels.get(rid_m.group(1))
+                if not path or path not in names:
+                    continue
+                # anchors count rows from 0; sheet rows count from 1
+                row = int(r_m.group(1)) + 1
+                if row not in out:
+                    out[row] = (path.rsplit('/', 1)[-1], zf.read(path))
+    except Exception as e:
+        print(f'[DELIV] could not read embedded images: {e}')
+        return {}
+    return out
 
 
 # ──────────────────────── Programma parsing ────────────────────────
@@ -147,7 +206,7 @@ def parse_programma_xlsx(file_bytes):
     colmap = {}          # column letter -> our field key
     current_section = None
 
-    for cells in read_xlsx_rows(file_bytes):
+    for row_index, cells in read_xlsx_rows(file_bytes, with_row_index=True):
         if not cells:
             continue
         joined = ' '.join(cells.values())
@@ -197,6 +256,7 @@ def parse_programma_xlsx(file_bytes):
             qty = 1
 
         lines.append({
+            'sheet_row': row_index,
             'section':          current_section,
             'item_label':       row.get('item_label'),
             'product_name':     row.get('product_name'),
@@ -248,9 +308,28 @@ def api_deliveries_parse():
         lines, meta = parse_programma_xlsx(raw)
         deliverable = [l for l in lines if not l['is_service']]
 
+        # Product photos are embedded in the workbook, and the file only
+        # exists here — by the time the project is saved the client is
+        # sending JSON. So upload them now and let the URL travel with the
+        # line like any other field.
+        photos = extract_row_images(raw)
+        photo_count = 0
+        if photos:
+            import uuid as _uuid
+            batch = _uuid.uuid4().hex[:12]
+            for l in lines:
+                got = photos.get(l.get('sheet_row'))
+                if not got:
+                    continue
+                url = upload_line_photo(batch, l.get('sheet_row'), got[0], got[1])
+                if url:
+                    l['photo_url'] = url
+                    photo_count += 1
+
         return jsonify({
             'success':      True,
             'filename':     f.filename,
+            'photos':       photo_count,
             'meta':         meta,
             'counts': {
                 'total':        len(lines),
@@ -302,12 +381,48 @@ def _sb(method, table, params='', body=None, prefer='return=representation'):
         raise RuntimeError(f'Supabase {method} {table} failed: {e}')
 
 
+PHOTO_BUCKET = 'delivery-photos'
+
+
+def upload_line_photo(project_id, line_key, filename, blob):
+    """Put one product photo in storage and return its public URL.
+
+    The path is derived from the project and the line, so re-importing
+    overwrites the same object instead of piling up copies. Returns None on
+    failure — a missing photo must never stop an import.
+    """
+    ext = (filename.rsplit('.', 1)[-1] or 'png').lower()
+    if ext not in ('png', 'jpg', 'jpeg', 'gif', 'webp'):
+        ext = 'png'
+    safe = re.sub(r'[^A-Za-z0-9_-]', '', str(line_key))[:40] or 'line'
+    path = f'{project_id}/{safe}.{ext}'
+    url = f'{_SB_URL.replace("/rest/v1", "")}/storage/v1/object/{PHOTO_BUCKET}/{path}'
+    mime = 'image/jpeg' if ext in ('jpg', 'jpeg') else f'image/{ext}'
+    req = urllib.request.Request(url, data=blob, method='POST', headers={
+        'apikey': _SB_KEY,
+        'Authorization': 'Bearer ' + _SB_KEY,
+        'Content-Type': mime,
+        'x-upsert': 'true',          # re-importing replaces, never duplicates
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=20):
+            pass
+    except urllib.error.HTTPError as e:
+        print(f'[DELIV] photo upload failed ({e.code}): {e.read()[:200]}')
+        return None
+    except Exception as e:
+        print(f'[DELIV] photo upload failed: {e}')
+        return None
+    return (f'{_SB_URL.replace("/rest/v1", "")}'
+            f'/storage/v1/object/public/{PHOTO_BUCKET}/{path}')
+
+
 # Fields copied from a parsed line into delivery_lines
 _LINE_FIELDS = (
     'section', 'item_label', 'product_name', 'brand', 'sku', 'doc_code',
     'colour', 'finish', 'material', 'dimensions', 'lead_time',
     'qty_expected', 'rrp', 'programma_status', 'supplier', 'url',
-    'important_info', 'notes', 'is_service',
+    'important_info', 'notes', 'is_service', 'photo_url',
 )
 
 

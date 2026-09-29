@@ -100,7 +100,11 @@ tr.service{background:#fcfbf8;color:var(--muted);}
 .save-bar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;background:white;border:1px solid var(--border);border-radius:4px;padding:14px 16px;margin:14px 0;}
 .pcard{display:block;width:100%;text-align:left;background:white;border:1px solid var(--border);border-radius:4px;padding:16px 18px;margin-bottom:10px;cursor:pointer;font-family:inherit;transition:border-color .15s;}
 .pcard:hover{border-color:var(--accent);}
-.pcard-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;}
+/* The archive button is absolutely positioned in the top-right corner, so
+   the header row has to stop short of it — on a wide screen the units count
+   is right-aligned into exactly that space. */
+.pcard-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  flex-wrap:wrap;padding-right:92px;}
 .pcard-name{font-family:'Cormorant Garamond',serif;font-size:1.3rem;}
 .pcard-meta{font-size:0.75rem;color:var(--muted);}
 .bar{height:5px;background:var(--sand);border-radius:3px;margin-top:11px;overflow:hidden;}

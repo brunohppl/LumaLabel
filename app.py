@@ -2277,6 +2277,25 @@ def api_job_status(job_id):
                     sb_patch('job_schedule', f'id=eq.{entry["id"]}',
                              {'vehicle': new_truck})
     result = sb_patch('jobs', f'id=eq.{job_id}', payload)
+
+    # Once a job is installed, "this item arrived from another job" has done
+    # its work. Leaving it set means the next time this job is picked up and
+    # moved on, the stylist opens it to find items already ticked from a move
+    # that finished weeks ago — and the driver's loading list silently
+    # excludes them, so they could be left behind on the collection.
+    if status == 'installed':
+        try:
+            cleared = sb_patch('items',
+                               f'job_id=eq.{job_id}&is_transfer_item=eq.true',
+                               {'is_transfer_item': False})
+            n = len(cleared) if isinstance(cleared, list) else 0
+            if n:
+                print(f'[TRANSFER] job {job_id} installed — cleared '
+                      f'{n} stale is_transfer_item flag(s)')
+        except Exception as e:
+            # Never let the cleanup stop the status change itself
+            print(f'[TRANSFER] could not clear transfer flags on {job_id}: {e}')
+
     return jsonify({'success': bool(result)})
 
 WAREHOUSE_ADDRESS = '63 Westgate St, Wacol QLD'

@@ -55,6 +55,28 @@ tr.service{background:#fcfbf8;color:var(--muted);}
 .sku.none{color:var(--border);font-family:inherit;font-style:italic;}
 .qty{font-weight:600;text-align:center;}
 /* Big enough to recognise the piece, small enough not to take over the row */
+.pcard-wrap{position:relative;}
+.arch-btn{position:absolute;top:10px;right:10px;padding:4px 10px;background:#fff;
+  border:1px solid var(--border);border-radius:3px;font-family:inherit;font-size:0.68rem;
+  color:var(--muted);cursor:pointer;}
+.arch-btn:hover{border-color:var(--accent);color:var(--accent);}
+.arch-tag{font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);
+  border:1px solid var(--border);border-radius:9px;padding:1px 7px;margin-left:6px;}
+.arch-toggle{display:flex;align-items:center;gap:6px;font-size:0.76rem;color:var(--muted);cursor:pointer;}
+.gres{background:#fff;border:1px solid var(--border);border-radius:4px;margin-bottom:8px;
+  padding:10px 12px;display:flex;align-items:center;gap:12px;}
+.gres-thumb{width:44px;height:44px;object-fit:cover;border-radius:3px;border:1px solid var(--border);flex-shrink:0;}
+.gres-body{flex:1;min-width:0;}
+.gres-name{font-weight:600;font-size:0.88rem;}
+.gres-meta{font-size:0.74rem;color:var(--muted);margin-top:1px;}
+.gres-proj{font-size:0.74rem;color:var(--accent);font-weight:600;cursor:pointer;text-decoration:underline;}
+.gres-count{font-size:0.82rem;font-weight:600;white-space:nowrap;}
+.gres-count.done{color:var(--green,#4A7C59);}
+.gres-actions{display:flex;gap:6px;flex-shrink:0;}
+.gres-btn{padding:6px 10px;border:1px solid var(--border);background:#fff;border-radius:3px;
+  font-family:inherit;font-size:0.74rem;cursor:pointer;white-space:nowrap;}
+.gres-btn:hover{border-color:var(--accent);color:var(--accent);}
+.gres-note{font-size:0.76rem;color:var(--muted);padding:6px 2px;}
 .photo-backfill{display:flex;align-items:center;gap:10px;margin:0 0 14px;flex-wrap:wrap;}
 .btn-ghost{padding:7px 14px;background:transparent;border:1px solid var(--border);
   border-radius:3px;font-family:inherit;font-size:0.76rem;color:var(--muted);cursor:pointer;}
@@ -143,8 +165,17 @@ tr.part{background:rgba(184,147,90,0.06);}
     <h1 class="page-title">Deliveries<span>.</span></h1>
     <div class="page-sub">Import a Programma schedule, then check arriving stock against it.</div>
     <div class="toolbar">
-      <input class="search" id="pq" placeholder="Search projects…" oninput="renderProjects()"/>
+      <input class="search" id="gq" placeholder="Find an item in any project — name, SKU or brand…"
+             oninput="globalSearch()"/>
       <button class="btn-primary" onclick="showImport()">+ New import</button>
+    </div>
+    <div id="global-results"></div>
+
+    <div class="toolbar" id="project-toolbar">
+      <input class="search" id="pq" placeholder="Search projects…" oninput="renderProjects()"/>
+      <label class="arch-toggle">
+        <input type="checkbox" id="show-archived" onchange="loadProjects()"/> Show archived
+      </label>
     </div>
     <div id="project-list"></div>
   </div>
@@ -245,10 +276,96 @@ async function api(url, opts){
 }
 
 // ───────────────── project list ─────────────────
+// ── Find an item without knowing which project it belongs to ──────────
+// A box arrives at the warehouse with a SKU on it, not a project name.
+let _gqTimer=null;
+
+function globalSearch(){
+  clearTimeout(_gqTimer);
+  _gqTimer=setTimeout(runGlobalSearch, 250);   // don't query on every keystroke
+}
+
+async function runGlobalSearch(){
+  const q=(document.getElementById('gq').value||'').trim();
+  const box=document.getElementById('global-results');
+  const list=document.getElementById('project-list');
+  const bar=document.getElementById('project-toolbar');
+  const showProjects=on=>{ list.style.display=on?'':'none'; bar.style.display=on?'':'none'; };
+
+  if(q.length<2){ box.innerHTML=''; showProjects(true); return; }
+  showProjects(false);
+  box.innerHTML='<div class="gres-note">Searching…</div>';
+  const r=await api('/api/deliveries/search?q='+encodeURIComponent(q));
+  if(!r.ok){ box.innerHTML=`<div class="notice err">${r.error}</div>`; return; }
+  renderGlobalResults(r.data.lines||[], q, r.data.capped);
+}
+
+function renderGlobalResults(lines, q, capped){
+  const box=document.getElementById('global-results');
+  if(!lines.length){
+    box.innerHTML=`<div class="gres-note">Nothing matches “${q}” in any active project. `+
+      `Archived projects aren't searched.</div>`;
+    return;
+  }
+  box.innerHTML=(capped?'<div class="gres-note">Showing the first 120 matches — narrow the search for more.</div>':'')
+    +lines.map(l=>{
+    const exp=Number(l.qty_expected||0), got=Number(l.qty_received||0);
+    const done=exp>0&&got>=exp;
+    return `<div class="gres" id="gres-${l.id}">
+      ${l.photo_url?`<img class="gres-thumb" src="${l.photo_url}" alt="" loading="lazy" onerror="this.style.display='none'"/>`:''}
+      <div class="gres-body">
+        <div class="gres-name">${l.product_name||l.item_label||'—'}</div>
+        <div class="gres-meta">${[l.sku,l.brand,l.section].filter(Boolean).join(' · ')||'—'}</div>
+        <div class="gres-proj" onclick="openProject('${l.project_id}')">${l.project_name}</div>
+      </div>
+      <div class="gres-count ${done?'done':''}" id="gcount-${l.id}">${got} / ${exp}</div>
+      <div class="gres-actions">
+        <button class="gres-btn" onclick="gCheck('${l.id}',1)">+1</button>
+        <button class="gres-btn" onclick="gCheck('${l.id}',null,${exp})">All</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Uses the same endpoint as receiving inside a project, so the audit trail
+// is written identically — and the count comes back from the server rather
+// than being assumed, so nothing can be double-received off a stale number.
+async function gCheck(lineId, delta, qty){
+  const el=document.getElementById('gcount-'+lineId);
+  const before=el.textContent;
+  el.textContent='…';
+  const body=(qty!==undefined&&qty!==null)?{qty:qty}:{delta:delta};
+  const r=await api('/api/deliveries/lines/'+lineId+'/check',
+                    {method:'POST',headers:{'Content-Type':'application/json'},
+                     body:JSON.stringify(body)});
+  if(!r.ok){
+    el.textContent=before;
+    alert('Could not record that — '+r.error);
+    return;
+  }
+  const line=r.data.line||{};
+  const exp=Number(line.qty_expected||0), got=Number(line.qty_received||0);
+  el.textContent=`${got} / ${exp}`;
+  el.classList.toggle('done', exp>0&&got>=exp);
+}
+
+// Archiving hides a project from the list and from search. Nothing is
+// deleted — every line, count and check stays exactly as it is.
+async function setArchived(id, archived){
+  if(archived && !confirm('Archive this project?\n\nIt disappears from the list and from item search. '+
+                          'Nothing is deleted — you can restore it at any time.')) return;
+  const r=await api('/api/deliveries/projects/'+id+'/archive',
+    {method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({archived})});
+  if(!r.ok){ alert('Could not do that — '+r.error); return; }
+  await loadProjects();
+}
+
 async function loadProjects(){
   const el = document.getElementById('project-list');
   el.innerHTML = '<div class="empty"><span class="spinner"></span>Loading projects…</div>';
-  const r = await api('/api/deliveries/projects');
+  const arch = document.getElementById('show-archived');
+  const r = await api('/api/deliveries/projects' + (arch && arch.checked ? '?archived=1' : ''));
   if(!r.ok){ el.innerHTML = `<div class="notice err">${r.error}</div>`; return; }
   PROJECTS = r.data.projects;
   renderProjects();
@@ -266,14 +383,20 @@ function renderProjects(){
   if(!list.length){ el.innerHTML = `<div class="empty">No project matches “${q}”.</div>`; return; }
 
   el.innerHTML = list.map(p=>`
-    <button class="pcard" onclick="openProject('${p.id}')">
-      <div class="pcard-top">
-        <span class="pcard-name">${p.name}</span>
-        <span class="pcard-meta">${p.units_received} of ${p.units_expected} units received</span>
-      </div>
-      <div class="pcard-meta">${p.item_count} items${p.source_filename?' · '+p.source_filename:''}</div>
-      <div class="bar"><div class="bar-fill ${p.complete?'done':''}" style="width:${p.pct}%;"></div></div>
-    </button>`).join('');
+    <div class="pcard-wrap">
+      <button class="pcard" onclick="openProject('${p.id}')">
+        <div class="pcard-top">
+          <span class="pcard-name">${p.name}${p.archived?' <span class="arch-tag">archived</span>':''}</span>
+          <span class="pcard-meta">${p.units_received} of ${p.units_expected} units received</span>
+        </div>
+        <div class="pcard-meta">${p.item_count} items${p.source_filename?' · '+p.source_filename:''}</div>
+        <div class="bar"><div class="bar-fill ${p.complete?'done':''}" style="width:${p.pct}%;"></div></div>
+      </button>
+      <button class="arch-btn" title="${p.archived?'Bring this project back':'Hide this project from the list and from search'}"
+              onclick="event.stopPropagation();setArchived('${p.id}',${!p.archived})">
+        ${p.archived?'Restore':'Archive'}
+      </button>
+    </div>`).join('');
 }
 
 // ───────────────── open one project ─────────────────

@@ -5,7 +5,8 @@ const html=fs.readFileSync('/mnt/user-data/outputs/deliveries.html','utf8').repl
 const PROJECT={id:'P1',name:'Somers Residence',line_count:3};
 const LINES=[
  {id:'L1',project_id:'P1',section:'Living',product_name:'Arc Sofa',brand:'Calibre',sku:'DT12137-BB',
-  qty_expected:2,qty_received:0,is_service:false,programma_status:'paid'},
+  qty_expected:2,qty_received:0,is_service:false,programma_status:'paid',
+  photo_url:'https://example.test/p/sofa.png'},
  {id:'L4',project_id:'P1',section:'Bed 1',product_name:'Lamp',brand:'Cult',sku:'LM-1',
   qty_expected:1,qty_received:0,is_service:false,programma_status:'awaiting_freight'},
  {id:'L2',project_id:'P1',section:'Living',product_name:'Side Table',brand:'Globe West',sku:null,
@@ -42,7 +43,18 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   else { w.PROJ_LINES=LINES; w.renderProjectLines && w.renderProjectLines(); await sleep(100); }
 
   ok('edit buttons rendered on saved lines ('+d.querySelectorAll('.edit-btn').length+')',
+
      d.querySelectorAll('.edit-btn').length>0);
+
+  // Product photos from the export
+  const thumbs=[...d.querySelectorAll('img.line-thumb')];
+  ok('a line with a photo shows a thumbnail', thumbs.length===1);
+  ok('pointing at the stored image', /sofa\.png/.test(thumbs[0].getAttribute('src')));
+  ok('lines without a photo leave the cell empty',
+     d.querySelectorAll('td.thumb-cell').length>thumbs.length);
+  ok('the header has a column for it',
+     d.querySelectorAll('thead th').length===d.querySelectorAll('tbody tr:first-child td').length);
+
 
   w.openEdit('L1'); await sleep(50);
   ok('editor opens', d.getElementById('edit-pop').classList.contains('open'));

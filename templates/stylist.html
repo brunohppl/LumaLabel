@@ -176,6 +176,24 @@ body.mobile-mode .mobile-only{display:block !important;}
 .room-add-input::placeholder{color:var(--border);}
 .room-add-btn{font-size:0.72rem;padding:5px 12px;}
 
+.tsearch{margin:14px 0 0;}
+.tsearch-input{width:100%;padding:10px 13px;border:1px solid var(--border);border-radius:3px;
+  font-family:'Jost',sans-serif;font-size:0.88rem;background:#fff;color:var(--ink);outline:none;}
+.tsearch-input:focus{border-color:var(--accent);}
+.tsearch-results{margin-top:8px;}
+.tsr{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fff;
+  border:1px solid var(--border);border-radius:3px;margin-bottom:5px;}
+.tsr-body{flex:1;min-width:0;}
+.tsr-name{font-size:0.84rem;line-height:1.25;}
+.tsr-room{font-size:0.7rem;color:var(--muted);}
+.tsr-flags{display:flex;gap:12px;flex-shrink:0;}
+.tsr-flag{display:flex;align-items:center;gap:5px;font-size:0.7rem;color:var(--muted);
+  cursor:pointer;white-space:nowrap;}
+.tsr-flag input{width:17px;height:17px;accent-color:var(--accent);cursor:pointer;}
+.tsr.is-transfer{background:rgba(74,126,184,0.07);}
+.tsr.is-staying{background:rgba(184,147,90,0.08);}
+.tsr-warn{font-size:0.68rem;color:var(--red,#A63D2F);font-weight:600;}
+.tsr-note{font-size:0.76rem;color:var(--muted);padding:6px 2px;}
 .not-transferring-card{border:2px solid var(--accent);}
 .not-transferring-card .room-card-header{background:rgba(184,147,90,0.08);}
 .not-transferring-card .room-card-name{color:var(--accent);}
@@ -306,6 +324,13 @@ body.mobile-mode .mobile-only{display:block !important;}
           oninput="autoGrow(this)"
           onblur="saveDriverNotes(this.value)"></textarea>
       </div>
+    </div>
+
+    <!-- Find an item without opening every room -->
+    <div class="tsearch" id="tsearch">
+      <input class="tsearch-input" id="tsearch-q" placeholder="Find an item to mark as transferring…"
+             oninput="transferSearch()"/>
+      <div class="tsearch-results" id="tsearch-results"></div>
     </div>
     <div id="accessory-tubs-section" class="paper-accessories" style="display:none;">
       <span class="paper-acc-label">Tubs</span>
@@ -1225,6 +1250,58 @@ function groupRow(grp){
   </div>`;
 }
 
+// ── Find an item without opening every room ──────────────────────────
+// Marking transfers means hunting through groups for a handful of items.
+// This searches the flat list and offers the same two checkboxes, calling
+// the same functions — so the room cards and this stay in step.
+function transferSearch(){
+  const q=(document.getElementById('tsearch-q').value||'').trim().toLowerCase();
+  const box=document.getElementById('tsearch-results');
+  if(q.length<2){ box.innerHTML=''; return; }
+
+  const hits=(allItems||[]).filter(i=>{
+    const hay=[(i.description||''), (i.room||''), (i.serial||'')].join(' ').toLowerCase();
+    return hay.includes(q);
+  }).slice(0, 40);
+
+  if(!hits.length){ box.innerHTML='<div class="tsr-note">No item matches that.</div>'; return; }
+
+  box.innerHTML=hits.map(i=>{
+    const t=!!i.is_transfer_item, n=!!i.not_transferring;
+    const cls=t?'is-transfer':(n?'is-staying':'');
+    return `<div class="tsr ${cls}" id="tsr-${i.id}">
+      <div class="tsr-body">
+        <div class="tsr-name">${escHtml(i.description||'—')}
+          ${t&&n?'<span class="tsr-warn">both ticked</span>':''}</div>
+        <div class="tsr-room">${escHtml(i.room||'No room')}${i.serial?' · '+escHtml(i.serial):''}</div>
+      </div>
+      <div class="tsr-flags">
+        <label class="tsr-flag">
+          <input type="checkbox" ${t?'checked':''}
+                 onchange="searchToggle('${i.id}','transfer',this.checked)"/> Transfer
+        </label>
+        <label class="tsr-flag">
+          <input type="checkbox" ${n?'checked':''}
+                 onchange="searchToggle('${i.id}','staying',this.checked)"/> Not transferring
+        </label>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,c=>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Routes straight to the existing toggles, so there is one code path for
+// saving and the room cards update exactly as they would from the list.
+async function searchToggle(id, which, checked){
+  if(which==='transfer') await toggleTransferItem(id, checked, null);
+  else                   await toggleNotTransferring(id, checked, null);
+  transferSearch();      // repaint so the row's colour and warning follow
+}
+
 async function toggleNotTransferring(ids, checked, el){
   const idList = ids.split(',');
   for(const id of idList){
@@ -1243,7 +1320,7 @@ async function toggleTransferItem(ids, checked, el){
     const item = allItems.find(i=>i.id===id);
     if(item) item.is_transfer_item = checked;
   }
-  const row = el.closest('.item-row');
+  const row = el ? el.closest('.item-row') : null;   // no element when called from search
   if(row) row.classList.toggle('item-transfer-item', checked);
   await Promise.all(idList.map(id=>
     fetch('/api/items/'+id+'/check',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_transfer_item:checked})})

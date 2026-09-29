@@ -466,7 +466,10 @@ def _project_summary(project, lines):
 def api_deliveries_projects():
     """List saved projects with their receiving progress."""
     try:
-        projects = _sb('GET', 'delivery_projects', 'order=created_at.desc')
+        show_archived = str(request.args.get('archived') or '').lower() in ('1', 'true')
+        projects = _sb('GET', 'delivery_projects', 'order=created_at.desc') or []
+        if not show_archived:
+            projects = [p for p in projects if not p.get('archived')]
         if not projects:
             return jsonify({'success': True, 'projects': []})
         ids = ','.join(p['id'] for p in projects)
@@ -608,6 +611,67 @@ def api_deliveries_add_lines(project_id):
 
         report['added'] = len(rows)
         return jsonify(report)
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@deliveries_bp.route('/api/deliveries/search', methods=['GET'])
+def api_deliveries_search():
+    """Find an item across every project at once.
+
+    The warehouse receives a box without knowing which project it belongs
+    to, so the useful question is "where does this SKU live?" rather than
+    "which project shall I open?".
+
+    Archived projects are excluded — that is what archiving is for.
+    """
+    try:
+        q = (request.args.get('q') or '').strip()
+        if len(q) < 2:
+            return jsonify({'success': True, 'lines': [], 'query': q})
+
+        include_archived = str(request.args.get('archived') or '').lower() in ('1', 'true')
+
+        projects = _sb('GET', 'delivery_projects',
+                       'select=id,name,archived&order=created_at.desc') or []
+        live = {p['id']: p for p in projects
+                if include_archived or not p.get('archived')}
+        if not live:
+            return jsonify({'success': True, 'lines': [], 'query': q})
+
+        # PostgREST or-filter across the fields someone would actually search
+        safe = q.replace(',', ' ').replace('(', '').replace(')', '').replace('*', '')
+        pattern = f'*{safe}*'
+        params = (
+            f'project_id=in.({",".join(live)})'
+            f'&or=(product_name.ilike.{pattern},sku.ilike.{pattern},'
+            f'brand.ilike.{pattern},item_label.ilike.{pattern})'
+            '&is_service=eq.false'
+            '&order=project_id.asc,section.asc'
+            '&limit=120'
+        )
+        rows = _sb('GET', 'delivery_lines', params) or []
+
+        for r in rows:
+            p = live.get(r.get('project_id')) or {}
+            r['project_name'] = p.get('name') or '—'
+            r['project_archived'] = bool(p.get('archived'))
+
+        return jsonify({'success': True, 'lines': rows, 'query': q,
+                        'capped': len(rows) >= 120})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@deliveries_bp.route('/api/deliveries/projects/<project_id>/archive', methods=['POST'])
+def api_deliveries_archive(project_id):
+    """Archive or restore a project. Nothing is deleted either way."""
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        archived = bool(payload.get('archived', True))
+        _sb('PATCH', 'delivery_projects', f'id=eq.{project_id}',
+            body={'archived': archived}, prefer='return=minimal')
+        return jsonify({'success': True, 'archived': archived})
     except Exception as e:
         return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
 

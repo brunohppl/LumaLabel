@@ -29,7 +29,8 @@ const rows=()=>[...d.querySelectorAll('.tsr')];
   w.eval(`
     allItems=[{id:'i1',description:'Tate Console Table',room:'Living',serial:'001'},
               {id:'i2',description:'Tate Side Table',room:'Bed 1',serial:'002',is_transfer_item:true},
-              {id:'i3',description:'Rug',room:'Living',serial:'003',not_transferring:true},
+              {id:'i3',description:'Rug',room:'Living',serial:'003',not_transferring:true,
+               photo_url:'https://x/rug.jpg'},
               {id:'i4',description:'Artwork',room:'Study',serial:'004',
                is_transfer_item:true,not_transferring:true}];
     renderItems=()=>{};
@@ -41,6 +42,13 @@ const rows=()=>[...d.querySelectorAll('.tsr')];
   q().value='tate'; w.transferSearch();
   ok('searching finds matching items', rows().length===2);
   ok('the room is shown on each result', /Living/.test(rows()[0].textContent));
+  // a photo makes the right row obvious in a flat list
+  q().value='rug'; w.transferSearch();
+  ok('an item with a photo shows it', !!rows()[0].querySelector('img.tsr-thumb'));
+  ok('pointing at the stored photo', /rug\.jpg/.test(rows()[0].querySelector('img.tsr-thumb').src));
+  q().value='tate'; w.transferSearch();
+  ok('an item without a photo keeps the rows aligned',
+     !!rows()[0].querySelector('.tsr-thumb-none'));
   ok('an already-transferring item shows ticked',
      rows()[1].querySelectorAll('input')[0].checked===true);
   ok('and is tinted', rows()[1].classList.contains('is-transfer'));

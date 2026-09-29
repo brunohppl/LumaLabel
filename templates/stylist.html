@@ -183,6 +183,12 @@ body.mobile-mode .mobile-only{display:block !important;}
 .tsearch-results{margin-top:8px;}
 .tsr{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fff;
   border:1px solid var(--border);border-radius:3px;margin-bottom:5px;}
+/* Seeing the piece is the quickest way to know it's the right row — a flat
+   list puts similar names next to each other. A placeholder keeps the rows
+   aligned when an item has no photo. */
+.tsr-thumb{width:46px;height:46px;object-fit:cover;border-radius:3px;
+  border:1px solid var(--border);flex-shrink:0;background:#fff;display:block;}
+.tsr-thumb-none{background:repeating-linear-gradient(45deg,#f6f3ee,#f6f3ee 4px,#fff 4px,#fff 8px);}
 .tsr-body{flex:1;min-width:0;}
 .tsr-name{font-size:0.84rem;line-height:1.25;}
 .tsr-room{font-size:0.7rem;color:var(--muted);}
@@ -1272,6 +1278,10 @@ function transferSearch(){
     const t=!!i.is_transfer_item, n=!!i.not_transferring;
     const cls=t?'is-transfer':(n?'is-staying':'');
     return `<div class="tsr ${cls}" id="tsr-${i.id}">
+      ${i.photo_url
+        ? `<img class="tsr-thumb" src="${i.photo_url}" alt="" loading="lazy"
+               onerror="this.style.display='none'"/>`
+        : '<div class="tsr-thumb tsr-thumb-none"></div>'}
       <div class="tsr-body">
         <div class="tsr-name">${escHtml(i.description||'—')}
           ${t&&n?'<span class="tsr-warn">both ticked</span>':''}</div>

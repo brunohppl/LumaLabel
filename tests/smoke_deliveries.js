@@ -110,45 +110,10 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   ok('a home link is present', !!home);
   ok('and reads as Home', home && /home/i.test(home.textContent));
 
-  // ── Photo backfill: dry run, confirm, write ──
-  ok('the add-photos control exists', !!d.querySelector('.photo-backfill button'));
-  let sentPh=[]; let dryReply={success:true,dry_run:true,to_update:3,already_had:1,unmatched:2,unmatched_names:[]};
-  let wetReply={success:true,written:3};
-  w.fetch=async(url,opt={})=>{
-    if(String(url).includes('/photos')){
-      const dry=opt.body && opt.body.get && opt.body.get('dry_run');
-      sentPh.push(dry?'dry':'write');
-      return {ok:true,status:200,json:async()=>(dry?dryReply:wetReply)};
-    }
-    return {ok:true,status:200,json:async()=>({project:{id:'P1'},lines:[]})};
-  };
-  w.eval("PROJ={id:'P1'};");
-
-  // declining the confirmation must write nothing
-  w.confirm=()=>false;
-  await w.checkPhotos(new w.File(['x'],'e.xlsx'));
-  await sleep(60);
-  ok('a dry run happens first', sentPh[0]==='dry');
-  ok('declining writes nothing', !sentPh.includes('write'));
-  ok('and says so', /Cancelled/.test(d.getElementById('photo-msg').textContent));
-
-  // accepting writes
-  sentPh=[]; w.confirm=()=>true;
-  await w.checkPhotos(new w.File(['x'],'e.xlsx'));
-  await sleep(60);
-  ok('accepting writes', sentPh.includes('write'));
-  ok('and reports how many', /Added 3 photos/.test(d.getElementById('photo-msg').textContent));
-
-  // nothing to do is stated, not silently 'done'
-  sentPh=[]; dryReply={success:true,dry_run:true,to_update:0,already_had:5,unmatched:0};
-  await w.checkPhotos(new w.File(['x'],'e.xlsx'));
-  await sleep(60);
-  ok('nothing to do writes nothing', !sentPh.includes('write'));
-  ok('and explains why', /already have a photo/.test(d.getElementById('photo-msg').textContent));
-
   // ── Adding new lines from a newer export ──
   ok('the add-items control exists',
-     [...d.querySelectorAll('.photo-backfill button')].length===2);
+     [...d.querySelectorAll('.photo-backfill button')].length===1);
+  ok('the photo backfill control is gone', !d.getElementById('photo-file'));
   let sentAdd=[];
   let addDry={success:true,dry_run:true,to_add:3,already_here:90,with_photos:3,
               names:['Side Table','Vase','Runner'],possible_renames:[]};

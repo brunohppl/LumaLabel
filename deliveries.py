@@ -312,19 +312,34 @@ def api_deliveries_parse():
         # exists here — by the time the project is saved the client is
         # sending JSON. So upload them now and let the URL travel with the
         # line like any other field.
-        photos = extract_row_images(raw)
+        photos = {}
+        try:
+            photos = extract_row_images(raw)
+        except Exception as e:
+            print(f'[DELIV] photo step skipped: {e}')
         photo_count = 0
         if photos:
             import uuid as _uuid
+            from concurrent.futures import ThreadPoolExecutor
             batch = _uuid.uuid4().hex[:12]
-            for l in lines:
-                got = photos.get(l.get('sheet_row'))
-                if not got:
-                    continue
-                url = upload_line_photo(batch, l.get('sheet_row'), got[0], got[1])
-                if url:
-                    l['photo_url'] = url
-                    photo_count += 1
+
+            # Each upload is its own round trip to Supabase. Done one after
+            # another, a schedule with 86 photos takes long enough to outrun
+            # the platform's request timeout and the worker is killed before
+            # Flask can reply — which is a 500 with no body. In parallel it
+            # is a few seconds.
+            targets = [(l, photos[l['sheet_row']]) for l in lines
+                       if photos.get(l.get('sheet_row'))][:MAX_PHOTOS_PER_IMPORT]
+
+            def _put(pair):
+                line, (fname, blob) = pair
+                return line, upload_line_photo(batch, line.get('sheet_row'), fname, blob)
+
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                for line, url in pool.map(_put, targets):
+                    if url:
+                        line['photo_url'] = url
+                        photo_count += 1
 
         return jsonify({
             'success':      True,
@@ -383,6 +398,9 @@ def _sb(method, table, params='', body=None, prefer='return=representation'):
 
 PHOTO_BUCKET = 'delivery-photos'
 
+# A very large schedule shouldn't hold the request open indefinitely.
+MAX_PHOTOS_PER_IMPORT = 400
+
 
 def upload_line_photo(project_id, line_key, filename, blob):
     """Put one product photo in storage and return its public URL.
@@ -405,7 +423,7 @@ def upload_line_photo(project_id, line_key, filename, blob):
         'x-upsert': 'true',          # re-importing replaces, never duplicates
     })
     try:
-        with urllib.request.urlopen(req, timeout=20):
+        with urllib.request.urlopen(req, timeout=8):
             pass
     except urllib.error.HTTPError as e:
         print(f'[DELIV] photo upload failed ({e.code}): {e.read()[:200]}')

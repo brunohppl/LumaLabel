@@ -401,6 +401,9 @@ PHOTO_BUCKET = 'delivery-photos'
 # A very large schedule shouldn't hold the request open indefinitely.
 MAX_PHOTOS_PER_IMPORT = 400
 
+# A wrong file shouldn't be able to add hundreds of lines unnoticed.
+MAX_NEW_LINES = 150
+
 
 def upload_line_photo(project_id, line_key, filename, blob):
     """Put one product photo in storage and return its public URL.
@@ -585,6 +588,118 @@ def api_deliveries_backfill_photos(project_id):
             written += 1
 
         report['written'] = written
+        return jsonify(report)
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@deliveries_bp.route('/api/deliveries/projects/<project_id>/add-lines', methods=['POST'])
+def api_deliveries_add_lines(project_id):
+    """Add lines that are in a newer export but not yet in the project.
+
+    Insert only. A line that matches something already here is left entirely
+    alone — no field is updated, so received counts and check history cannot
+    change. New lines arrive with qty_received = 0 and their photo attached.
+
+    The risk worth knowing: matching is SKU + product + section, so a line
+    renamed in the app looks new and would be added a second time. The dry
+    run lists every name it would add, and flags any whose SKU already
+    exists here under a different name as a likely rename.
+
+    Send dry_run=1 for the report without writing.
+    """
+    try:
+        f = request.files.get('file')
+        if not f:
+            return jsonify({'success': False, 'error': 'No file was uploaded.'}), 400
+        raw = f.read()
+        if not raw:
+            return jsonify({'success': False, 'error': 'The uploaded file is empty.'}), 400
+
+        dry_run = str(request.form.get('dry_run') or '').lower() in ('1', 'true', 'yes')
+
+        lines, _meta = parse_programma_xlsx(raw)
+        if not lines:
+            return jsonify({'success': False,
+                            'error': 'No lines could be read from that file.'}), 400
+        photos = extract_row_images(raw)
+
+        existing = _sb('GET', 'delivery_lines',
+                       f'project_id=eq.{project_id}'
+                       '&select=id,sku,product_name,item_label,section'
+                       '&order=id.asc') or []
+        have = {_match_key(r) for r in existing}
+        # SKU -> the names already stored under it, to spot renames
+        by_sku = {}
+        for r in existing:
+            sku = (r.get('sku') or '').strip().lower()
+            if sku:
+                by_sku.setdefault(sku, set()).add(
+                    (r.get('product_name') or r.get('item_label') or '').strip().lower())
+
+        new_lines, suspects = [], []
+        for l in lines:
+            if _match_key(l) in have:
+                continue
+            new_lines.append(l)
+            sku = (l.get('sku') or '').strip().lower()
+            name = (l.get('product_name') or l.get('item_label') or '').strip().lower()
+            if sku and sku in by_sku and name not in by_sku[sku]:
+                suspects.append({
+                    'sku': l.get('sku'),
+                    'new_name': l.get('product_name') or l.get('item_label'),
+                    'existing_names': sorted(by_sku[sku]),
+                })
+
+        report = {
+            'success':   True,
+            'dry_run':   dry_run,
+            'to_add':    len(new_lines),
+            'already_here': len(lines) - len(new_lines),
+            'lines_in_project': len(existing),
+            'names': [(l.get('product_name') or l.get('item_label') or '—')
+                      for l in new_lines][:60],
+            'possible_renames': suspects[:20],
+            'with_photos': sum(1 for l in new_lines if photos.get(l.get('sheet_row'))),
+        }
+
+        if len(new_lines) > MAX_NEW_LINES:
+            report['success'] = False
+            report['error'] = (f'That file would add {len(new_lines)} lines, which looks '
+                               f'wrong for this project. Check it is the right export.')
+            return jsonify(report), 400
+
+        if dry_run or not new_lines:
+            return jsonify(report)
+
+        # Photos first, so each new line arrives complete
+        if photos:
+            import uuid as _uuid
+            from concurrent.futures import ThreadPoolExecutor
+            batch = _uuid.uuid4().hex[:12]
+            targets = [(l, photos[l['sheet_row']]) for l in new_lines
+                       if photos.get(l.get('sheet_row'))][:MAX_PHOTOS_PER_IMPORT]
+
+            def _put(pair):
+                line, (fname, blob) = pair
+                return line, upload_line_photo(batch, line.get('sheet_row'), fname, blob)
+
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                for line, url in pool.map(_put, targets):
+                    if url:
+                        line['photo_url'] = url
+
+        rows = []
+        for l in new_lines:
+            row = {f: l.get(f) for f in _LINE_FIELDS}
+            row['project_id'] = project_id
+            row['qty_received'] = 0          # nothing has arrived for a new line
+            rows.append(row)
+
+        for i in range(0, len(rows), 200):
+            _sb('POST', 'delivery_lines', body=rows[i:i + 200], prefer='return=minimal')
+
+        report['added'] = len(rows)
         return jsonify(report)
     except Exception as e:
         return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500

@@ -193,6 +193,11 @@ tr.part{background:rgba(184,147,90,0.06);}
       </button>
       <input type="file" id="photo-file" accept=".xlsx" style="display:none;"
              onchange="checkPhotos(this.files[0])"/>
+      <button class="btn-ghost" onclick="document.getElementById('addlines-file').click()">
+        Add new items from export
+      </button>
+      <input type="file" id="addlines-file" accept=".xlsx" style="display:none;"
+             onchange="checkNewLines(this.files[0])"/>
       <span class="photo-msg" id="photo-msg"></span>
     </div>
     <div class="toolbar">
@@ -504,6 +509,57 @@ async function checkPhotos(file){
     msg.textContent='Could not add photos — '+e.message;
   }
   document.getElementById('photo-file').value='';
+}
+
+// Adds lines present in a newer export but missing here. Insert only —
+// nothing existing is updated, so received counts can't move. The dry run
+// lists what would be added, because the failure mode here is a duplicate
+// rather than a miss.
+async function checkNewLines(file){
+  if(!file) return;
+  const msg=document.getElementById('photo-msg');
+  const send=async dry=>{
+    const fd=new FormData();
+    fd.append('file', file);
+    if(dry) fd.append('dry_run','1');
+    const res=await fetch(`/api/deliveries/projects/${PROJ.id}/add-lines`,
+      {method:'POST', body:fd});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok || data.success===false) throw new Error(data.error||`HTTP ${res.status}`);
+    return data;
+  };
+  msg.className='photo-msg'; msg.textContent='Reading that file…';
+  try{
+    const dry=await send(true);
+    if(!dry.to_add){
+      msg.textContent=`Nothing new — all ${dry.already_here} lines in that file are already here.`;
+      document.getElementById('addlines-file').value='';
+      return;
+    }
+    let text=`${dry.to_add} new line${dry.to_add!==1?'s':''} would be added`+
+      (dry.with_photos?` (${dry.with_photos} with photos)`:'')+`:\n\n`+
+      dry.names.slice(0,25).join('\n')+
+      (dry.to_add>25?`\n…and ${dry.to_add-25} more`:'');
+    if(dry.possible_renames && dry.possible_renames.length){
+      text+=`\n\n⚠ ${dry.possible_renames.length} of these share a SKU with a line already here `+
+        `under a different name — they may be renames rather than new items:\n`+
+        dry.possible_renames.slice(0,5).map(r=>`  ${r.sku}: "${r.new_name}" vs "${r.existing_names[0]}"`).join('\n');
+    }
+    text+=`\n\nExisting lines are not changed — received counts stay as they are.\n\nGo ahead?`;
+    if(!confirm(text)){
+      msg.textContent='Cancelled — nothing was added.';
+      document.getElementById('addlines-file').value='';
+      return;
+    }
+    msg.textContent='Adding…';
+    const done=await send(false);
+    msg.textContent=`Added ${done.added} line${done.added!==1?'s':''}.`;
+    await openProject(PROJ.id);
+  }catch(e){
+    msg.className='photo-msg err';
+    msg.textContent='Could not add items — '+e.message;
+  }
+  document.getElementById('addlines-file').value='';
 }
 
 function tableHTML(rows, q, showReceived){

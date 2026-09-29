@@ -54,6 +54,10 @@ tr.service{background:#fcfbf8;color:var(--muted);}
 .sku{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.76rem;color:var(--accent);}
 .sku.none{color:var(--border);font-family:inherit;font-style:italic;}
 .qty{font-weight:600;text-align:center;}
+/* Big enough to recognise the piece, small enough not to take over the row */
+.thumb-cell{width:52px;padding-right:0;}
+.line-thumb{width:44px;height:44px;object-fit:cover;border-radius:3px;
+  border:1px solid var(--border);background:#fff;display:block;}
 .badge{display:inline-block;font-size:0.66rem;border-radius:10px;padding:2px 9px;letter-spacing:0.04em;white-space:nowrap;}
 .b-delivered{background:rgba(74,124,89,0.13);color:var(--green);}
 .b-paid{background:rgba(184,147,90,0.15);color:var(--accent);}
@@ -449,7 +453,7 @@ function tableHTML(rows, q, showReceived){
   }
   return `<table>
     <thead><tr>
-      <th>Room</th><th>Item</th><th>SKU</th><th>Brand</th>
+      <th></th><th>Room</th><th>Item</th><th>SKU</th><th>Brand</th>
       <th style="text-align:center;">Qty</th>
       ${showReceived?'<th style="text-align:center;">Received</th>':''}
       <th>Programma Status</th>
@@ -457,6 +461,10 @@ function tableHTML(rows, q, showReceived){
     </tr></thead>
     <tbody>${rows.map(l=>`
       <tr class="${l.is_service?'service':rowClass(l)}" id="row-${l.id||''}">
+        <td class="thumb-cell">${l.photo_url
+          ? `<img class="line-thumb" src="${l.photo_url}" alt="" loading="lazy"
+                 onerror="this.style.display='none'"/>`
+          : ''}</td>
         <td class="sec">${l.section||'—'}</td>
         <td>
           <div class="pname">${l.product_name||l.item_label||'—'}</div>

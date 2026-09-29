@@ -21,8 +21,10 @@ const rows=()=>[...d.querySelectorAll('.tsr')];
 (async()=>{
   await sleep(300);
   ok('the search box exists', !!q());
-  ok('it sits after the driver notes',
-     d.body.innerHTML.indexOf('driver-notes-tablet') < d.body.innerHTML.indexOf('tsearch-q'));
+  // It must NOT be inside paper-only, which is hidden on phones
+  ok('the search is visible in every layout',
+     !d.querySelector('.paper-only #tsearch'));
+  ok('and it is in the main content', !!d.querySelector('.content #tsearch'));
 
   w.eval(`
     allItems=[{id:'i1',description:'Tate Console Table',room:'Living',serial:'001'},

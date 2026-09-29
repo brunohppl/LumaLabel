@@ -55,6 +55,12 @@ tr.service{background:#fcfbf8;color:var(--muted);}
 .sku.none{color:var(--border);font-family:inherit;font-style:italic;}
 .qty{font-weight:600;text-align:center;}
 /* Big enough to recognise the piece, small enough not to take over the row */
+.photo-backfill{display:flex;align-items:center;gap:10px;margin:0 0 14px;flex-wrap:wrap;}
+.btn-ghost{padding:7px 14px;background:transparent;border:1px solid var(--border);
+  border-radius:3px;font-family:inherit;font-size:0.76rem;color:var(--muted);cursor:pointer;}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.photo-msg{font-size:0.76rem;color:var(--muted);}
+.photo-msg.err{color:var(--red,#A63D2F);}
 .thumb-cell{width:52px;padding-right:0;}
 .line-thumb{width:44px;height:44px;object-fit:cover;border-radius:3px;
   border:1px solid var(--border);background:#fff;display:block;}
@@ -181,6 +187,14 @@ tr.part{background:rgba(184,147,90,0.06);}
     <h1 class="page-title" id="proj-title"></h1>
     <div class="page-sub" id="proj-sub"></div>
     <div class="stats" id="proj-stats"></div>
+    <div class="photo-backfill">
+      <button class="btn-ghost" onclick="document.getElementById('photo-file').click()">
+        Add photos from export
+      </button>
+      <input type="file" id="photo-file" accept=".xlsx" style="display:none;"
+             onchange="checkPhotos(this.files[0])"/>
+      <span class="photo-msg" id="photo-msg"></span>
+    </div>
     <div class="toolbar">
       <input class="search" id="pq2" placeholder="Search by product name, SKU, brand or room…" oninput="renderProjectLines()"/>
       <button class="chip on" id="f-all" onclick="setFilter('all')">All</button>
@@ -445,6 +459,51 @@ function statusBadge(s){
   if(!s) return '<span class="badge b-other">—</span>';
   const cls = s==='delivered' ? 'b-delivered' : (s==='paid' ? 'b-paid' : 'b-other');
   return `<span class="badge ${cls}">${s.replace(/_/g,' ')}</span>`;
+}
+
+// Adds product photos to a project that already exists. Runs a dry pass
+// first and shows exactly what would change — it writes photo_url and
+// nothing else, so received counts and check history can't be affected.
+async function checkPhotos(file){
+  if(!file) return;
+  const msg=document.getElementById('photo-msg');
+  const send=async dry=>{
+    const fd=new FormData();
+    fd.append('file', file);
+    if(dry) fd.append('dry_run','1');
+    const res=await fetch(`/api/deliveries/projects/${PROJ.id}/photos`,
+      {method:'POST', body:fd});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok || data.success===false) throw new Error(data.error||`HTTP ${res.status}`);
+    return data;
+  };
+  msg.className='photo-msg'; msg.textContent='Reading that file…';
+  try{
+    const dry=await send(true);
+    if(!dry.to_update){
+      msg.textContent=dry.already_had
+        ? `Nothing to do — all ${dry.already_had} matched lines already have a photo.`
+        : `No lines matched. ${dry.unmatched} photo rows in the file didn't match this project.`;
+      document.getElementById('photo-file').value='';
+      return;
+    }
+    const detail=[`${dry.to_update} line${dry.to_update!==1?'s':''} would get a photo`,
+      dry.already_had?`${dry.already_had} already have one`:null,
+      dry.unmatched?`${dry.unmatched} didn't match`:null].filter(Boolean).join('\n');
+    if(!confirm(`${detail}\n\nNothing else about these lines changes — received counts and check history are untouched.\n\nGo ahead?`)){
+      msg.textContent='Cancelled — nothing was changed.';
+      document.getElementById('photo-file').value='';
+      return;
+    }
+    msg.textContent='Adding photos…';
+    const done=await send(false);
+    msg.textContent=`Added ${done.written} photo${done.written!==1?'s':''}.`;
+    await openProject(PROJ.id);
+  }catch(e){
+    msg.className='photo-msg err';
+    msg.textContent='Could not add photos — '+e.message;
+  }
+  document.getElementById('photo-file').value='';
 }
 
 function tableHTML(rows, q, showReceived){

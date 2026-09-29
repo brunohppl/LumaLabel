@@ -301,6 +301,14 @@ body.mobile-mode .mobile-only{display:block !important;}
     </button>
   </div>
 
+  <!-- Find an item without opening every room. Deliberately outside the
+       paper-only block, which is hidden on phones and narrow screens. -->
+    <div class="tsearch" id="tsearch">
+      <input class="tsearch-input" id="tsearch-q" placeholder="Find an item to mark as transferring…"
+             oninput="transferSearch()"/>
+      <div class="tsearch-results" id="tsearch-results"></div>
+    </div>
+
   <!-- TABLET: notes bar + accessories inline -->
   <div class="paper-only">
     <div class="paper-notes-bar">
@@ -326,12 +334,6 @@ body.mobile-mode .mobile-only{display:block !important;}
       </div>
     </div>
 
-    <!-- Find an item without opening every room -->
-    <div class="tsearch" id="tsearch">
-      <input class="tsearch-input" id="tsearch-q" placeholder="Find an item to mark as transferring…"
-             oninput="transferSearch()"/>
-      <div class="tsearch-results" id="tsearch-results"></div>
-    </div>
     <div id="accessory-tubs-section" class="paper-accessories" style="display:none;">
       <span class="paper-acc-label">Tubs</span>
       <input type="number" id="accessory-tubs-input" class="paper-acc-input" min="0" max="99" placeholder="0"

@@ -813,8 +813,8 @@ async function saveInstallDate(jobId, newDate){
 }
 
 async function downloadLabels(jobId, jobRef){
-  // One stock now — Avery 62 x 42-R.
-  if(!confirm(`Download labels for job ${jobRef}?\n\nSheet: Avery 62 × 42mm, 18 per page.`)) return;
+  // One stock now — the 62 x 42mm sheet (unbranded).
+  if(!confirm(`Download labels for job ${jobRef}?\n\nSheet: 62 × 42mm, 18 per page.`)) return;
   const a=document.createElement('a');
   a.href=`/api/jobs/${jobId}/labels-pdf?format=18`;
   a.download='';

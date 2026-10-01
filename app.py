@@ -981,11 +981,12 @@ LABEL_FORMATS = {
     # 0.5mm top and bottom.
     16: {'size': (105.0, 37.0), 'grid': (2, 8), 'margin': (0.0, 0.5), 'gap': (0.0, 0.0)},
 
-    # Avery 62 x 42-R, 3 across x 6 down — the previous stock.
+    # 62 x 42mm, 3 across x 6 down — the stock in use (Avery 62x42-R
+    # layout, but the sheets are unbranded).
     18: {'size': (62.0, 42.0),  'grid': (3, 6), 'margin': (6.0, 6.43), 'gap': (6.0, 6.43)},
 }
-# Avery 62 x 42-R is the stock in use. The 16-up geometry stays defined
-# because the free-text label page still prints on that sheet.
+# The 62 x 42mm sheet is the stock in use. The 105 x 37mm geometry stays
+# defined because the free-text label page still prints on that sheet.
 DEFAULT_LABEL_FORMAT = 18
 
 
@@ -2179,7 +2180,7 @@ def api_job_access_notes(job_id):
 
 @app.route('/api/jobs/<job_id>/labels-pdf', methods=['GET'])
 def api_job_labels_pdf(job_id):
-    """Re-generate the Avery labels PDF from stored job data.
+    """Re-generate the labels PDF from stored job data.
     Uses the job's current colour, stage_date, and items from the database."""
     job_rows = sb_get('jobs', f'id=eq.{job_id}')
     if not job_rows:

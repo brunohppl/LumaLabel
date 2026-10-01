@@ -2664,6 +2664,17 @@ def api_freelabels():
     Uses the same geometry as the job labels that used that stock, so the
     alignment is identical — only the content is free.
     """
+    try:
+        return _freelabels_pdf()
+    except Exception as e:
+        # A bare 500 is impossible to diagnose from the outside; name it.
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False,
+                        'error': f'{type(e).__name__}: {e}'}), 500
+
+
+def _freelabels_pdf():
     from reportlab.pdfgen import canvas as _canvas
     from reportlab.lib.pagesizes import A4 as _A4
     from reportlab.lib.units import mm as _mm

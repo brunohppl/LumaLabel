@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Blank Labels · LUMA</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{--ink:#1A1714;--muted:#9A8F80;--border:#D8CFBF;--warm:#F2EDE4;--cream:#FAF8F4;
+  --accent:#B8935A;--green:#4A7C59;--red:#A63D2F;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;}
+
+.hero{background:var(--ink);padding:22px;text-align:center;}
+.logo-mark{height:40px;width:auto;display:block;margin:0 auto;}
+.hero-sub{font-size:0.68rem;letter-spacing:0.2em;text-transform:uppercase;
+  color:rgba(250,248,244,0.5);margin-top:10px;}
+
+.page{max-width:760px;margin:0 auto;padding:22px 18px 60px;}
+.lead{font-size:0.84rem;color:var(--muted);line-height:1.6;margin-bottom:18px;}
+
+/* Laid out as the sheet is: two across, eight down */
+.sheet{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#fff;
+  border:1px solid var(--border);border-radius:4px;padding:10px;}
+.cell{position:relative;}
+.cell textarea{width:100%;height:62px;resize:none;padding:8px 9px 8px 26px;
+  border:1px solid var(--border);border-radius:3px;font-family:'Jost',sans-serif;
+  font-size:0.84rem;line-height:1.3;color:var(--ink);background:var(--cream);outline:none;}
+.cell textarea:focus{border-color:var(--accent);background:#fff;}
+.cell-no{position:absolute;top:8px;left:8px;font-size:0.6rem;color:var(--muted);
+  pointer-events:none;}
+
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px;}
+.btn{padding:11px 22px;border:none;border-radius:3px;font-family:'Jost',sans-serif;
+  font-size:0.78rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:disabled{opacity:0.45;cursor:default;}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.msg{font-size:0.78rem;color:var(--muted);}
+.msg.err{color:var(--red);}
+
+.fill{margin:18px 0;padding:14px;background:#fff;border:1px solid var(--border);border-radius:4px;}
+.fill label{display:block;font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:7px;}
+.fill textarea{width:100%;height:84px;resize:vertical;padding:9px;border:1px solid var(--border);
+  border-radius:3px;font-family:'Jost',sans-serif;font-size:0.84rem;outline:none;}
+.fill textarea:focus{border-color:var(--accent);}
+.fill-hint{font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.5;}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <img class="logo-mark" src="/static/luma-mark-light.png" alt="LUMA Design Co"/>
+  <div class="hero-sub">Blank labels</div>
+</div>
+
+<div class="page">
+  <p class="lead">
+    Type whatever you like into each label. Prints on the 105 × 37mm sheet,
+    16 to a page, in the same positions as the job labels. Empty labels are
+    left blank so you can start part-way down a part-used sheet.
+  </p>
+
+  <div class="fill">
+    <label for="bulk">Fill them all at once</label>
+    <textarea id="bulk" placeholder="One label per line…"></textarea>
+    <div class="fill-hint">
+      Paste a list and press Fill — one line becomes one label. For two lines
+      on the same label, type them in the boxes below instead.
+    </div>
+    <div class="bar">
+      <button class="btn btn-ghost" onclick="fillFromBulk()">Fill</button>
+      <button class="btn btn-ghost" onclick="clearAll()">Clear all</button>
+    </div>
+  </div>
+
+  <div class="sheet" id="sheet"></div>
+
+  <div class="bar">
+    <button class="btn btn-primary" id="make" onclick="makePdf()">Download PDF</button>
+    <span class="msg" id="msg"></span>
+  </div>
+</div>
+
+<script>
+const COUNT = 16;
+
+(function build(){
+  const sheet=document.getElementById('sheet');
+  let html='';
+  for(let i=0;i<COUNT;i++){
+    html+=`<div class="cell">
+      <span class="cell-no">${i+1}</span>
+      <textarea id="l${i}" rows="3" placeholder=""></textarea>
+    </div>`;
+  }
+  sheet.innerHTML=html;
+})();
+
+function values(){
+  const out=[];
+  for(let i=0;i<COUNT;i++){
+    out.push((document.getElementById('l'+i).value||'').replace(/\s+$/,''));
+  }
+  return out;
+}
+
+function fillFromBulk(){
+  const lines=(document.getElementById('bulk').value||'').split('\n');
+  for(let i=0;i<COUNT;i++){
+    document.getElementById('l'+i).value=(lines[i]||'').trim();
+  }
+  setMsg(`Filled ${Math.min(lines.filter(l=>l.trim()).length, COUNT)} label(s).`);
+}
+
+function clearAll(){
+  for(let i=0;i<COUNT;i++) document.getElementById('l'+i).value='';
+  document.getElementById('bulk').value='';
+  setMsg('Cleared.');
+}
+
+function setMsg(t, bad){
+  const m=document.getElementById('msg');
+  m.textContent=t||'';
+  m.className='msg'+(bad?' err':'');
+}
+
+async function makePdf(){
+  const labels=values();
+  if(!labels.some(l=>l.trim())){ setMsg('Type something on at least one label first.', true); return; }
+  const btn=document.getElementById('make');
+  btn.disabled=true; setMsg('Building…');
+  try{
+    const res=await fetch('/api/freelabels',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({labels})});
+    if(!res.ok){
+      const err=await res.json().catch(()=>({}));
+      throw new Error(err.error||`HTTP ${res.status}`);
+    }
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='labels.pdf';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setMsg(`Downloaded ${labels.filter(l=>l.trim()).length} label(s).`);
+  }catch(e){
+    setMsg('Could not build that — '+e.message, true);
+  }
+  btn.disabled=false;
+}
+</script>
+</body>
+</html>

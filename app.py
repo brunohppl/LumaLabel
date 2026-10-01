@@ -2691,21 +2691,27 @@ def api_freelabels():
         c.rect(x, y, LBL_W, LBL_H, stroke=1, fill=0)
 
         lines = [l for l in str(text).split('\n')]
-        # Shrink to fit rather than spill off the label
-        size = 16
-        while size > 7:
-            c.setFont('Helvetica-Bold', size)
-            widest = max((c.stringWidth(l, 'Helvetica-Bold', size) for l in lines), default=0)
-            if widest <= LBL_W - 8 * _mm and len(lines) * size * 1.25 <= LBL_H - 6 * _mm:
+
+        # Use the whole label: grow the type until it almost touches the
+        # edges, then stop. A small margin keeps text clear of the cut line.
+        pad_x, pad_y = 4 * _mm, 3 * _mm
+        max_w, max_h = LBL_W - 2 * pad_x, LBL_H - 2 * pad_y
+
+        size = 4.0
+        while size < 120:
+            trial = size + 0.5
+            widest = max((c.stringWidth(l, 'Helvetica-Bold', trial) for l in lines), default=0)
+            if widest > max_w or len(lines) * trial * 1.2 > max_h:
                 break
-            size -= 1
+            size = trial
+        c.setFont('Helvetica-Bold', size)
 
         c.setFillColor(colors.black)
-        total = len(lines) * size * 1.25
+        total = len(lines) * size * 1.2
         ty = y + LBL_H / 2 + total / 2 - size
         for line in lines:
             c.drawCentredString(x + LBL_W / 2, ty, line)
-            ty -= size * 1.25
+            ty -= size * 1.2
 
     for i, text in enumerate(labels):
         if i and i % per_page == 0:
@@ -2719,8 +2725,11 @@ def api_freelabels():
 
     c.save()
     buf.seek(0)
-    return send_file(buf, mimetype='application/pdf', as_attachment=True,
-                     download_name='labels.pdf')
+    return Response(
+        buf.getvalue(),
+        mimetype='application/pdf',
+        headers={'Content-Disposition': 'attachment; filename="labels.pdf"'},
+    )
 
 
 @app.route('/api/version', methods=['GET'])

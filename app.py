@@ -984,7 +984,9 @@ LABEL_FORMATS = {
     # Avery 62 x 42-R, 3 across x 6 down — the previous stock.
     18: {'size': (62.0, 42.0),  'grid': (3, 6), 'margin': (6.0, 6.43), 'gap': (6.0, 6.43)},
 }
-DEFAULT_LABEL_FORMAT = 16
+# Avery 62 x 42-R is the stock in use. The 16-up geometry stays defined
+# because the free-text label page still prints on that sheet.
+DEFAULT_LABEL_FORMAT = 18
 
 
 AU_STATE_RE = re.compile(
@@ -2646,6 +2648,78 @@ def _readiness_payload():
     severity = {'overdue': 0, 'late': 1, 'due': 2, 'warn': 3, 'ok': 4, 'done': 5}
     out.sort(key=lambda r: (severity.get(r['state'], 9), r['date']))
     return jsonify({'days': days, 'jobs': out, 'teams': day_teams})
+
+
+@app.route('/freelabels', methods=['GET'])
+def freelabels_page():
+    """Blank labels you type yourself. Deliberately unlinked."""
+    return render_page('freelabels.html')
+
+
+@app.route('/api/freelabels', methods=['POST'])
+def api_freelabels():
+    """Print whatever text you like on the 105 x 37mm sheet.
+
+    Uses the same geometry as the job labels that used that stock, so the
+    alignment is identical — only the content is free.
+    """
+    from reportlab.pdfgen import canvas as _canvas
+    from reportlab.lib.pagesizes import A4 as _A4
+    from reportlab.lib.units import mm as _mm
+
+    data = request.get_json(silent=True) or {}
+    labels = data.get('labels') or []
+    if not isinstance(labels, list) or not any((l or '').strip() for l in labels):
+        return jsonify({'success': False, 'error': 'Nothing to print.'}), 400
+
+    fmt = LABEL_FORMATS[16]
+    LBL_W, LBL_H = (v * _mm for v in fmt['size'])
+    COLS,  ROWS  = fmt['grid']
+    SX,    SY    = (v * _mm for v in fmt['margin'])
+    GX,    GY    = (v * _mm for v in fmt['gap'])
+    PAGE_W, PAGE_H = _A4
+
+    buf = io.BytesIO()
+    c = _canvas.Canvas(buf, pagesize=_A4)
+    per_page = COLS * ROWS
+
+    def draw(x, y, text):
+        # A faint edge, so a misfed sheet is obvious before you peel it
+        c.setStrokeColor(colors.HexColor('#DDDDDD'))
+        c.setLineWidth(0.5)
+        c.rect(x, y, LBL_W, LBL_H, stroke=1, fill=0)
+
+        lines = [l for l in str(text).split('\n')]
+        # Shrink to fit rather than spill off the label
+        size = 16
+        while size > 7:
+            c.setFont('Helvetica-Bold', size)
+            widest = max((c.stringWidth(l, 'Helvetica-Bold', size) for l in lines), default=0)
+            if widest <= LBL_W - 8 * _mm and len(lines) * size * 1.25 <= LBL_H - 6 * _mm:
+                break
+            size -= 1
+
+        c.setFillColor(colors.black)
+        total = len(lines) * size * 1.25
+        ty = y + LBL_H / 2 + total / 2 - size
+        for line in lines:
+            c.drawCentredString(x + LBL_W / 2, ty, line)
+            ty -= size * 1.25
+
+    for i, text in enumerate(labels):
+        if i and i % per_page == 0:
+            c.showPage()
+        slot = i % per_page
+        col, row = slot % COLS, slot // COLS
+        x = SX + col * (LBL_W + GX)
+        y = PAGE_H - SY - (row + 1) * LBL_H - row * GY
+        if (text or '').strip():
+            draw(x, y, text)
+
+    c.save()
+    buf.seek(0)
+    return send_file(buf, mimetype='application/pdf', as_attachment=True,
+                     download_name='labels.pdf')
 
 
 @app.route('/api/version', methods=['GET'])

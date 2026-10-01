@@ -2691,7 +2691,7 @@ def _freelabels_pdf():
     GX,    GY    = (v * _mm for v in fmt['gap'])
     PAGE_W, PAGE_H = _A4
 
-    buf = io.BytesIO()
+    buf = BytesIO()
     c = _canvas.Canvas(buf, pagesize=_A4)
     per_page = COLS * ROWS
 

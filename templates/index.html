@@ -925,7 +925,7 @@ generateBtn.addEventListener('click', async () => {
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M7 9L4 6M7 9l3-3M1 11h12v2H1z" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Download Labels PDF
       </a>
-      <div style="font-size:0.68rem;color:var(--muted);margin:10px 0 16px;">Print on Avery 62x42-R label sheets · 18 labels per page</div>
+      <div style="font-size:0.68rem;color:var(--muted);margin:10px 0 16px;">Print on 62 × 42mm label sheets · 18 labels per page</div>
       <div class="next-action-row">
         <button class="btn-next-action btn-next-primary" id="goto-jobs-btn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
@@ -967,9 +967,10 @@ function readFileAsBase64(file) {
 }
 
 // ── Label sheet choice ──────────────────────────────────────────────
-// Avery 62 x 42-R is the only stock in use now, so there is nothing to
-// choose. A remembered '16' from the old picker is cleared, or a reprint
-// would quietly come out on a sheet nobody has.
+// One stock now — the 62 x 42mm sheet, 18 per page (the Avery 62x42-R
+// layout, though the sheets themselves are unbranded). A remembered '16'
+// from the old picker is cleared, or a reprint would come out on a sheet
+// nobody has.
 function labelFormat(){ return 18; }
 
 (function(){

@@ -2748,6 +2748,10 @@ def _freelabels_pdf():
 # dozens of times. A design group gathers those entries under the single
 # piece they represent.
 
+# How many designs to build per request. Enough to finish a normal
+# catalogue in a few passes, few enough that a request always returns.
+SEED_BATCH_GROUPS = 12
+
 _COLOUR_WORDS = ('black', 'white', 'grey', 'gray', 'natural', 'oak', 'walnut',
                  'charcoal', 'cream', 'tan', 'brown', 'green', 'blue', 'rust',
                  'sand', 'stone', 'ivory', 'beige', 'navy', 'mango wood')
@@ -2864,8 +2868,14 @@ def api_design_groups_seed():
         if dry_run:
             return jsonify(report)
 
+        # Work in slices. A whole catalogue in one request outran the
+        # gateway, which kills the worker mid-write — no error page I can
+        # catch, just half the groups made. Only ungrouped photos are ever
+        # touched, so each call safely continues where the last stopped.
+        batch = plan[:SEED_BATCH_GROUPS]
+
         created = assigned = 0
-        for p in plan:
+        for p in batch:
             gid = existing.get(p['name'].lower(), {}).get('id')
             if not gid:
                 made = sb_post('design_groups', {'name': p['name'], 'type': p['type']})
@@ -2883,7 +2893,11 @@ def api_design_groups_seed():
                                 f'id=in.({",".join(ids)})', {'group_id': gid})
                 assigned += len(done) if isinstance(done, list) else len(ids)
 
-        report.update({'created': created, 'assigned': assigned})
+        report.update({
+            'created':   created,
+            'assigned':  assigned,
+            'remaining': max(0, len(plan) - len(batch)),
+        })
         return jsonify(report)
     except Exception as e:
         return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500

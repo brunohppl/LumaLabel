@@ -27,6 +27,27 @@ nav{background:var(--ink);padding:12px 20px;display:flex;align-items:center;just
 
 /* ── PAGE ── */
 .page{max-width:1100px;margin:0 auto;padding:28px 20px 60px;}
+.view-tabs{display:flex;gap:8px;margin:14px 0 18px;}
+.vtab{padding:8px 18px;background:transparent;border:1px solid var(--border);border-radius:20px;
+  font-family:inherit;font-size:0.76rem;letter-spacing:0.05em;color:var(--muted);cursor:pointer;}
+.vtab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+.dg-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+.dg-stat{font-size:0.8rem;color:var(--muted);}
+.dg-btn{padding:8px 15px;background:transparent;border:1px solid var(--border);border-radius:3px;
+  font-family:inherit;font-size:0.74rem;color:var(--muted);cursor:pointer;}
+.dg-btn:hover{border-color:var(--accent);color:var(--accent);}
+.dg{background:#fff;border:1px solid var(--border);border-radius:4px;padding:12px 14px;margin-bottom:10px;}
+.dg-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+.dg-name{font-size:0.95rem;font-weight:600;flex:1;min-width:150px;}
+.dg-type{font-size:0.7rem;color:var(--accent);letter-spacing:0.06em;text-transform:uppercase;}
+.dg-count{font-size:0.74rem;color:var(--muted);}
+.dg-photos{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap;}
+.dg-photo{width:62px;height:62px;object-fit:cover;border-radius:3px;border:1px solid var(--border);}
+.dg-alt{font-size:0.7rem;color:var(--muted);margin-top:7px;line-height:1.5;}
+.dg-actions{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap;}
+.dg-act{padding:4px 11px;background:transparent;border:1px solid var(--border);border-radius:3px;
+  font-family:inherit;font-size:0.7rem;color:var(--muted);cursor:pointer;}
+.dg-act:hover{border-color:var(--accent);color:var(--accent);}
 .page-title{font-family:'Cormorant Garamond',serif;font-size:2.2rem;font-weight:400;margin-bottom:4px;}
 .page-sub{font-size:0.82rem;color:var(--muted);margin-bottom:24px;}
 
@@ -185,6 +206,21 @@ nav{background:var(--ink);padding:12px 20px;display:flex;align-items:center;just
   <h1 class="page-title">Catalogue</h1>
   <p class="page-sub">Furniture reference — built from job photos. Browse by type, filter by room.</p>
 
+  <div class="view-tabs">
+    <button class="vtab active" id="vt-photos" onclick="setView('photos')">Photos</button>
+    <button class="vtab" id="vt-designs" onclick="setView('designs')">Designs</button>
+  </div>
+
+  <div id="designs-view" style="display:none;">
+    <div class="dg-bar">
+      <span class="dg-stat" id="dg-stat">Loading…</span>
+      <button class="dg-btn" onclick="seedGroups()">Group by description</button>
+    </div>
+    <div id="dg-list"></div>
+  </div>
+
+  <div id="photos-view">
+
   <div class="toolbar">
     <div class="filter-chips" id="type-chips">
       <button class="chip active" data-type="" onclick="selectType(this,'')">All</button>
@@ -206,6 +242,7 @@ nav{background:var(--ink);padding:12px 20px;display:flex;align-items:center;just
   <div id="catalogue-grid" class="photo-grid">
     <div class="loading"><div class="spinner"></div>Loading catalogue…</div>
   </div>
+</div>
 </div>
 
 <script>
@@ -277,6 +314,138 @@ async function handleCatalogueFileSelect(input){
     btn.disabled=false;
     input.value='';
   }
+}
+
+// ── Designs: one row per piece we own, not per photo ─────────────────
+let DGROUPS=[];
+
+function setView(v){
+  document.getElementById('photos-view').style.display = v==='photos'?'':'none';
+  document.getElementById('designs-view').style.display = v==='designs'?'':'none';
+  document.getElementById('vt-photos').classList.toggle('active', v==='photos');
+  document.getElementById('vt-designs').classList.toggle('active', v==='designs');
+  if(v==='designs') loadGroups();
+}
+
+async function loadGroups(){
+  const stat=document.getElementById('dg-stat');
+  const list=document.getElementById('dg-list');
+  stat.textContent='Loading…';
+  try{
+    const res=await fetch('/api/design-groups');
+    const d=await res.json();
+    if(d.success===false) throw new Error(d.error);
+    DGROUPS=d.groups||[];
+    stat.textContent=`${DGROUPS.length} design${DGROUPS.length!==1?'s':''} · `+
+      `${d.total_entries} catalogue photo${d.total_entries!==1?'s':''} · `+
+      `${d.ungrouped_count} not yet grouped`;
+    list.innerHTML=DGROUPS.length
+      ? DGROUPS.map(groupHTML).join('')
+      : '<div class="dg-alt">No designs yet. Use “Group by description” to build them from the photos you already have.</div>';
+  }catch(e){
+    stat.textContent='Could not load — '+e.message;
+  }
+}
+
+function groupHTML(g){
+  const others=(g.descriptions||[]).filter(x=>x && x!==g.name);
+  return `<div class="dg" id="dg-${g.id}">
+    <div class="dg-top">
+      <span class="dg-name">${escapeHtml(g.name)}</span>
+      ${g.type?`<span class="dg-type">${escapeHtml(g.type)}</span>`:''}
+      <span class="dg-count">${g.entry_count} photo${g.entry_count!==1?'s':''} · ${g.job_count} job${g.job_count!==1?'s':''}</span>
+    </div>
+    ${g.photos && g.photos.length
+      ? `<div class="dg-photos">${g.photos.map(p=>
+          `<img class="dg-photo" src="${p}" alt="" loading="lazy" onerror="this.style.display='none'"/>`).join('')}</div>`
+      : ''}
+    ${others.length?`<div class="dg-alt">Also listed as: ${others.map(escapeHtml).join(' · ')}</div>`:''}
+    <div class="dg-actions">
+      <button class="dg-act" onclick="renameGroup('${g.id}')">Rename</button>
+      <button class="dg-act" onclick="retypeGroup('${g.id}')">Change type</button>
+      <button class="dg-act" onclick="mergeGroup('${g.id}')">Merge another in</button>
+    </div>
+  </div>`;
+}
+
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,c=>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Dry run first: the number of photos involved is only knowable here, and
+// it decides whether this is a tidy-up or a big change.
+async function seedGroups(){
+  const stat=document.getElementById('dg-stat');
+  stat.textContent='Working out the grouping…';
+  try{
+    let res=await fetch('/api/design-groups/seed',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({dry_run:true})});
+    const dry=await res.json();
+    if(dry.success===false) throw new Error(dry.error);
+    if(!dry.would_assign){
+      stat.textContent=`Nothing to group — ${dry.already_grouped} of ${dry.total_entries} photos are already in a design.`;
+      return;
+    }
+    const sample=(dry.preview||[]).slice(0,12)
+      .map(p=>`  ${p.name} — ${p.count}`).join('\n');
+    const text=`${dry.total_entries} catalogue photos\n`+
+      `${dry.already_grouped} already grouped\n\n`+
+      `Would create ${dry.would_create} design(s) and file ${dry.would_assign} photo(s).\n`+
+      (dry.unmatched?`${dry.unmatched} photo(s) have no usable description and stay ungrouped.\n`:'')+
+      `\nLargest:\n${sample}\n\nNothing is deleted — photos just gain a design. Go ahead?`;
+    if(!confirm(text)){ stat.textContent='Cancelled — nothing changed.'; return; }
+
+    stat.textContent='Grouping…';
+    res=await fetch('/api/design-groups/seed',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({dry_run:false})});
+    const done=await res.json();
+    if(done.success===false) throw new Error(done.error);
+    await loadGroups();
+  }catch(e){
+    stat.textContent='Could not do that — '+e.message;
+  }
+}
+
+async function patchGroup(id, body){
+  const res=await fetch('/api/design-groups/'+id,{method:'PATCH',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d=await res.json().catch(()=>({}));
+  if(d.success===false){ alert('Could not save — '+(d.error||'unknown')); return false; }
+  await loadGroups();
+  return true;
+}
+
+async function renameGroup(id){
+  const g=DGROUPS.find(x=>x.id===id); if(!g) return;
+  const name=prompt('Name for this design:', g.name);
+  if(name===null || !name.trim() || name===g.name) return;
+  await patchGroup(id, {name:name.trim()});
+}
+
+async function retypeGroup(id){
+  const g=DGROUPS.find(x=>x.id===id); if(!g) return;
+  const type=prompt('Type for this design (blank to clear):', g.type||'');
+  if(type===null) return;
+  await patchGroup(id, {type:type.trim()||null});
+}
+
+async function mergeGroup(id){
+  const g=DGROUPS.find(x=>x.id===id); if(!g) return;
+  const others=DGROUPS.filter(x=>x.id!==id);
+  if(!others.length){ alert('There is nothing else to merge in yet.'); return; }
+  const list=others.map((o,i)=>`${i+1}. ${o.name} (${o.entry_count})`).join('\n');
+  const pick=prompt(`Merge which design INTO “${g.name}”?\n\n${list}\n\nType its number:`);
+  const n=parseInt(pick,10);
+  if(!n || n<1 || n>others.length) return;
+  const from=others[n-1];
+  if(!confirm(`Move all ${from.entry_count} photo(s) from “${from.name}” into “${g.name}”?\n\n`+
+              `“${from.name}” is removed as a design. No photo is deleted.`)) return;
+  const res=await fetch('/api/design-groups/'+id+'/merge',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({from_id:from.id})});
+  const d=await res.json().catch(()=>({}));
+  if(d.success===false){ alert('Could not merge — '+(d.error||'unknown')); return; }
+  await loadGroups();
 }
 
 async function loadCatalogue(){

@@ -396,12 +396,28 @@ async function seedGroups(){
       `\nLargest:\n${sample}\n\nNothing is deleted — photos just gain a design. Go ahead?`;
     if(!confirm(text)){ stat.textContent='Cancelled — nothing changed.'; return; }
 
-    stat.textContent='Grouping…';
-    res=await fetch('/api/design-groups/seed',{method:'POST',
-      headers:{'Content-Type':'application/json'},body:JSON.stringify({dry_run:false})});
-    const done=await res.json();
-    if(done.success===false) throw new Error(done.error);
+    // A whole catalogue in one request was long enough for the gateway to
+    // kill the worker — which returns an HTML error page, not JSON, and
+    // leaves the job half done. Go in passes until there is nothing left.
+    let created=0, assigned=0, pass=0;
+    while(pass < 40){
+      pass++;
+      stat.textContent=`Grouping… ${created} design(s) so far`;
+      res=await fetch('/api/design-groups/seed',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({dry_run:false})});
+      const ct=res.headers.get('content-type')||'';
+      if(!ct.includes('json')){
+        throw new Error('the server timed out part-way — press the button again to carry on');
+      }
+      const done=await res.json();
+      if(done.success===false) throw new Error(done.error);
+      created  += done.created||0;
+      assigned += done.assigned||0;
+      if(!done.remaining) break;
+    }
     await loadGroups();
+    document.getElementById('dg-stat').textContent +=
+      ` — just grouped ${assigned} photo(s) into ${created} design(s)`;
   }catch(e){
     stat.textContent='Could not do that — '+e.message;
   }

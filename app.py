@@ -2743,6 +2743,195 @@ def _freelabels_pdf():
     )
 
 
+# ─────────────────────── Design groups (phase 1) ───────────────────────
+# furniture_catalogue holds one entry per item per job, so one sofa appears
+# dozens of times. A design group gathers those entries under the single
+# piece they represent.
+
+_COLOUR_WORDS = ('black', 'white', 'grey', 'gray', 'natural', 'oak', 'walnut',
+                 'charcoal', 'cream', 'tan', 'brown', 'green', 'blue', 'rust',
+                 'sand', 'stone', 'ivory', 'beige', 'navy', 'mango wood')
+
+
+def design_key(description):
+    """Normalise a description so the same product matches across jobs.
+
+    Descriptions come from the packing slip, so the same product is usually
+    written the same way — this folds the differences that remain: case,
+    punctuation, and a trailing colour or finish, which is how the same
+    design is often distinguished per job.
+    """
+    d = (description or '').lower().strip()
+    if not d:
+        return ''
+    d = re.sub(r'[\u2013\u2014]', '-', d)
+    # Drop a trailing " - Black" / " - Mango Wood" style qualifier
+    parts = [p.strip() for p in d.split(' - ')]
+    if len(parts) > 1 and any(c in parts[-1] for c in _COLOUR_WORDS):
+        parts = parts[:-1]
+    d = ' '.join(parts)
+    d = re.sub(r'[^a-z0-9 ]+', ' ', d)
+    # Packing slips number repeats — "Dining Chair #001".."#004" are four of
+    # one design, not four designs, so a trailing serial is dropped.
+    d = re.sub(r'\s+\d{1,4}$', '', d)
+    d = re.sub(r'\s+', ' ', d).strip()
+    return d
+
+
+@app.route('/api/design-groups', methods=['GET'])
+def api_design_groups():
+    """Every group, with its entry count and photos."""
+    try:
+        groups = sb_get('design_groups', 'order=name.asc') or []
+        entries = sb_get('furniture_catalogue',
+                         'select=id,type,description,photo_url,room_context,job_id,group_id') or []
+
+        by_group = {}
+        for e in entries:
+            by_group.setdefault(e.get('group_id'), []).append(e)
+
+        out = []
+        for g in groups:
+            rows = by_group.get(g['id'], [])
+            out.append({
+                **g,
+                'entry_count': len(rows),
+                'job_count':   len({r.get('job_id') for r in rows if r.get('job_id')}),
+                'photos':      [r['photo_url'] for r in rows if r.get('photo_url')][:8],
+                'descriptions': sorted({r.get('description') or '' for r in rows})[:6],
+            })
+
+        ungrouped = by_group.get(None, [])
+        return jsonify({
+            'success': True,
+            'groups': out,
+            'ungrouped_count': len(ungrouped),
+            'total_entries': len(entries),
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@app.route('/api/design-groups/seed', methods=['POST'])
+def api_design_groups_seed():
+    """Group catalogue entries by their normalised description.
+
+    Dry run by default: reports what it would create and how big each group
+    would be, so the scale is visible before anything is written. Only
+    entries that have no group yet are touched.
+    """
+    try:
+        dry_run = (request.get_json(silent=True) or {}).get('dry_run', True)
+
+        entries = sb_get('furniture_catalogue',
+                         'select=id,type,description,group_id') or []
+        loose = [e for e in entries if not e.get('group_id')]
+
+        buckets = {}
+        for e in loose:
+            k = design_key(e.get('description'))
+            if k:
+                buckets.setdefault(k, []).append(e)
+
+        existing = {(g.get('name') or '').lower(): g
+                    for g in (sb_get('design_groups', 'select=id,name') or [])}
+
+        plan = []
+        for key, rows in sorted(buckets.items(), key=lambda kv: -len(kv[1])):
+            # The longest description reads best as the group's name
+            name = max((r.get('description') or '' for r in rows), key=len).strip()
+            types = [r.get('type') for r in rows if r.get('type')]
+            plan.append({
+                'key':   key,
+                'name':  name,
+                'type':  max(set(types), key=types.count) if types else None,
+                'count': len(rows),
+                'ids':   [r['id'] for r in rows],
+                'exists': name.lower() in existing,
+            })
+
+        report = {
+            'success': True,
+            'dry_run': bool(dry_run),
+            'total_entries':     len(entries),
+            'already_grouped':   len(entries) - len(loose),
+            'would_create':      sum(1 for p in plan if not p['exists']),
+            'would_assign':      sum(p['count'] for p in plan),
+            'unmatched':         len([e for e in loose if not design_key(e.get('description'))]),
+            'preview': [{'name': p['name'], 'count': p['count'], 'type': p['type']}
+                        for p in plan[:40]],
+        }
+        if dry_run:
+            return jsonify(report)
+
+        created = assigned = 0
+        for p in plan:
+            gid = existing.get(p['name'].lower(), {}).get('id')
+            if not gid:
+                made = sb_post('design_groups', {'name': p['name'], 'type': p['type']})
+                if not made:
+                    continue
+                gid = made[0]['id']
+                existing[p['name'].lower()] = made[0]
+                created += 1
+            for eid in p['ids']:
+                if sb_patch('furniture_catalogue', f'id=eq.{eid}', {'group_id': gid}):
+                    assigned += 1
+
+        report.update({'created': created, 'assigned': assigned})
+        return jsonify(report)
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@app.route('/api/design-groups/<group_id>', methods=['PATCH'])
+def api_design_group_update(group_id):
+    """Rename a group or correct its type."""
+    try:
+        data = request.get_json(silent=True) or {}
+        payload = {}
+        if 'name' in data:
+            name = (data['name'] or '').strip()
+            if not name:
+                return jsonify({'success': False, 'error': 'Name cannot be empty'}), 400
+            payload['name'] = name
+        for f in ('type', 'notes', 'owned_count'):
+            if f in data:
+                payload[f] = data[f]
+        if not payload:
+            return jsonify({'success': False, 'error': 'Nothing to change'}), 400
+        result = sb_patch('design_groups', f'id=eq.{group_id}', payload)
+        return jsonify({'success': bool(result)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@app.route('/api/design-groups/<group_id>/merge', methods=['POST'])
+def api_design_group_merge(group_id):
+    """Fold another group into this one. The other group is removed; its
+    catalogue entries move across. No photo or entry is deleted."""
+    try:
+        other = (request.get_json(silent=True) or {}).get('from_id')
+        if not other or other == group_id:
+            return jsonify({'success': False, 'error': 'Pick a different group to merge in'}), 400
+        moved = sb_patch('furniture_catalogue', f'group_id=eq.{other}', {'group_id': group_id})
+        sb_delete('design_groups', f'id=eq.{other}')
+        return jsonify({'success': True, 'moved': len(moved) if isinstance(moved, list) else 0})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@app.route('/api/catalogue/<entry_id>/group', methods=['PATCH'])
+def api_catalogue_entry_group(entry_id):
+    """Move one photo into a group, or out of every group (group_id null)."""
+    try:
+        gid = (request.get_json(silent=True) or {}).get('group_id') or None
+        result = sb_patch('furniture_catalogue', f'id=eq.{entry_id}', {'group_id': gid})
+        return jsonify({'success': bool(result)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
 @app.route('/api/version', methods=['GET'])
 def api_version():
     return jsonify({'version': APP_VERSION})

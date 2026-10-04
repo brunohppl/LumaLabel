@@ -2874,9 +2874,14 @@ def api_design_groups_seed():
                 gid = made[0]['id']
                 existing[p['name'].lower()] = made[0]
                 created += 1
-            for eid in p['ids']:
-                if sb_patch('furniture_catalogue', f'id=eq.{eid}', {'group_id': gid}):
-                    assigned += 1
+            # One request per photo would mean hundreds of round trips inside
+            # a single page request — slow enough to be killed by the
+            # gateway. PostgREST can take them all at once per group.
+            for chunk in range(0, len(p['ids']), 100):
+                ids = p['ids'][chunk:chunk + 100]
+                done = sb_patch('furniture_catalogue',
+                                f'id=in.({",".join(ids)})', {'group_id': gid})
+                assigned += len(done) if isinstance(done, list) else len(ids)
 
         report.update({'created': created, 'assigned': assigned})
         return jsonify(report)

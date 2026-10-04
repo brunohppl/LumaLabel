@@ -8,6 +8,7 @@ const GROUPS={success:true,total_entries:412,ungrouped_count:18,groups:[
   {id:'G1',name:'Tate Console Table Mango Wood',type:'Storage & Consoles',entry_count:9,job_count:7,
    photos:['https://x/1.png','https://x/2.png'],descriptions:['Tate Console Table Mango Wood','Tate Console - Black']},
   {id:'G2',name:'Hampton 3 Seater Sofa',type:'Sofas',entry_count:4,job_count:4,photos:[],descriptions:[]}]};
+let seedPasses=0;
 let calls=[], dry={success:true,dry_run:true,total_entries:412,already_grouped:0,
                   would_create:37,would_assign:394,unmatched:18,
                   preview:[{name:'Tate Console Table',count:9,type:'Storage & Consoles'}]};
@@ -17,8 +18,13 @@ const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'h
     w.fetch=async(url,opt={})=>{
       const u=String(url); calls.push({u,method:opt.method||'GET',
         body:opt.body?JSON.parse(opt.body):null});
-      if(u.includes('/design-groups/seed')) return {ok:true,json:async()=>
-        (JSON.parse(opt.body).dry_run?dry:{success:true,created:37,assigned:394})};
+      if(u.includes('/design-groups/seed')){
+        if(JSON.parse(opt.body).dry_run) return {ok:true,headers:{get:()=>'application/json'},json:async()=>dry};
+        seedPasses++;
+        const more = seedPasses < 3;
+        return {ok:true,headers:{get:()=>'application/json'},
+                json:async()=>({success:true,created:12,assigned:100,remaining:more?20:0})};
+      }
       if(u.includes('/merge'))  return {ok:true,json:async()=>({success:true,moved:4})};
       if(u.match(/design-groups\/G\d$/)) return {ok:true,json:async()=>({success:true})};
       if(u.includes('/api/design-groups')) return {ok:true,json:async()=>GROUPS};
@@ -61,9 +67,12 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   ok('promising nothing is deleted', /Nothing is deleted/.test(shown));
   ok('declining writes nothing', !calls.some(c=>c.body&&c.body.dry_run===false));
 
-  calls=[]; w.confirm=()=>true;
-  await w.seedGroups(); await sleep(80);
+  calls=[]; seedPasses=0; w.confirm=()=>true;
+  await w.seedGroups(); await sleep(120);
   ok('accepting runs it for real', calls.some(c=>c.body&&c.body.dry_run===false));
+  ok('it keeps going until nothing remains', seedPasses===3);
+  ok('and reports the total across passes',
+     /36 design\(s\)/.test(d.getElementById('dg-stat').textContent));
 
   // nothing to do
   dry={...dry, would_assign:0, already_grouped:412};

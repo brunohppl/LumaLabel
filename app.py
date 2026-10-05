@@ -3955,6 +3955,33 @@ _CATALOGUE_CATEGORIES = [
     ('Accessories',         ['accessor','centrepiece','mirror']),
 ]
 
+def normalise_au_mobile(raw):
+    """An Australian mobile in +61 form, or '' if it isn't one.
+
+    Numbers get typed every imaginable way — 0412 345 678, (04) 1234 5678,
+    +61 412 345 678. Storing one shape means nothing downstream has to
+    guess. Anything unrecognisable returns empty rather than a mangled
+    number: no number is better than a wrong one, because a reminder would
+    reach a stranger.
+    """
+    if not raw:
+        return ''
+    digits = re.sub(r'[^0-9+]', '', str(raw))
+    if digits.startswith('+61'):
+        rest = digits[3:]
+    elif digits.startswith('61') and len(digits) == 11:
+        rest = digits[2:]
+    elif digits.startswith('0'):
+        rest = digits[1:]
+    else:
+        rest = digits
+    rest = re.sub(r'[^0-9]', '', rest)
+    # An Australian mobile is 9 digits starting with 4 once the 0 is gone
+    if len(rest) == 9 and rest.startswith('4'):
+        return '+61' + rest
+    return ''
+
+
 def catalogue_type_for(description):
     """Return the catalogue type label for a description, or None if it
     shouldn't be catalogued (e.g. blank extras, unrecognised items)."""
@@ -4207,6 +4234,10 @@ def _get_monday_board_data_inner():
     # not a time.
     photos_col_id   = find_col('photos', 'photo', 'photography',
                                exclude=['photographer'])
+    # The client's mobile, for install and pickup reminders. "contact" would
+    # also match a contact NAME column, so that one is excluded.
+    phone_col_id    = find_col('client phone', 'phone', 'mobile',
+                               exclude=['contact name', 'office'])
     install_date_id = find_col('install date', 'install')
     end_date_id     = find_col('end date', 'de-install', 'deinstall', 'pickup date', 'finish')
     date_cols = [c['id'] for c in columns if c['type'] == 'date']
@@ -4292,6 +4323,7 @@ def _get_monday_board_data_inner():
         size_val    = col_text(size_col_id)
         style_val   = col_text(style_col_id) if style_col_id else ''
         photos_val  = col_text(photos_col_id) if photos_col_id else ''
+        phone_val   = normalise_au_mobile(col_text(phone_col_id)) if phone_col_id else ''
         install_dt  = col_text(install_date_id)
         end_dt      = col_text(end_date_id)
         status_val  = col_text(status_col_id)
@@ -4310,6 +4342,7 @@ def _get_monday_board_data_inner():
             'install_size':      size_val,
             'install_style':     style_val,
             'photo_time':        photos_val,
+            'client_phone':      phone_val,
             'install_date':      install_dt,
             'end_date':          end_dt,
             'status':            status_val,
@@ -4343,6 +4376,7 @@ def _get_monday_board_data_inner():
             'size':     col_title_by_id.get(size_col_id),
             'style':    col_title_by_id.get(style_col_id),
             'photos':   col_title_by_id.get(photos_col_id),
+            'phone':    col_title_by_id.get(phone_col_id),
             'install_date': col_title_by_id.get(install_date_id),
             'end_date': col_title_by_id.get(end_date_id),
             'status':   col_title_by_id.get(status_col_id),
@@ -4538,7 +4572,8 @@ def _api_monday_pull_inner():
                 for field, value in (('property_type',  item.get('install_type')),
                                      ('property_size',  item.get('install_size')),
                                      ('property_style', item.get('install_style')),
-                                     ('photo_time',     item.get('photo_time'))):
+                                     ('photo_time',     item.get('photo_time')),
+                                     ('client_phone',   item.get('client_phone'))):
                     val = (value or '').strip()
                     if val and luma_job.get(field) != val:
                         patch[field] = val
@@ -4628,7 +4663,8 @@ def _api_monday_pull_inner():
             for field, value in (('property_type',  item.get('install_type')),
                                  ('property_size',  item.get('install_size')),
                                  ('property_style', item.get('install_style')),
-                                 ('photo_time',     item.get('photo_time'))):
+                                 ('photo_time',     item.get('photo_time')),
+                                 ('client_phone',   item.get('client_phone'))):
                 val = (value or '').strip()
                 if val and luma_job.get(field) != val:
                     patch[field] = val

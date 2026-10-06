@@ -304,6 +304,7 @@ async function syncBoard(){
               <th>Install Type</th>
               <th>Size</th>
               <th>Photos</th>
+              <th>Client Phone</th>
               <th>Install Date</th>
               <th>End Date</th>
               <th>Luma Job</th>
@@ -321,6 +322,9 @@ async function syncBoard(){
           <td>${item.install_size || '<span style="color:var(--border);font-style:italic;">—</span>'}</td>
           <td>${item.photo_time
             ? `<span style="color:var(--accent);font-weight:600;">📷 ${item.photo_time}</span>`
+            : '<span style="color:var(--border);">—</span>'}</td>
+          <td>${item.client_phone
+            ? `<span style="color:var(--ink);">📱 ${item.client_phone}</span>`
             : '<span style="color:var(--border);">—</span>'}</td>
           <td>${item.install_date
             ? `<span style="color:var(--ink);">${item.install_date}</span>`

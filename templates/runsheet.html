@@ -28,7 +28,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .date-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
 .date-nav-btn{background:none;border:1px solid var(--border);border-radius:4px;padding:6px 12px;cursor:pointer;font-size:1rem;color:var(--ink);}
 .date-nav-btn:hover{background:var(--sand);}
-.date-label{font-size:1rem;font-weight:600;min-width:200px;text-align:center;}
+.date-label{font-size:1rem;font-weight:600;min-width:200px;text-align:center;
+  background:none;border:1px solid transparent;border-radius:4px;padding:5px 8px;
+  font-family:inherit;color:var(--ink);cursor:pointer;}
+.date-label:hover{border-color:var(--border);background:var(--sand);}
 .btn-today{padding:6px 14px;background:var(--accent);color:white;border:none;border-radius:4px;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:600;cursor:pointer;}
 .rs-wrap{overflow-x:auto;}
 .view-toggle{display:inline-flex;margin-left:12px;border:1px solid var(--border);border-radius:3px;overflow:hidden;}
@@ -212,7 +215,10 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 
   <div class="date-row">
     <button class="date-nav-btn" onclick="shiftDate(-1)">‹</button>
-    <div class="date-label" id="date-label"></div>
+    <button class="date-label" id="date-label" onclick="openDatePicker()"
+            title="Pick a date"></button>
+    <input type="date" id="date-picker" onchange="pickDate(this.value)"
+           style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;"/>
     <button class="date-nav-btn" onclick="shiftDate(1)">›</button>
     <button class="btn-today" onclick="goToday()">Today</button>
     <span class="view-toggle">
@@ -419,6 +425,40 @@ function shiftDate(n){
   if(_view==='week') loadWeek(); else load();
 }
 function goToday(){viewDate=new Date(); if(_view==='week') loadWeek(); else load();}
+
+// Stepping day by day to reach a date three weeks back was the only way
+// there. The label already reads like something you'd click, so it is.
+function openDatePicker(){
+  const el=document.getElementById('date-picker');
+  if(!el) return;
+  el.value=localDate(viewDate);
+  el.style.pointerEvents='auto';
+  // showPicker is the reliable way to open it; older browsers fall back to
+  // a click, and if neither works the arrows still do.
+  try{ el.showPicker(); }catch(e){ el.click(); }
+}
+
+function pickDate(value){
+  if(!value) return;
+  const [y,m,d]=value.split('-').map(Number);
+  if(!y||!m||!d) return;
+  viewDate=new Date(y, m-1, d);
+  if(_view==='week') loadWeek(); else load();
+}
+
+// Arrow keys step a day — or a week in week view, matching the buttons.
+// Ignored while typing, or the time and notes fields become unusable.
+document.addEventListener('keydown', e=>{
+  if(e.key!=='ArrowLeft' && e.key!=='ArrowRight') return;
+  if(e.metaKey || e.ctrlKey || e.altKey) return;
+  const t=e.target;
+  if(t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA' || t.tagName==='SELECT'
+           || t.isContentEditable)) return;
+  // A popover is open — the arrows belong to whatever is in it
+  if(document.querySelector('.pop-overlay.open')) return;
+  e.preventDefault();
+  shiftDate(e.key==='ArrowLeft' ? -1 : 1);
+});
 function fmtSlot(t){if(!t)return'';const[h,m]=t.split(':').map(Number);return`${h%12||12}:${String(m).padStart(2,'0')}${h<12?'am':'pm'}`;}
 function slotIdx(t){if(!t)return 0;const[h,m]=t.split(':').map(Number);return Math.max(0,(h-7)*2+Math.floor(m/30));}
 

@@ -739,9 +739,19 @@ function compressImage(file,maxWidth,quality){
   });
 }
 
+let _submitting=false;
+
 async function submitReport(skipPhotos=false){
+  // Two buttons submit this form, and only one of them was ever disabled —
+  // so a second tap, or a tap on the other one, filed a duplicate report.
+  // A photo upload takes seconds, which is plenty of time to tap again.
+  if(_submitting) return;
+  _submitting=true;
+
   const btn=document.querySelector('.btn-submit');
+  const skipBtn=document.querySelector('.btn-skip');
   btn.textContent='Saving…';btn.disabled=true;
+  if(skipBtn) skipBtn.disabled=true;
   try{
     let photoUrl=_existingPhotoUrl; // keep existing by default
     if(!skipPhotos && _photos.length){
@@ -773,7 +783,9 @@ async function submitReport(skipPhotos=false){
   }catch(e){
     alert('Failed to save report. Please try again.');
   }finally{
+    _submitting=false;
     btn.textContent='Submit Report';btn.disabled=false;
+    if(skipBtn) skipBtn.disabled=false;
   }
 }
 

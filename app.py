@@ -288,6 +288,37 @@ def street_only(address):
     return address.split(',')[0].strip()
 
 
+def scheduled_vehicle_for(job_id):
+    """The vehicle this job is scheduled on, from the runsheet.
+
+    Prefers the TO LOAD tile — that is the one that says which truck is
+    carrying the stock — then the install tile. A job split across two
+    trucks names both, because picking one would be quietly wrong.
+    Returns '' when nothing is scheduled, so the caller can fall back.
+    """
+    if not job_id:
+        return ''
+    try:
+        tiles = sb_get('job_schedule',
+                       f'job_id=eq.{job_id}&select=type,vehicle,date') or []
+    except Exception as e:
+        print(f'[SLACK] could not read the schedule for {job_id}: {e}')
+        return ''
+
+    def vehicles(kind):
+        seen = []
+        for t in tiles:
+            if t.get('type') == kind and t.get('vehicle') and t['vehicle'] not in seen:
+                seen.append(t['vehicle'])
+        return seen
+
+    for kind in ('to_load', 'install'):
+        found = vehicles(kind)
+        if found:
+            return ' + '.join(found)
+    return ''
+
+
 def notify_slack_eta(job, role, eta_text):
     """Post an ETA to Slack — only called when someone explicitly taps
     the address on /driver or /stylist and a location is captured, never
@@ -320,7 +351,11 @@ def notify_slack_eta(job, role, eta_text):
     address = street_only(job.get('address', ''))
 
     if role == 'truck':
-        truck_name = job.get('truck') or ''
+        # The vehicle the SCHEDULER assigned, not the one stored on the job.
+        # Drivers used to pick their own truck; now the runsheet decides, so
+        # job.truck can be stale or empty. The load tile is the one that says
+        # which truck is carrying this job's stock.
+        truck_name = scheduled_vehicle_for(job.get('id')) or job.get('truck') or ''
         who = f'🚛 {truck_name}' if truck_name else '🚛 Truck'
     else:
         who = '🚗 Stylist'

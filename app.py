@@ -289,12 +289,17 @@ def street_only(address):
 
 
 def scheduled_vehicle_for(job_id):
-    """The vehicle this job is scheduled on, from the runsheet.
+    """The vehicle this job is on TODAY, from the runsheet.
 
-    Prefers the TO LOAD tile — that is the one that says which truck is
-    carrying the stock — then the install tile. A job split across two
-    trucks names both, because picking one would be quietly wrong.
-    Returns '' when nothing is scheduled, so the caller can fall back.
+    A job's install and its pickup are often on different trucks weeks
+    apart, so the question is always "which truck is on this job today?"
+    rather than "which truck does this job belong to". Today's tiles win;
+    within a day, the pickup or load tile says which truck is carrying the
+    stock. Only if nothing is scheduled today does it fall back to any
+    tile, so an ETA sent a day early still names something sensible.
+
+    A job split across two trucks names both — picking one would be
+    quietly wrong. Returns '' when nothing is scheduled at all.
     """
     if not job_id:
         return ''
@@ -305,18 +310,21 @@ def scheduled_vehicle_for(job_id):
         print(f'[SLACK] could not read the schedule for {job_id}: {e}')
         return ''
 
-    def vehicles(kind):
-        seen = []
-        for t in tiles:
-            if t.get('type') == kind and t.get('vehicle') and t['vehicle'] not in seen:
-                seen.append(t['vehicle'])
-        return seen
+    today = brisbane_now().strftime('%Y-%m-%d')
 
-    for kind in ('to_load', 'install'):
-        found = vehicles(kind)
-        if found:
-            return ' + '.join(found)
-    return ''
+    def pick(rows):
+        # Whichever of these is present decides; a bay tile is warehouse
+        # work and never names the truck that drives anywhere.
+        for kind in ('pickup', 'to_load', 'install'):
+            seen = []
+            for t in rows:
+                if t.get('type') == kind and t.get('vehicle') and t['vehicle'] not in seen:
+                    seen.append(t['vehicle'])
+            if seen:
+                return ' + '.join(seen)
+        return ''
+
+    return pick([t for t in tiles if t.get('date') == today]) or pick(tiles)
 
 
 def notify_slack_eta(job, role, eta_text):

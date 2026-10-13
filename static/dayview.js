@@ -27,7 +27,7 @@
     task:    'var(--purple,#6a3d8a)'
   };
 
-  var CREWS = [], JOBS = {}, pxPerMin = 0.9, styled = false, built = false;
+  var CREWS = [], JOBS = {}, OC = {}, pxPerMin = 0.9, styled = false, built = false;
   var TRUCKS = ['nemo', 'bruce', 'nigel'];
 
   var CSS = [
@@ -52,6 +52,12 @@
     '#dayview-root .crew-util span{display:block;height:100%;background:var(--green,#4a7c59);}',
     '#dayview-root .crew-util.low span{background:var(--red,#e85c47);}',
     '#dayview-root .lane{position:relative;flex:1;padding:10px 0;min-height:72px;}',
+    '#dayview-root .dv-cap{flex:0 0 118px;padding:8px 6px;box-sizing:border-box;}',
+    '#dayview-root .dv-cap-label{font-size:0.58rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted,#9a8f80);align-self:flex-end;padding-bottom:4px;}',
+    '#dayview-root .dv-cap-box{border:1px dashed var(--accent,#b8935a);background:rgba(184,147,90,0.08);border-radius:4px;padding:5px 7px;}',
+    '#dayview-root .dv-cap-hd{font-size:0.55rem;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--accent,#b8935a);margin-bottom:2px;}',
+    '#dayview-root .dv-cap-task{font-size:0.64rem;color:var(--ink,#1a1714);line-height:1.3;}',
+    '#dayview-root .dv-cap-dur{color:var(--muted,#9a8f80);font-size:0.6rem;}',
     '#dayview-root .ruler{display:flex;align-items:flex-end;height:24px;}',
     '#dayview-root .ruler .rowhead{padding-bottom:4px;border-bottom:none;}',
     '#dayview-root .ruler-lane{position:relative;flex:1;}',
@@ -141,6 +147,24 @@
     var h = Math.floor(m / 60), r = m % 60;
     return r ? h + 'h' + r + 'm' : h + 'h';
   }
+  // A cap holds a crew's opening or closing tasks. Outside the timeline,
+  // because they have a duration but no start — putting them at 07:00
+  // would claim a time nobody set.
+  function capHTML(key, kind) {
+    var rows = (OC[key] && OC[key][kind]) || [];
+    if (!rows.length) return '<div class="dv-cap"></div>';
+    var total = rows.reduce(function (s, t) { return s + (Number(t.duration) || 0); }, 0);
+    return '<div class="dv-cap"><div class="dv-cap-box ' + kind + '">' +
+      '<div class="dv-cap-hd">' + (kind === 'opening' ? 'Opening' : 'Closing') +
+      (total ? ' · ' + dur(total) : '') + '</div>' +
+      rows.map(function (t) {
+        return '<div class="dv-cap-task">' + esc(t.title || 'Task') +
+          (t.duration ? ' <span class="dv-cap-dur">' + dur(t.duration) + '</span>' : '') +
+          '</div>';
+      }).join('') +
+      '</div></div>';
+  }
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -175,6 +199,7 @@
     }
 
     JOBS = {};
+    OC = {};
     teams.forEach(function (t) {
       var key = t.name || t.vehicle || 'Team', rows = [];
       schedule.forEach(function (e) {
@@ -190,6 +215,12 @@
       });
       tasks.forEach(function (k) {
         if (!belongs(k, t) && k.vehicle !== 'ALL') return;
+        // Opening and closing have no start time — they are drawn in the
+        // caps either side of the timeline, not on it.
+        if (k.kind === 'opening' || k.kind === 'closing') {
+          (OC[key] = OC[key] || {opening: [], closing: []})[k.kind].push(k);
+          return;
+        }
         var s = toMin(k.start_time);
         if (s === null) return;
         rows.push({
@@ -200,6 +231,7 @@
       });
       rows.sort(function (a, b) { return a.s - b.s; });
       JOBS[key] = rows;
+      if (!OC[key]) OC[key] = {opening: [], closing: []};
     });
   }
 
@@ -220,8 +252,17 @@
       ticks += '<div class="tick" style="left:' + x(m) + 'px">' + fmt(m) + '</div>';
     }
 
+    // The cap columns exist only when some crew needs them — otherwise the
+    // timeline keeps the width. Within a column, a crew with nothing shows
+    // nothing.
+    var anyOpening = Object.keys(OC).some(function (k) { return OC[k].opening.length; });
+    var anyClosing = Object.keys(OC).some(function (k) { return OC[k].closing.length; });
+
     var html = '<div class="ruler"><div class="rowhead"></div>' +
-      '<div class="ruler-lane" style="width:' + laneW + 'px">' + ticks + '</div></div>';
+      (anyOpening ? '<div class="dv-cap dv-cap-label">Before</div>' : '') +
+      '<div class="ruler-lane" style="width:' + laneW + 'px">' + ticks + '</div>' +
+      (anyClosing ? '<div class="dv-cap dv-cap-label">After</div>' : '') +
+      '</div>';
 
 
     CREWS.forEach(function (crew) {
@@ -264,7 +305,11 @@
         '<div class="crew-name">' + esc(crew.name) + '</div>' +
         '<div class="crew-people">' + esc(crew.people) + '</div>' +
         utilBar +
-        '</div><div class="lane" style="width:' + laneW + 'px">' + lines + blocks + '</div></div>';
+        '</div>' +
+        (anyOpening ? capHTML(crew.name, 'opening') : '') +
+        '<div class="lane" style="width:' + laneW + 'px">' + lines + blocks + '</div>' +
+        (anyClosing ? capHTML(crew.name, 'closing') : '') +
+        '</div>';
     });
 
     grid.innerHTML = html;

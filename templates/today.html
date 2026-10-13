@@ -42,6 +42,20 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .team-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:6px;margin-bottom:16px;font-size:0.82rem;font-weight:600;color:white;}
 
 /* CARDS */
+/* Deliberately flatter than a job card — a crew scanning for their next
+   job shouldn't have their eye caught by "sweep the bay". */
+.oc-band{background:rgba(184,147,90,0.08);border:1px solid rgba(184,147,90,0.4);
+  border-radius:6px;padding:9px 11px;margin-bottom:10px;}
+.oc-band.closing{margin-bottom:0;margin-top:2px;}
+.oc-head{display:flex;justify-content:space-between;align-items:baseline;
+  font-size:0.62rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:5px;}
+.oc-total{color:var(--muted);font-weight:600;letter-spacing:0.04em;}
+.oc-row{padding:2px 0;}
+.oc-line{display:flex;justify-content:space-between;gap:10px;align-items:baseline;}
+.oc-title{font-size:0.86rem;color:var(--ink);}
+.oc-dur{font-size:0.74rem;color:var(--muted);white-space:nowrap;}
+.oc-notes{font-size:0.76rem;color:var(--muted);line-height:1.4;margin-top:1px;}
 .card{background:white;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;border-left:4px solid transparent;}
 .card.install{border-left-color:var(--green);}
 .card.pickup{border-left-color:var(--blue);}
@@ -288,6 +302,38 @@ async function load(){
   }catch(e){document.getElementById('day-content').innerHTML='<div class="loading">Failed to load.</div>';}
 }
 
+const OC_MODES=['opening','closing'];
+const isOC=k=>OC_MODES.includes(k);
+
+// Opening and closing tasks frame a crew's day — they have a duration but
+// no start time, so they sit above and below the job cards rather than
+// among them.
+function ocBandHTML(teamId, kind, tasks){
+  const rows=(tasks||[]).filter(t=>t.kind===kind && resolveTaskTeamId(t,teamId));
+  if(!rows.length) return '';
+  const total=rows.reduce((s,t)=>s+(Number(t.duration)||0),0);
+  return `<div class="oc-band ${kind}">
+    <div class="oc-head">
+      <span>${kind==='opening'?'Opening':'Closing'}</span>
+      ${total?`<span class="oc-total">${fmtDuration(total)}</span>`:''}
+    </div>
+    ${rows.map(t=>`<div class="oc-row">
+      <div class="oc-line">
+        <span class="oc-title">${escapeHtml(t.title||'Task')}</span>
+        ${t.duration?`<span class="oc-dur">${fmtDuration(t.duration)}</span>`:''}
+      </div>
+      ${t.notes?`<div class="oc-notes">${escapeHtml(t.notes)}</div>`:''}
+    </div>`).join('')}
+  </div>`;
+}
+
+function resolveTaskTeamId(t, teamId){ return t.team_id===teamId; }
+
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,c=>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 let activeTab='cards';
 let fnFilter='all';       // all | transport | styling | warehouse
 
@@ -363,7 +409,8 @@ function renderDay(){
       entries:[
         ...schedule.filter(e=>e.team_id===team.id||(!e.team_id&&team.vehicle&&e.vehicle===team.vehicle))
                    .map(e=>({...e,_team:team,_isTask:false})),
-        ...tasks.filter(t=>resolveTaskTeam(t,teams)===team.id).map(t=>({...t,_team:team,_isTask:true})),
+        ...tasks.filter(t=>resolveTaskTeam(t,teams)===team.id && !isOC(t.kind))
+                .map(t=>({...t,_team:team,_isTask:true})),
       ].sort((a,b)=>(a.start_time||'99:99').localeCompare(b.start_time||'99:99'))
     })).filter(x=>x.entries.length);
 
@@ -397,7 +444,9 @@ function renderDay(){
           ${others?`<div class="team-col-sub">${others}</div>`:''}
         </div>
         <div class="team-col-cards">
+          ${ocBandHTML(team.id,'opening',tasks)}
           ${teamEntries.map(e=>cardHTML(e,jobById,false)).join('')}
+          ${ocBandHTML(team.id,'closing',tasks)}
         </div>
       </div>`;
     });

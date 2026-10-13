@@ -416,7 +416,37 @@ const VEHICLES=['Bruce','Nigel','Nemo','Marlin','VUG','Deb','Flo','Own Car'];
 // The built-in roster. Also the fallback: if /api/staff can't be reached,
 // the pickers show exactly these names rather than emptying out.
 let ALL_WORKERS=['Addy','Montie','Delphine','India','Hayley','Lyndall','Gill','Carolina','Jo','Savio','Nick','Ayoub','Bruno','Phil','Thiago','Rohan','Isaac','Jack'];
-const SLOTS=[];for(let h=7;h<=15;h++)for(let m=0;m<60;m+=30){if(h===15&&m>30)break;SLOTS.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);}
+// What may be CHOSEN as a start time — deliberately wider than the grid
+// draws, so an early prep job or a late finish can be scheduled. The server
+// accepts this same range; the two used to disagree, which is why picking
+// 07:00 came back as an invalid time.
+const PICK_SLOTS=[];
+for(let h=5;h<=19;h++)for(let m=0;m<60;m+=30){
+  if(h===19&&m>0)break;
+  PICK_SLOTS.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+}
+
+// What the grid DRAWS. Normally 07:00–15:30; it starts earlier only when
+// something that day does, so an ordinary day is exactly as tall as before
+// and nothing scheduled early is ever hidden.
+let SLOTS=[];
+function buildSlots(from){
+  const out=[];
+  let [h,m]=(from||'07:00').split(':').map(Number);
+  while(h<15 || (h===15&&m<=30)){
+    out.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+    m+=30; if(m===60){m=0;h++;}
+  }
+  return out;
+}
+SLOTS=buildSlots('07:00');
+
+// The earliest start on the day, when it's before the usual opening.
+function gridStart(){
+  const times=[...daySchedule,...dayTasks]
+    .map(e=>e.start_time).filter(Boolean).filter(t=>t<'07:00');
+  return times.length ? times.sort()[0] : '07:00';
+}
 const DURS=[30,60,90,120,150,180,210,240,270,300,330,360,390,420,450,480,510,540];
 const SLOT_H=46;
 const FN_COL={transport:'#2e5a8a',styling:'#6a3d8a',warehouse:'#b8935a'};
@@ -482,7 +512,19 @@ document.addEventListener('keydown', e=>{
   shiftDate(e.key==='ArrowLeft' ? -1 : 1);
 });
 function fmtSlot(t){if(!t)return'';const[h,m]=t.split(':').map(Number);return`${h%12||12}:${String(m).padStart(2,'0')}${h<12?'am':'pm'}`;}
-function slotIdx(t){if(!t)return 0;const[h,m]=t.split(':').map(Number);return Math.max(0,(h-7)*2+Math.floor(m/30));}
+// Which grid row a time falls on. Measured from whatever the grid starts
+// at today — hard-coding 7 put every tile two rows out on a day that opened
+// earlier.
+function slotIdx(t){
+  if(!t) return 0;
+  const i=SLOTS.indexOf(t);
+  if(i>-1) return i;
+  // Not on a half-hour boundary, or outside the drawn range: fall back to
+  // measuring from the first slot so it still lands somewhere sensible.
+  const [h,m]=t.split(':').map(Number);
+  const [sh,sm]=(SLOTS[0]||'07:00').split(':').map(Number);
+  return Math.max(0,(h-sh)*2+Math.floor(m/30)-Math.floor(sm/30));
+}
 
 async function load(){
   const seq = ++_loadSeq; // this load's ticket — if a newer load starts before we finish, we discard our result
@@ -587,6 +629,7 @@ function render(){
   const timew=56,colw=Math.max(160,Math.floor((window.innerWidth-timew-40)/(n+1)));
   const cols=`${timew}px repeat(${n},${colw}px) ${Math.max(120,colw*0.7)}px`;
   const hasClosing=teams.some(t=>ocTasksFor(t.id,'closing').length);
+  SLOTS=buildSlots(gridStart());   // starts earlier only if the day does
   const rows=`auto repeat(${SLOTS.length},${SLOT_H}px)${hasClosing?' auto':''}`;
 
   let g=`<div style="display:grid;grid-template-columns:${cols};grid-template-rows:${rows};" id="rs-inner">`;
@@ -1465,7 +1508,7 @@ async function openEntryPop(entryId,teamId,slot){
   }
 
   const tSel=document.getElementById('entry-time');
-  tSel.innerHTML='<option value="">No time</option>'+SLOTS.map(s=>`<option value="${s}">${fmtSlot(s)}</option>`).join('');
+  tSel.innerHTML='<option value="">No time</option>'+PICK_SLOTS.map(s=>`<option value="${s}">${fmtSlot(s)}</option>`).join('');
   if(slot)tSel.value=slot;
   else if(isTraySource && SLOTS.includes(DEFAULT_START)) tSel.value=DEFAULT_START;
   document.getElementById('entry-dur').innerHTML='<option value="">—</option>'+DURS.map(d=>`<option value="${d}">${d>=60?Math.floor(d/60)+'h'+(d%60?d%60+'m':''):d+'m'}</option>`).join('');

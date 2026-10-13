@@ -489,9 +489,17 @@ RUNSHEET_WORKERS  = RUNSHEET_STYLISTS + RUNSHEET_DRIVERS
 # Time slots: 07:30 to 15:30 in 30-minute increments — matches the
 # actual transport day. Generated rather than hand-typed to avoid gaps.
 def _build_time_slots():
+    """Selectable start times.
+
+    Opens at 05:00 for early prep and runs to 19:00, which is wider than the
+    grid draws — the grid's own range decides what is DISPLAYED, this only
+    decides what may be SAVED. They were out of step: the page offered 07:00
+    while the server accepted nothing before 07:30, so choosing 7am was
+    rejected as an invalid time.
+    """
     slots = []
-    h, m = 7, 30
-    while (h, m) <= (15, 30):
+    h, m = 5, 0
+    while (h, m) <= (19, 0):
         slots.append(f'{h:02d}:{m:02d}')
         m += 30
         if m == 60:

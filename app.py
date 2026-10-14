@@ -3007,6 +3007,57 @@ def api_catalogue_entry_group(entry_id):
         return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
 
 
+def record_nav_event(**kw):
+    """Log a Navigate tap. Never allowed to break the thing that triggered it.
+
+    This is the app's only record of when anything actually happens, so it
+    is worth collecting — but a driver tapping Navigate must never see an
+    error because logging failed.
+    """
+    try:
+        sb_post('nav_events', {k: v for k, v in kw.items() if v is not None})
+    except Exception as e:
+        print(f'[NAV] could not record the event: {e}')
+
+
+@app.route('/api/eta/warehouse', methods=['POST'])
+def api_warehouse_eta():
+    """ETA from where someone is now back to the warehouse.
+
+    Mirrors the job ETA: same calculation, same Slack posting, same truck
+    naming. It writes no ETA onto a job — a warehouse run has no job — but
+    it does log the tap, which is the point.
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        lat, lng = data.get('lat'), data.get('lng')
+        vehicle  = (data.get('vehicle') or '').strip()
+        if vehicle and vehicle not in TRANSPORT_VEHICLES:
+            vehicle = ''          # only trucks are named, as in the job ETA
+
+        # Same lookup the job ETA uses, so the number means the same thing.
+        eta_text = None
+        if lat is not None and lng is not None:
+            eta_text = get_truck_eta(lat, lng, WAREHOUSE_ADDRESS)
+
+        record_nav_event(destination='warehouse', vehicle=vehicle or None,
+                         team_id=data.get('team_id'), role='truck',
+                         lat=lat, lng=lng)
+
+        posted = False
+        if eta_text:
+            # A stand-in job, so the existing Slack formatting is reused
+            # rather than a second message layout drifting away from it.
+            posted = notify_slack_eta(
+                {'job_ref': 'Warehouse', 'address': WAREHOUSE_ADDRESS,
+                 'truck': vehicle, 'id': None},
+                'truck', eta_text)
+        return jsonify({'success': True, 'eta_text': eta_text,
+                        'slack_posted': bool(posted)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
 @app.route('/api/warehouse', methods=['GET'])
 def api_warehouse():
     """Where the warehouse is. Served rather than typed into each page, so
@@ -3954,6 +4005,9 @@ def api_job_eta(job_id):
         time_col: datetime.utcnow().isoformat(),
     })
 
+    record_nav_event(destination='job', job_id=job_id, role=role,
+                     vehicle=(scheduled_vehicle_for(job_id) or None),
+                     lat=lat, lng=lng)
     slack_posted = notify_slack_eta(job, role, eta_text)
 
     return jsonify({'success': True, 'eta_text': eta_text, 'role': role, 'slack_posted': slack_posted})

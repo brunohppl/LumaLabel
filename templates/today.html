@@ -120,10 +120,13 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .fn-filter{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:0 0 14px;}
 /* Getting back to the warehouse is the end of every day, from any crew's
    page — one button, always in the same place. */
-.wh-nav{padding:6px 13px;border:1px solid var(--border);border-radius:20px;
-  font-size:0.72rem;letter-spacing:0.04em;color:var(--muted);text-decoration:none;
-  white-space:nowrap;}
-.wh-nav:hover{border-color:var(--accent);color:var(--accent);}
+/* Per crew, because the Slack message has to name a truck — one button
+   above all the columns had nothing to name. */
+.wh-nav{display:block;width:100%;margin-top:7px;padding:5px 10px;
+  background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.3);
+  border-radius:3px;font-family:inherit;font-size:0.68rem;color:#fff;
+  cursor:pointer;white-space:nowrap;}
+.wh-nav:hover{background:rgba(255,255,255,0.24);}
 .fn-btn{padding:6px 13px;background:transparent;border:1px solid var(--border);border-radius:20px;
   font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.04em;color:var(--muted);
   cursor:pointer;white-space:nowrap;}
@@ -240,8 +243,6 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
     <button class="fn-btn" data-fn="transport" onclick="setFnFilter('transport')">Transport</button>
     <button class="fn-btn" data-fn="styling" onclick="setFnFilter('styling')">Styling</button>
     <button class="fn-btn" data-fn="warehouse" onclick="setFnFilter('warehouse')">Warehouse</button>
-    <a class="wh-nav" id="wh-nav" href="#" target="_blank" rel="noopener"
-       title="Directions back to the warehouse">🏭 Warehouse</a>
   </div>
 
   <div class="scroll-hint" id="scroll-hint" style="display:none;">← swipe to see more teams →</div>
@@ -348,17 +349,14 @@ let fnFilter='all';       // all | transport | styling | warehouse
 // The address comes from the server so there is one copy of it. If the
 // call fails the button simply stays hidden rather than sending someone
 // to a wrong or empty destination.
+// One copy of the address, from the server.
+let WAREHOUSE_ADDR='';
 (async function loadWarehouse(){
   try{
     const res=await fetch('/api/warehouse');
     const d=await res.json();
-    const el=document.getElementById('wh-nav');
-    if(el && d && d.address){
-      el.href=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.address)}`;
-    }else if(el){ el.style.display='none'; }
-  }catch(e){
-    const el=document.getElementById('wh-nav'); if(el) el.style.display='none';
-  }
+    WAREHOUSE_ADDR=(d&&d.address)||'';
+  }catch(e){ /* the button falls back to a plain search */ }
 })();
 
 function setFnFilter(fn){
@@ -466,6 +464,8 @@ function renderDay(){
           ${team.vehicle?`<div class="team-col-sub">Vehicle: ${team.vehicle}</div>`:''}
           ${team.lead?`<div class="team-col-lead">Lead: ${team.lead}</div>`:''}
           ${others?`<div class="team-col-sub">${others}</div>`:''}
+          <button class="wh-nav" onclick="navWarehouse('${team.id}','${(team.vehicle||'').replace(/'/g,'')}')"
+                  title="Directions back to the warehouse">🏭 Warehouse</button>
         </div>
         <div class="team-col-cards">
           ${ocBandHTML(team.id,'opening',tasks)}
@@ -645,18 +645,30 @@ function navigate(jobId, addr, teamFunction){
   _pendingNav={jobId,addr,role:(teamFunction==='styling'?'stylist':'truck')};
   document.getElementById('slack-overlay').classList.add('open');
 }
+// The warehouse run uses the same prompt as a job — notify Slack or just
+// navigate — so there is one habit to learn, not two.
+function navWarehouse(teamId, vehicle){
+  _pendingNav={warehouse:true, teamId, vehicle,
+               addr:WAREHOUSE_ADDR||'63 Westgate St, Wacol QLD 4076', role:'truck'};
+  document.getElementById('slack-overlay').classList.add('open');
+}
+
 function slackChoice(choice){
   document.getElementById('slack-overlay').classList.remove('open');
-  const{jobId,addr,role}=_pendingNav||{};
+  const{jobId,addr,role,warehouse,teamId,vehicle}=_pendingNav||{};
   _pendingNav=null;
   if(choice==='cancel') return;
   const mapsUrl=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr||'')}`;
   if(choice==='no'){window.open(mapsUrl,'_blank');return;}
   if(!navigator.geolocation){window.open(mapsUrl,'_blank');return;}
+  const url=warehouse ? '/api/eta/warehouse' : `/api/jobs/${jobId}/eta`;
   navigator.geolocation.getCurrentPosition(
     pos=>{
-      fetch(`/api/jobs/${jobId}/eta`,{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,role:role||'truck'})})
+      const body=warehouse
+        ? {lat:pos.coords.latitude,lng:pos.coords.longitude,team_id:teamId,vehicle:vehicle||''}
+        : {lat:pos.coords.latitude,lng:pos.coords.longitude,role:role||'truck'};
+      fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify(body)})
         .then(async res=>{
           // Maps opens either way, so a rejected request used to look exactly
           // like a successful one. At least say so in the console.

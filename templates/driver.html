@@ -60,7 +60,8 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .transfer-link:hover{opacity:0.75;}
 /* Heading back to the warehouse is the end of every run. */
 .wh-nav{flex:0 0 auto;padding:10px 14px;border:1px solid var(--border);border-radius:2px;
-  font-size:0.84rem;color:var(--muted);text-decoration:none;white-space:nowrap;}
+  font-family:inherit;font-size:0.84rem;color:var(--muted);background:#fff;
+  cursor:pointer;white-space:nowrap;}
 .wh-nav:hover{border-color:var(--accent);color:var(--accent);}
 .truck-value{flex:1;padding:10px 13px;font-size:1.05rem;font-weight:600;color:var(--ink);
   background:var(--warm);border:1px solid var(--border);border-radius:1px;}
@@ -207,8 +208,8 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 <div class="truck-section">
   <div class="truck-label">Truck</div>
   <div class="truck-value" id="truck-value">—</div>
-  <a class="wh-nav" id="wh-nav" href="#" target="_blank" rel="noopener"
-     title="Directions back to the warehouse">🏭 Warehouse</a>
+  <button class="wh-nav" id="wh-nav" onclick="navWarehouse()"
+          title="Directions back to the warehouse">🏭 Warehouse</button>
 </div>
 
 <div class="action-bar" id="action-bar"></div>
@@ -378,10 +379,11 @@ function slackConfirmChoice(choice){
   const mapsUrl = _pendingMapsUrl;
   _pendingMapsUrl = null;
 
-  if(choice === 'cancel') return; // do nothing
+  if(choice === 'cancel'){ _warehouseNav=false; return; }
 
   if(choice === 'no'){
     // Just open Maps, skip Slack entirely
+    _warehouseNav=false;
     window.open(mapsUrl, '_blank');
     return;
   }
@@ -403,15 +405,21 @@ function slackConfirmChoice(choice){
 
   navigator.geolocation.getCurrentPosition(
     (pos)=>{
-      fetch(`/api/jobs/${job.id}/eta`,{
+      fetch(_warehouseNav ? '/api/eta/warehouse' : `/api/jobs/${job.id}/eta`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,role:'truck'})
+        // The warehouse run needs the truck named; the job run derives it.
+        body:JSON.stringify(_warehouseNav
+          ? {lat:pos.coords.latitude,lng:pos.coords.longitude,
+             vehicle:(job&&job.truck)||''}
+          : {lat:pos.coords.latitude,lng:pos.coords.longitude,role:'truck'})
       }).then(r=>r.json()).then(data=>{
         console.log('[ETA] response:', data);
+        _warehouseNav=false;
         window.open(mapsUrl, '_blank');
       }).catch(err=>{
         console.log('[ETA] fetch failed:', err);
+        _warehouseNav=false;
         window.open(mapsUrl, '_blank');
       });
     },
@@ -1013,18 +1021,23 @@ async function setStatus(newStatus){
 // disagree with the plan and there was no way to tell which was right.
 // One copy of the address, from the server. A failed call hides the button
 // rather than offering a wrong destination.
+let WAREHOUSE_ADDR='';
 (async function loadWarehouse(){
   try{
     const res=await fetch('/api/warehouse');
     const d=await res.json();
-    const el=document.getElementById('wh-nav');
-    if(el && d && d.address){
-      el.href=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.address)}`;
-    }else if(el){ el.style.display='none'; }
-  }catch(e){
-    const el=document.getElementById('wh-nav'); if(el) el.style.display='none';
-  }
+    WAREHOUSE_ADDR=(d&&d.address)||'';
+  }catch(e){ /* falls back below */ }
 })();
+
+// Same prompt as tapping the job address — notify Slack, or just navigate.
+function navWarehouse(){
+  _warehouseNav=true;
+  _pendingMapsUrl='https://www.google.com/maps/search/?api=1&query='+
+    encodeURIComponent(WAREHOUSE_ADDR||'63 Westgate St, Wacol QLD 4076');
+  document.getElementById('slack-confirm-overlay').style.display='flex';
+}
+let _warehouseNav=false;
 
 function renderTruck(schedule){
   const el=document.getElementById('truck-value');

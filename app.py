@@ -318,8 +318,13 @@ def scheduled_vehicle_for(job_id):
         for kind in ('pickup', 'to_load', 'install'):
             seen = []
             for t in rows:
-                if t.get('type') == kind and t.get('vehicle') and t['vehicle'] not in seen:
-                    seen.append(t['vehicle'])
+                v = t.get('vehicle')
+                # Only actual trucks. A job part-loaded into someone's own
+                # car read as "Nemo + Own Car", which tells the client
+                # nothing useful — the truck is what turns up.
+                if (t.get('type') == kind and v and v in TRANSPORT_VEHICLES
+                        and v not in seen):
+                    seen.append(v)
             if seen:
                 return ' + '.join(seen)
         return ''

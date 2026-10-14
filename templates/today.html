@@ -465,7 +465,7 @@ function renderDay(){
           ${team.lead?`<div class="team-col-lead">Lead: ${team.lead}</div>`:''}
           ${others?`<div class="team-col-sub">${others}</div>`:''}
           <button class="wh-nav" onclick="navWarehouse('${team.id}','${(team.vehicle||'').replace(/'/g,'')}')"
-                  title="Directions back to the warehouse">🏭 Warehouse</button>
+                  title="Directions back to the warehouse">🏭 Navigate to warehouse</button>
         </div>
         <div class="team-col-cards">
           ${ocBandHTML(team.id,'opening',tasks)}

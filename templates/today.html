@@ -118,6 +118,12 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 
 /* Team columns — full day view */
 .fn-filter{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:0 0 14px;}
+/* Getting back to the warehouse is the end of every day, from any crew's
+   page — one button, always in the same place. */
+.wh-nav{padding:6px 13px;border:1px solid var(--border);border-radius:20px;
+  font-size:0.72rem;letter-spacing:0.04em;color:var(--muted);text-decoration:none;
+  white-space:nowrap;}
+.wh-nav:hover{border-color:var(--accent);color:var(--accent);}
 .fn-btn{padding:6px 13px;background:transparent;border:1px solid var(--border);border-radius:20px;
   font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.04em;color:var(--muted);
   cursor:pointer;white-space:nowrap;}
@@ -234,6 +240,8 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
     <button class="fn-btn" data-fn="transport" onclick="setFnFilter('transport')">Transport</button>
     <button class="fn-btn" data-fn="styling" onclick="setFnFilter('styling')">Styling</button>
     <button class="fn-btn" data-fn="warehouse" onclick="setFnFilter('warehouse')">Warehouse</button>
+    <a class="wh-nav" id="wh-nav" href="#" target="_blank" rel="noopener"
+       title="Directions back to the warehouse">🏭 Warehouse</a>
   </div>
 
   <div class="scroll-hint" id="scroll-hint" style="display:none;">← swipe to see more teams →</div>
@@ -336,6 +344,22 @@ function escapeHtml(s){
 
 let activeTab='cards';
 let fnFilter='all';       // all | transport | styling | warehouse
+
+// The address comes from the server so there is one copy of it. If the
+// call fails the button simply stays hidden rather than sending someone
+// to a wrong or empty destination.
+(async function loadWarehouse(){
+  try{
+    const res=await fetch('/api/warehouse');
+    const d=await res.json();
+    const el=document.getElementById('wh-nav');
+    if(el && d && d.address){
+      el.href=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.address)}`;
+    }else if(el){ el.style.display='none'; }
+  }catch(e){
+    const el=document.getElementById('wh-nav'); if(el) el.style.display='none';
+  }
+})();
 
 function setFnFilter(fn){
   fnFilter=fn;

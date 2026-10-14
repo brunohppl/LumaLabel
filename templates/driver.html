@@ -58,6 +58,10 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 .transfer-link{color:inherit;font-weight:700;text-decoration:underline;
   text-underline-offset:2px;}
 .transfer-link:hover{opacity:0.75;}
+/* Heading back to the warehouse is the end of every run. */
+.wh-nav{flex:0 0 auto;padding:10px 14px;border:1px solid var(--border);border-radius:2px;
+  font-size:0.84rem;color:var(--muted);text-decoration:none;white-space:nowrap;}
+.wh-nav:hover{border-color:var(--accent);color:var(--accent);}
 .truck-value{flex:1;padding:10px 13px;font-size:1.05rem;font-weight:600;color:var(--ink);
   background:var(--warm);border:1px solid var(--border);border-radius:1px;}
 .truck-value.unset{font-weight:400;color:var(--muted);font-size:0.92rem;}
@@ -203,6 +207,8 @@ body{background:#EDEAE4;color:var(--ink);font-family:'Jost',sans-serif;font-weig
 <div class="truck-section">
   <div class="truck-label">Truck</div>
   <div class="truck-value" id="truck-value">—</div>
+  <a class="wh-nav" id="wh-nav" href="#" target="_blank" rel="noopener"
+     title="Directions back to the warehouse">🏭 Warehouse</a>
 </div>
 
 <div class="action-bar" id="action-bar"></div>
@@ -1005,6 +1011,21 @@ async function setStatus(newStatus){
 // The truck comes from the runsheet — whichever vehicle the scheduler put
 // this job's LOAD on. Drivers used to pick it themselves, which could
 // disagree with the plan and there was no way to tell which was right.
+// One copy of the address, from the server. A failed call hides the button
+// rather than offering a wrong destination.
+(async function loadWarehouse(){
+  try{
+    const res=await fetch('/api/warehouse');
+    const d=await res.json();
+    const el=document.getElementById('wh-nav');
+    if(el && d && d.address){
+      el.href=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.address)}`;
+    }else if(el){ el.style.display='none'; }
+  }catch(e){
+    const el=document.getElementById('wh-nav'); if(el) el.style.display='none';
+  }
+})();
+
 function renderTruck(schedule){
   const el=document.getElementById('truck-value');
   if(!el) return;

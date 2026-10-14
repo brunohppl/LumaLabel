@@ -2357,7 +2357,7 @@ def api_job_status(job_id):
 
     return jsonify({'success': bool(result)})
 
-WAREHOUSE_ADDRESS = '63 Westgate St, Wacol QLD'
+WAREHOUSE_ADDRESS = '63 Westgate St, Wacol QLD 4076'
 
 # Rough bounding box for Australia incl. Tasmania — lat_min, lat_max, lng_min, lng_max
 AU_BOUNDS = (-44.0, -9.0, 112.0, 154.5)
@@ -3005,6 +3005,13 @@ def api_catalogue_entry_group(entry_id):
         return jsonify({'success': bool(result)})
     except Exception as e:
         return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@app.route('/api/warehouse', methods=['GET'])
+def api_warehouse():
+    """Where the warehouse is. Served rather than typed into each page, so
+    there is one copy to change if it ever moves."""
+    return jsonify({'address': WAREHOUSE_ADDRESS})
 
 
 @app.route('/api/version', methods=['GET'])

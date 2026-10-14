@@ -395,7 +395,7 @@ def notify_slack_eta(job, role, eta_text):
         return False
 
 
-def get_truck_eta(lat, lng, destination_address):
+def get_truck_eta(lat, lng, destination_address, with_minutes=False):
     """Look up driving time from (lat, lng) to destination_address using
     Google's Distance Matrix API, and return the estimated *arrival
     clock time* (e.g. "9:15am") rather than a duration like "14 mins" —
@@ -429,7 +429,7 @@ def get_truck_eta(lat, lng, destination_address):
     api_key = os.environ.get('GOOGLE_MAPS_API_KEY')
     if not api_key:
         print('[ETA] GOOGLE_MAPS_API_KEY is not set')
-        return None
+        return (None, None) if with_minutes else None
     try:
         import time as _time
         params = urllib.parse.urlencode({
@@ -447,18 +447,18 @@ def get_truck_eta(lat, lng, destination_address):
         print(f'[ETA] Distance Matrix response: {result}')
         if result.get('status') != 'OK':
             print(f'[ETA] Top-level status not OK: {result.get("status")} — {result.get("error_message", "")}')
-            return None
+            return (None, None) if with_minutes else None
         element = result['rows'][0]['elements'][0]
         if element.get('status') != 'OK':
             print(f'[ETA] Element status not OK: {element.get("status")}')
-            return None
+            return (None, None) if with_minutes else None
 
         # Prefer duration_in_traffic (live traffic) — falls back to duration
         # if traffic data isn't available for this route
         dur = element.get('duration_in_traffic') or element.get('duration')
         if not dur:
             print('[ETA] No duration in response')
-            return None
+            return (None, None) if with_minutes else None
         duration_seconds = dur['value']
         from zoneinfo import ZoneInfo
         from datetime import timedelta, timezone as _tz
@@ -466,14 +466,18 @@ def get_truck_eta(lat, lng, destination_address):
         arrival_utc  = now_utc + timedelta(seconds=duration_seconds)
         arrival_local = arrival_utc.astimezone(ZoneInfo('Australia/Brisbane'))
         # e.g. "9:15am" — lowercase am/pm, no leading zero on the hour
-        return arrival_local.strftime('%-I:%M%p').lower()
+        text = arrival_local.strftime('%-I:%M%p').lower()
+        # The journey length is already in hand; it was being thrown away.
+        # Callers that want it ask for it, so every existing caller is
+        # untouched and still gets a plain string.
+        return (text, round(duration_seconds / 60)) if with_minutes else text
     except urllib.error.HTTPError as e:
         body = e.read().decode(errors='replace')
         print(f'[ETA] HTTPError {e.code}: {body}')
-        return None
+        return (None, None) if with_minutes else None
     except Exception as e:
         print(f'[ETA] Unexpected error: {type(e).__name__}: {e}')
-        return None
+        return (None, None) if with_minutes else None
 
 
 # ── Runsheet schedule constants ──
@@ -3036,13 +3040,14 @@ def api_warehouse_eta():
             vehicle = ''          # only trucks are named, as in the job ETA
 
         # Same lookup the job ETA uses, so the number means the same thing.
-        eta_text = None
+        eta_text, eta_minutes = None, None
         if lat is not None and lng is not None:
-            eta_text = get_truck_eta(lat, lng, WAREHOUSE_ADDRESS)
+            eta_text, eta_minutes = get_truck_eta(lat, lng, WAREHOUSE_ADDRESS,
+                                                  with_minutes=True)
 
         record_nav_event(destination='warehouse', vehicle=vehicle or None,
                          team_id=data.get('team_id'), role='truck',
-                         lat=lat, lng=lng)
+                         eta_minutes=eta_minutes, lat=lat, lng=lng)
 
         posted = False
         if eta_text:
@@ -3992,7 +3997,7 @@ def api_job_eta(job_id):
     job     = job_rows[0]
     address = job.get('address', '')
 
-    eta_text = get_truck_eta(lat, lng, address)
+    eta_text, eta_minutes = get_truck_eta(lat, lng, address, with_minutes=True)
     if eta_text is None:
         # Couldn't calculate — leave any previous ETA untouched rather than
         # overwriting a good value with nothing just because this attempt failed.
@@ -4007,7 +4012,7 @@ def api_job_eta(job_id):
 
     record_nav_event(destination='job', job_id=job_id, role=role,
                      vehicle=(scheduled_vehicle_for(job_id) or None),
-                     lat=lat, lng=lng)
+                     eta_minutes=eta_minutes, lat=lat, lng=lng)
     slack_posted = notify_slack_eta(job, role, eta_text)
 
     return jsonify({'success': True, 'eta_text': eta_text, 'role': role, 'slack_posted': slack_posted})

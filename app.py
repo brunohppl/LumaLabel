@@ -373,7 +373,11 @@ def notify_slack_eta(job, role, eta_text):
     else:
         who = '🚗 Stylist'
 
-    text = f'{who} — Job {ref} — {address} — ETA {eta_text}'
+    # A run back to the warehouse isn't a job, so it shouldn't read as one.
+    if (ref or '').strip().lower() == 'warehouse':
+        text = f'{who} — Warehouse — ETA {eta_text}'
+    else:
+        text = f'{who} — Job {ref} — {address} — ETA {eta_text}'
 
     message = {
         'username': 'Luma Warehouse',

@@ -57,10 +57,11 @@ setTimeout(async()=>{
   // The styling crew needs to know which truck is turning up
   const stylingCard=[...d.querySelectorAll('#day-content *')]
     .filter(x=>x.textContent.includes('Styling Crew 1'));
-  ok('loading truck shown on the team view', body.includes('Nemo'));
-  ok('shown as a plain tag, no warning', !body.includes('⚠'));
-  ok('a job with no load shows no truck line',
-     (body.match(/📦/g)||[]).length <= 2);
+  // The truck is the column you're looking at, so saying it again on the
+  // card was noise. (This passed before for the wrong reason — 'Nemo' also
+  // appears in the column header.)
+  ok('no "on truck" line on the cards', !/📦\s*<?strong>?On/.test(body));
+  ok('and no warning markers', !body.includes('⚠'));
   ok('pickup gets no loading line',
      !/Pickup[\s\S]{0,80}📦/.test(body));
   // Navigate -> the ETA post that feeds Slack

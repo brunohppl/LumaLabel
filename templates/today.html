@@ -524,15 +524,6 @@ function fmtDuration(mins){
 
 // Which truck the stock is on. A styling crew arriving on site needs to know
 // which vehicle to expect, and they aren't the ones who loaded it.
-function loadedLine(job){
-  if(!job) return '';
-  const loads=(dayData.loads||[]).filter(l=>l.job_id===job.id && l.vehicle);
-  if(!loads.length) return '';
-  const seen=[];
-  loads.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))
-       .forEach(l=>{ if(!seen.includes(l.vehicle)) seen.push(l.vehicle); });
-  return `<div class="card-loaded">📦 <strong>On</strong> ${seen.join(' + ')}</div>`;
-}
 
 // A transfer is only useful if you can tell WHICH job it is — reference
 // plus street name, e.g. "QU-1351 · 66 Hope St". Falls back gracefully when
@@ -612,7 +603,6 @@ function cardHTML(e, jobById, showTeam){
       ${(_pj && _pj.photo_time && !(e.kind==='break'||e.title==='Lunch break'))
           ? `<div class="card-photo">📷 Photos ${_pj.photo_time}</div>` : ''}
       ${propTag?`<div class="card-prop">${propTag}</div>`:''}
-      ${(e.type==='install')?loadedLine(_pj):''}
       ${transferLine(_pj, jobById, e.type)}
       ${e.notes?`<div class="card-note">📝 ${e.notes}</div>`:''}
       ${(isTask && e.job_id && jobById[e.job_id])

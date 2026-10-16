@@ -626,7 +626,7 @@ function cardHTML(e, jobById, showTeam){
       </div>`
           : ''}
       ${job?`<div class="card-btns">
-        ${(e.type==='bay'||e.type==='selection')?'':`<button class="card-btn card-btn-nav" onclick="navigate('${job.id}','${addr.replace(/'/g,"\\'")}','${e._team?.function||''}')">📍 Navigate</button>`}
+        ${(e.type==='bay'||e.type==='selection')?'':`<button class="card-btn card-btn-nav" onclick="navigate('${job.id}','${addr.replace(/'/g,"\\'")}','${e._team?.function||''}','${(e._team?.vehicle||'').replace(/'/g,'')}')">📍 Navigate</button>`}
 
         ${(e.type==='selection'||(e.type!=='bay'&&e._team?.function==='styling'))
             ? `<a href="/stylist/${job.id}" target="_blank" class="card-btn card-btn-stylist">✎ Stylist</a>`:''}
@@ -638,11 +638,15 @@ function cardHTML(e, jobById, showTeam){
 }
 
 // Navigate with Slack confirm
-function navigate(jobId, addr, teamFunction){
+function navigate(jobId, addr, teamFunction, vehicle){
   // The endpoint files the ETA against the truck or the stylist, and words the
   // Slack message accordingly. This page used to send role:'team', which isn't
   // a value it accepts — so the request was rejected and nothing reached Slack.
-  _pendingNav={jobId,addr,role:(teamFunction==='styling'?'stylist':'truck')};
+  // The truck is whichever column you tapped. Deriving it from the job
+  // instead named every truck the job is split across — "Nemo + Nigel" —
+  // when the person tapping is on exactly one of them.
+  _pendingNav={jobId,addr,vehicle:vehicle||'',
+               role:(teamFunction==='styling'?'stylist':'truck')};
   document.getElementById('slack-overlay').classList.add('open');
 }
 // The warehouse run uses the same prompt as a job — notify Slack or just
@@ -666,7 +670,8 @@ function slackChoice(choice){
     pos=>{
       const body=warehouse
         ? {lat:pos.coords.latitude,lng:pos.coords.longitude,team_id:teamId,vehicle:vehicle||''}
-        : {lat:pos.coords.latitude,lng:pos.coords.longitude,role:role||'truck'};
+        : {lat:pos.coords.latitude,lng:pos.coords.longitude,role:role||'truck',
+           vehicle:vehicle||''};
       fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
             body:JSON.stringify(body)})
         .then(async res=>{

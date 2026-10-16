@@ -4017,6 +4017,12 @@ def api_job_eta(job_id):
     record_nav_event(destination='job', job_id=job_id, role=role,
                      vehicle=(scheduled_vehicle_for(job_id) or None),
                      eta_minutes=eta_minutes, lat=lat, lng=lng)
+    # Whoever tapped is on one truck. If they said which, that is the
+    # answer — deriving it from the job names every truck it is split
+    # across, which is wrong for the person actually driving.
+    named = (data.get('vehicle') or '').strip()
+    if named and named in TRANSPORT_VEHICLES:
+        job = {**job, 'truck': named, 'id': None}   # id None skips the lookup
     slack_posted = notify_slack_eta(job, role, eta_text)
 
     return jsonify({'success': True, 'eta_text': eta_text, 'role': role, 'slack_posted': slack_posted})

@@ -412,7 +412,9 @@ function slackConfirmChoice(choice){
         body:JSON.stringify(_warehouseNav
           ? {lat:pos.coords.latitude,lng:pos.coords.longitude,
              vehicle:(job&&job.truck)||''}
-          : {lat:pos.coords.latitude,lng:pos.coords.longitude,role:'truck'})
+          // Name one truck, not every truck the job is split across.
+          : {lat:pos.coords.latitude,lng:pos.coords.longitude,role:'truck',
+             vehicle:((job&&job.truck)||'').split(' + ')[0]})
       }).then(r=>r.json()).then(data=>{
         console.log('[ETA] response:', data);
         _warehouseNav=false;

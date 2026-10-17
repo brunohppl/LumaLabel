@@ -94,6 +94,10 @@ setTimeout(async()=>{
   // Prefetch: the request must start before the page script runs, and must
   // only be used for the date it was fetched for.
   const dayCalls=w.__gets.filter(u=>u.includes('/api/runsheet/'));
+  // Neighbouring days are now fetched in the background so flicking between
+  // them is instant — the one being VIEWED should still be fetched once.
+  const viewedDate=dayCalls[0] ? dayCalls[0].split('/api/runsheet/')[1].split('?')[0] : '';
+  const viewedCalls=dayCalls.filter(u=>u.includes(viewedDate));
   ok('photo deadline shown on the card', /📷 Photos 11:00 AM/.test(d.body.innerHTML));
   // Bay staging task: names its job and links to the loading list
   ok('staging task card shown', /Stage bay/.test(d.body.innerHTML));
@@ -152,7 +156,8 @@ setTimeout(async()=>{
 
   ok('card shows street and suburb', /12 Somers St, Ascot/.test(d.body.innerHTML));
   ok('the day request is made', dayCalls.length>=1);
-  ok('it fires once, not twice (prefetch reused)', dayCalls.length===1);
+  ok('the viewed day is fetched once, not twice (prefetch reused)', viewedCalls.length===1);
+  ok('and the days around it are fetched too', dayCalls.length>viewedCalls.length);
   ok('prefetch slot is cleared after use', w.__prefetch===null);
   ok('all three tabs exist', !!d.getElementById('tab-cards') && !!d.getElementById('tab-day') && !!d.getElementById('tab-map'));
   ok('Cards is the default tab', d.getElementById('tab-cards').classList.contains('active'));

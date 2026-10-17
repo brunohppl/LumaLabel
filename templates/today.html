@@ -291,11 +291,28 @@ function fmtTime(t){if(!t)return{h:'—',ampm:''};const[h,m]=t.split(':').map(Nu
 function shiftDate(n){viewDate=new Date(viewDate);viewDate.setDate(viewDate.getDate()+n);load();}
 function goToday(){viewDate=new Date();load();}
 
+// Days already fetched, so flicking between them is instant. Always
+// re-fetched in the background on arrival — a cached day is shown at once
+// and corrected a moment later if the scheduler has moved something. Never
+// slower than before, and never stale for more than a second.
+const DAY_CACHE={};
+let _loadSeq=0;
+
 async function load(){
   const ds=localDate(viewDate);
+  const seq=++_loadSeq;
   document.getElementById('date-lbl').textContent=fmtDate(viewDate);
   document.getElementById('hero-date').textContent=fmtDate(viewDate);
-  document.getElementById('day-content').innerHTML='<div class="loading">Loading…</div>';
+
+  const cached=DAY_CACHE[ds];
+  if(cached){
+    dayData=cached;
+    renderDay();
+    if(activeTab==='day') drawDayView();
+  }else{
+    document.getElementById('day-content').innerHTML='<div class="loading">Loading…</div>';
+  }
+
   try{
     // The head-start request only covers today; any other date fetches now.
     let res;
@@ -305,10 +322,42 @@ async function load(){
     }else{
       res = await fetch(`/api/runsheet/${ds}`);
     }
-    dayData=await res.json();
-    renderDay();
-    if(activeTab==='day') drawDayView();
-  }catch(e){document.getElementById('day-content').innerHTML='<div class="loading">Failed to load.</div>';}
+    const fresh=await res.json();
+    if(seq!==_loadSeq) return;         // the user moved on while this was in flight
+    const changed=JSON.stringify(fresh)!==JSON.stringify(DAY_CACHE[ds]);
+    DAY_CACHE[ds]=fresh;
+    if(!cached || changed){
+      dayData=fresh;
+      renderDay();
+      if(activeTab==='day') drawDayView();
+    }
+    prefetchWeek(ds);
+  }catch(e){
+    // A cached day on screen is better than an error over the top of it.
+    if(!cached && seq===_loadSeq){
+      document.getElementById('day-content').innerHTML='<div class="loading">Failed to load.</div>';
+    }
+  }
+}
+
+// Quietly fetch the days either side, after the one being looked at is up.
+// Failures are ignored: this is a convenience, and the day the user lands
+// on is always fetched for real anyway.
+let _weekDone='';
+function prefetchWeek(aroundDate){
+  if(_weekDone===aroundDate) return;
+  _weekDone=aroundDate;
+  const base=new Date(aroundDate+'T00:00:00');
+  for(let off=-2; off<=4; off++){
+    if(!off) continue;
+    const d=new Date(base); d.setDate(d.getDate()+off);
+    const ds=localDate(d);
+    if(DAY_CACHE[ds]) continue;
+    fetch(`/api/runsheet/${ds}`)
+      .then(r=>r.json())
+      .then(j=>{ DAY_CACHE[ds]=j; })
+      .catch(()=>{});
+  }
 }
 
 const OC_MODES=['opening','closing'];

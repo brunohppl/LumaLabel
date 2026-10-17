@@ -1,0 +1,65 @@
+// Team view: cached days flick instantly, and are corrected in the background.
+const fs=require('fs'), {JSDOM}=require('jsdom');
+let pass=0,fail=0;
+const ok=(l,c)=>{ c?(pass++,console.log('✓ '+l)):(fail++,console.log('✗ FAIL '+l)); };
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+const day=(ref)=>({teams:[{id:'T1',name:'Nemo',vehicle:'Nemo',function:'transport',members:['Jo']}],
+  schedule:[{id:'E1',job_id:'J1',team_id:'T1',type:'install',start_time:'09:00',duration:60}],
+  tasks:[], jobs:[{id:'J1',job_ref:ref,address:'1 A St, Ascot'}], loads:[]});
+
+let fetched=[], responses={}, delay=0;
+const html=fs.readFileSync('/mnt/user-data/outputs/today.html','utf8');
+const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://x/today',
+  beforeParse(w){
+    w.fetch=async(url)=>{
+      const u=String(url);
+      if(u.includes('/api/runsheet/')){
+        const d=u.split('/api/runsheet/')[1].split('?')[0];
+        fetched.push(d);
+        if(delay) await new Promise(r=>setTimeout(r,delay));
+        return {ok:true,status:200,json:async()=>(responses[d]||day('QU-'+d.slice(-2)))};
+      }
+      return {ok:true,status:200,json:async()=>({})};
+    };
+    w.alert=()=>{};
+  }});
+const w=dom.window,d=w.document;
+const shown=()=>d.getElementById('day-content').textContent;
+
+(async()=>{
+  await sleep(500);
+  ok('the day opens as before', /QU-/.test(shown()));
+  ok('and the days around it are fetched quietly', fetched.length>=5);
+  const cachedCount=w.eval('Object.keys(DAY_CACHE).length');
+  ok(`several days are held (${cachedCount})`, cachedCount>=5);
+
+  // flick to tomorrow — should paint before the network answers
+  delay=300; fetched=[];
+  w.shiftDate(1);
+  await sleep(40);
+  ok('a cached day appears immediately, with no spinner', !/Loading/.test(shown()));
+  await sleep(450);
+  ok('and it is still right after the re-fetch', /QU-/.test(shown()));
+  ok('the day landed on is always re-fetched', fetched.length>=1);
+
+  // a day that has changed must repaint
+  delay=0;
+  const tomorrow=fetched[0];
+  responses[tomorrow]=day('QU-CHANGED');
+  w.shiftDate(-1); await sleep(200);
+  w.shiftDate(1);  await sleep(300);
+  ok('a changed day updates on screen', /QU-CHANGED/.test(shown()));
+
+  // an uncached day still shows the spinner, not a blank
+  delay=200; 
+  w.eval("viewDate=new Date('2027-01-01T00:00:00');");
+  const p=w.load();
+  await sleep(40);
+  ok('an unseen day shows that it is loading', /Loading/.test(shown()));
+  await p; await sleep(60);
+  ok('then shows the day', !/Loading/.test(shown()));
+
+  console.log(`\n${pass} passed, ${fail} failed`);
+  process.exit(fail?1:0);
+})();

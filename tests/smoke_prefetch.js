@@ -63,6 +63,9 @@ const shown=()=>d.getElementById('day-content').textContent;
   // The loading bar
   const bar=()=>d.getElementById('load-bar');
   ok('a loading bar exists', !!bar());
+  // It completes to 100% and then fades — a bar that vanishes mid-way
+  // reads as a failure — so allow for that finish.
+  await sleep(500);
   ok('and is off once the day is up', !bar().classList.contains('on'));
 
   delay=300; fetched=[];
@@ -70,8 +73,10 @@ const shown=()=>d.getElementById('day-content').textContent;
   const pending=w.load();
   await sleep(50);
   ok('it shows while an unseen day loads', bar().classList.contains('on'));
-  await pending; await sleep(60);
+  await pending; await sleep(500);
   ok('and clears when the day arrives', !bar().classList.contains('on'));
+  ok('having reached 100% first', bar().querySelector('span').style.width==='0%' ||
+     bar().querySelector('span').style.width==='100%');
 
   // a cached day must not flash it
   delay=200;

@@ -15,15 +15,22 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 /* A thin bar rather than the word "Loading" — on a phone, grey text in an
    empty area reads as nothing happening at all. It indicates activity, not
    progress: the browser cannot say how far through a fetch it is. */
+/* Fills quickly, eases toward 80%, then completes when the data lands.
+   The browser cannot say how far through a fetch it is, so the middle is
+   an honest-feeling guess and only the finish is real. A shimmer keeps it
+   from looking frozen on a slow day. */
 .load-bar{position:fixed;top:0;left:0;right:0;height:3px;z-index:999;
-  background:transparent;overflow:hidden;opacity:0;transition:opacity 0.2s;
+  background:transparent;overflow:hidden;opacity:0;transition:opacity 0.25s;
   pointer-events:none;}
 .load-bar.on{opacity:1;}
-.load-bar span{display:block;height:100%;width:40%;background:var(--accent);
-  border-radius:0 2px 2px 0;animation:load-slide 1.1s ease-in-out infinite;}
-@keyframes load-slide{
+.load-bar span{display:block;height:100%;width:0%;background:var(--accent);
+  border-radius:0 2px 2px 0;transition:width 0.3s ease-out;position:relative;}
+.load-bar.on span::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.55),transparent);
+  animation:load-shimmer 1.1s ease-in-out infinite;}
+@keyframes load-shimmer{
   0%   {transform:translateX(-100%);}
-  100% {transform:translateX(320%);}
+  100% {transform:translateX(100%);}
 }
 .hero{position:relative;background:var(--ink);padding:24px 20px 20px;text-align:center;}
 .hero-logo{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;letter-spacing:0.14em;color:#faf8f4;}
@@ -311,9 +318,36 @@ function goToday(){viewDate=new Date();load();}
 // slower than before, and never stale for more than a second.
 // The bar is deliberately silent for the background day-fetching —
 // otherwise it would be up almost constantly, which reads as "always busy".
+let _loadTimer=null;
+
 function showLoading(on){
-  const el=document.getElementById('load-bar');
-  if(el) el.classList.toggle('on', !!on);
+  const bar=document.getElementById('load-bar');
+  if(!bar) return;
+  const fill=bar.querySelector('span');
+  clearInterval(_loadTimer);
+
+  if(!on){
+    // Finish honestly, then fade out — a bar that vanishes at 60% feels
+    // like something failed.
+    if(fill) fill.style.width='100%';
+    setTimeout(()=>{
+      bar.classList.remove('on');
+      setTimeout(()=>{ if(fill) fill.style.width='0%'; }, 250);
+    }, 180);
+    return;
+  }
+
+  if(fill) fill.style.width='0%';
+  bar.classList.add('on');
+  // Move quickly at first and slow as it approaches 80, where it waits for
+  // the data rather than pretending to finish.
+  let pct=0;
+  _loadTimer=setInterval(()=>{
+    pct += Math.max(0.6, (80-pct)*0.12);
+    if(pct>80) pct=80;
+    if(fill) fill.style.width=pct+'%';
+  }, 120);
+  if(fill) setTimeout(()=>{ if(bar.classList.contains('on')) fill.style.width='12%'; }, 20);
 }
 
 const DAY_CACHE={};

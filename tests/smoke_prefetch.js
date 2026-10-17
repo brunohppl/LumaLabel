@@ -60,6 +60,27 @@ const shown=()=>d.getElementById('day-content').textContent;
   await p; await sleep(60);
   ok('then shows the day', !/Loading/.test(shown()));
 
+  // The loading bar
+  const bar=()=>d.getElementById('load-bar');
+  ok('a loading bar exists', !!bar());
+  ok('and is off once the day is up', !bar().classList.contains('on'));
+
+  delay=300; fetched=[];
+  w.eval("viewDate=new Date('2027-06-15T00:00:00');");
+  const pending=w.load();
+  await sleep(50);
+  ok('it shows while an unseen day loads', bar().classList.contains('on'));
+  await pending; await sleep(60);
+  ok('and clears when the day arrives', !bar().classList.contains('on'));
+
+  // a cached day must not flash it
+  delay=200;
+  w.eval("viewDate=new Date('2027-06-15T00:00:00');");
+  const p2=w.load();
+  await sleep(40);
+  ok('a cached day does not flash the bar', !bar().classList.contains('on'));
+  await p2;
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);
 })();

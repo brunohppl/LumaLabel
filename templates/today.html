@@ -12,6 +12,19 @@
 body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-height:100vh;}
 
 /* HERO */
+/* A thin bar rather than the word "Loading" — on a phone, grey text in an
+   empty area reads as nothing happening at all. It indicates activity, not
+   progress: the browser cannot say how far through a fetch it is. */
+.load-bar{position:fixed;top:0;left:0;right:0;height:3px;z-index:999;
+  background:transparent;overflow:hidden;opacity:0;transition:opacity 0.2s;
+  pointer-events:none;}
+.load-bar.on{opacity:1;}
+.load-bar span{display:block;height:100%;width:40%;background:var(--accent);
+  border-radius:0 2px 2px 0;animation:load-slide 1.1s ease-in-out infinite;}
+@keyframes load-slide{
+  0%   {transform:translateX(-100%);}
+  100% {transform:translateX(320%);}
+}
 .hero{position:relative;background:var(--ink);padding:24px 20px 20px;text-align:center;}
 .hero-logo{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;letter-spacing:0.14em;color:#faf8f4;}
 .hero-logo em{font-style:italic;color:var(--accent);}
@@ -202,6 +215,7 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 </head>
 <body>
 
+<div class="load-bar" id="load-bar"><span></span></div>
 <div class="hero">
   <a href="/" class="hero-home">← Home</a>
   <img class="logo-mark" src="/static/luma-mark-light.png" alt="LUMA Design Co"/>
@@ -295,6 +309,13 @@ function goToday(){viewDate=new Date();load();}
 // re-fetched in the background on arrival — a cached day is shown at once
 // and corrected a moment later if the scheduler has moved something. Never
 // slower than before, and never stale for more than a second.
+// The bar is deliberately silent for the background day-fetching —
+// otherwise it would be up almost constantly, which reads as "always busy".
+function showLoading(on){
+  const el=document.getElementById('load-bar');
+  if(el) el.classList.toggle('on', !!on);
+}
+
 const DAY_CACHE={};
 let _loadSeq=0;
 
@@ -310,6 +331,9 @@ async function load(){
     renderDay();
     if(activeTab==='day') drawDayView();
   }else{
+    // Only when there is genuinely nothing to show. A bar flashing over an
+    // instant action looks like a fault.
+    showLoading(true);
     document.getElementById('day-content').innerHTML='<div class="loading">Loading…</div>';
   }
 
@@ -331,8 +355,10 @@ async function load(){
       renderDay();
       if(activeTab==='day') drawDayView();
     }
+    showLoading(false);
     prefetchWeek(ds);
   }catch(e){
+    showLoading(false);
     // A cached day on screen is better than an error over the top of it.
     if(!cached && seq===_loadSeq){
       document.getElementById('day-content').innerHTML='<div class="loading">Failed to load.</div>';

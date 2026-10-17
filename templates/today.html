@@ -339,12 +339,15 @@ function showLoading(on){
 
   if(fill) fill.style.width='0%';
   bar.classList.add('on');
-  // Move quickly at first and slow as it approaches 80, where it waits for
-  // the data rather than pretending to finish.
+  // Quick at first, easing toward 80, then creeping on very slowly — it
+  // never stops moving, but never reaches the end either, because only the
+  // arrival of the data can honestly claim that.
   let pct=0;
   _loadTimer=setInterval(()=>{
-    pct += Math.max(0.6, (80-pct)*0.12);
-    if(pct>80) pct=80;
+    const step = pct < 80
+      ? Math.max(0.6, (80-pct)*0.12)   // the main climb
+      : (97-pct)*0.03;                 // a crawl toward, never past, 97
+    pct = Math.min(97, pct+step);
     if(fill) fill.style.width=pct+'%';
   }, 120);
   if(fill) setTimeout(()=>{ if(bar.classList.contains('on')) fill.style.width='12%'; }, 20);

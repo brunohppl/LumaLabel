@@ -1933,11 +1933,36 @@ APP_VERSION = '2.0'
 _TEMPLATE_CACHE = {}
 
 
+# What makes the app installable on a phone. Injected here rather than
+# pasted into fifteen templates, so there is one copy to change.
+_PWA_HEAD = """
+<link rel="manifest" href="/static/manifest.json"/>
+<meta name="theme-color" content="#1A1714"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="LUMA"/>
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png"/>
+<script>
+  // Registering the worker is what allows installation. It caches nothing
+  // yet — see static/sw.js. A failure here must never stop the page.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function () {});
+    });
+  }
+</script>
+"""
+
+
 def render_page(name):
     html = _TEMPLATE_CACHE.get(name)
     if html is None:
         with open(f'templates/{name}', 'r') as f:
             html = f.read()
+        # Once, at load — the cache keeps it for every later request.
+        if '<head>' in html and 'manifest.json' not in html:
+            html = html.replace('<head>', '<head>' + _PWA_HEAD, 1)
         _TEMPLATE_CACHE[name] = html
     return html
 
@@ -3065,6 +3090,16 @@ def api_warehouse_eta():
                         'slack_posted': bool(posted)})
     except Exception as e:
         return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@app.route('/sw.js', methods=['GET'])
+def service_worker():
+    """Served from the root on purpose: a worker's reach is limited to the
+    folder it is served from, so one at /static could only ever control
+    /static."""
+    with open('static/sw.js', 'r') as f:
+        return Response(f.read(), mimetype='application/javascript',
+                        headers={'Cache-Control': 'no-cache'})
 
 
 @app.route('/api/warehouse', methods=['GET'])

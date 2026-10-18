@@ -30,18 +30,26 @@ const shown=()=>d.getElementById('day-content').textContent;
 (async()=>{
   await sleep(500);
   ok('the day opens as before', /QU-/.test(shown()));
-  ok('and the days around it are fetched quietly', fetched.length>=5);
-  const cachedCount=w.eval('Object.keys(DAY_CACHE).length');
-  ok(`several days are held (${cachedCount})`, cachedCount>=5);
+  // Nothing is fetched ahead of time — parallel prefetching queued in
+  // front of the user's own request and made a day take 17 seconds.
+  ok(`only the day being viewed is fetched (${fetched.length})`, fetched.length===1);
+  await sleep(1500);
+  ok('and still nothing extra after a pause', fetched.length===1);
 
-  // flick to tomorrow — should paint before the network answers
+  // a day not seen before fetches once, as it always did
   delay=300; fetched=[];
   w.shiftDate(1);
-  await sleep(40);
-  ok('a cached day appears immediately, with no spinner', !/Loading/.test(shown()));
   await sleep(450);
-  ok('and it is still right after the re-fetch', /QU-/.test(shown()));
-  ok('the day landed on is always re-fetched', fetched.length>=1);
+  ok('a new day is fetched once', fetched.length===1);
+  ok('and shows', /QU-/.test(shown()));
+
+  // going back to a day already seen is instant
+  fetched=[]; delay=300;
+  w.shiftDate(-1);
+  await sleep(40);
+  ok('a day already visited appears at once', !/Loading/.test(shown()));
+  await sleep(450);
+  ok('and is quietly re-checked', fetched.length===1);
 
   // a day that has changed must repaint
   delay=0;

@@ -157,7 +157,7 @@ setTimeout(async()=>{
   ok('card shows street and suburb', /12 Somers St, Ascot/.test(d.body.innerHTML));
   ok('the day request is made', dayCalls.length>=1);
   ok('the viewed day is fetched once, not twice (prefetch reused)', viewedCalls.length===1);
-  ok('and the days around it are fetched too', dayCalls.length>viewedCalls.length);
+  ok('nothing else is fetched ahead of time', dayCalls.length===viewedCalls.length);
   ok('prefetch slot is cleared after use', w.__prefetch===null);
   ok('all three tabs exist', !!d.getElementById('tab-cards') && !!d.getElementById('tab-day') && !!d.getElementById('tab-map'));
   ok('Cards is the default tab', d.getElementById('tab-cards').classList.contains('active'));

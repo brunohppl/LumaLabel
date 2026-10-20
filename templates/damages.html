@@ -25,6 +25,8 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 /* PAGE */
 .page{max-width:900px;margin:0 auto;padding:28px 20px 60px;}
 .page-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
+.arch-toggle{display:inline-flex;align-items:center;gap:6px;font-size:0.76rem;
+  color:var(--muted);cursor:pointer;margin-bottom:10px;}
 .page-title{font-family:'Cormorant Garamond',serif;font-size:2.2rem;font-weight:400;}
 .btn-add{width:44px;height:44px;border-radius:50%;background:var(--accent);color:white;border:none;font-size:1.5rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(184,147,90,0.4);transition:opacity 0.15s;flex-shrink:0;}
 .btn-add:hover{opacity:0.88;}
@@ -312,6 +314,9 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     </div>
     <button class="btn-add" onclick="openWizard()" title="Log new damage">+</button>
   </div>
+  <label class="arch-toggle">
+    <input type="checkbox" id="show-archived" onchange="loadReports()"/> Show archived
+  </label>
   <div id="table-wrap"><div class="loading"><div class="spinner"></div>Loading…</div></div>
 </div>
 
@@ -347,7 +352,8 @@ let _existingPhotoUrl = null; // existing photo(s) when editing
 // ── Table ──
 async function loadReports(){
   try{
-    const res = await fetch('/api/damages');
+    const arch=document.getElementById('show-archived');
+    const res = await fetch('/api/damages' + (arch && arch.checked ? '?archived=1' : ''));
     reports = await res.json();
     renderTable();
   }catch(e){
@@ -420,6 +426,9 @@ function reportGroupHTML(title, list, isProperty){
           })()}</td>
           <td style="white-space:nowrap;">
             <button class="del-btn" onclick="editReport('${r.id}')" title="Edit" style="color:var(--muted);margin-right:4px;">✎</button>
+            <button class="del-btn" onclick="setArchived('${r.id}',${!r.archived})"
+                    title="${r.archived?'Bring this report back':'Archive — keeps everything, just hides it from the list'}"
+                    style="color:var(--muted);margin-right:4px;">${r.archived?'↩':'🗄'}</button>
             <button class="del-btn" onclick="deleteReport('${r.id}')" title="Delete">✕</button>
           </td>
         </tr>`).join('')}
@@ -468,6 +477,22 @@ function formatDate(iso){
   const d = new Date(iso);
   return d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})
     +' '+d.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
+}
+
+// Archiving keeps the report, its photo and its history — it only leaves
+// the list. Deleting is still there for a report filed by mistake.
+async function setArchived(id, archived){
+  if(archived && !confirm('Archive this report?\n\nIt leaves the list but nothing is deleted — '+
+                          'tick "Show archived" to see it again or bring it back.')) return;
+  try{
+    const res=await fetch('/api/damages/'+id,{method:'PATCH',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({archived})});
+    const d=await res.json().catch(()=>({}));
+    if(!res.ok || d.success===false) throw new Error(d.error||`HTTP ${res.status}`);
+    await loadReports();
+  }catch(e){
+    alert('Could not do that — '+e.message);
+  }
 }
 
 async function deleteReport(id){

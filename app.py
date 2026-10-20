@@ -2136,8 +2136,13 @@ def damages_guide():
 
 @app.route('/api/damages', methods=['GET'])
 def api_damages_list():
-    rows = sb_get('damage_reports', 'order=created_at.desc')
-    return jsonify(rows or [])
+    """Reports, newest first. Archived ones are left out unless asked for —
+    that is what archiving is for."""
+    show_archived = str(request.args.get('archived') or '').lower() in ('1', 'true')
+    rows = sb_get('damage_reports', 'order=created_at.desc') or []
+    if not show_archived:
+        rows = [r for r in rows if not r.get('archived')]
+    return jsonify(rows)
 
 DAMAGE_REPAIR_STATUSES = ['to_schedule', 'scheduled', 'fixed', 'discard']
 
@@ -2167,6 +2172,9 @@ def api_damages_create():
 def api_damages_update(report_id):
     data = request.get_json()
     payload = {}
+    # Archiving is just another field on the report — no separate endpoint,
+    # and no risk of it being treated as a delete.
+    if 'archived'         in data: payload['archived']         = bool(data['archived'])
     if 'location'         in data: payload['location']         = data['location']
     if 'damage_type'      in data: payload['damage_type']      = data['damage_type']
     if 'furniture'        in data: payload['furniture']        = data['furniture'] or None

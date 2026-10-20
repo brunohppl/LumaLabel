@@ -4437,7 +4437,7 @@ def _get_monday_board_data_inner():
     # filter returns every column of every item, including a raw JSON
     # `value` alongside the text, most of which is discarded.
     wanted_cols = [c for c in (
-        addr_col_id, type_col_id, size_col_id, style_col_id, photos_col_id,
+        address_col_id, type_col_id, size_col_id, style_col_id, photos_col_id,
         phone_col_id, install_date_id, end_date_id, status_col_id,
     ) if c]
     col_filter = ''

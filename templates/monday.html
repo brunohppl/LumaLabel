@@ -46,6 +46,26 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .group-count{font-size:0.7rem;color:var(--muted);background:var(--sand);border-radius:10px;padding:1px 9px;font-weight:600;}
 
 /* Table */
+.run-history{margin:26px 0 40px;}
+.run-head{display:flex;align-items:baseline;justify-content:space-between;
+  font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);
+  margin-bottom:8px;}
+.run-refresh{background:none;border:1px solid var(--border);border-radius:3px;
+  font-family:inherit;font-size:0.66rem;letter-spacing:0.06em;text-transform:uppercase;
+  color:var(--muted);padding:3px 10px;cursor:pointer;}
+.run-refresh:hover{border-color:var(--accent);color:var(--accent);}
+.run{display:flex;align-items:baseline;gap:12px;padding:7px 10px;background:#fff;
+  border:1px solid var(--border);border-left:3px solid var(--green);border-radius:3px;
+  margin-bottom:5px;flex-wrap:wrap;}
+.run.error{border-left-color:var(--red,#A63D2F);}
+.run.warn{border-left-color:var(--accent);}
+.run.running{border-left-color:var(--muted);}
+.run-when{font-size:0.78rem;font-weight:600;white-space:nowrap;}
+.run-who{font-size:0.66rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
+.run-what{flex:1;font-size:0.78rem;color:var(--ink);min-width:160px;}
+.run-dur{font-size:0.7rem;color:var(--muted);white-space:nowrap;}
+.run-err{font-size:0.74rem;color:var(--red,#A63D2F);}
+.run-empty{font-size:0.78rem;color:var(--muted);padding:8px 2px;}
 .sync-table{width:100%;border-collapse:collapse;font-size:0.82rem;}
 .sync-table th{background:var(--warm);color:var(--muted);font-weight:600;font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);}
 .sync-table td{padding:10px 12px;border-bottom:1px solid var(--sand);vertical-align:middle;}
@@ -116,6 +136,15 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   <div id="board-content">
     <div class="state-msg"><strong>Ready to sync</strong>Click Sync Now to pull the latest data from Monday.</div>
   </div>
+
+  <div class="run-history">
+    <div class="run-head">
+      <span>Sync history</span>
+      <button class="run-refresh" onclick="loadRuns()">Refresh</button>
+    </div>
+    <div id="run-list"><div class="run-empty">Loading…</div></div>
+  </div>
+
 </div>
 
 <script>
@@ -358,6 +387,65 @@ async function syncBoard(){
 
 // Auto-sync on load
 syncBoard();
+
+// ── Sync history ──────────────────────────────────────────────────────
+// Every pull is recorded, pressed or scheduled. A run that shows as still
+// running is one that crashed — which is exactly what no record at all
+// would fail to tell you.
+async function loadRuns(){
+  const el=document.getElementById('run-list');
+  if(!el) return;
+  try{
+    const res=await fetch('/api/monday/runs');
+    const d=await res.json();
+    if(d.success===false) throw new Error(d.error);
+    const runs=d.runs||[];
+    if(!runs.length){ el.innerHTML='<div class="run-empty">No syncs recorded yet.</div>'; return; }
+    el.innerHTML=runs.map(runHTML).join('');
+  }catch(e){
+    el.innerHTML='<div class="run-empty">Could not load the history — '+e.message+'</div>';
+  }
+}
+
+function runHTML(r){
+  const counts=[
+    [r.dates_updated,'dates'], [r.statuses_updated,'statuses'],
+    [r.completed_updated,'completed'], [r.details_updated,'details'],
+    [r.tiles_created,'tiles made'], [r.tiles_updated,'tiles moved'],
+  ].filter(([n])=>n).map(([n,l])=>`${n} ${l}`);
+
+  const problems=[];
+  if(r.skipped_errors)   problems.push(`${r.skipped_errors} errors`);
+  if(r.unmatched)        problems.push(`${r.unmatched} unmatched`);
+  if(r.writes_remaining) problems.push(`${r.writes_remaining} left over (hit the limit)`);
+
+  const cls = r.status==='error' ? 'error'
+            : r.status==='running' ? 'running'
+            : problems.length ? 'warn' : '';
+
+  const when=new Date(r.started_at).toLocaleString('en-AU',
+    {day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+
+  let what;
+  if(r.status==='running')      what='<span class="run-err">Did not finish</span>';
+  else if(r.status==='error')   what=`<span class="run-err">${escapeHtml(r.error||'Failed')}</span>`;
+  else what=(counts.join(', ')||'nothing to change')+
+            (problems.length?` · ${problems.join(', ')}`:'');
+
+  return `<div class="run ${cls}">
+    <span class="run-when">${when}</span>
+    <span class="run-who">${r.trigger==='scheduled'?'Scheduled':'Manual'}</span>
+    <span class="run-what">${what}</span>
+    ${r.duration_ms?`<span class="run-dur">${(r.duration_ms/1000).toFixed(1)}s</span>`:''}
+  </div>`;
+}
+
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,c=>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+loadRuns();
 </script>
 </body>
 </html>

@@ -1,4 +1,5 @@
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 import re
 import base64
@@ -330,6 +331,31 @@ def scheduled_vehicle_for(job_id):
         return ''
 
     return pick([t for t in tiles if t.get('date') == today]) or pick(tiles)
+
+
+def post_slack(text):
+    """Post a plain message to Slack. Returns True if it went.
+
+    Used by the nightly sync so a failure is visible in the morning —
+    silence then means something is wrong, rather than everything is fine.
+    """
+    webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
+    if not webhook_url:
+        print('[SLACK] no webhook configured; message not sent')
+        return False
+    try:
+        req = urllib.request.Request(
+            webhook_url,
+            data=json.dumps({'username': 'Luma Warehouse',
+                             'icon_emoji': ':calendar:',
+                             'text': text}).encode(),
+            headers={'Content-Type': 'application/json'},
+        )
+        urllib.request.urlopen(req, timeout=8)
+        return True
+    except Exception as e:
+        print(f'[SLACK] could not post: {e}')
+        return False
 
 
 def notify_slack_eta(job, role, eta_text):
@@ -4609,7 +4635,12 @@ MONDAY_COLLECT_LABEL = 'ready to collect'
 # empty body, because the worker is killed before Flask can reply. Cap the
 # writes per run and report what's left; a second click finishes the job.
 # Once the backlog clears, normal pulls do almost no writes at all.
-MONDAY_MAX_JOB_WRITES = 25
+# How many job writes one pull may make. The browser button keeps a low
+# cap because the request has to finish; the nightly cron job raises it via
+# this variable, since it has no such deadline. The ceiling is a guard
+# against a bad board state rewriting everything unattended, not a
+# performance limit.
+MONDAY_MAX_JOB_WRITES = int(os.environ.get('MONDAY_MAX_JOB_WRITES', '25'))
 
 
 def monday_prev_business_day(date_str):
@@ -4632,6 +4663,62 @@ def monday_label_norm(s):
     s = re.sub(r'[^a-z0-9]+', ' ', str(s).lower())
     return re.sub(r'\s+', ' ', s).strip()
 
+def sync_run_start(trigger):
+    """Record that a pull has begun. Returns the row id, or None.
+
+    Written BEFORE the work so a crash leaves evidence — a run that never
+    finished is visible as 'running', where no row at all would look
+    exactly like a night the job never fired.
+    """
+    try:
+        rows = sb_post('sync_runs', {'trigger': trigger, 'status': 'running'})
+        return rows[0]['id'] if rows else None
+    except Exception as e:
+        print(f'[SYNC] could not record the start: {e}')
+        return None
+
+
+def sync_run_finish(run_id, data=None, error=None, started=None):
+    """Close off the run. Never allowed to break the pull itself."""
+    if not run_id:
+        return
+    try:
+        from datetime import datetime as _dt
+        patch = {
+            'status':      'error' if error else 'ok',
+            'finished_at': brisbane_now().isoformat(),
+        }
+        if started is not None:
+            patch['duration_ms'] = int((time.time() - started) * 1000)
+        if error:
+            patch['error'] = str(error)[:500]
+        for col, key in (
+            ('dates_updated',     'dates_updated'),
+            ('statuses_updated',  'statuses_updated'),
+            ('completed_updated', 'completed_updated'),
+            ('details_updated',   'details_updated'),
+            ('tiles_created',     'tiles_created'),
+            ('tiles_updated',     'tiles_updated'),
+            ('skipped_errors',    'skipped_errors'),
+            ('unmatched',         'scheduled_unmatched'),
+            ('writes_remaining',  'writes_remaining'),
+        ):
+            patch[col] = int((data or {}).get(key) or 0)
+        sb_patch('sync_runs', f'id=eq.{run_id}', patch)
+    except Exception as e:
+        print(f'[SYNC] could not record the finish: {e}')
+
+
+@app.route('/api/monday/runs', methods=['GET'])
+def api_monday_runs():
+    """The last 30 pulls, newest first."""
+    try:
+        rows = sb_get('sync_runs', 'order=started_at.desc&limit=30') or []
+        return jsonify({'success': True, 'runs': rows})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
 @app.route('/api/monday/pull', methods=['POST'])
 def api_monday_pull():
     """Pull matched install dates into existing Luma jobs, and add every item
@@ -4642,9 +4729,23 @@ def api_monday_pull():
 
     WRITES to Supabase (jobs, job_schedule) only. Still never writes to
     Monday — every Monday call underneath is a read-only query."""
+    # Every pull is recorded, pressed or scheduled, so the Monday page can
+    # show what happened and when — including runs that failed.
+    trigger = 'scheduled' if (request.args.get('trigger') == 'cron') else 'manual'
+    run_id = sync_run_start(trigger)
+    started = time.time()
     try:
-        return _api_monday_pull_inner()
+        result = _api_monday_pull_inner()
+        body = result[0] if isinstance(result, tuple) else result
+        data = body.get_json() if hasattr(body, 'get_json') else {}
+        if isinstance(result, tuple) or not (data or {}).get('success', True):
+            sync_run_finish(run_id, data, error=(data or {}).get('error', 'failed'),
+                            started=started)
+        else:
+            sync_run_finish(run_id, data, started=started)
+        return result
     except Exception as e:
+        sync_run_finish(run_id, error=f'{type(e).__name__}: {e}', started=started)
         return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
 
 

@@ -4427,28 +4427,45 @@ def _get_monday_board_data_inner():
         (c['id'] for c in columns if c['type'] == 'color' or 'status' in c['title'].lower()), None
     )
 
-    # Step 2: fetch all items with column values, following pagination fully
+    # Step 2: fetch the items.
+    #
+    # Two things keep this inside a single request on a 1,000-item board.
+    # Monday's pagination is cursor-based, so pages CANNOT be fetched in
+    # parallel — each needs the one before it. So: ask for 500 at a time
+    # rather than 100, which turns ten round trips into two or three.
+    # And ask only for the columns this code reads: `column_values` with no
+    # filter returns every column of every item, including a raw JSON
+    # `value` alongside the text, most of which is discarded.
+    wanted_cols = [c for c in (
+        addr_col_id, type_col_id, size_col_id, style_col_id, photos_col_id,
+        phone_col_id, install_date_id, end_date_id, status_col_id,
+    ) if c]
+    col_filter = ''
+    if wanted_cols:
+        ids = ', '.join(f'"{c}"' for c in wanted_cols)
+        col_filter = f'(ids: [{ids}])'
+
     items_q = '''
     query($bid: ID!) {
       boards(ids: [$bid]) {
-        items_page(limit: 100) {
+        items_page(limit: 500) {
           cursor
           items {
             id name
             group { id }
-            column_values { id text value }
+            column_values''' + col_filter + ''' { id text value }
           }
         }
       }
     }'''
     next_q = '''
     query($cursor: String!) {
-      next_items_page(limit: 100, cursor: $cursor) {
+      next_items_page(limit: 500, cursor: $cursor) {
         cursor
         items {
           id name
           group { id }
-          column_values { id text value }
+          column_values''' + col_filter + ''' { id text value }
         }
       }
     }'''
@@ -4462,7 +4479,10 @@ def _get_monday_board_data_inner():
         cursor = page.get('cursor')
 
         pages_fetched = 1
-        while cursor and pages_fetched < 10:  # safety cap: 1000 items max
+        # At 500 per page this still covers 5,000 items — well past the
+        # board's size — where the old cap of ten 100-item pages stopped
+        # dead at 1,000 and silently dropped anything beyond.
+        while cursor and pages_fetched < 10:  # 5,000 items at 500 a page
             next_result = monday_query(next_q, {'cursor': cursor})
             if 'errors' in next_result:
                 break
@@ -4474,7 +4494,12 @@ def _get_monday_board_data_inner():
         return {'error': str(e)}
 
     # Step 3: load all Luma jobs for address matching
-    luma_jobs = sb_get('jobs', 'order=created_at.desc') or []
+    # Every job ever is loaded here to match against the board. That list
+    # only grows, and a job from last year cannot match a board item that
+    # is still live, so look back a year rather than forever.
+    from datetime import timedelta as _td
+    since = (brisbane_now() - _td(days=365)).strftime('%Y-%m-%d')
+    luma_jobs = sb_get('jobs', f'created_at=gte.{since}&order=created_at.desc') or []
     luma_by_addr = {}
     luma_by_key  = {}
     for j in luma_jobs:
@@ -4654,8 +4679,9 @@ def _api_monday_pull_inner():
             # Completed work still describes a real property, and a pickup is
             # scheduled precisely when a job has finished — so its Monday item
             # has usually moved to Completed. Skipping these entirely left
-            # pickup tiles with no type or size. Dates, tiles and status are
-            # still left alone for these; only the description is synced.
+            # pickup tiles with no type or size. Dates and tiles are left
+            # alone; the description is synced, and a job already installed
+            # is archived, which is what Completed means in the app.
             for item in items:
                 if item.get('luma_job'):
                     details_only.append(item)
@@ -4831,6 +4857,14 @@ def _api_monday_pull_inner():
 
     # Property details for jobs whose Monday item sits in an ignored group.
     # Same cap as everything else, so a big first run drains over a few clicks.
+    # Completions are processed BEFORE the general loop spends the write
+    # budget. On a large board the cap was exhausted by date and detail
+    # updates long before the code reached the Completed group, so a job
+    # sitting at 'installed' with its Monday item filed as Completed was
+    # silently never archived — the logic was right and never ran.
+    details_only.sort(key=lambda it: 0 if (it.get('luma_job') or {}).get('status')
+                      in ('installed', 'ready_to_collect') else 1)
+
     for item in details_only:
         try:
             luma_job = item['luma_job']
@@ -4856,7 +4890,10 @@ def _api_monday_pull_inner():
 
             if not patch:
                 continue
-            if (dates_updated + statuses_updated + details_updated) >= MONDAY_MAX_JOB_WRITES:
+            # Archiving a finished job is the point of the Completed group —
+            # it is never skipped for budget, unlike a cosmetic detail sync.
+            if not completing and \
+               (dates_updated + statuses_updated + details_updated) >= MONDAY_MAX_JOB_WRITES:
                 writes_remaining += 1
                 continue
             sb_patch('jobs', f"id=eq.{luma_job['id']}", patch)

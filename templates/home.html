@@ -40,10 +40,6 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .toggle-knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
   background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.25);transition:transform 0.18s;}
 .toggle.on .toggle-knob{transform:translateX(22px);}
-.tools-row{display:flex;gap:16px;justify-content:center;margin:26px 0 10px;flex-wrap:wrap;}
-.tool-link{font-size:0.72rem;letter-spacing:0.08em;color:var(--muted);text-decoration:none;
-  border-bottom:1px solid transparent;padding-bottom:2px;}
-.tool-link:hover{color:var(--accent);border-bottom-color:var(--accent);}
 .nav-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:22px 12px;background:white;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--ink);transition:all 0.18s;cursor:pointer;}
 .nav-tile:hover{border-color:var(--accent);box-shadow:0 4px 16px rgba(184,147,90,0.15);transform:translateY(-2px);}
 .nav-tile:active{transform:translateY(0);}
@@ -227,13 +223,6 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
             role="switch" aria-checked="false" aria-label="Notifications">
       <span class="toggle-knob"></span>
     </button>
-  </div>
-
-  <!-- An installed app has no address bar, so a page with no link is a
-       page you cannot reach. Deliberately quiet rather than a tile. -->
-  <div class="tools-row">
-    <a href="/push" class="tool-link">Notifications</a>
-    <a href="/freelabels" class="tool-link">Blank labels</a>
   </div>
 
 </div>

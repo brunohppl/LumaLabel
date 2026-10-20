@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Notifications · LUMA</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{--ink:#1A1714;--muted:#9A8F80;--border:#D8CFBF;--warm:#F2EDE4;--cream:#FAF8F4;
+  --accent:#B8935A;--green:#4A7C59;--red:#A63D2F;--blue:#2E5A8A;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;}
+
+.hero{background:var(--ink);padding:22px;text-align:center;}
+.logo-mark{height:40px;width:auto;display:block;margin:0 auto;}
+.hero-sub{font-size:0.68rem;letter-spacing:0.2em;text-transform:uppercase;
+  color:rgba(250,248,244,0.5);margin-top:10px;}
+
+.page{max-width:620px;margin:0 auto;padding:22px 18px 60px;}
+.card{background:#fff;border:1px solid var(--border);border-radius:5px;
+  padding:16px 18px;margin-bottom:16px;}
+.card-title{font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:10px;}
+
+label{display:block;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;
+  color:var(--muted);margin:10px 0 4px;}
+input,textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:3px;
+  font-family:'Jost',sans-serif;font-size:0.92rem;color:var(--ink);background:var(--cream);outline:none;}
+input:focus,textarea:focus{border-color:var(--accent);background:#fff;}
+textarea{resize:vertical;min-height:80px;}
+
+.btn{padding:11px 20px;border:none;border-radius:3px;font-family:'Jost',sans-serif;
+  font-size:0.78rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:disabled{opacity:0.45;cursor:default;}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;}
+
+.state{font-size:0.82rem;line-height:1.6;}
+.state.ok{color:var(--green);}
+.state.err{color:var(--red);}
+.state.warn{color:var(--accent);}
+.hint{font-size:0.76rem;color:var(--muted);line-height:1.6;margin-top:8px;}
+
+.sub{display:flex;justify-content:space-between;gap:10px;padding:6px 0;
+  border-bottom:1px solid var(--border);font-size:0.8rem;}
+.sub:last-child{border-bottom:none;}
+.sub-when{color:var(--muted);font-size:0.74rem;white-space:nowrap;}
+.result{margin-top:12px;font-size:0.84rem;line-height:1.7;}
+.result-err{color:var(--red);font-size:0.76rem;}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <img class="logo-mark" src="/static/luma-mark-light.png" alt="LUMA Design Co"/>
+  <div class="hero-sub">Notifications</div>
+</div>
+
+<div class="page">
+
+  <div class="card">
+    <div class="card-title">This device</div>
+    <div class="state" id="dev-state">Checking…</div>
+    <div class="row">
+      <button class="btn btn-primary" id="enable-btn" onclick="enable()">Enable on this device</button>
+      <button class="btn btn-ghost" onclick="refresh()">Refresh</button>
+    </div>
+    <div class="hint" id="dev-hint"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Send to everyone</div>
+    <label for="title">Title</label>
+    <input id="title" value="LUMA" maxlength="60"/>
+    <label for="body">Message</label>
+    <textarea id="body" placeholder="What do you want it to say?" maxlength="300"></textarea>
+    <label for="url">Opens</label>
+    <input id="url" value="/today" maxlength="200"/>
+    <div class="row">
+      <button class="btn btn-primary" id="send-btn" onclick="send()">Send</button>
+      <span class="state" id="send-state"></span>
+    </div>
+    <div class="result" id="send-result"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Subscribed devices (<span id="sub-count">0</span>)</div>
+    <div id="sub-list"><div class="hint">Loading…</div></div>
+  </div>
+
+</div>
+
+<script>
+let PUBLIC_KEY='', CONFIGURED=false;
+
+// The browser wants the key as raw bytes, not the base64 the server holds.
+function urlB64ToUint8Array(base64String){
+  const padding='='.repeat((4 - base64String.length % 4) % 4);
+  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(base64);
+  const out=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+  return out;
+}
+
+function setState(id, text, cls){
+  const el=document.getElementById(id);
+  el.textContent=text;
+  el.className='state'+(cls?' '+cls:'');
+}
+
+async function refresh(){
+  // What this device can do, and what the server knows about it.
+  try{
+    const res=await fetch('/api/push/key');
+    const d=await res.json();
+    PUBLIC_KEY=d.key||''; CONFIGURED=!!d.configured;
+  }catch(e){ /* reported below */ }
+
+  const hint=document.getElementById('dev-hint');
+  const btn=document.getElementById('enable-btn');
+
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    setState('dev-state','This browser cannot receive notifications.','err');
+    hint.textContent='On iPhone, notifications only work once the app has been added to the Home Screen from Safari.';
+    btn.disabled=true;
+    return loadSubs();
+  }
+  // Both halves matter: without the public key a device cannot subscribe,
+  // and without the private one the server cannot send. Letting someone
+  // subscribe to a server that can't send is the worse failure, because
+  // nothing looks wrong until a message silently never arrives.
+  if(!PUBLIC_KEY || !CONFIGURED){
+    setState('dev-state','The server has no notification key set.','err');
+    hint.textContent='VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY both need to be set on Render.';
+    btn.disabled=true;
+    return loadSubs();
+  }
+
+  const perm=Notification.permission;
+  const reg=await navigator.serviceWorker.getRegistration();
+  const sub=reg ? await reg.pushManager.getSubscription() : null;
+
+  if(perm==='denied'){
+    setState('dev-state','Notifications are blocked for this site.','err');
+    hint.textContent='Allow them in the browser or phone settings for this site, then press Refresh.';
+    btn.disabled=true;
+  }else if(sub){
+    setState('dev-state','This device is subscribed.','ok');
+    hint.textContent='It will receive anything sent below.';
+    btn.textContent='Re-subscribe';
+    btn.disabled=false;
+  }else{
+    setState('dev-state','Not subscribed yet.','warn');
+    hint.textContent='Tap Enable, then allow notifications when asked.';
+    btn.disabled=false;
+  }
+  loadSubs();
+}
+
+async function enable(){
+  const btn=document.getElementById('enable-btn');
+  btn.disabled=true;
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){
+      setState('dev-state','Permission was not granted.','err');
+      btn.disabled=false;
+      return;
+    }
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      sub=await reg.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey:urlB64ToUint8Array(PUBLIC_KEY),
+      });
+    }
+    const label=prompt('Whose device is this? (optional)','')||'';
+    const res=await fetch('/api/push/subscribe',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({subscription:sub.toJSON(), label})});
+    const d=await res.json();
+    if(d.success===false) throw new Error(d.error);
+    setState('dev-state','This device is subscribed.','ok');
+    loadSubs();
+  }catch(e){
+    setState('dev-state','Could not subscribe — '+e.message,'err');
+  }
+  btn.disabled=false;
+}
+
+async function send(){
+  const btn=document.getElementById('send-btn');
+  const body=document.getElementById('body').value.trim();
+  if(!body){ setState('send-state','Write a message first.','err'); return; }
+  btn.disabled=true;
+  setState('send-state','Sending…','');
+  document.getElementById('send-result').innerHTML='';
+  try{
+    const res=await fetch('/api/push/send',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        title:document.getElementById('title').value.trim()||'LUMA',
+        body, url:document.getElementById('url').value.trim()||'/today'})});
+    const d=await res.json();
+    if(d.success===false) throw new Error(d.error);
+    setState('send-state','', '');
+    const bits=[`${d.sent} sent`];
+    if(d.failed)  bits.push(`${d.failed} failed`);
+    if(d.removed) bits.push(`${d.removed} removed (device gone)`);
+    document.getElementById('send-result').innerHTML=
+      bits.join(' · ') +
+      (d.errors && d.errors.length
+        ? '<div class="result-err">'+d.errors.map(escapeHtml).join('<br>')+'</div>'
+        : '');
+    loadSubs();
+  }catch(e){
+    setState('send-state','Could not send — '+e.message,'err');
+  }
+  btn.disabled=false;
+}
+
+async function loadSubs(){
+  try{
+    const res=await fetch('/api/push/subscriptions');
+    const d=await res.json();
+    const subs=d.subscriptions||[];
+    document.getElementById('sub-count').textContent=subs.length;
+    document.getElementById('sub-list').innerHTML = subs.length
+      ? subs.map(s=>`<div class="sub">
+          <span>${escapeHtml(s.label||deviceName(s.user_agent))}</span>
+          <span class="sub-when">${s.last_sent_at?'last sent '+when(s.last_sent_at):'added '+when(s.created_at)}</span>
+        </div>`).join('')
+      : '<div class="hint">Nothing subscribed yet.</div>';
+  }catch(e){
+    document.getElementById('sub-list').innerHTML='<div class="hint">Could not load.</div>';
+  }
+}
+
+// Enough to tell one device from another without pretending to be precise.
+function deviceName(ua){
+  const s=String(ua||'');
+  if(/iPhone/i.test(s)) return 'iPhone';
+  if(/iPad/i.test(s))   return 'iPad';
+  if(/Android/i.test(s))return 'Android';
+  if(/Mac/i.test(s))    return 'Mac';
+  if(/Windows/i.test(s))return 'Windows';
+  return 'Unknown device';
+}
+
+function when(ts){
+  try{ return new Date(ts).toLocaleString('en-AU',
+    {day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}); }
+  catch(e){ return ''; }
+}
+
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,c=>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+refresh();
+</script>
+</body>
+</html>

@@ -20,3 +20,49 @@ self.addEventListener('activate', (event) => {
 
 // No fetch handler on purpose. Adding one that merely forwards the request
 // would slow every request down for no benefit.
+
+// ── Push notifications ──────────────────────────────────────────────
+// A push arrives here even when no page is open — that is the point of a
+// worker. The payload is JSON the server sent; if it is missing or
+// malformed, still show something rather than nothing, because a silent
+// push is worse than a vague one.
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { body: event.data ? event.data.text() : '' };
+  }
+
+  const title = data.title || 'LUMA';
+  const options = {
+    body: data.body || '',
+    icon: '/static/icon-192.png',
+    badge: '/static/icon-192.png',
+    data: { url: data.url || '/today' },
+    // Without a tag, several notifications stack up; with one, a newer
+    // message replaces the last rather than burying the phone.
+    tag: data.tag || 'luma',
+    renotify: true,
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Tapping the notification should land on the relevant page — and reuse
+// an open window rather than piling up new ones.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || '/today';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((windows) => {
+        for (const client of windows) {
+          if ('focus' in client) {
+            client.navigate(target);
+            return client.focus();
+          }
+        }
+        return self.clients.openWindow(target);
+      })
+  );
+});

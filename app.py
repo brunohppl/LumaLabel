@@ -3126,6 +3126,143 @@ def api_warehouse_eta():
         return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
 
 
+# ─────────────────────── Push notifications ───────────────────────
+# A subscription identifies one browser on one device. The private key
+# never leaves the server; the public one is handed to the page so the
+# browser can address its push service to us.
+
+VAPID_PUBLIC_KEY  = os.environ.get('VAPID_PUBLIC_KEY', '')
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+VAPID_SUBJECT     = os.environ.get('VAPID_SUBJECT', 'mailto:admin@lumadesignco.au')
+
+
+@app.route('/push', methods=['GET'])
+def push_page():
+    """Write and send a notification. Deliberately unlinked."""
+    return render_page('push.html')
+
+
+@app.route('/api/push/key', methods=['GET'])
+def api_push_key():
+    return jsonify({'key': VAPID_PUBLIC_KEY, 'configured': bool(VAPID_PRIVATE_KEY)})
+
+
+@app.route('/api/push/subscribe', methods=['POST'])
+def api_push_subscribe():
+    """Remember a device that has agreed to be notified."""
+    try:
+        data = request.get_json(silent=True) or {}
+        sub = data.get('subscription') or {}
+        endpoint = sub.get('endpoint')
+        keys = sub.get('keys') or {}
+        if not endpoint or not keys.get('p256dh') or not keys.get('auth'):
+            return jsonify({'success': False, 'error': 'Incomplete subscription'}), 400
+
+        # The endpoint is unique per device, so re-subscribing updates
+        # rather than piling up duplicates.
+        existing = sb_get('push_subscriptions',
+                          f'endpoint=eq.{urllib.parse.quote(endpoint, safe="")}') or []
+        row = {
+            'endpoint':   endpoint,
+            'p256dh':     keys['p256dh'],
+            'auth':       keys['auth'],
+            'label':      (data.get('label') or '').strip() or None,
+            'user_agent': (request.headers.get('User-Agent') or '')[:300],
+        }
+        if existing:
+            sb_patch('push_subscriptions', f"id=eq.{existing[0]['id']}", row)
+        else:
+            sb_post('push_subscriptions', row)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@app.route('/api/push/subscriptions', methods=['GET'])
+def api_push_subscriptions():
+    """Who can currently be reached."""
+    try:
+        rows = sb_get('push_subscriptions',
+                      'select=id,label,user_agent,created_at,last_sent_at'
+                      '&order=created_at.desc') or []
+        return jsonify({'success': True, 'subscriptions': rows})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
+@app.route('/api/push/send', methods=['POST'])
+def api_push_send():
+    """Send one notification to every subscribed device.
+
+    A subscription that comes back rejected is removed: phones get reset
+    and permission gets withdrawn without anyone telling us, and a table
+    full of dead endpoints makes every send slower and the count a lie.
+    """
+    try:
+        from pywebpush import webpush, WebPushException
+    except ImportError:
+        return jsonify({'success': False,
+                        'error': 'pywebpush is not installed on this server'}), 500
+
+    if not VAPID_PRIVATE_KEY:
+        return jsonify({'success': False,
+                        'error': 'VAPID_PRIVATE_KEY is not set'}), 400
+
+    data  = request.get_json(silent=True) or {}
+    title = (data.get('title') or '').strip() or 'LUMA'
+    body  = (data.get('body') or '').strip()
+    url   = (data.get('url') or '/today').strip()
+    if not body:
+        return jsonify({'success': False, 'error': 'Write a message first'}), 400
+
+    try:
+        subs = sb_get('push_subscriptions', 'order=created_at.desc') or []
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Could not read subscriptions: {e}'}), 500
+
+    payload = json.dumps({'title': title, 'body': body, 'url': url})
+    sent, failed, removed = 0, 0, 0
+    errors = []
+
+    for s in subs:
+        try:
+            webpush(
+                subscription_info={
+                    'endpoint': s['endpoint'],
+                    'keys': {'p256dh': s['p256dh'], 'auth': s['auth']},
+                },
+                data=payload,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={'sub': VAPID_SUBJECT},
+                timeout=10,
+            )
+            sent += 1
+            try:
+                sb_patch('push_subscriptions', f"id=eq.{s['id']}",
+                         {'last_sent_at': brisbane_now().isoformat()})
+            except Exception:
+                pass
+        except WebPushException as e:
+            code = getattr(getattr(e, 'response', None), 'status_code', None)
+            # 404/410 mean the device is gone for good — not a transient fault.
+            if code in (404, 410):
+                try:
+                    sb_delete('push_subscriptions', f"id=eq.{s['id']}")
+                    removed += 1
+                except Exception:
+                    pass
+            else:
+                failed += 1
+                errors.append(f'{code or "error"}: {str(e)[:120]}')
+        except Exception as e:
+            failed += 1
+            errors.append(f'{type(e).__name__}: {str(e)[:120]}')
+
+    return jsonify({'success': True, 'sent': sent, 'failed': failed,
+                    'removed': removed, 'total': len(subs),
+                    'errors': errors[:5]})
+
+
 @app.route('/sw.js', methods=['GET'])
 def service_worker():
     """Served from the root on purpose: a worker's reach is limited to the

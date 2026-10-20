@@ -27,6 +27,19 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 .section-label{font-size:0.68rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:14px;margin-top:32px;}
 .nav-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
 @media(max-width:480px){.nav-grid{grid-template-columns:repeat(2,1fr);}}
+.notif-row{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  background:#fff;border:1px solid var(--border);border-radius:8px;
+  padding:14px 16px;margin:24px 0 4px;}
+.notif-title{font-size:0.92rem;font-weight:600;}
+.notif-sub{font-size:0.76rem;color:var(--muted);margin-top:2px;line-height:1.4;}
+.toggle{flex:0 0 auto;width:50px;height:28px;border-radius:14px;border:none;
+  background:var(--border);position:relative;cursor:pointer;padding:0;
+  transition:background 0.18s;}
+.toggle.on{background:var(--green,#4A7C59);}
+.toggle:disabled{opacity:0.5;cursor:default;}
+.toggle-knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.25);transition:transform 0.18s;}
+.toggle.on .toggle-knob{transform:translateX(22px);}
 .tools-row{display:flex;gap:16px;justify-content:center;margin:26px 0 10px;flex-wrap:wrap;}
 .tool-link{font-size:0.72rem;letter-spacing:0.08em;color:var(--muted);text-decoration:none;
   border-bottom:1px solid transparent;padding-bottom:2px;}
@@ -203,6 +216,19 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
     </div>
   </div>
 
+  <!-- One tap to opt in or out. The crew should not have to find a page
+       to do this, and the state has to be visible without tapping. -->
+  <div class="notif-row" id="notif-row" style="display:none;">
+    <div class="notif-text">
+      <div class="notif-title">Notifications</div>
+      <div class="notif-sub" id="notif-sub">Checking…</div>
+    </div>
+    <button class="toggle" id="notif-toggle" onclick="toggleNotifs()"
+            role="switch" aria-checked="false" aria-label="Notifications">
+      <span class="toggle-knob"></span>
+    </button>
+  </div>
+
   <!-- An installed app has no address bar, so a page with no link is a
        page you cannot reach. Deliberately quiet rather than a tile. -->
   <div class="tools-row">
@@ -213,6 +239,95 @@ body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;min-h
 </div>
 
 <script>
+// ── Notifications toggle ──────────────────────────────────────────────
+// One tap to opt in or out, with the state readable without tapping.
+// The row stays hidden on a device that cannot receive them at all —
+// an inert toggle invites people to keep pressing it.
+let PUSH_KEY='';
+
+function b64ToBytes(s){
+  const pad='='.repeat((4 - s.length % 4) % 4);
+  const b64=(s+pad).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(b64);
+  const out=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+  return out;
+}
+
+function paintToggle(on, sub, enabled){
+  const t=document.getElementById('notif-toggle');
+  t.classList.toggle('on', !!on);
+  t.setAttribute('aria-checked', on ? 'true' : 'false');
+  t.disabled = !enabled;
+  document.getElementById('notif-sub').textContent = sub;
+}
+
+async function initNotifs(){
+  const row=document.getElementById('notif-row');
+  if(!('serviceWorker' in navigator) || !('PushManager' in window) ||
+     typeof Notification==='undefined'){
+    return;                       // leave the row hidden
+  }
+  try{
+    const res=await fetch('/api/push/key');
+    const d=await res.json();
+    PUSH_KEY=d.key||'';
+    if(!PUSH_KEY || !d.configured) return;    // nothing to opt into yet
+  }catch(e){ return; }
+
+  row.style.display='flex';
+
+  if(Notification.permission==='denied'){
+    paintToggle(false,'Blocked in your phone settings for this site.',false);
+    return;
+  }
+  const reg=await navigator.serviceWorker.getRegistration();
+  const sub=reg ? await reg.pushManager.getSubscription() : null;
+  paintToggle(!!sub, sub ? 'On for this device.' : 'Off — tap to turn on.', true);
+}
+
+async function toggleNotifs(){
+  const t=document.getElementById('notif-toggle');
+  t.disabled=true;
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const existing=await reg.pushManager.getSubscription();
+
+    if(existing){
+      // Opting out: tell the server first, so a send stops trying even if
+      // the browser end fails.
+      await fetch('/api/push/unsubscribe',{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({endpoint:existing.endpoint})});
+      await existing.unsubscribe();
+      paintToggle(false,'Off — tap to turn on.',true);
+      return;
+    }
+
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){
+      paintToggle(false, perm==='denied'
+        ? 'Blocked in your phone settings for this site.'
+        : 'Not allowed — tap to try again.', perm!=='denied');
+      return;
+    }
+    const sub=await reg.pushManager.subscribe({
+      userVisibleOnly:true, applicationServerKey:b64ToBytes(PUSH_KEY)});
+    const res=await fetch('/api/push/subscribe',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({subscription:sub.toJSON()})});
+    const d=await res.json();
+    if(d.success===false) throw new Error(d.error);
+    paintToggle(true,'On for this device.',true);
+  }catch(e){
+    paintToggle(false,'Could not change that — '+e.message, true);
+  }finally{
+    document.getElementById('notif-toggle').disabled=false;
+  }
+}
+
+initNotifs();
+
 // Date in hero
 const now = new Date();
 document.getElementById('hero-date').textContent =

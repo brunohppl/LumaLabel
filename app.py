@@ -3178,6 +3178,26 @@ def api_push_subscribe():
         return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
 
 
+@app.route('/api/push/unsubscribe', methods=['POST'])
+def api_push_unsubscribe():
+    """Forget a device that has opted out.
+
+    Browser permission and our record are separate things: a device can
+    revoke one without the other. Removing the row here means a send no
+    longer tries, rather than waiting for a rejection to discover it.
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        endpoint = (data.get('endpoint') or '').strip()
+        if not endpoint:
+            return jsonify({'success': False, 'error': 'No endpoint given'}), 400
+        sb_delete('push_subscriptions',
+                  f'endpoint=eq.{urllib.parse.quote(endpoint, safe="")}')
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+
 @app.route('/api/push/subscriptions', methods=['GET'])
 def api_push_subscriptions():
     """Who can currently be reached."""

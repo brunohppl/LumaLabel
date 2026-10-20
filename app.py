@@ -4678,6 +4678,23 @@ def sync_run_start(trigger):
         return None
 
 
+def sync_run_stage(run_id, stage):
+    """Note where a run has got to.
+
+    The row was only written at the start and the end, so a run that died
+    in between said 'did not finish' and nothing else. Recording each
+    stage turns that into 'died while fetching the board, after 1,000
+    items' — which is the difference between knowing and guessing.
+    """
+    if not run_id:
+        return
+    try:
+        sb_patch('sync_runs', f'id=eq.{run_id}', {'stage': stage[:200]})
+    except Exception as e:
+        print(f'[SYNC] could not record the stage: {e}')
+    print(f'[SYNC] {stage}', flush=True)
+
+
 def sync_run_finish(run_id, data=None, error=None, started=None):
     """Close off the run. Never allowed to break the pull itself."""
     if not run_id:
@@ -4692,6 +4709,14 @@ def sync_run_finish(run_id, data=None, error=None, started=None):
             patch['duration_ms'] = int((time.time() - started) * 1000)
         if error:
             patch['error'] = str(error)[:500]
+        # The list the pull already builds, kept rather than discarded —
+        # so the history can answer "what did it change", not just "how
+        # many". Capped because a big night could otherwise store a very
+        # long list for something nobody reads past the first screen.
+        changes = (data or {}).get('changes') or []
+        if changes:
+            patch['changes'] = changes[:60]
+
         for col, key in (
             ('dates_updated',     'dates_updated'),
             ('statuses_updated',  'statuses_updated'),
@@ -4735,7 +4760,7 @@ def api_monday_pull():
     run_id = sync_run_start(trigger)
     started = time.time()
     try:
-        result = _api_monday_pull_inner()
+        result = _api_monday_pull_inner(run_id)
         body = result[0] if isinstance(result, tuple) else result
         data = body.get_json() if hasattr(body, 'get_json') else {}
         if isinstance(result, tuple) or not (data or {}).get('success', True):
@@ -4749,8 +4774,13 @@ def api_monday_pull():
         return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
 
 
-def _api_monday_pull_inner():
+def _api_monday_pull_inner(run_id=None):
+    sync_run_stage(run_id, 'fetching the Monday board')
+    t0 = time.time()
     data = get_monday_board_data()
+    if 'error' not in data:
+        n = sum(len(v) for v in (data.get('groups') or {}).values())
+        sync_run_stage(run_id, f'fetched {n} items in {time.time()-t0:.0f}s')
     if 'error' in data:
         return jsonify({'success': False, 'error': data['error']}), 500
 
@@ -4820,6 +4850,7 @@ def _api_monday_pull_inner():
         for r in rows:
             unscheduled_by_job.setdefault((r['job_id'], r.get('type'), r.get('date')), r)
 
+    sync_run_stage(run_id, f'matching {len(actionable)} items against jobs')
     to_insert = []
 
     held_ids = []
@@ -4966,6 +4997,7 @@ def _api_monday_pull_inner():
     details_only.sort(key=lambda it: 0 if (it.get('luma_job') or {}).get('status')
                       in ('installed', 'ready_to_collect') else 1)
 
+    sync_run_stage(run_id, f'updating {len(details_only)} completed/detail items')
     for item in details_only:
         try:
             luma_job = item['luma_job']
@@ -5010,6 +5042,7 @@ def _api_monday_pull_inner():
         except Exception:
             skipped_errors += 1
 
+    sync_run_stage(run_id, f'creating {len(to_insert)} tray tiles')
     if to_insert:
         sb_post('job_schedule', to_insert)
 

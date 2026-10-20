@@ -54,9 +54,14 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
   font-family:inherit;font-size:0.66rem;letter-spacing:0.06em;text-transform:uppercase;
   color:var(--muted);padding:3px 10px;cursor:pointer;}
 .run-refresh:hover{border-color:var(--accent);color:var(--accent);}
-.run{display:flex;align-items:baseline;gap:12px;padding:7px 10px;background:#fff;
-  border:1px solid var(--border);border-left:3px solid var(--green);border-radius:3px;
-  margin-bottom:5px;flex-wrap:wrap;}
+.run{padding:7px 10px;background:#fff;border:1px solid var(--border);
+  border-left:3px solid var(--green);border-radius:3px;margin-bottom:5px;}
+.run-top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}
+.run-more{background:none;border:1px solid var(--border);border-radius:10px;
+  font-family:inherit;font-size:0.66rem;color:var(--muted);padding:1px 9px;cursor:pointer;}
+.run-more:hover{border-color:var(--accent);color:var(--accent);}
+.run-changes{margin-top:7px;padding-top:6px;border-top:1px solid var(--border);}
+.run-change{font-size:0.74rem;color:var(--ink);line-height:1.6;}
 .run.error{border-left-color:var(--red,#A63D2F);}
 .run.warn{border-left-color:var(--accent);}
 .run.running{border-left-color:var(--muted);}
@@ -64,6 +69,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .run-who{font-size:0.66rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
 .run-what{flex:1;font-size:0.78rem;color:var(--ink);min-width:160px;}
 .run-dur{font-size:0.7rem;color:var(--muted);white-space:nowrap;}
+.run-stage{color:var(--muted);font-size:0.72rem;}
 .run-err{font-size:0.74rem;color:var(--red,#A63D2F);}
 .run-empty{font-size:0.78rem;color:var(--muted);padding:8px 2px;}
 .sync-table{width:100%;border-collapse:collapse;font-size:0.82rem;}
@@ -427,17 +433,33 @@ function runHTML(r){
     {day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
 
   let what;
-  if(r.status==='running')      what='<span class="run-err">Did not finish</span>';
-  else if(r.status==='error')   what=`<span class="run-err">${escapeHtml(r.error||'Failed')}</span>`;
+  if(r.status==='running')      what='<span class="run-err">Did not finish</span>'+
+                                     (r.stage?` <span class="run-stage">— stopped while ${escapeHtml(r.stage)}</span>`:'');
+  else if(r.status==='error')   what=`<span class="run-err">${escapeHtml(r.error||'Failed')}</span>`+
+                                     (r.stage?` <span class="run-stage">— while ${escapeHtml(r.stage)}</span>`:'');
   else what=(counts.join(', ')||'nothing to change')+
             (problems.length?` · ${problems.join(', ')}`:'');
 
+  const list=(r.changes||[]);
   return `<div class="run ${cls}">
-    <span class="run-when">${when}</span>
-    <span class="run-who">${r.trigger==='scheduled'?'Scheduled':'Manual'}</span>
-    <span class="run-what">${what}</span>
-    ${r.duration_ms?`<span class="run-dur">${(r.duration_ms/1000).toFixed(1)}s</span>`:''}
+    <div class="run-top">
+      <span class="run-when">${when}</span>
+      <span class="run-who">${r.trigger==='scheduled'?'Scheduled':'Manual'}</span>
+      <span class="run-what">${what}</span>
+      ${list.length?`<button class="run-more" onclick="toggleRun('${r.id}')">${list.length} changes</button>`:''}
+      ${r.duration_ms?`<span class="run-dur">${(r.duration_ms/1000).toFixed(1)}s</span>`:''}
+    </div>
+    ${list.length?`<div class="run-changes" id="rc-${r.id}" style="display:none;">
+      ${list.map(c=>`<div class="run-change">${escapeHtml(c)}</div>`).join('')}
+    </div>`:''}
   </div>`;
+}
+
+// The counts answer "how much"; this answers "what" — collapsed, because
+// a run with sixty changes shouldn't bury the one above it.
+function toggleRun(id){
+  const el=document.getElementById('rc-'+id);
+  if(el) el.style.display = el.style.display==='none' ? 'block' : 'none';
 }
 
 function escapeHtml(s){

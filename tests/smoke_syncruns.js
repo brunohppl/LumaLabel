@@ -6,12 +6,15 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
 const RUNS=[
  {id:'1',trigger:'scheduled',status:'ok',started_at:'2026-10-18T15:00:00Z',duration_ms:8400,
-  dates_updated:12,completed_updated:3,tiles_created:5,skipped_errors:0,unmatched:0,writes_remaining:0},
+  dates_updated:12,completed_updated:3,tiles_created:5,skipped_errors:0,unmatched:0,writes_remaining:0,
+  changes:['#QU-1351 install date set to 2026-10-22','#QU-1362 moved to Completed',
+           '#QU-1370 property details updated']},
  {id:'2',trigger:'manual',status:'ok',started_at:'2026-10-17T04:12:00Z',duration_ms:6100,
   dates_updated:4,skipped_errors:2,unmatched:7,writes_remaining:0},
  {id:'3',trigger:'scheduled',status:'error',started_at:'2026-10-16T15:00:00Z',
   error:'Monday token rejected'},
- {id:'4',trigger:'scheduled',status:'running',started_at:'2026-10-15T15:00:00Z'},
+ {id:'4',trigger:'scheduled',status:'running',started_at:'2026-10-15T15:00:00Z',
+  stage:'fetched 1000 items in 41s'},
  {id:'5',trigger:'manual',status:'ok',started_at:'2026-10-14T01:00:00Z',duration_ms:900,
   dates_updated:0,writes_remaining:40}];
 
@@ -47,9 +50,23 @@ const w=dom.window,d=w.document;
   // the case the start-row exists for
   ok('a run that never finished is visible', /Did not finish/.test(rows[3].textContent));
   ok('and distinguishable', rows[3].classList.contains('running'));
+  ok('saying where it stopped', /stopped while fetched 1000 items in 41s/.test(rows[3].textContent));
 
   ok('hitting the write limit is called out', /hit the limit/.test(rows[4].textContent));
   ok('a run that changed nothing says so', /nothing to change/.test(rows[4].textContent));
+
+  // What it changed, not just how much
+  ok('a run with changes offers to show them', /3 changes/.test(rows[0].textContent));
+  const panel=d.getElementById('rc-1');
+  ok('the list is collapsed by default', panel && panel.style.display==='none');
+  w.toggleRun('1');
+  ok('opening it shows each change', panel.style.display==='block');
+  ok('naming the job and what happened',
+     /QU-1351 install date set to 2026-10-22/.test(panel.textContent));
+  ok('including completions', /QU-1362 moved to Completed/.test(panel.textContent));
+  w.toggleRun('1');
+  ok('and it closes again', panel.style.display==='none');
+  ok('a run with no changes offers no button', !/changes/.test(rows[2].textContent));
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);

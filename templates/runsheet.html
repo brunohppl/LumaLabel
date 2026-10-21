@@ -623,10 +623,23 @@ function esc(s){
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// The space the grid actually has. Measured from the container rather than
+// the window, because pinch-zooming on a phone changes what you can see
+// without changing innerWidth — so a width baked in at first render stayed
+// put while the view scaled around it, pushing the grid into the corner.
+// The renderer and the resize watcher both use this, so they can never
+// disagree about how wide things should be.
+function gridWidth(){
+  const host=document.getElementById('rs-grid');
+  const measured=(host && host.clientWidth) || 0;
+  return Math.max(280, measured || window.innerWidth || 1024);
+}
+
 function render(){
   const teams=dayTeams;   // the day grid always shows every crew column
   const n=teams.length;
-  const timew=56,colw=Math.max(160,Math.floor((window.innerWidth-timew-40)/(n+1)));
+  const avail=gridWidth();
+  const timew=56, colw=Math.max(160, Math.floor((avail-timew-40)/(n+1)));
   const cols=`${timew}px repeat(${n},${colw}px) ${Math.max(120,colw*0.7)}px`;
   const hasClosing=teams.some(t=>ocTasksFor(t.id,'closing').length);
   SLOTS=buildSlots(gridStart());   // starts earlier only if the day does
@@ -2168,6 +2181,37 @@ async function deleteEntry(){
 
 loadStaff();
 load();
+
+// Rotating the phone, zooming, or resizing a window all change how much
+// room the grid has. Without this it kept the width it was born with.
+// Debounced, because a resize fires continuously while it happens.
+(function watchWidth(){
+  let lastWidth = 0, timer = null;
+
+  function check(){
+    if(!document.getElementById('rs-grid')) return;
+    const w = gridWidth();            // the same measurement render uses
+    // Ignore the small jitters a scrollbar or an address bar causes.
+    if(Math.abs(w - lastWidth) < 24) return;
+    lastWidth = w;
+    if(_view === 'week') loadWeek(); else render();
+  }
+
+  function schedule(){
+    clearTimeout(timer);
+    timer = setTimeout(check, 180);
+  }
+
+  window.addEventListener('resize', schedule);
+  window.addEventListener('orientationchange', schedule);
+  // Pinch-zoom moves the visual viewport without firing a resize on some
+  // browsers, so watch that too where it exists.
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', schedule);
+  }
+  // And catch the first measurement once the grid is actually in the page.
+  setTimeout(check, 400);
+})();
 </script>
 </body>
 </html>

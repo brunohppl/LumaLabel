@@ -18,6 +18,7 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .nav-links{display:flex;gap:16px;flex-wrap:wrap;}
 .nav-link{color:rgba(250,248,244,0.45);text-decoration:none;font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;transition:color 0.2s;white-space:nowrap;}
 .nav-link:hover,.nav-link.active{color:var(--accent);}
+@media(max-width:480px){.date-label{min-width:0;flex:1;}}
 @media(max-width:480px){header{padding:12px 16px;}.logo{font-size:1.2rem;}.nav-link{font-size:0.68rem;}.nav-links{gap:12px;}}
 .page{padding:20px 16px 60px;}
 .page-hdr{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;}
@@ -25,7 +26,14 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .dev-banner{background:rgba(184,147,90,0.1);border:1px solid rgba(184,147,90,0.3);border-radius:6px;padding:8px 14px;font-size:0.8rem;color:var(--accent);display:flex;align-items:center;gap:8px;margin-bottom:14px;}
 .team-view-link{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--green);color:white;text-decoration:none;border-radius:6px;font-size:0.78rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-left:auto;}
 .team-view-link:hover{opacity:0.88;}
-.date-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+/* Wrapping matters more than it looks: this row holds six controls and a
+   200px date label, which on a phone comes to far more than the screen.
+   Unable to wrap, it pushed the whole PAGE wider than the viewport — and
+   a page wider than the screen is what lets a browser zoom out past
+   normal and leave the content small and off to one side. The grid itself
+   was never the problem; it scrolls inside its own container.
+   On a desktop there is room for one line, so nothing changes there. */
+.date-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
 .date-nav-btn{background:none;border:1px solid var(--border);border-radius:4px;padding:6px 12px;cursor:pointer;font-size:1rem;color:var(--ink);}
 .date-nav-btn:hover{background:var(--sand);}
 .date-label{font-size:1rem;font-weight:600;min-width:200px;text-align:center;

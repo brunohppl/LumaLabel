@@ -358,6 +358,40 @@ def post_slack(text):
         return False
 
 
+def scheduled_lead_for(job_id):
+    """The lead on the crew doing this job's styling today.
+
+    The lead is a property of the crew, not the tile, so this goes through
+    today's styling tile to find which crew is on it. Falls back to any
+    styling tile for the job, then to nothing — a plain 'Stylist' reads
+    better than a name belonging to someone else.
+    """
+    if not job_id:
+        return ''
+    try:
+        tiles = sb_get('job_schedule',
+                       f'job_id=eq.{job_id}&select=type,team_id,date') or []
+        if not tiles:
+            return ''
+        today = brisbane_now().strftime('%Y-%m-%d')
+
+        def team_of(rows):
+            for t in rows:
+                if t.get('type') == 'styling' and t.get('team_id'):
+                    return t['team_id']
+            return None
+
+        team_id = (team_of([t for t in tiles if t.get('date') == today])
+                   or team_of(tiles))
+        if not team_id:
+            return ''
+        crew = sb_get('day_teams', f'id=eq.{team_id}&select=lead') or []
+        return (crew[0].get('lead') or '').strip() if crew else ''
+    except Exception as e:
+        print(f'[SLACK] could not read the styling crew for {job_id}: {e}')
+        return ''
+
+
 def notify_slack_eta(job, role, eta_text):
     """Post an ETA to Slack — only called when someone explicitly taps
     the address on /driver or /stylist and a location is captured, never
@@ -397,7 +431,10 @@ def notify_slack_eta(job, role, eta_text):
         truck_name = scheduled_vehicle_for(job.get('id')) or job.get('truck') or ''
         who = f'🚛 {truck_name}' if truck_name else '🚛 Truck'
     else:
-        who = '🚗 Stylist'
+        # Name the person where we know it — "Addy is 20 minutes away" is
+        # worth more in a channel than "a stylist is".
+        lead = (job.get('lead') or '').strip() or scheduled_lead_for(job.get('id'))
+        who = f'🚗 {lead}' if lead else '🚗 Stylist'
 
     # A run back to the warehouse isn't a job, so it shouldn't read as one.
     if (ref or '').strip().lower() == 'warehouse':
@@ -4252,6 +4289,11 @@ def api_job_eta(job_id):
     named = (data.get('vehicle') or '').strip()
     if named and named in TRANSPORT_VEHICLES:
         job = {**job, 'truck': named, 'id': None}   # id None skips the lookup
+    # The page knows which crew's card was tapped, so it can say who —
+    # cheaper and more certain than looking it up from the schedule.
+    lead = (data.get('lead') or '').strip()
+    if lead:
+        job = {**job, 'lead': lead}
     slack_posted = notify_slack_eta(job, role, eta_text)
 
     return jsonify({'success': True, 'eta_text': eta_text, 'role': role, 'slack_posted': slack_posted})

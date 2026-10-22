@@ -724,7 +724,7 @@ function cardHTML(e, jobById, showTeam){
       </div>`
           : ''}
       ${job?`<div class="card-btns">
-        ${(e.type==='bay'||e.type==='selection')?'':`<button class="card-btn card-btn-nav" onclick="navigate('${job.id}','${addr.replace(/'/g,"\\'")}','${e._team?.function||''}','${(e._team?.vehicle||'').replace(/'/g,'')}')">📍 Navigate</button>`}
+        ${(e.type==='bay'||e.type==='selection')?'':`<button class="card-btn card-btn-nav" onclick="navigate('${job.id}','${addr.replace(/'/g,"\\'")}','${e._team?.function||''}','${(e._team?.vehicle||'').replace(/'/g,'')}','${(e._team?.lead||'').replace(/'/g,'')}')">📍 Navigate</button>`}
 
         ${(e.type==='selection'||(e.type!=='bay'&&e._team?.function==='styling'))
             ? `<a href="/stylist/${job.id}" target="_blank" class="card-btn card-btn-stylist">✎ Stylist</a>`:''}
@@ -736,14 +736,14 @@ function cardHTML(e, jobById, showTeam){
 }
 
 // Navigate with Slack confirm
-function navigate(jobId, addr, teamFunction, vehicle){
+function navigate(jobId, addr, teamFunction, vehicle, lead){
   // The endpoint files the ETA against the truck or the stylist, and words the
   // Slack message accordingly. This page used to send role:'team', which isn't
   // a value it accepts — so the request was rejected and nothing reached Slack.
   // The truck is whichever column you tapped. Deriving it from the job
   // instead named every truck the job is split across — "Nemo + Nigel" —
   // when the person tapping is on exactly one of them.
-  _pendingNav={jobId,addr,vehicle:vehicle||'',
+  _pendingNav={jobId,addr,vehicle:vehicle||'',lead:lead||'',
                role:(teamFunction==='styling'?'stylist':'truck')};
   document.getElementById('slack-overlay').classList.add('open');
 }
@@ -757,7 +757,7 @@ function navWarehouse(teamId, vehicle){
 
 function slackChoice(choice){
   document.getElementById('slack-overlay').classList.remove('open');
-  const{jobId,addr,role,warehouse,teamId,vehicle}=_pendingNav||{};
+  const{jobId,addr,role,warehouse,teamId,vehicle,lead}=_pendingNav||{};
   _pendingNav=null;
   if(choice==='cancel') return;
   const mapsUrl=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr||'')}`;
@@ -769,7 +769,7 @@ function slackChoice(choice){
       const body=warehouse
         ? {lat:pos.coords.latitude,lng:pos.coords.longitude,team_id:teamId,vehicle:vehicle||''}
         : {lat:pos.coords.latitude,lng:pos.coords.longitude,role:role||'truck',
-           vehicle:vehicle||''};
+           vehicle:vehicle||'', lead:lead||''};
       fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
             body:JSON.stringify(body)})
         .then(async res=>{

@@ -701,9 +701,13 @@ function cardHTML(e, jobById, showTeam){
       ${teamLabel}
       <div class="card-ref">${ref}</div>
       ${street?`<div class="card-addr">${street}</div>`:''}
-      ${(e.kind==='break'||e.title==='Lunch break'||WAREHOUSE_TYPES.includes(e.type))
-          ?''
-          :(job&&job.access_notes?`<div class="card-access">🔑 <strong>Access</strong> ${job.access_notes}</div>`:'')}
+      ${(() => {
+        if(e.kind==='break'||e.title==='Lunch break'||WAREHOUSE_TYPES.includes(e.type)) return '';
+        // A note set for this crew wins over the property's. Same line,
+        // same styling — only the words differ.
+        const note = e.access_note || (job && job.access_notes);
+        return note ? `<div class="card-access">🔑 <strong>Access</strong> ${note}</div>` : '';
+      })()}
       ${(_pj && _pj.photo_time && !(e.kind==='break'||e.title==='Lunch break'))
           ? `<div class="card-photo">📷 Photos ${_pj.photo_time}</div>` : ''}
       ${propTag?`<div class="card-prop">${propTag}</div>`:''}

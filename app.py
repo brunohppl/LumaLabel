@@ -4037,6 +4037,9 @@ def api_schedule_update(entry_id):
     if 'team'     in data: payload['team']     = data['team'] or None
     if 'category' in data: payload['category'] = data['category'] or 'transport'
     if 'type'     in data: payload['type']     = data['type']
+    # A note for this crew only. Empty puts them back on the property's.
+    if 'access_note' in data:
+        payload['access_note'] = (data['access_note'] or '').strip() or None
     if 'date'     in data: payload['date']     = data['date']
     if 'start_time' in data:
         if data['start_time'] is not None and data['start_time'] not in RUNSHEET_TIME_SLOTS:

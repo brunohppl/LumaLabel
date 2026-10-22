@@ -191,6 +191,9 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
 .jsr-ref{font-weight:700;color:var(--accent);margin-right:6px;}
 .jsr-addr{color:var(--muted);font-size:0.77rem;}
 .loading{text-align:center;padding:40px;color:var(--muted);}
+.access-share{display:flex;align-items:center;gap:7px;margin-top:7px;
+  font-size:0.76rem;color:var(--muted);cursor:pointer;}
+.access-share input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .template-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
 
@@ -393,9 +396,13 @@ header{background:var(--ink);padding:16px 24px;display:flex;align-items:center;j
     </div>
   </div>
   <div id="entry-access-wrap" style="display:none;">
-    <label class="fl">🔑 Property access <span style="font-weight:400;text-transform:none;">(all crews, both days)</span></label>
+    <label class="fl">🔑 Property access</label>
     <textarea class="fi" id="entry-access" rows="2" placeholder="Gate code, lockbox, parking, where the key is…" style="resize:none;font-size:0.84rem;padding:8px 10px;"></textarea>
-    <div style="font-size:0.7rem;color:var(--muted);margin-top:4px;margin-bottom:10px;">
+    <label class="access-share">
+      <input type="checkbox" id="entry-access-all" checked onchange="updateAccessHint()"/>
+      <span>Same for all crews on this job</span>
+    </label>
+    <div style="font-size:0.7rem;color:var(--muted);margin-top:4px;margin-bottom:10px;" id="entry-access-hint">
       Saved against the property, so every crew on this job sees it — including the load crew the day before.
     </div>
   </div>
@@ -786,7 +793,9 @@ function render(){
       // so it sits with the reference rather than buried in the detail line.
       const photoTag=(!isTask&&job&&job.photo_time)?`<span class="rs-photo" title="Photography deadline">📷 ${job.photo_time}</span>`:'';
       const lbl=isBreak?'🍽 Break':(isTask?(taskJobRef?`Task · ${taskJobRef}`:'Task'):(TYPE_LBL[e.type]||e.type||''));
-      const accessTag=(!isTask&&job&&job.access_notes)?`<span class="rs-access" title="${String(job.access_notes).replace(/"/g,'&quot;')}">🔑</span>`:'';
+      // The tile's own note wins over the property's, same as the cards.
+      const accessNote=(!isTask) ? (e.access_note || (job&&job.access_notes)) : null;
+      const accessTag=accessNote?`<span class="rs-access" title="${String(accessNote).replace(/"/g,'&quot;')}">🔑</span>`:'';
       // A transfer comes from another job rather than the warehouse, so the
       // crew needs to know before they start loading.
       const transferTag=(!isTask&&job)?transferBadge(job, e.type):'';
@@ -1951,14 +1960,46 @@ function transferBadge(job, type){
 function refreshAccessField(jobId){
   const wrap=document.getElementById('entry-access-wrap');
   const box=document.getElementById('entry-access');
+  const all=document.getElementById('entry-access-all');
+  const hint=document.getElementById('entry-access-hint');
   if(!wrap||!box) return;
   const job=jobId?dayJobs.find(j=>j.id===jobId):null;
-  if(job){
-    box.value=job.access_notes||'';
-    wrap.style.display='block';
+  if(!job){
+    box.value=''; wrap.style.display='none';
+    if(all) all.checked=true;
+    return;
+  }
+
+  // A tile with its own note is showing that; otherwise the job's.
+  const eid=document.getElementById('entry-id').value;
+  const entry=eid?daySchedule.find(x=>x.id===eid):null;
+  const tileNote=entry && entry.access_note;
+
+  box.value = tileNote || job.access_notes || '';
+  if(all) all.checked = !tileNote;        // ticked unless this tile has its own
+  wrap.style.display='block';
+  updateAccessHint();
+}
+
+// Say plainly where the note is going, and — the case that otherwise looks
+// broken — that a crew with its own note will not see an edit to the
+// shared one.
+function updateAccessHint(){
+  const all=document.getElementById('entry-access-all');
+  const hint=document.getElementById('entry-access-hint');
+  if(!all||!hint) return;
+  if(all.checked){
+    const eid=document.getElementById('entry-id').value;
+    const entry=eid?daySchedule.find(x=>x.id===eid):null;
+    const jobId=entry?entry.job_id:document.getElementById('entry-job')?.value;
+    const others=jobId
+      ? daySchedule.filter(e=>e.job_id===jobId && e.access_note && e.id!==eid).length
+      : 0;
+    hint.textContent = others
+      ? `Saved against the property. ${others} crew${others>1?'s have':' has'} their own note and will keep it.`
+      : 'Saved against the property, so every crew on this job sees it — including the load crew the day before.';
   }else{
-    box.value='';
-    wrap.style.display='none';
+    hint.textContent='Saved for this crew only. Everyone else keeps the property note.';
   }
 }
 
@@ -1969,14 +2010,42 @@ async function saveAccessNotes(jobId){
   const job=dayJobs.find(j=>j.id===jobId);
   if(!job) return;
   const val=box.value.trim();
-  if((job.access_notes||'')===val) return;    // unchanged — don't write
+  const all=document.getElementById('entry-access-all');
+  const shared=!all || all.checked;
 
-  const prev=job.access_notes;
-  job.access_notes=val||null;                 // optimistic, so tiles update now
-  const r=await apiFetch(`/api/jobs/${jobId}/access-notes`,{
+  const eid=document.getElementById('entry-id').value;
+  const entry=eid?daySchedule.find(x=>x.id===eid):null;
+
+  if(shared){
+    // Back to the property note. If this tile had its own, clear it, or
+    // the crew would keep seeing the old one and the tick would be a lie.
+    if(entry && entry.access_note){
+      const prevTile=entry.access_note;
+      entry.access_note=null;
+      const r=await apiFetch(`/api/schedule/${entry.id}`,{
+        method:'PATCH',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({access_note:null})});
+      if(!r.ok){ entry.access_note=prevTile; }
+    }
+    if((job.access_notes||'')===val) return;   // unchanged — don't write
+    const prev=job.access_notes;
+    job.access_notes=val||null;                // optimistic, so tiles update now
+    const r=await apiFetch(`/api/jobs/${jobId}/access-notes`,{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({access_notes:val})});
+    if(!r.ok){ job.access_notes=prev; }
+    return;
+  }
+
+  // This crew only — the property note is left exactly as it was.
+  if(!entry) return;
+  if((entry.access_note||'')===val) return;
+  const prevTile=entry.access_note;
+  entry.access_note=val||null;
+  const r=await apiFetch(`/api/schedule/${entry.id}`,{
     method:'PATCH',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({access_notes:val})});
-  if(!r.ok){ job.access_notes=prev; }
+    body:JSON.stringify({access_note:val||null})});
+  if(!r.ok){ entry.access_note=prevTile; }
 }
 
 async function cloneEntryToTeam(){

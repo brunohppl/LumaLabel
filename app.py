@@ -1954,7 +1954,7 @@ def _settled(future):
 # tab, a new way of working). MINOR bumps for features and fixes within
 # that. Single source of truth — the home page reads it from /api/version
 # so it can't drift from what's deployed.
-APP_VERSION = '2.0'
+APP_VERSION = '2.1'
 
 _TEMPLATE_CACHE = {}
 

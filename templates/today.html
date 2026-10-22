@@ -299,6 +299,11 @@ const FN_COL={transport:'#2e5a8a',styling:'#6a3d8a',warehouse:'#b8935a'};
 const FN_LBL={transport:'🚛 Transport',styling:'🎨 Styling',warehouse:'🏭 Warehouse'};
 const TYPE_LBL={install:'Install',pickup:'Pickup',to_load:'To Load',task:'Task',styling:'Styling',bay:'Load Bay',selection:'Selection'};
 
+// Work that happens at the warehouse. The property's access notes — gate
+// codes, lockboxes, which lift to use — mean nothing to someone loading a
+// truck in the bay, and they push the real detail further down the card.
+const WAREHOUSE_TYPES=['to_load','bay','selection'];
+
 let viewDate=new Date();
 let dayData={teams:[],schedule:[],tasks:[],jobs:[]};
 let _pendingNav=null;
@@ -696,7 +701,9 @@ function cardHTML(e, jobById, showTeam){
       ${teamLabel}
       <div class="card-ref">${ref}</div>
       ${street?`<div class="card-addr">${street}</div>`:''}
-      ${(e.kind==='break'||e.title==='Lunch break')?'':(job&&job.access_notes?`<div class="card-access">🔑 <strong>Access</strong> ${job.access_notes}</div>`:'')}
+      ${(e.kind==='break'||e.title==='Lunch break'||WAREHOUSE_TYPES.includes(e.type))
+          ?''
+          :(job&&job.access_notes?`<div class="card-access">🔑 <strong>Access</strong> ${job.access_notes}</div>`:'')}
       ${(_pj && _pj.photo_time && !(e.kind==='break'||e.title==='Lunch break'))
           ? `<div class="card-photo">📷 Photos ${_pj.photo_time}</div>` : ''}
       ${propTag?`<div class="card-prop">${propTag}</div>`:''}

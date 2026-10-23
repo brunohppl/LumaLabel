@@ -3124,6 +3124,62 @@ def record_nav_event(**kw):
         print(f'[NAV] could not record the event: {e}')
 
 
+def advance_jobs_on_return(team_id, vehicle=None):
+    """Move a crew's jobs on when they head back to the warehouse.
+
+    An install becomes Installed, a pickup becomes Completed — but only
+    from the rung below. A job still 'ready' plainly was not installed,
+    and a crew that pops back at 10am to reload must not finish its
+    afternoon work by accident. The status ladder does that limiting for
+    us, so no questions need asking.
+
+    Never allowed to break the navigation that triggered it.
+    """
+    moved = []
+    try:
+        today = brisbane_now().strftime('%Y-%m-%d')
+        flt = f'date=eq.{today}&select=job_id,type,team_id,vehicle'
+        tiles = sb_get('job_schedule', flt) or []
+
+        mine = [t for t in tiles
+                if (team_id and t.get('team_id') == team_id)
+                or (not team_id and vehicle and t.get('vehicle') == vehicle)]
+        if not mine:
+            return moved
+
+        # What each kind of work means the job has reached, and what it
+        # must already be for that to be true.
+        TRANSITIONS = {
+            'install': ('loaded', 'installed'),
+            'pickup':  ('ready_to_collect', 'returned'),   # shown as Completed
+        }
+
+        job_ids = {t['job_id'] for t in mine
+                   if t.get('job_id') and t.get('type') in TRANSITIONS}
+        if not job_ids:
+            return moved
+
+        ids = ','.join(job_ids)
+        jobs = sb_get('jobs', f'id=in.({ids})&select=id,job_ref,status') or []
+        by_id = {j['id']: j for j in jobs}
+
+        for t in mine:
+            jid = t.get('job_id')
+            rule = TRANSITIONS.get(t.get('type'))
+            if not jid or not rule or jid not in by_id:
+                continue
+            need, becomes = rule
+            job = by_id[jid]
+            if job.get('status') != need:
+                continue          # not where it would have to be — leave it
+            if sb_patch('jobs', f'id=eq.{jid}', {'status': becomes}):
+                job['status'] = becomes      # so two tiles can't double-move it
+                moved.append({'job_ref': job.get('job_ref'), 'status': becomes})
+    except Exception as e:
+        print(f'[RETURN] could not advance jobs: {e}')
+    return moved
+
+
 @app.route('/api/eta/warehouse', methods=['POST'])
 def api_warehouse_eta():
     """ETA from where someone is now back to the warehouse.
@@ -3149,6 +3205,12 @@ def api_warehouse_eta():
                          team_id=data.get('team_id'), role='truck',
                          eta_minutes=eta_minutes, lat=lat, lng=lng)
 
+        # Heading back to the warehouse means the run is done, so move the
+        # crew's jobs on. Only jobs already at the right rung move: a crew
+        # returning mid-morning to reload must not mark an afternoon job
+        # installed. Done quietly — nobody wants a dialog at the end of a run.
+        advanced = advance_jobs_on_return(data.get('team_id'), vehicle)
+
         posted = False
         if eta_text:
             # A stand-in job, so the existing Slack formatting is reused
@@ -3158,7 +3220,7 @@ def api_warehouse_eta():
                  'truck': vehicle, 'id': None},
                 'truck', eta_text)
         return jsonify({'success': True, 'eta_text': eta_text,
-                        'slack_posted': bool(posted)})
+                        'slack_posted': bool(posted), 'advanced': advanced})
     except Exception as e:
         return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
 

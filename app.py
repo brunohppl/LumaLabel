@@ -12,7 +12,7 @@ from io import BytesIO
 from datetime import datetime, timedelta, timezone
 
 import pdfplumber
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, session, redirect
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm, mm
 from reportlab.lib import colors
@@ -20,6 +20,13 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
 
 app = Flask(__name__)
+
+# Sessions need a signing key. Set SECRET_KEY on Render and keep it — if it
+# changes, every logged-in session is invalidated and everyone has to sign
+# in again. The fallback keeps local development working, and means a
+# missing variable logs people out rather than crashing the app.
+app.secret_key = os.environ.get('SECRET_KEY') or 'luma-dev-only-change-me'
+app.permanent_session_lifetime = timedelta(days=30)
 
 # ── Deliveries (separate department, isolated module) ──
 # Registered defensively: if deliveries.py has an import error or any other
@@ -3263,6 +3270,78 @@ def api_warehouse_eta():
 VAPID_PUBLIC_KEY  = os.environ.get('VAPID_PUBLIC_KEY', '')
 VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
 VAPID_SUBJECT     = os.environ.get('VAPID_SUBJECT', 'mailto:admin@lumadesignco.au')
+
+
+# ─────────────────────── Password gate ───────────────────────
+# One shared password, no accounts — enough to keep the outside world out,
+# and nothing more. It cannot tell you WHO did something; that needs real
+# accounts and the upkeep they bring.
+#
+# Only the pages listed in GATED_PATHS are protected, while this is being
+# tried out. Widening it later means adding to that list, or flipping to
+# protect-everything-except, which is the safer default once it is trusted.
+
+APP_PASSWORD = os.environ.get('APP_PASSWORD', '')
+
+# The page, and the two endpoints that matter behind it. Gating the page
+# alone would leave anyone who knew the URL able to send a notification to
+# every device.
+#
+# /api/push/key and /api/push/subscribe stay open deliberately: the home
+# page toggle calls them, and that has to work for crews who will never
+# see this password.
+GATED_PATHS = ('/push', '/api/push/send', '/api/push/subscriptions')
+
+
+def is_signed_in():
+    return bool(session.get('luma_in'))
+
+
+def gate_required(path):
+    """Whether this path needs a password. Static files and the service
+    worker never do, or an installed app cannot load itself."""
+    if not APP_PASSWORD:
+        return False                      # not configured: behave as before
+    return any(path == p or path.startswith(p + '/') for p in GATED_PATHS)
+
+
+@app.route('/signin', methods=['GET', 'POST'])
+def signin():
+    """One field, one button. Nothing to remember but the password."""
+    nxt = request.values.get('next') or '/push'
+    # Only ever send people back inside this app — an open redirect would
+    # let a crafted link bounce someone to another site after signing in.
+    if not nxt.startswith('/') or nxt.startswith('//'):
+        nxt = '/push'
+
+    error = ''
+    if request.method == 'POST':
+        given = (request.form.get('password') or '').strip()
+        if APP_PASSWORD and given == APP_PASSWORD:
+            session.permanent = True
+            session['luma_in'] = True
+            return redirect(nxt)
+        error = 'That password is not right.'
+
+    html = render_page('signin.html')
+    return html.replace('{{ERROR}}', error).replace('{{NEXT}}', nxt)
+
+
+@app.route('/signout', methods=['GET'])
+def signout():
+    session.pop('luma_in', None)
+    return redirect('/signin')
+
+
+@app.before_request
+def require_password():
+    if gate_required(request.path) and not is_signed_in():
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'error': 'Not signed in'}), 401
+        # safe='' so the slashes are encoded — a bare slash in a query
+        # string is legal but ambiguous, and quote() leaves it alone by
+        # default, which is not what is wanted here.
+        return redirect(f'/signin?next={urllib.parse.quote(request.path, safe="")}')
 
 
 @app.route('/push', methods=['GET'])

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Sign in · LUMA</title>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{--ink:#1A1714;--muted:#9A8F80;--border:#D8CFBF;--warm:#F2EDE4;--cream:#FAF8F4;
+  --accent:#B8935A;--red:#A63D2F;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--ink);color:var(--ink);font-family:'Jost',sans-serif;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.box{background:var(--cream);border-radius:8px;padding:32px 28px;width:100%;max-width:340px;
+  text-align:center;}
+.mark{height:52px;margin-bottom:18px;}
+.title{font-size:0.7rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);
+  margin-bottom:20px;}
+input{width:100%;padding:13px 14px;border:1px solid var(--border);border-radius:4px;
+  font-family:inherit;font-size:1.1rem;text-align:center;letter-spacing:0.3em;
+  background:#fff;color:var(--ink);outline:none;}
+input:focus{border-color:var(--accent);}
+button{width:100%;margin-top:12px;padding:13px;background:var(--accent);color:#fff;
+  border:none;border-radius:4px;font-family:inherit;font-size:0.8rem;font-weight:600;
+  letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;}
+button:hover{opacity:0.92;}
+.err{color:var(--red);font-size:0.8rem;margin-top:12px;min-height:1em;}
+</style>
+</head>
+<body>
+  <form class="box" method="POST" action="/signin">
+    <img class="mark" src="/static/luma-mark-dark.png" alt="LUMA"/>
+    <div class="title">Enter the password</div>
+    <input type="password" name="password" inputmode="numeric" autocomplete="current-password"
+           autofocus required/>
+    <input type="hidden" name="next" value="{{NEXT}}"/>
+    <button type="submit">Sign in</button>
+    <div class="err">{{ERROR}}</div>
+  </form>
+</body>
+</html>

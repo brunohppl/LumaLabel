@@ -366,8 +366,8 @@ def post_slack(text):
         return False
 
 
-def scheduled_lead_for(job_id):
-    """The lead on the crew doing this job's styling today.
+def scheduled_lead_for(job_id, kind='styling'):
+    """The lead on the crew doing this job today.
 
     The lead is a property of the crew, not the tile, so this goes through
     today's styling tile to find which crew is on it. Falls back to any
@@ -383,9 +383,14 @@ def scheduled_lead_for(job_id):
             return ''
         today = brisbane_now().strftime('%Y-%m-%d')
 
+        # Which tiles count as "this crew's work" depends on what we are
+        # asking about: a stylist's day is the styling tile, a driver's is
+        # whichever of the delivery tiles they are on.
+        wanted = ('styling',) if kind == 'styling' else ('install', 'pickup', 'to_load')
+
         def team_of(rows):
             for t in rows:
-                if t.get('type') == 'styling' and t.get('team_id'):
+                if t.get('type') in wanted and t.get('team_id'):
                     return t['team_id']
             return None
 
@@ -437,12 +442,34 @@ def notify_slack_eta(job, role, eta_text):
         # job.truck can be stale or empty. The load tile is the one that says
         # which truck is carrying this job's stock.
         truck_name = scheduled_vehicle_for(job.get('id')) or job.get('truck') or ''
-        who = f'🚛 {truck_name}' if truck_name else '🚛 Truck'
+        # Who is driving, with the truck in brackets — "Jo (Nemo)". The
+        # truck alone said which vehicle was coming but not who, which is
+        # the thing people in the channel actually want to know.
+        lead = (job.get('lead') or '').strip() or scheduled_lead_for(job.get('id'), 'transport')
+        if lead and truck_name:
+            who = f'🚛 {lead} ({truck_name})'
+        elif lead:
+            who = f'🚛 {lead}'
+        elif truck_name:
+            who = f'🚛 {truck_name}'
+        else:
+            who = '🚛 Truck'
     else:
         # Name the person where we know it — "Addy is 20 minutes away" is
         # worth more in a channel than "a stylist is".
         lead = (job.get('lead') or '').strip() or scheduled_lead_for(job.get('id'))
-        who = f'🚗 {lead}' if lead else '🚗 Stylist'
+        # The vehicle in brackets after the name — "Delphine (Marlin)" —
+        # so the channel knows which van to look for. Not done for trucks,
+        # where the name IS the vehicle.
+        van  = (job.get('vehicle') or '').strip()
+        if lead and van:
+            who = f'🚗 {lead} ({van})'
+        elif lead:
+            who = f'🚗 {lead}'
+        elif van:
+            who = f'🚗 Stylist ({van})'
+        else:
+            who = '🚗 Stylist'
 
     # A run back to the warehouse isn't a job, so it shouldn't read as one.
     if (ref or '').strip().lower() == 'warehouse':
@@ -3236,7 +3263,7 @@ def api_warehouse_eta():
         # the wrong icon, and no idea who was coming.
         role = 'stylist' if (data.get('function') or '') == 'styling' else 'truck'
         if role == 'truck' and vehicle and vehicle not in TRANSPORT_VEHICLES:
-            vehicle = ''          # only trucks are named, as in the job ETA
+            vehicle = ''          # only real trucks are named, as in the job ETA
 
         # Same lookup the job ETA uses, so the number means the same thing.
         eta_text, eta_minutes = None, None
@@ -3260,7 +3287,8 @@ def api_warehouse_eta():
             # rather than a second message layout drifting away from it.
             posted = notify_slack_eta(
                 {'job_ref': 'Warehouse', 'address': WAREHOUSE_ADDRESS,
-                 'truck': vehicle, 'lead': lead, 'id': None},
+                 'truck': vehicle, 'lead': lead, 'vehicle': vehicle,
+                 'id': None},
                 role, eta_text)
         return jsonify({'success': True, 'eta_text': eta_text,
                         'slack_posted': bool(posted), 'advanced': advanced})
@@ -4700,6 +4728,8 @@ def api_job_eta(job_id):
     lead = (data.get('lead') or '').strip()
     if lead:
         job = {**job, 'lead': lead}
+    if named:
+        job = {**job, 'vehicle': named}      # shown in brackets for stylists
     slack_posted = notify_slack_eta(job, role, eta_text)
 
     return jsonify({'success': True, 'eta_text': eta_text, 'role': role, 'slack_posted': slack_posted})

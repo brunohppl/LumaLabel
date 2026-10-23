@@ -3230,7 +3230,12 @@ def api_warehouse_eta():
         data = request.get_json(silent=True) or {}
         lat, lng = data.get('lat'), data.get('lng')
         vehicle  = (data.get('vehicle') or '').strip()
-        if vehicle and vehicle not in TRANSPORT_VEHICLES:
+        lead     = (data.get('lead') or '').strip()
+        # A styling crew heading back is not a truck. This was hard-coded
+        # as one, so a stylist in their own car posted a bare "🚛 Truck" —
+        # the wrong icon, and no idea who was coming.
+        role = 'stylist' if (data.get('function') or '') == 'styling' else 'truck'
+        if role == 'truck' and vehicle and vehicle not in TRANSPORT_VEHICLES:
             vehicle = ''          # only trucks are named, as in the job ETA
 
         # Same lookup the job ETA uses, so the number means the same thing.
@@ -3240,7 +3245,7 @@ def api_warehouse_eta():
                                                   with_minutes=True)
 
         record_nav_event(destination='warehouse', vehicle=vehicle or None,
-                         team_id=data.get('team_id'), role='truck',
+                         team_id=data.get('team_id'), role=role,
                          eta_minutes=eta_minutes, lat=lat, lng=lng)
 
         # Heading back to the warehouse means the run is done, so move the
@@ -3255,8 +3260,8 @@ def api_warehouse_eta():
             # rather than a second message layout drifting away from it.
             posted = notify_slack_eta(
                 {'job_ref': 'Warehouse', 'address': WAREHOUSE_ADDRESS,
-                 'truck': vehicle, 'id': None},
-                'truck', eta_text)
+                 'truck': vehicle, 'lead': lead, 'id': None},
+                role, eta_text)
         return jsonify({'success': True, 'eta_text': eta_text,
                         'slack_posted': bool(posted), 'advanced': advanced})
     except Exception as e:

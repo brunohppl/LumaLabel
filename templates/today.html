@@ -566,7 +566,7 @@ function renderDay(){
           ${team.vehicle?`<div class="team-col-sub">Vehicle: ${team.vehicle}</div>`:''}
           ${team.lead?`<div class="team-col-lead">Lead: ${team.lead}</div>`:''}
           ${others?`<div class="team-col-sub">${others}</div>`:''}
-          <button class="wh-nav" onclick="navWarehouse('${team.id}','${(team.vehicle||'').replace(/'/g,'')}')"
+          <button class="wh-nav" onclick="navWarehouse('${team.id}','${(team.vehicle||'').replace(/'/g,'')}','${team.function||''}','${(team.lead||'').replace(/'/g,'')}')"
                   title="Directions back to the warehouse">🏭 Navigate to warehouse</button>
         </div>
         <div class="team-col-cards">
@@ -749,15 +749,17 @@ function navigate(jobId, addr, teamFunction, vehicle, lead){
 }
 // The warehouse run uses the same prompt as a job — notify Slack or just
 // navigate — so there is one habit to learn, not two.
-function navWarehouse(teamId, vehicle){
-  _pendingNav={warehouse:true, teamId, vehicle,
-               addr:WAREHOUSE_ADDR||'63 Westgate St, Wacol QLD 4076', role:'truck'};
+function navWarehouse(teamId, vehicle, teamFunction, lead){
+  _pendingNav={warehouse:true, teamId, vehicle, lead:lead||'',
+               fn:teamFunction||'',
+               addr:WAREHOUSE_ADDR||'63 Westgate St, Wacol QLD 4076',
+               role:(teamFunction==='styling'?'stylist':'truck')};
   document.getElementById('slack-overlay').classList.add('open');
 }
 
 function slackChoice(choice){
   document.getElementById('slack-overlay').classList.remove('open');
-  const{jobId,addr,role,warehouse,teamId,vehicle,lead}=_pendingNav||{};
+  const{jobId,addr,role,warehouse,teamId,vehicle,lead,fn}=_pendingNav||{};
   _pendingNav=null;
   if(choice==='cancel') return;
   const mapsUrl=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr||'')}`;
@@ -767,7 +769,8 @@ function slackChoice(choice){
   navigator.geolocation.getCurrentPosition(
     pos=>{
       const body=warehouse
-        ? {lat:pos.coords.latitude,lng:pos.coords.longitude,team_id:teamId,vehicle:vehicle||''}
+        ? {lat:pos.coords.latitude,lng:pos.coords.longitude,team_id:teamId,
+           vehicle:vehicle||'', lead:lead||'', function:fn||''}
         : {lat:pos.coords.latitude,lng:pos.coords.longitude,role:role||'truck',
            vehicle:vehicle||'', lead:lead||''};
       fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},

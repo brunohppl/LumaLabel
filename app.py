@@ -1,5 +1,6 @@
 import os
 import time
+import hmac
 from concurrent.futures import ThreadPoolExecutor
 import re
 import base64
@@ -3283,14 +3284,32 @@ VAPID_SUBJECT     = os.environ.get('VAPID_SUBJECT', 'mailto:admin@lumadesignco.a
 
 APP_PASSWORD = os.environ.get('APP_PASSWORD', '')
 
-# The page, and the two endpoints that matter behind it. Gating the page
-# alone would leave anyone who knew the URL able to send a notification to
-# every device.
+# Everything is protected EXCEPT these. That way round on purpose: a page
+# added next month is covered without anyone remembering to list it, where
+# the opposite default leaks by omission.
 #
-# /api/push/key and /api/push/subscribe stay open deliberately: the home
-# page toggle calls them, and that has to work for crews who will never
-# see this password.
-GATED_PATHS = ('/push', '/api/push/send', '/api/push/subscriptions')
+# Each exception earns its place:
+#   /static, /sw.js  the BROWSER fetches these, often before any session
+#                    exists — and the service worker is fetched with no
+#                    page open at all. Redirect them and the sign-in page
+#                    loses its own logo and the app stops installing.
+#                    Nothing in there is data: icons, a stylesheet, and
+#                    render code with no jobs or keys in it.
+#   /health          whatever pings the service has no session.
+#   /signin          plainly.
+#   /api/push/key,
+#   /api/push/subscribe
+#                    the home page toggle calls these, and notifications
+#                    should work for crews before they ever sign in.
+OPEN_PATHS = ('/signin', '/signout', '/health', '/sw.js', '/static',
+              '/api/push/key', '/api/push/subscribe', '/favicon.ico')
+
+# Guessing is the real risk, not the length of the password — so wrong
+# attempts are slowed down. Kept in memory: a restart clears it, which is
+# acceptable for locking out a script and avoids a table for the purpose.
+SIGNIN_MAX_TRIES   = 5
+SIGNIN_LOCK_MIN    = 10
+_signin_failures   = {}
 
 
 def is_signed_in():
@@ -3298,30 +3317,66 @@ def is_signed_in():
 
 
 def gate_required(path):
-    """Whether this path needs a password. Static files and the service
-    worker never do, or an installed app cannot load itself."""
+    """Whether this path needs a password."""
     if not APP_PASSWORD:
         return False                      # not configured: behave as before
-    return any(path == p or path.startswith(p + '/') for p in GATED_PATHS)
+    return not any(path == p or path.startswith(p + '/') for p in OPEN_PATHS)
+
+
+def signin_blocked(who):
+    """Minutes left on a lockout, or 0."""
+    rec = _signin_failures.get(who)
+    if not rec:
+        return 0
+    tries, until = rec
+    if tries < SIGNIN_MAX_TRIES:
+        return 0
+    left = (until - time.time()) / 60
+    if left <= 0:
+        _signin_failures.pop(who, None)
+        return 0
+    return max(1, int(left + 0.5))
+
+
+def note_signin_failure(who):
+    tries, _ = _signin_failures.get(who, (0, 0))
+    tries += 1
+    _signin_failures[who] = (tries, time.time() + SIGNIN_LOCK_MIN * 60)
+    # Don't let the dict grow without bound on a long-running server.
+    if len(_signin_failures) > 500:
+        now = time.time()
+        for k, (_, until) in list(_signin_failures.items()):
+            if until < now:
+                _signin_failures.pop(k, None)
 
 
 @app.route('/signin', methods=['GET', 'POST'])
 def signin():
     """One field, one button. Nothing to remember but the password."""
-    nxt = request.values.get('next') or '/push'
+    nxt = request.values.get('next') or '/'
     # Only ever send people back inside this app — an open redirect would
     # let a crafted link bounce someone to another site after signing in.
     if not nxt.startswith('/') or nxt.startswith('//'):
-        nxt = '/push'
+        nxt = '/'
+
+    who = request.headers.get('X-Forwarded-For', request.remote_addr or '?').split(',')[0].strip()
 
     error = ''
     if request.method == 'POST':
-        given = (request.form.get('password') or '').strip()
-        if APP_PASSWORD and given == APP_PASSWORD:
-            session.permanent = True
-            session['luma_in'] = True
-            return redirect(nxt)
-        error = 'That password is not right.'
+        locked = signin_blocked(who)
+        if locked:
+            error = f'Too many attempts. Try again in {locked} minute{"s" if locked > 1 else ""}.'
+        else:
+            given = (request.form.get('password') or '').strip()
+            # Compared in constant time so the answer cannot be teased out
+            # a character at a time by timing the response.
+            if APP_PASSWORD and hmac.compare_digest(given, APP_PASSWORD):
+                _signin_failures.pop(who, None)
+                session.permanent = True
+                session['luma_in'] = True
+                return redirect(nxt)
+            note_signin_failure(who)
+            error = 'That password is not right.'
 
     html = render_page('signin.html')
     return html.replace('{{ERROR}}', error).replace('{{NEXT}}', nxt)

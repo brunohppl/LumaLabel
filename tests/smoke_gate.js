@@ -17,8 +17,12 @@ const app=fs.readFileSync('/mnt/user-data/outputs/app.py','utf8');
 ok('the password comes from the environment', /os\.environ\.get\('APP_PASSWORD'/.test(app));
 ok('and is not written in the code', !/APP_PASSWORD[^)]*2118/.test(app));
 ok('sessions last 30 days', /permanent_session_lifetime\s*=\s*timedelta\(days=30\)/.test(app));
-ok('only the push page and its two endpoints are gated',
-   /GATED_PATHS = \('\/push', '\/api\/push\/send', '\/api\/push\/subscriptions'\)/.test(app));
+ok('everything is protected except a named few',
+   /OPEN_PATHS = /.test(app) && /return not any\(path == p/.test(app));
+ok('the browser can still fetch its own files', /'\/static'/.test(app) && /'\/sw\.js'/.test(app));
+ok('and the health check', /'\/health'/.test(app));
+ok('wrong attempts are limited', /SIGNIN_MAX_TRIES/.test(app) && /SIGNIN_LOCK_MIN/.test(app));
+ok('and compared in constant time', /compare_digest/.test(app));
 ok('with no password set, nothing is gated', /if not APP_PASSWORD:\s*\n\s*return False/.test(app));
 
 console.log(`\n${pass} passed, ${fail} failed`);

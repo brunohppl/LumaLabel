@@ -2663,6 +2663,36 @@ def brisbane_now():
     return datetime.now(BRISBANE)
 
 
+def parse_ts(ts):
+    """A Supabase timestamp as a datetime, or None.
+
+    Postgres returns an offset and sometimes microseconds to more places
+    than fromisoformat accepts on older Pythons, and a trailing Z it does
+    not accept at all — so both are normalised rather than assumed away.
+    """
+    if not ts:
+        return None
+    s = str(ts).strip().replace('Z', '+00:00')
+    # Trim fractional seconds to six digits
+    m = re.match(r'^(.*\.\d{1,6})\d*(.*)$', s)
+    if m:
+        s = m.group(1) + m.group(2)
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def to_brisbane(ts):
+    """A stored timestamp in Brisbane time. Render runs on UTC, so without
+    this every evening tap would be filed under the following day."""
+    dt = parse_ts(ts)
+    return dt.astimezone(BRISBANE) if dt else None
+
+
 # Where a job has got to, as a ladder. Everything on the readiness board
 # compares where a job IS against where its day requires it to BE.
 STATUS_RANK = {
@@ -3239,6 +3269,181 @@ VAPID_SUBJECT     = os.environ.get('VAPID_SUBJECT', 'mailto:admin@lumadesignco.a
 def push_page():
     """Write and send a notification. Deliberately unlinked."""
     return render_page('push.html')
+
+
+# ─────────────────────── Trip timings ───────────────────────
+# Everything here is derived from nav_events, which records a tap of
+# Navigate. A tap means "setting off", never "arrived" — so the gap
+# between two taps covers the drive AND the time on site. Subtracting
+# the predicted drive leaves an estimate of time on site: an estimate
+# sitting on an estimate, useful for comparing, not for billing.
+
+TIMING_MIN_GAP = 5      # under this is someone tapping twice in a row
+TIMING_MAX_GAP = 240    # over this is a tap that never happened
+TIMING_THIN    = 10     # fewer legs than this and a figure means little
+
+
+@app.route('/timings', methods=['GET'])
+def timings_page():
+    """Trip and on-site timings. Deliberately unlinked."""
+    return render_page('timings.html')
+
+
+@app.route('/api/timings', methods=['GET'])
+def api_timings():
+    """Tap-to-tap timings, grouped every way worth looking at."""
+    try:
+        days = max(1, min(365, int(request.args.get('days') or 30)))
+    except ValueError:
+        days = 30
+
+    try:
+        from datetime import timedelta as _td
+        since = (brisbane_now() - _td(days=days)).strftime('%Y-%m-%d')
+        events = sb_get('nav_events',
+                        f'created_at=gte.{since}&order=created_at.asc') or []
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'{type(e).__name__}: {e}'}), 500
+
+    if not events:
+        return jsonify({'success': True, 'days': days, 'taps': 0,
+                        'legs': [], 'by_type': [], 'by_vehicle': [],
+                        'by_both': [], 'quality': {}, 'recent': []})
+
+    # What each job was that day — install or pickup. The event only knows
+    # it went to "a job"; the kind of work lives on the schedule tile.
+    job_ids = sorted({e['job_id'] for e in events if e.get('job_id')})
+    tile_type = {}
+    refs = {}
+    try:
+        for chunk in range(0, len(job_ids), 100):
+            ids = ','.join(job_ids[chunk:chunk + 100])
+            if not ids:
+                continue
+            for t in (sb_get('job_schedule',
+                             f'job_id=in.({ids})&select=job_id,date,type') or []):
+                if t.get('type') in ('install', 'pickup'):
+                    tile_type.setdefault((t['job_id'], t.get('date')), t['type'])
+            for j in (sb_get('jobs', f'id=in.({ids})&select=id,job_ref,address') or []):
+                refs[j['id']] = j
+    except Exception as e:
+        print(f'[TIMINGS] could not read the schedule: {e}')
+
+    def bne_day(ts):
+        try:
+            return to_brisbane(ts).strftime('%Y-%m-%d')
+        except Exception:
+            return (ts or '')[:10]
+
+    def bne_time(ts):
+        try:
+            return to_brisbane(ts).strftime('%H:%M')
+        except Exception:
+            return ''
+
+    # Order each vehicle's day, then measure the gap to its next tap.
+    runs = {}
+    for e in events:
+        v = (e.get('vehicle') or '').strip()
+        if not v:
+            continue
+        runs.setdefault((v, bne_day(e['created_at'])), []).append(e)
+
+    legs, short, long_, open_ = [], 0, 0, 0
+    for (vehicle, day), rows in runs.items():
+        rows.sort(key=lambda r: r['created_at'])
+        for i, row in enumerate(rows):
+            if i + 1 >= len(rows):
+                open_ += 1                      # the last tap of a day
+                continue
+            nxt = rows[i + 1]
+            try:
+                gap = (parse_ts(nxt['created_at']) - parse_ts(row['created_at'])).total_seconds() / 60
+            except Exception:
+                continue
+            if gap < TIMING_MIN_GAP:
+                short += 1
+                continue
+            if gap > TIMING_MAX_GAP:
+                long_ += 1
+                continue
+
+            doing = (tile_type.get((row.get('job_id'), day))
+                     or ('warehouse' if row.get('destination') == 'warehouse' else 'job'))
+            drive = row.get('eta_minutes')
+            job = refs.get(row.get('job_id')) or {}
+            legs.append({
+                'vehicle':  vehicle,
+                'day':      day,
+                'set_off':  bne_time(row['created_at']),
+                'doing':    doing,
+                'job_ref':  job.get('job_ref'),
+                'address':  (job.get('address') or '').split(',')[0],
+                'gap':      round(gap),
+                'drive':    drive,
+                'on_site':  round(gap - drive) if drive is not None else None,
+            })
+
+    def summarise(key):
+        groups = {}
+        for leg in legs:
+            groups.setdefault(key(leg), []).append(leg)
+        out = []
+        for name, rows in groups.items():
+            gaps = [r['gap'] for r in rows]
+            sites = [r['on_site'] for r in rows if r['on_site'] is not None]
+            drives = [r['drive'] for r in rows if r['drive'] is not None]
+            out.append({
+                'name':     name,
+                'legs':     len(rows),
+                'avg_gap':  round(sum(gaps) / len(gaps)) if gaps else None,
+                'avg_site': round(sum(sites) / len(sites)) if sites else None,
+                'avg_drive': round(sum(drives) / len(drives)) if drives else None,
+                'fastest':  min(gaps) if gaps else None,
+                'slowest':  max(gaps) if gaps else None,
+                'thin':     len(rows) < TIMING_THIN,
+            })
+        return sorted(out, key=lambda r: -r['legs'])
+
+    # The run home is almost always the last tap of the day, so it never
+    # has a following tap and never becomes a "leg". Its predicted drive
+    # is recorded though, and that is the number worth having: how long
+    # the trip back takes, per vehicle.
+    home = {}
+    for e in events:
+        if e.get('destination') != 'warehouse' or e.get('eta_minutes') is None:
+            continue
+        v = (e.get('vehicle') or '').strip() or 'Unknown'
+        home.setdefault(v, []).append(e['eta_minutes'])
+    runs_home = sorted(
+        [{'name': v, 'legs': len(mins),
+          'avg_drive': round(sum(mins) / len(mins)),
+          'fastest': min(mins), 'slowest': max(mins),
+          'thin': len(mins) < TIMING_THIN}
+         for v, mins in home.items()],
+        key=lambda r: -r['legs'])
+
+    quality = {
+        'taps':        len(events),
+        'legs':        len(legs),
+        'double_taps': short,
+        'missed':      long_,
+        'open':        open_,
+        'days':        len({d for _, d in runs}),
+        'vehicles':    len({v for v, _ in runs}),
+        'warehouse_taps': sum(1 for e in events if e.get('destination') == 'warehouse'),
+    }
+
+    return jsonify({
+        'success':    True,
+        'days':       days,
+        'quality':    quality,
+        'by_type':    summarise(lambda l: l['doing']),
+        'by_vehicle': summarise(lambda l: l['vehicle']),
+        'by_both':    summarise(lambda l: f"{l['vehicle']} · {l['doing']}"),
+        'runs_home':  runs_home,
+        'recent':     sorted(legs, key=lambda l: (l['day'], l['set_off']), reverse=True)[:40],
+    })
 
 
 @app.route('/api/push/key', methods=['GET'])

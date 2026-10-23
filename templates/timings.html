@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Timings · LUMA</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{--ink:#1A1714;--muted:#9A8F80;--border:#D8CFBF;--warm:#F2EDE4;--cream:#FAF8F4;
+  --accent:#B8935A;--green:#4A7C59;--red:#A63D2F;--blue:#2E5A8A;--sand:#EDE7DC;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--warm);color:var(--ink);font-family:'Jost',sans-serif;}
+
+.hero{background:var(--ink);padding:20px;text-align:center;}
+.logo-mark{height:36px;}
+.hero-sub{font-size:0.66rem;letter-spacing:0.2em;text-transform:uppercase;
+  color:rgba(250,248,244,0.5);margin-top:8px;}
+
+.page{max-width:980px;margin:0 auto;padding:20px 16px 60px;}
+
+.bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+.range{display:flex;gap:6px;}
+.rbtn{padding:6px 14px;background:transparent;border:1px solid var(--border);
+  border-radius:20px;font-family:inherit;font-size:0.72rem;color:var(--muted);cursor:pointer;}
+.rbtn.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+.updated{font-size:0.7rem;color:var(--muted);margin-left:auto;}
+
+/* The honesty panel. If this reads badly, nothing below it is worth
+   much — so it sits above everything, not tucked underneath. */
+.quality{background:#fff;border:1px solid var(--border);border-left:3px solid var(--accent);
+  border-radius:4px;padding:12px 14px;margin-bottom:18px;}
+.q-line{font-size:0.82rem;line-height:1.7;}
+.q-warn{color:var(--red);font-size:0.78rem;margin-top:6px;line-height:1.6;}
+.q-note{color:var(--muted);font-size:0.74rem;margin-top:6px;line-height:1.6;}
+
+.sec-title{font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--muted);margin:22px 0 8px;}
+table{width:100%;border-collapse:collapse;background:#fff;
+  border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+th{font-size:0.64rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);
+  text-align:right;padding:9px 10px;background:var(--sand);font-weight:600;}
+th:first-child{text-align:left;}
+td{padding:9px 10px;font-size:0.84rem;text-align:right;border-top:1px solid var(--sand);}
+td:first-child{text-align:left;font-weight:500;}
+tr.thin td{color:var(--muted);}
+.thin-tag{font-size:0.62rem;letter-spacing:0.06em;text-transform:uppercase;
+  color:var(--accent);margin-left:6px;}
+.dash{color:var(--border);}
+.empty{padding:26px 10px;text-align:center;color:var(--muted);font-size:0.84rem;}
+.foot{font-size:0.74rem;color:var(--muted);line-height:1.7;margin-top:22px;
+  padding-top:14px;border-top:1px solid var(--border);}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <img class="logo-mark" src="/static/luma-mark-light.png" alt="LUMA"/>
+  <div class="hero-sub">Trip &amp; on-site timings</div>
+</div>
+
+<div class="page">
+
+  <div class="bar">
+    <div class="range" id="range">
+      <button class="rbtn" data-days="7">7 days</button>
+      <button class="rbtn on" data-days="30">30 days</button>
+      <button class="rbtn" data-days="90">90 days</button>
+      <button class="rbtn" data-days="365">All</button>
+    </div>
+    <span class="updated" id="updated"></span>
+  </div>
+
+  <div class="quality" id="quality"><div class="q-line">Loading…</div></div>
+
+  <div id="body"></div>
+
+  <div class="foot">
+    A tap of Navigate means <strong>setting off</strong>, never arriving. So each
+    gap below covers the drive <em>and</em> the time on site, and the on-site
+    figure is what remains after subtracting the drive Google predicted at the
+    moment of the tap — an estimate resting on an estimate. Worth comparing;
+    not worth billing anyone on.
+  </div>
+
+</div>
+
+<script>
+let DAYS=30, TIMER=null;
+
+function fmtMin(n){
+  if(n===null||n===undefined) return '<span class="dash">—</span>';
+  if(n<60) return n+'m';
+  const h=Math.floor(n/60), m=n%60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,c=>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+const LABEL={install:'Installs', pickup:'Pickups', warehouse:'Back to warehouse', job:'Jobs (type unknown)'};
+
+function table(rows, firstCol){
+  if(!rows.length) return '<div class="empty">Nothing in this period.</div>';
+  return `<table>
+    <tr>
+      <th>${firstCol}</th><th>Legs</th><th>Tap to tap</th>
+      <th>Drive</th><th>On site</th><th>Fastest</th><th>Slowest</th>
+    </tr>
+    ${rows.map(r=>`<tr class="${r.thin?'thin':''}">
+      <td>${esc(LABEL[r.name]||r.name)}${r.thin?'<span class="thin-tag">thin</span>':''}</td>
+      <td>${r.legs}</td>
+      <td>${fmtMin(r.avg_gap)}</td>
+      <td>${fmtMin(r.avg_drive)}</td>
+      <td>${fmtMin(r.avg_site)}</td>
+      <td>${fmtMin(r.fastest)}</td>
+      <td>${fmtMin(r.slowest)}</td>
+    </tr>`).join('')}
+  </table>`;
+}
+
+function qualityHTML(q, days){
+  if(!q || !q.taps){
+    return `<div class="q-line">No taps recorded in the last ${days} days.</div>
+      <div class="q-note">Nothing is wrong — this fills in as crews use Navigate.</div>`;
+  }
+  const discarded=(q.double_taps||0)+(q.missed||0);
+  const usable=q.legs||0;
+  const pct = (usable+discarded) ? Math.round(discarded/(usable+discarded)*100) : 0;
+
+  let warn='';
+  if(usable < 20){
+    warn=`<div class="q-warn">Too few legs to draw conclusions from. Treat everything
+      below as a first look, not a measurement.</div>`;
+  }else if(pct > 30){
+    warn=`<div class="q-warn">${pct}% of legs were discarded as double-taps or missed
+      taps. The averages below are built on what is left, so they are shakier than
+      they look — the fix is consistent tapping, not better maths.</div>`;
+  }
+  const whNote = q.warehouse_taps
+    ? ''
+    : `<div class="q-note">No one has used “Navigate to warehouse” yet, so there is
+       no end-of-run leg to measure.</div>`;
+
+  return `<div class="q-line">
+      <strong>${q.taps}</strong> taps over <strong>${q.days}</strong> day${q.days===1?'':'s'}
+      · <strong>${q.vehicles}</strong> vehicle${q.vehicles===1?'':'s'}
+      · <strong>${usable}</strong> usable leg${usable===1?'':'s'}
+    </div>
+    <div class="q-note">
+      ${q.double_taps} discarded as double taps · ${q.missed} as missed taps ·
+      ${q.open} were the last tap of a day, so have no gap.
+    </div>${warn}${whNote}`;
+}
+
+async function load(){
+  try{
+    const res=await fetch(`/api/timings?days=${DAYS}`);
+    const d=await res.json();
+    if(d.success===false) throw new Error(d.error);
+
+    document.getElementById('quality').innerHTML=qualityHTML(d.quality, d.days);
+
+    let html='';
+    html+=`<div class="sec-title">By what they were doing</div>${table(d.by_type,'Doing')}`;
+    html+=`<div class="sec-title">By vehicle</div>${table(d.by_vehicle,'Vehicle')}`;
+    html+=`<div class="sec-title">Vehicle and job type</div>${table(d.by_both,'Vehicle · doing')}`;
+
+    // The run home has no following tap, so it is measured from the
+    // predicted drive rather than a gap — a different thing, shown apart.
+    if(d.runs_home && d.runs_home.length){
+      html+=`<div class="sec-title">The run back to the warehouse</div>
+      <table>
+        <tr><th>Vehicle</th><th>Runs</th><th>Avg drive</th><th>Fastest</th><th>Slowest</th></tr>
+        ${d.runs_home.map(r=>`<tr class="${r.thin?'thin':''}">
+          <td>${esc(r.name)}${r.thin?'<span class="thin-tag">thin</span>':''}</td>
+          <td>${r.legs}</td><td>${fmtMin(r.avg_drive)}</td>
+          <td>${fmtMin(r.fastest)}</td><td>${fmtMin(r.slowest)}</td>
+        </tr>`).join('')}
+      </table>
+      <div class="q-note">Predicted drive at the moment of setting off — this leg
+      has no following tap to measure against.</div>`;
+    }
+
+    if(d.recent && d.recent.length){
+      html+=`<div class="sec-title">The legs themselves — newest first</div>
+      <table>
+        <tr><th>Day</th><th>Set off</th><th>Vehicle</th><th>Doing</th><th>Job</th>
+            <th>Tap to tap</th><th>Drive</th><th>On site</th></tr>
+        ${d.recent.map(l=>`<tr>
+          <td>${esc(l.day)}</td>
+          <td>${esc(l.set_off)}</td>
+          <td>${esc(l.vehicle)}</td>
+          <td>${esc(LABEL[l.doing]||l.doing)}</td>
+          <td>${esc(l.job_ref||'')}${l.address?' · '+esc(l.address):''}</td>
+          <td>${fmtMin(l.gap)}</td>
+          <td>${fmtMin(l.drive)}</td>
+          <td>${fmtMin(l.on_site)}</td>
+        </tr>`).join('')}
+      </table>`;
+    }
+    document.getElementById('body').innerHTML=html;
+    document.getElementById('updated').textContent=
+      'Updated '+new Date().toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'});
+  }catch(e){
+    document.getElementById('quality').innerHTML=
+      `<div class="q-warn">Could not load — ${esc(e.message)}</div>`;
+  }
+}
+
+document.getElementById('range').addEventListener('click', ev=>{
+  const btn=ev.target.closest('.rbtn');
+  if(!btn) return;
+  [...document.querySelectorAll('.rbtn')].forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  DAYS=Number(btn.dataset.days);
+  load();
+});
+
+// Refreshed every five minutes — taps arrive a few times a day, so
+// anything quicker would be work for nothing. Paused while the tab is
+// hidden, so a page left open all week isn't polling into the void.
+function schedule(){
+  clearInterval(TIMER);
+  TIMER=setInterval(()=>{ if(!document.hidden) load(); }, 5*60*1000);
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) load(); });
+
+load();
+schedule();
+</script>
+</body>
+</html>
